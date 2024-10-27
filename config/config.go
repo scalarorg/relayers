@@ -23,19 +23,6 @@ type RabbitMQConfig struct {
 	StopHeight  *int64 `mapstructure:"stop_height"`
 }
 
-type AxelarConfig struct {
-	ChainID  string `mapstructure:"chainId"`
-	Denom    string `mapstructure:"denom"`
-	GasPrice string `mapstructure:"gasPrice"`
-	RPCUrl   string `mapstructure:"rpcUrl"`
-	LCDUrl   string `mapstructure:"lcdUrl"`
-	WS       string `mapstructure:"ws"`
-}
-
-type DatabaseConfig struct {
-	URL string `mapstructure:"url"`
-}
-
 type EvmNetworkConfig struct {
 	ChainID    string `mapstructure:"chain_id"`
 	ID         string `mapstructure:"id"`
@@ -47,13 +34,13 @@ type EvmNetworkConfig struct {
 }
 
 type CosmosNetworkConfig struct {
-	ChainID  string `mapstructure:"chain_id"`
-	RPCUrl   string `mapstructure:"rpc_url"`
-	LCDUrl   string `mapstructure:"lcd_url"`
-	WS       string `mapstructure:"ws"`
-	Denom    string `mapstructure:"denom"`
-	Mnemonic string `mapstructure:"mnemonic"`
-	GasPrice string `mapstructure:"gas_price"`
+	ChainID  string  `mapstructure:"chain_id"`
+	RPCUrl   string  `mapstructure:"rpc_url"`
+	LCDUrl   string  `mapstructure:"lcd_url"`
+	WS       string  `mapstructure:"ws"`
+	Denom    string  `mapstructure:"denom"`
+	Mnemonic *string `mapstructure:"mnemonic"`
+	GasPrice string  `mapstructure:"gas_price"`
 }
 
 type BtcNetworkConfig struct {
@@ -89,11 +76,10 @@ type RuntimeEvmNetworkConfig struct {
 
 type Config struct {
 	RabbitMQ      RabbitMQConfig      `mapstructure:"rabbitmq"`
-	Axelar        AxelarConfig        `mapstructure:"axelar"`
-	Database      DatabaseConfig      `mapstructure:"database"`
+	Axelar        CosmosNetworkConfig `mapstructure:"axelar"`
 	EvmNetworks   []EvmNetworkConfig  `mapstructure:"evm_networks"`
 	CosmosNetwork CosmosNetworkConfig `mapstructure:"cosmos_network"`
-	BtcNetwork    BtcNetworkConfig    `mapstructure:"btc_network"`
+	BtcNetworks   []BtcNetworkConfig  `mapstructure:"btc_networks"`
 }
 
 var GlobalConfig *Config
@@ -113,34 +99,86 @@ func LoadEnv() error {
 func Load() error {
 	var cfg Config
 
-	// --- Read RabbitMQ config from JSON file
-	viper.SetConfigFile("data/example-env/rabbitmq.json")
+	chainEnv := viper.GetString("CHAIN_ENV")
+	dir := fmt.Sprintf("data/%s", chainEnv)
+
+	switch chainEnv {
+	case "local":
+		fmt.Println("[getConfig] Using local configuration")
+	case "devnet":
+		fmt.Println("[getConfig] Using devnet configuration")
+	case "testnet":
+		fmt.Println("[getConfig] Using testnet configuration")
+	default:
+		return fmt.Errorf("[getConfig] Invalid CHAIN_ENV: %s", chainEnv)
+	}
+
+	// Read Axelar config from JSON file
+	viper.SetConfigFile(fmt.Sprintf("%s/axelar.json", dir))
 	viper.SetConfigType("json")
 
-	if err := viper.MergeInConfig(); err != nil {
-		return err
+	if err := viper.ReadInConfig(); err != nil {
+		return fmt.Errorf("error reading Axelar config: %w", err)
 	}
 
-	// Unmarshal RabbitMQ config
-	if err := viper.UnmarshalKey("rabbitmq", &cfg.RabbitMQ); err != nil {
-		return err
-	}
-
-	// --- Read Axelar config from JSON file
-	viper.SetConfigFile("data/example-env/axelar.json")
-	viper.SetConfigType("json")
-
-	if err := viper.MergeInConfig(); err != nil {
-		return err
-	}
-
-	// Unmarshal Axelar config
 	if err := viper.UnmarshalKey("axelar", &cfg.Axelar); err != nil {
-		return err
+		return fmt.Errorf("error unmarshaling Axelar config: %w", err)
 	}
 
-	// Load EVM Network configs
-	viper.SetConfigFile("data/example-env/evm.json")
+	axelarMnemonic := viper.GetString("AXELAR_MNEMONIC")
+	cfg.Axelar.Mnemonic = &axelarMnemonic
+
+	// Read BTC broadcast config
+	viper.SetConfigFile(fmt.Sprintf("%s/btc.json", dir))
+	viper.SetConfigType("json")
+
+	if err := viper.ReadInConfig(); err != nil {
+		return fmt.Errorf("error reading BTC broadcast config: %w", err)
+	}
+
+	var btcBroadcastConfig []BtcNetworkConfig
+	if err := viper.Unmarshal(&btcBroadcastConfig); err != nil {
+		return fmt.Errorf("error unmarshaling BTC broadcast config: %w", err)
+	}
+
+	// Read BTC signer config
+	viper.SetConfigFile(fmt.Sprintf("%s/btc-signer.json", dir))
+	viper.SetConfigType("json")
+
+	if err := viper.ReadInConfig(); err != nil {
+		return fmt.Errorf("error reading BTC signer config: %w", err)
+	}
+
+	var btcSignerConfig []BtcNetworkConfig
+	if err := viper.Unmarshal(&btcSignerConfig); err != nil {
+		return fmt.Errorf("error unmarshaling BTC signer config: %w", err)
+	}
+
+	// Combine BTC configs
+	cfg.BtcNetworks = append(btcBroadcastConfig, btcSignerConfig...)
+
+	for i := range cfg.BtcNetworks {
+		privateKey := viper.GetString("BTC_PRIVATE_KEY")
+		cfg.BtcNetworks[i].PrivateKey = &privateKey
+	}
+
+	// Read Cosmos network config from JSON file
+	viper.SetConfigFile(fmt.Sprintf("%s/cosmos.json", dir))
+	viper.SetConfigType("json")
+
+	if err := viper.ReadInConfig(); err != nil {
+		return fmt.Errorf("error reading Cosmos config: %w", err)
+	}
+
+	if err := viper.UnmarshalKey("cosmos_network", &cfg.CosmosNetwork); err != nil {
+		return fmt.Errorf("error unmarshaling Cosmos network config: %w", err)
+	}
+
+	cosmosMnemonic := viper.GetString("AXELAR_MNEMONIC")
+	cfg.CosmosNetwork.Mnemonic = &cosmosMnemonic
+
+	// Read EVM Network configs
+	viper.SetConfigFile(fmt.Sprintf("%s/evm.json", dir))
 	viper.SetConfigType("json")
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -154,7 +192,7 @@ func Load() error {
 
 	// Get EVM private keys and assign them to the corresponding networks
 	for i, evmNetwork := range evmNetworks {
-		privateKey, err := cfg.GetEvmPrivateKey(evmNetwork.ID)
+		privateKey, err := GetEvmPrivateKey(evmNetwork.ID)
 		if err != nil {
 			return fmt.Errorf("failed to get EVM private key for network %s: %w", evmNetwork.ID, err)
 		}
@@ -163,27 +201,23 @@ func Load() error {
 
 	cfg.EvmNetworks = evmNetworks
 
-	// --- Read Cosmos network config from JSON file
-	viper.SetConfigFile("data/example-env/cosmos.json")
+	// Read RabbitMQ config from JSON file
+	viper.SetConfigFile(fmt.Sprintf("%s/rabbitmq.json", dir))
 	viper.SetConfigType("json")
 
-	if err := viper.MergeInConfig(); err != nil {
-		return err
+	if err := viper.ReadInConfig(); err != nil {
+		return fmt.Errorf("error reading RabbitMQ config: %w", err)
 	}
 
-	// Unmarshal Cosmos network config
-	if err := viper.UnmarshalKey("cosmos_network", &cfg.CosmosNetwork); err != nil {
-		return err
+	if err := viper.UnmarshalKey("rabbitmq", &cfg.RabbitMQ); err != nil {
+		return fmt.Errorf("error unmarshaling RabbitMQ config: %w", err)
 	}
-
-	// Load database URL from environment variable (already set by LoadEnv)
-	cfg.Database.URL = viper.GetString("DATABASE_URL")
 
 	GlobalConfig = &cfg
 	return nil
 }
 
-func (c *Config) GetEvmPrivateKey(networkID string) (string, error) {
+func GetEvmPrivateKey(networkID string) (string, error) {
 	configChainsPath := viper.GetString("CONFIG_CHAINS")
 	configFile := fmt.Sprintf("%s/%s/config.json", configChainsPath, networkID)
 

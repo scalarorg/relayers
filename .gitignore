@@ -25,3 +25,7 @@ go.work.sum
 .env
 
 runtime
+
+data/local
+data/devnet
+data/testnet

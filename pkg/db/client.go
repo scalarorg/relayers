@@ -6,18 +6,14 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/types"
+	"github.com/spf13/viper"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-type Client struct {
-	db *gorm.DB
-}
-
-var DatabaseClient *Client
+var DatabaseClient *gorm.DB
 
 func InitDatabaseClient() error {
 	var err error
@@ -28,8 +24,8 @@ func InitDatabaseClient() error {
 	return nil
 }
 
-func NewDatabaseClient() (*Client, error) {
-	db, err := gorm.Open(postgres.Open(config.GlobalConfig.Database.URL), &gorm.Config{})
+func NewDatabaseClient() (*gorm.DB, error) {
+	db, err := gorm.Open(postgres.Open(viper.GetString("DATABASE_URL")), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -47,12 +43,10 @@ func NewDatabaseClient() (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{
-		db: db,
-	}, nil
+	return db, nil
 }
 
-func (c *Client) CreateBtcCallContractEvent(event *types.BtcEventTransaction) error {
+func CreateBtcCallContractEvent(event *types.BtcEventTransaction) error {
 	id := fmt.Sprintf("%s-%d", strings.ToLower(event.TxHash), event.LogIndex)
 
 	// Convert VaultTxHex and Payload to byte slices
@@ -95,7 +89,7 @@ func (c *Client) CreateBtcCallContractEvent(event *types.BtcEventTransaction) er
 		Str("id", id).
 		Msg("[DatabaseClient] Creating BtcCallContract")
 
-	result := c.db.Create(&relayData)
+	result := DatabaseClient.Create(&relayData)
 	return result.Error
 }
 
