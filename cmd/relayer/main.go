@@ -19,6 +19,7 @@ func main() {
 		panic("Failed to load environment variables: " + err.Error())
 	}
 
+	// Initialize OpenObserve
 	appName := viper.GetString("APP_NAME")
 	if viper.GetBool("IS_DEV") {
 		appName = appName + "-dev"
@@ -30,6 +31,7 @@ func main() {
 		Env:         viper.GetString("ENV"),
 	})
 
+	// Initialize logger
 	config.InitLogger()
 
 	// Load and initialize global config
@@ -43,11 +45,13 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to create database client")
 	}
 
+	// Initialize relayer service
 	service, err := relayer.NewService()
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create relayer service")
 	}
 
+	// Start relayer service
 	err = service.Start()
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to start relayer service")

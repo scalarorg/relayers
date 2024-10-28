@@ -17,8 +17,8 @@ import (
 	"github.com/scalarorg/relayers/pkg/types"
 
 	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/scalarorg/relayers/pkg/client/axelar"
 	"github.com/scalarorg/relayers/pkg/db"
+	"github.com/scalarorg/relayers/pkg/services/axelar"
 )
 
 var RabbitMQClient *Client
@@ -260,7 +260,7 @@ func GetChainNameById(chainId string) (string, error) {
 }
 
 func handleBtcEvent(btcEvent *types.BtcEventTransaction, msg *amqp.Delivery) error {
-	confirmTx, err := axelar.AxelarClient.ConfirmEvmTx(btcEvent.SourceChain, btcEvent.TxHash)
+	confirmTx, err := axelar.AxelarService.ConfirmEvmTx(btcEvent.SourceChain, btcEvent.TxHash)
 	if err != nil {
 		return fmt.Errorf("failed to confirm BTC Event: %w", err)
 	}

@@ -1,7 +1,7 @@
 package btc
 
 import (
-	"github.com/scalarorg/relayers/pkg/client/rabbitmq"
+	"github.com/scalarorg/relayers/pkg/services/rabbitmq"
 )
 
 type Listener struct {

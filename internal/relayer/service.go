@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/relayers/pkg/client/axelar"
-	"github.com/scalarorg/relayers/pkg/client/rabbitmq"
+	"github.com/scalarorg/relayers/pkg/services/axelar"
+	"github.com/scalarorg/relayers/pkg/services/rabbitmq"
 )
 
 type Service struct {
@@ -15,13 +15,14 @@ type Service struct {
 func NewService() (*Service, error) {
 	var err error
 
-	err = rabbitmq.InitRabbitMQClient()
+	// Initialize Axelar service
+	err = axelar.InitAxelarService()
 	if err != nil {
 		return nil, err
 	}
 
-	// Initialize Axelar client
-	err = axelar.InitAxelarClient()
+	// Initialize RabbitMQ client
+	err = rabbitmq.InitRabbitMQClient()
 	if err != nil {
 		return nil, err
 	}
