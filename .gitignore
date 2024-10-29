@@ -29,3 +29,5 @@ runtime
 data/local
 data/devnet
 data/testnet
+
+pkg/contracts/generated

@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/services/axelar"
+	"github.com/scalarorg/relayers/pkg/services/evm"
 	"github.com/scalarorg/relayers/pkg/services/rabbitmq"
 )
 
@@ -17,6 +18,12 @@ func NewService() (*Service, error) {
 
 	// Initialize Axelar service
 	err = axelar.InitAxelarService()
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize EVM service
+	err = evm.InitEVMService()
 	if err != nil {
 		return nil, err
 	}

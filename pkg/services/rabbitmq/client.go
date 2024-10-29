@@ -260,7 +260,7 @@ func GetChainNameById(chainId string) (string, error) {
 }
 
 func handleBtcEvent(btcEvent *types.BtcEventTransaction, msg *amqp.Delivery) error {
-	confirmTx, err := axelar.AxelarService.ConfirmEvmTx(btcEvent.SourceChain, btcEvent.TxHash)
+	confirmTx, err := axelar.AxelarService.Client.ConfirmEvmTx(btcEvent.SourceChain, btcEvent.TxHash)
 	if err != nil {
 		return fmt.Errorf("failed to confirm BTC Event: %w", err)
 	}

@@ -3,8 +3,8 @@ package axelar
 var AxelarService *Service
 
 type Service struct {
-	listener *AxelarListener
-	client   *Client
+	Listener *AxelarListener
+	Client   *AxelarClient
 }
 
 func InitAxelarService() error {
@@ -21,8 +21,8 @@ func InitAxelarService() error {
 		return err
 	}
 	AxelarService = &Service{
-		listener: listener,
-		client:   client,
+		Listener: listener,
+		Client:   client,
 	}
 	return nil
 }
