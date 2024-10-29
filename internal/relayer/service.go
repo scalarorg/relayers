@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/services/axelar"
+	"github.com/scalarorg/relayers/pkg/services/btc"
 	"github.com/scalarorg/relayers/pkg/services/evm"
 	"github.com/scalarorg/relayers/pkg/services/rabbitmq"
 )
@@ -24,6 +26,12 @@ func NewService() (*Service, error) {
 
 	// Initialize EVM service
 	err = evm.InitEVMService()
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize BTC service
+	err = btc.NewBtcClients(config.GlobalConfig.BtcNetworks)
 	if err != nil {
 		return nil, err
 	}
