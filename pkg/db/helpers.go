@@ -1,19 +1,22 @@
 package db
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
-	"time"
 
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/rs/zerolog/log"
 	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/services/evm"
 	"github.com/scalarorg/relayers/pkg/types"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
-func CreateBtcCallContractEvent(event *types.BtcEventTransaction) error {
+func (dbClient *DatabaseClient) CreateBtcCallContractEvent(event *types.BtcEventTransaction) error {
 	id := fmt.Sprintf("%s-%d", strings.ToLower(event.TxHash), event.LogIndex)
 
 	// Convert VaultTxHex and Payload to byte slices
@@ -56,11 +59,11 @@ func CreateBtcCallContractEvent(event *types.BtcEventTransaction) error {
 		Str("id", id).
 		Msg("[DatabaseClient] Creating BtcCallContract")
 
-	result := DatabaseClient.Create(&relayData)
+	result := dbClient.postgresClient.Create(&relayData)
 	return result.Error
 }
 
-func FindRelayDataById(id string, includeCallContract, includeCallContractWithToken *bool) (*models.RelayData, error) {
+func (dbClient *DatabaseClient) FindRelayDataById(id string, includeCallContract, includeCallContractWithToken *bool) (*models.RelayData, error) {
 	var relayData models.RelayData
 
 	// Set default values if options are nil
@@ -73,7 +76,7 @@ func FindRelayDataById(id string, includeCallContract, includeCallContractWithTo
 		includeCallContractWithToken = &defaultTrue
 	}
 
-	query := DatabaseClient.Where("id = ?", id)
+	query := dbClient.postgresClient.Where("id = ?", id)
 
 	// Add preload conditions based on options
 	if *includeCallContract {
@@ -92,14 +95,13 @@ func FindRelayDataById(id string, includeCallContract, includeCallContractWithTo
 }
 
 // --- For Setup and Run Evm and Cosmos Relayer ---
-func UpdateEventStatusWithPacketSequence(id string, status types.Status, sequence *int) error {
+func (dbClient *DatabaseClient) UpdateEventStatusWithPacketSequence(id string, status types.Status, sequence *int) error {
 	data := models.RelayData{
 		Status:         int(status),
 		PacketSequence: sequence,
-		UpdatedAt:      time.Now(),
 	}
 
-	result := DatabaseClient.Model(&models.RelayData{}).Where("id = ?", id).Updates(data)
+	result := dbClient.postgresClient.Model(&models.RelayData{}).Where("id = ?", id).Updates(data)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -108,7 +110,7 @@ func UpdateEventStatusWithPacketSequence(id string, status types.Status, sequenc
 	return nil
 }
 
-func CreateEvmCallContractEvent(event evm.EvmEvent[*contracts.IAxelarGatewayContractCall]) error {
+func (dbClient *DatabaseClient) CreateEvmCallContractEvent(event evm.EvmEvent[*contracts.IAxelarGatewayContractCall]) error {
 	id := fmt.Sprintf("%s-%d", strings.ToLower(event.Hash), event.LogIndex)
 	payloadBytes, err := hex.DecodeString(strings.TrimPrefix(string(event.Args.Payload), "0x"))
 	if err != nil {
@@ -137,11 +139,11 @@ func CreateEvmCallContractEvent(event evm.EvmEvent[*contracts.IAxelarGatewayCont
 
 	log.Debug().Msgf("[DatabaseClient] Create Evm Call Contract Event: %v", data)
 
-	result := DatabaseClient.Create(&data)
+	result := dbClient.postgresClient.Create(&data)
 	return result.Error
 }
 
-func FindCosmosToEvmCallContractApproved(event evm.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]) ([]struct {
+func (dbClient *DatabaseClient) FindCosmosToEvmCallContractApproved(event evm.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]) ([]struct {
 	ID      string
 	Payload []byte
 }, error) {
@@ -166,7 +168,7 @@ func FindCosmosToEvmCallContractApproved(event evm.EvmEvent[*contracts.IAxelarGa
 		},
 	}
 
-	result := DatabaseClient.
+	result := dbClient.postgresClient.
 		Preload("CallContract").
 		Where(map[string]interface{}{
 			"call_contract.payload_hash":     pendingQuery.CallContract.PayloadHash,
@@ -204,7 +206,7 @@ func FindCosmosToEvmCallContractApproved(event evm.EvmEvent[*contracts.IAxelarGa
 	return mappedResult, nil
 }
 
-func CreateEvmContractCallApprovedEvent(event evm.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]) error {
+func (dbClient *DatabaseClient) CreateEvmContractCallApprovedEvent(event evm.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]) error {
 	id := fmt.Sprintf("%s-%d-%d", event.Hash, event.Args.SourceEventIndex, event.LogIndex)
 	data := models.CallContractApproved{
 		ID:               id,
@@ -223,7 +225,7 @@ func CreateEvmContractCallApprovedEvent(event evm.EvmEvent[*contracts.IAxelarGat
 
 	log.Debug().Msgf("[DatabaseClient] Create EvmContractCallApproved: %v", data)
 
-	result := DatabaseClient.Create(&data)
+	result := dbClient.postgresClient.Create(&data)
 	if result.Error != nil {
 		log.Error().Msgf("[DatabaseClient] Create DB with error: %v", result.Error)
 		return result.Error
@@ -233,13 +235,12 @@ func CreateEvmContractCallApprovedEvent(event evm.EvmEvent[*contracts.IAxelarGat
 	return nil
 }
 
-func UpdateEventStatus(id string, status types.Status) error {
+func (dbClient *DatabaseClient) UpdateEventStatus(id string, status types.Status) error {
 	data := models.RelayData{
-		Status:    int(status),
-		UpdatedAt: time.Now(),
+		Status: int(status),
 	}
 
-	result := DatabaseClient.Model(&models.RelayData{}).Where("id = ?", id).Updates(data)
+	result := dbClient.postgresClient.Model(&models.RelayData{}).Where("id = ?", id).Updates(data)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -248,7 +249,7 @@ func UpdateEventStatus(id string, status types.Status) error {
 	return nil
 }
 
-func CreateEvmExecutedEvent(event evm.EvmEvent[*contracts.IAxelarGatewayExecuted]) error {
+func (dbClient *DatabaseClient) CreateEvmExecutedEvent(event evm.EvmEvent[*contracts.IAxelarGatewayExecuted]) error {
 	id := fmt.Sprintf("%s-%d", event.Hash, event.LogIndex)
 	log.Debug().Msgf("[DatabaseClient] Create EvmExecuted: %s", id)
 
@@ -263,12 +264,195 @@ func CreateEvmExecutedEvent(event evm.EvmEvent[*contracts.IAxelarGatewayExecuted
 		Status:           int(types.SUCCESS),
 	}
 
-	result := DatabaseClient.Create(&data)
+	result := dbClient.postgresClient.Create(&data)
 	if result.Error != nil {
 		log.Error().Msgf("[DatabaseClient] Create DB with error: %v", result.Error)
 		return result.Error
 	}
 
 	log.Debug().Msgf("[DatabaseClient] Create DB result: %v", data)
+	return nil
+}
+
+func (dbClient *DatabaseClient) GetBurningTx(payloadHash string) (string, error) {
+	var relayData models.RelayData
+
+	result := dbClient.postgresClient.
+		Preload("CallContract").
+		Where("call_contract.payload_hash = ?", strings.ToLower(payloadHash)).
+		First(&relayData)
+
+	if result.Error != nil {
+		return "", result.Error
+	}
+
+	if relayData.CallContract == nil || len(relayData.CallContract.Payload) == 0 {
+		return "", fmt.Errorf("PayloadNotFound")
+	}
+
+	return hex.EncodeToString(relayData.CallContract.Payload), nil
+}
+
+func (dbClient *DatabaseClient) GetChainConfig(sourceChain string) (models.ChainConfig, error) {
+	var chainConfig models.ChainConfig
+
+	result := dbClient.mongoDatabase.Collection("dapps").FindOne(context.Background(), bson.M{
+		"chain_name": sourceChain,
+	})
+
+	if err := result.Decode(&chainConfig); err != nil {
+		return models.ChainConfig{}, fmt.Errorf("chain not found: %w", err)
+	}
+
+	if chainConfig.RpcUrl == "" {
+		return models.ChainConfig{}, fmt.Errorf("RPC URL not found")
+	}
+
+	if chainConfig.AccessToken == "" {
+		return models.ChainConfig{}, fmt.Errorf("access token not found")
+	}
+
+	return chainConfig, nil
+}
+
+func (dbClient *DatabaseClient) UpdateCosmosToEvmEvent(event interface{}, txHash *string) error {
+	var messageID string
+	switch e := event.(type) {
+	case *types.IBCEvent[types.ContractCallSubmitted]:
+		messageID = e.Args.MessageID
+	case *types.IBCEvent[types.ContractCallWithTokenSubmitted]:
+		messageID = e.Args.MessageID
+	default:
+		return fmt.Errorf("unsupported event type: %T", event)
+	}
+	// If no transaction hash is provided, return early
+	if txHash == nil {
+		return nil
+	}
+
+	lowercaseHash := strings.ToLower(*txHash)
+	data := models.RelayData{
+		ID:          messageID,
+		ExecuteHash: &lowercaseHash,
+		Status:      int(types.APPROVED),
+	}
+
+	result := dbClient.postgresClient.Model(&models.RelayData{}).Where("id = ?", messageID).Updates(data)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	log.Info().Msgf("[DatabaseClient] [Evm ContractCallApproved]: %v", data)
+	return nil
+}
+
+func (dbClient *DatabaseClient) HandleMultipleEvmToBtcEventsTx(event interface{}, tx *btcjson.GetTransactionResult, refTxHash, batchedCommandId string) error {
+	// Extract common fields based on event type
+	var sourceChain, destinationChain, messageID, sender, contractAddress, payloadHash, hash string
+	var messageIDIndex int
+
+	switch e := event.(type) {
+	case *types.IBCEvent[types.ContractCallSubmitted]:
+		sourceChain = e.Args.SourceChain
+		destinationChain = e.Args.DestinationChain
+		messageID = e.Args.MessageID
+		sender = e.Args.Sender
+		contractAddress = e.Args.ContractAddress
+		payloadHash = e.Args.PayloadHash
+		hash = e.Hash
+		parts := strings.Split(messageID, "-")
+		if len(parts) > 1 {
+			if idx, err := strconv.Atoi(parts[1]); err == nil {
+				messageIDIndex = idx
+			}
+		}
+	case *types.IBCEvent[types.ContractCallWithTokenSubmitted]:
+		sourceChain = e.Args.SourceChain
+		destinationChain = e.Args.DestinationChain
+		messageID = e.Args.MessageID
+		sender = e.Args.Sender
+		contractAddress = e.Args.ContractAddress
+		payloadHash = e.Args.PayloadHash
+		hash = e.Hash
+		parts := strings.Split(messageID, "-")
+		if len(parts) > 1 {
+			if idx, err := strconv.Atoi(parts[1]); err == nil {
+				messageIDIndex = idx
+			}
+		}
+	default:
+		return fmt.Errorf("unsupported event type: %T", event)
+	}
+
+	if tx == nil {
+		return nil
+	}
+
+	// Use the extracted fields in your data structures
+	TxIDLower := strings.ToLower(tx.TxID)
+	contractCallData := models.RelayData{
+		ExecuteHash: &TxIDLower,
+		Status:      int(types.SUCCESS),
+	}
+
+	contractCallApprovedData := models.CallContractApproved{
+		ID:               messageID,
+		SourceChain:      sourceChain,
+		DestinationChain: destinationChain,
+		TxHash:           strings.ToLower(hash),
+		BlockNumber:      int(tx.BlockIndex),
+		LogIndex:         0,
+		CommandId:        batchedCommandId,
+		SourceAddress:    sender,
+		ContractAddress:  strings.ToLower(contractAddress),
+		PayloadHash:      strings.ToLower(payloadHash),
+		SourceTxHash:     strings.ToLower(hash),
+		SourceEventIndex: messageIDIndex,
+	}
+
+	amount := strconv.FormatFloat(tx.Amount, 'f', -1, 64)
+	executedData := models.CommandExecuted{
+		ID:               messageID,
+		SourceChain:      sourceChain,
+		DestinationChain: destinationChain,
+		TxHash:           strings.ToLower(tx.TxID),
+		BlockNumber:      int(tx.BlockIndex),
+		LogIndex:         0,
+		CommandId:        batchedCommandId,
+		Status:           int(types.SUCCESS),
+		ReferenceTxHash:  &refTxHash,
+		Amount:           &amount,
+	}
+
+	// Begin transaction
+	txDbClient := dbClient.postgresClient.Begin()
+	if txDbClient.Error != nil {
+		return txDbClient.Error
+	}
+
+	// Update RelayData
+	if err := txDbClient.Model(&models.RelayData{}).Where("id = ?", messageID).Updates(contractCallData).Error; err != nil {
+		txDbClient.Rollback()
+		return err
+	}
+
+	// Create CallContractApproved
+	if err := txDbClient.Create(&contractCallApprovedData).Error; err != nil {
+		txDbClient.Rollback()
+		return err
+	}
+
+	// Create CommandExecuted
+	if err := txDbClient.Create(&executedData).Error; err != nil {
+		txDbClient.Rollback()
+		return err
+	}
+
+	// Commit transaction
+	if err := txDbClient.Commit().Error; err != nil {
+		return err
+	}
+
+	log.Info().Msgf("[DatabaseClient] [HandleMultipleEvmToBtcEventsTx]: %+v", executedData)
 	return nil
 }

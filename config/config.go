@@ -47,7 +47,8 @@ type BtcNetworkConfig struct {
 	Network    string  `mapstructure:"network"`
 	ID         string  `mapstructure:"id"`
 	ChainID    string  `mapstructure:"chain_id"`
-	Type       string  `mapstructure:"type"` // signer or broadcast
+	Name       string  `mapstructure:"name"`
+	Type       string  `mapstructure:"type"`
 	Host       string  `mapstructure:"host"`
 	Port       int     `mapstructure:"port"`
 	User       string  `mapstructure:"user"`
@@ -55,6 +56,7 @@ type BtcNetworkConfig struct {
 	SSL        *bool   `mapstructure:"ssl,omitempty"`
 	PrivateKey *string `mapstructure:"private_key,omitempty"`
 	Address    *string `mapstructure:"address,omitempty"`
+	Gateway    *string `mapstructure:"gateway,omitempty"`
 }
 
 type RuntimeEvmNetworkConfig struct {

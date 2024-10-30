@@ -85,6 +85,10 @@ func NewEvmClients() ([]*EvmClient, error) {
 	return clients, nil
 }
 
+func (c *EvmClient) ChainName() string {
+	return c.chainName
+}
+
 func (c *EvmClient) GetSenderAddress() string {
 	return c.auth.From.Hex()
 }

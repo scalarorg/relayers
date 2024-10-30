@@ -1,4 +1,4 @@
-package axelar
+package types
 
 import sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -7,30 +7,6 @@ type AxelarListenerEvent[T any] struct {
 	TopicID    string
 	Type       string
 	ParseEvent func(events map[string][]string) (T, error)
-}
-
-// ContractCallSubmitted represents a contract call submission event
-type ContractCallSubmitted struct {
-	MessageID        string `json:"messageId"`
-	Sender           string `json:"sender"`
-	SourceChain      string `json:"sourceChain"`
-	DestinationChain string `json:"destinationChain"`
-	ContractAddress  string `json:"contractAddress"`
-	Payload          string `json:"payload"`
-	PayloadHash      string `json:"payloadHash"`
-}
-
-// ContractCallWithTokenSubmitted represents a contract call with token submission event
-type ContractCallWithTokenSubmitted struct {
-	MessageID        string `json:"messageId"`
-	Sender           string `json:"sender"`
-	SourceChain      string `json:"sourceChain"`
-	DestinationChain string `json:"destinationChain"`
-	ContractAddress  string `json:"contractAddress"`
-	Payload          string `json:"payload"`
-	PayloadHash      string `json:"payloadHash"`
-	Symbol           string `json:"symbol"`
-	Amount           string `json:"amount"`
 }
 
 // ExecuteRequest represents an execute request

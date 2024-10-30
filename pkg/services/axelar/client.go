@@ -72,63 +72,63 @@ func (c *AxelarClient) CallContract(ctx context.Context, chain string, contractA
 }
 
 // GetPendingCommands retrieves pending commands for a specific chain
-func (c *AxelarClient) GetPendingCommands(ctx context.Context, chain string) ([]string, error) {
+func (c *AxelarClient) GetPendingCommands(chain string) ([]string, error) {
 	// Implementation would involve querying the Axelar network for pending commands
 	return []string{}, nil
 }
 
 // SignCommands signs pending commands for a specific chain
-func (c *AxelarClient) SignCommands(ctx context.Context, chain string) error {
+func (c *AxelarClient) SignCommands(chain string) (*sdk.TxResponse, error) {
 	address, err := c.signer.GetAddress()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	msgs, err := GetSignCommandPayload(address, chain)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = c.signer.Broadcast(msgs, "")
+	resp, err := c.signer.Broadcast(msgs, "")
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to broadcast SignCommands")
-		return err
+		return nil, err
 	}
 
-	return nil
+	return resp, nil
 }
 
 // GetExecuteDataFromBatchCommands retrieves execution data for batched commands
-func (c *AxelarClient) GetExecuteDataFromBatchCommands(ctx context.Context, chain string, id string) (string, error) {
+func (c *AxelarClient) GetExecuteDataFromBatchCommands(chain string, id string) (string, error) {
 	// Implementation would involve polling the Axelar network until status is 3
 	// and then returning the execute data
 	return "", nil
 }
 
 // RouteMessageRequest sends a route message request
-func (c *AxelarClient) RouteMessageRequest(ctx context.Context, logIndex int, txHash string, payload string) error {
+func (c *AxelarClient) RouteMessageRequest(logIndex int, txHash string, payload string) (*sdk.TxResponse, error) {
 	address, err := c.signer.GetAddress()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	msgs, err := GetRouteMessageRequest(address, txHash, logIndex, payload)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = c.signer.Broadcast(msgs, "")
+	resp, err := c.signer.Broadcast(msgs, "")
 	if err != nil {
 		if strings.Contains(err.Error(), "already executed") {
 			log.Error().
 				Str("tx_hash", txHash).
 				Int("log_index", logIndex).
 				Msg("Already executed")
-			return nil
+			return nil, nil
 		}
 		log.Error().Err(err).Msg("Failed to broadcast RouteMessageRequest")
-		return err
+		return nil, err
 	}
 
-	return nil
+	return resp, nil
 }
 
 // SetFee sets the fee for the client

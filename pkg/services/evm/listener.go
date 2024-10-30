@@ -14,8 +14,16 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
+	"github.com/scalarorg/relayers/pkg/types"
 	"github.com/spf13/viper"
 )
+
+type EventHandler struct {
+	ContractCallChan         chan *EvmEvent[*contracts.IAxelarGatewayContractCall]
+	ContractCallApprovedChan chan *EvmEvent[*contracts.IAxelarGatewayContractCallApproved]
+	ExecutedChan             chan *EvmEvent[*contracts.IAxelarGatewayExecuted]
+	ConfirmEventChan         chan *types.ExecuteRequest
+}
 
 type EvmListener struct {
 	client         *ethclient.Client
@@ -157,4 +165,70 @@ func (l *EvmListener) Listen(eventName string, eventChan chan<- *EvmEvent) error
 	}()
 
 	return nil
+}
+
+func (l *EvmListener) SetupEventHandlers(axelarClient *AxelarClient, handler *EventHandler) {
+	// Handle ContractCall events
+	go func() {
+		for event := range handler.ContractCallChan {
+			log.Info().Msgf("[EVMListener] Handling ContractCall event: %s", event.Hash)
+
+			// Create event in DB
+			if err := db.CreateEvmCallContractEvent(event); err != nil {
+				log.Error().Err(err).Msg("Failed to create EVM call contract event")
+				continue
+			}
+
+			// Wait for finality
+			receipt, err := event.WaitForFinality()
+			if err != nil {
+				log.Error().Err(err).Msg("Failed waiting for finality")
+				continue
+			}
+
+			// Handle event
+			if err := handleEvmToCosmosEvent(axelarClient, event); err != nil {
+				log.Error().Err(err).Msg("Failed to handle EVM to Cosmos event")
+			}
+		}
+	}()
+
+	// Handle ContractCallApproved events
+	go func() {
+		for event := range handler.ContractCallApprovedChan {
+			log.Info().Msgf("[EVMListener] Handling ContractCallApproved event: %s", event.Hash)
+
+			// Find related data
+			relayData, err := db.FindCosmosToEvmCallContractApproved(event)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to find cosmos to evm call contract")
+				continue
+			}
+
+			// Create event if conditions met
+			if config.GlobalConfig.ChainEnv == "devnet" ||
+				config.GlobalConfig.ChainEnv == "testnet" ||
+				len(relayData) > 0 {
+				if err := db.CreateEvmContractCallApprovedEvent(event); err != nil {
+					log.Error().Err(err).Msg("Failed to create contract call approved event")
+				}
+			}
+
+			// Handle the event
+			if err := handleCosmosToEvmCallContractCompleteEvent(l, event, relayData); err != nil {
+				log.Error().Err(err).Msg("Failed to handle cosmos to evm call contract complete event")
+			}
+		}
+	}()
+
+	// Handle Executed events
+	go func() {
+		for event := range handler.ExecutedChan {
+			log.Info().Msgf("[EVMListener] Handling Executed event: %s", event.Hash)
+
+			if err := db.CreateEvmExecutedEvent(event); err != nil {
+				log.Error().Err(err).Msg("Failed to create EVM executed event")
+			}
+		}
+	}()
 }

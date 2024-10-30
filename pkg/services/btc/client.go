@@ -11,9 +11,9 @@ import (
 	"github.com/scalarorg/relayers/config"
 )
 
-var BtcClients []*BtcClientType
+var BtcClients []*BtcClient
 
-type BtcClientType struct {
+type BtcClient struct {
 	client *rpcclient.Client
 	config *config.BtcNetworkConfig
 }
@@ -38,7 +38,7 @@ func NewBtcClients(configs []config.BtcNetworkConfig) error {
 			return fmt.Errorf("failed to create BTC client for network %s: %w", clientConfig.Network, err)
 		}
 
-		BtcClients = append(BtcClients, &BtcClientType{
+		BtcClients = append(BtcClients, &BtcClient{
 			client: client,
 			config: &clientConfig,
 		})
@@ -51,7 +51,7 @@ func NewBtcClients(configs []config.BtcNetworkConfig) error {
 }
 
 // GetTransaction retrieves detailed information about a transaction given its ID
-func (c *BtcClientType) GetTransaction(txID string) (*btcjson.GetTransactionResult, error) {
+func (c *BtcClient) GetTransaction(txID string) (*btcjson.GetTransactionResult, error) {
 	result, err := c.client.RawRequest("gettransaction", []json.RawMessage{[]byte(`"` + txID + `"`)})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get transaction info: %w", err)
@@ -66,11 +66,15 @@ func (c *BtcClientType) GetTransaction(txID string) (*btcjson.GetTransactionResu
 }
 
 // IsSigner returns true if the client is configured as a signer node
-func (c *BtcClientType) IsSigner() bool {
+func (c *BtcClient) IsSigner() bool {
 	return strings.ToLower(c.config.Type) == "signer"
 }
 
 // IsBroadcast returns true if the client is configured as a broadcast node
-func (c *BtcClientType) IsBroadcast() bool {
+func (c *BtcClient) IsBroadcast() bool {
 	return strings.ToLower(c.config.Type) == "broadcast"
+}
+
+func (c *BtcClient) Config() *config.BtcNetworkConfig {
+	return c.config
 }

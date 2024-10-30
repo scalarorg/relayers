@@ -1,5 +1,7 @@
 package axelar
 
+import "github.com/scalarorg/relayers/pkg/types"
+
 // Define event types
 const (
 	EvmEventCompletedType              = "axelar.evm.v1beta1.EVMEventCompleted"
@@ -20,31 +22,31 @@ const (
 
 // Define AxelarListenerEvent instances with proper types
 var (
-	AxelarEVMCompletedEvent = AxelarListenerEvent[*ExecuteRequest]{
+	AxelarEVMCompletedEvent = types.AxelarListenerEvent[*types.ExecuteRequest]{
 		Type:       EvmEventCompletedType,
 		TopicID:    AxelarEVMCompletedEventTopicID,
 		ParseEvent: ParseEvmEventCompletedEvent,
 	}
 
-	AxelarCosmosContractCallEvent = AxelarListenerEvent[*IBCEvent[ContractCallSubmitted]]{
+	AxelarCosmosContractCallEvent = types.AxelarListenerEvent[*types.IBCEvent[types.ContractCallSubmitted]]{
 		Type:       ContractCallSubmittedType,
 		TopicID:    AxelarCosmosContractCallEventTopicID,
 		ParseEvent: ParseContractCallSubmittedEvent,
 	}
 
-	AxelarCosmosContractCallApprovedEvent = AxelarListenerEvent[*IBCEvent[ContractCallSubmitted]]{
+	AxelarCosmosContractCallApprovedEvent = types.AxelarListenerEvent[*types.IBCEvent[types.ContractCallSubmitted]]{
 		Type:       ContractCallApprovedType,
 		TopicID:    AxelarCosmosContractCallApprovedEventTopicID,
 		ParseEvent: ParseContractCallApprovedEvent,
 	}
 
-	AxelarCosmosContractCallWithTokenEvent = AxelarListenerEvent[*IBCEvent[ContractCallWithTokenSubmitted]]{
+	AxelarCosmosContractCallWithTokenEvent = types.AxelarListenerEvent[*types.IBCEvent[types.ContractCallWithTokenSubmitted]]{
 		Type:       ContractCallWithTokenSubmittedType,
 		TopicID:    AxelarCosmosContractCallWithTokenEventTopicID,
 		ParseEvent: ParseContractCallWithTokenSubmittedEvent,
 	}
 
-	AxelarIBCCompleteEvent = AxelarListenerEvent[*IBCPacketEvent]{
+	AxelarIBCCompleteEvent = types.AxelarListenerEvent[*types.IBCPacketEvent]{
 		Type:       ExecuteMessageType,
 		TopicID:    AxelarIBCCompleteEventTopicID,
 		ParseEvent: ParseIBCCompleteEvent,
