@@ -7,23 +7,18 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/types"
 	"github.com/spf13/viper"
 )
-
-type EventHandler struct {
-	ContractCallChan         chan *EvmEvent[*contracts.IAxelarGatewayContractCall]
-	ContractCallApprovedChan chan *EvmEvent[*contracts.IAxelarGatewayContractCallApproved]
-	ExecutedChan             chan *EvmEvent[*contracts.IAxelarGatewayExecuted]
-	ConfirmEventChan         chan *types.ExecuteRequest
-}
 
 type EvmListener struct {
 	client         *ethclient.Client
@@ -98,137 +93,162 @@ func NewEvmListeners() ([]*EvmListener, error) {
 	return listeners, nil
 }
 
-// Listen monitors events from the gateway contract and sends them to the provided channel
-func (l *EvmListener) Listen(eventName string, eventChan chan<- *EvmEvent) error {
-	log.Info().Msgf(
-		"[EVMListener] [%s] Listening to %s event from gateway contract %s",
-		l.chainName,
-		eventName,
-		l.gatewayAddress.Hex(),
-	)
+// Define the event structure
 
-	// Get current block number
-	currentBlock, err := l.client.BlockNumber(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to get current block number: %w", err)
-	}
-
-	// Create event filter
-	filterOpts := &bind.FilterOpts{
-		Start: currentBlock,
-	}
-
-	// Watch for events
-	eventCh := make(chan *contracts.IAxelarGatewayContractCall)
-	sub, err := l.gateway.WatchContractCall(filterOpts, eventCh)
-	if err != nil {
-		return fmt.Errorf("failed to watch for events: %w", err)
-	}
-
-	go func() {
-		defer sub.Unsubscribe()
-
-		for {
-			select {
-			case err := <-sub.Err():
-				log.Error().Msgf("[EVMListener] [%s] Subscription error: %v", l.chainName, err)
-				return
-
-			case event := <-eventCh:
-				if event.Raw.BlockNumber <= currentBlock {
-					continue
-				}
-
-				// Parse the event into EvmEvent struct
-				evmEvent, err := parseAnyEvent[*contracts.IAxelarGatewayContractCall](
-					l.chainName,
-					l.client,
-					event.Raw,
-					uint64(l.finalityBlocks),
-				)
-				if err != nil {
-					log.Error().Msgf("[EVMListener] [%s] Error while parsing event: %v", l.chainName, err)
-					continue
-				}
-
-				log.Debug().Msgf(
-					"[EVMListener] [%s] [%s] Parsed event: %+v",
-					l.chainName,
-					eventName,
-					mEvent,
-				)
-
-				// Send event to channel
-				eventChan <- evmEvent
-			}
-		}
-	}()
-
-	return nil
+type EvmAdapter struct {
+	client         *ethclient.Client
+	chainName      string
+	gatewayAddress common.Address
+	gateway        *contracts.IAxelarGateway
+	eventChan      chan *types.EventEnvelope
+	auth           *bind.TransactOpts
+	config         config.EvmNetworkConfig
 }
 
-func (l *EvmListener) SetupEventHandlers(axelarClient *AxelarClient, handler *EventHandler) {
-	// Handle ContractCall events
-	go func() {
-		for event := range handler.ContractCallChan {
-			log.Info().Msgf("[EVMListener] Handling ContractCall event: %s", event.Hash)
+// Rename from NewEvmListeners02 to NewEvmAdapter
+func NewEvmAdapter(config config.EvmNetworkConfig, eventChan chan *types.EventEnvelope) (*EvmAdapter, error) {
+	// Setup
+	ctx, cancel := context.WithTimeout(context.Background(), 29*time.Minute)
+	defer cancel()
 
-			// Create event in DB
-			if err := db.CreateEvmCallContractEvent(event); err != nil {
-				log.Error().Err(err).Msg("Failed to create EVM call contract event")
-				continue
-			}
+	// Connect to a test network
+	rpc, err := rpc.DialContext(ctx, config.RPCUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to EVM network %s: %w", config.Name, err)
+	}
 
-			// Wait for finality
-			receipt, err := event.WaitForFinality()
+	client := ethclient.NewClient(rpc)
+	if err != nil {
+		rpc.Close()
+		return nil, fmt.Errorf("failed to create client for EVM network %s: %w", config.Name, err)
+	}
+
+	// Initialize the contract
+	gatewayAddress := common.HexToAddress(config.Gateway)
+
+	gateway, err := contracts.NewIAxelarGateway(gatewayAddress, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize gateway contract for network %s: %w", config.Name, err)
+	}
+
+	privateKey, err := crypto.HexToECDSA(config.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key for network %s: %w", config.Name, err)
+	}
+	chainID, ok := new(big.Int).SetString(config.ChainID, 10)
+	if !ok {
+		return nil, fmt.Errorf("invalid chain ID for network %s", config.Name)
+	}
+	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create auth for network %s: %w", config.Name, err)
+	}
+
+	adapter := &EvmAdapter{
+		client:         client,
+		chainName:      config.Name,
+		gatewayAddress: gatewayAddress,
+		gateway:        gateway,
+		eventChan:      eventChan,
+		auth:           auth,
+		config:         config,
+	}
+
+	return adapter, nil
+}
+
+// Rename from ListenForContractCallApproved to PollForContractCallApproved
+func (ea *EvmAdapter) PollForContractCallApproved() error {
+	// Create ticker for 1-minute intervals
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		query := ethereum.FilterQuery{
+			FromBlock: big.NewInt(6922244),
+			ToBlock:   big.NewInt(6922244),
+			Addresses: []common.Address{
+				ea.gatewayAddress,
+			},
+		}
+
+		logs, err := ea.client.FilterLogs(context.Background(), query)
+		if err != nil {
+			fmt.Printf("Failed to filter logs: %v\n", err)
+			// Continue instead of returning error to keep the loop running
+			continue
+		}
+
+		// Process logs
+		for _, log := range logs {
+			event, err := parseEvmEvent[*contracts.IAxelarGatewayContractCallApproved](ea.chainName, log)
 			if err != nil {
-				log.Error().Err(err).Msg("Failed waiting for finality")
 				continue
 			}
 
-			// Handle event
-			if err := handleEvmToCosmosEvent(axelarClient, event); err != nil {
-				log.Error().Err(err).Msg("Failed to handle EVM to Cosmos event")
+			// Create the event envelope
+			eventEnvelope := types.EventEnvelope{
+				Component: "DbAdapter",
+				Handler:   "FindCosmosToEvmCallContractApproved",
+				Data:      event,
+			}
+
+			// Send the envelope to the channel
+			select {
+			case ea.eventChan <- &eventEnvelope:
+				// Event sent successfully
+			default:
+				fmt.Printf("Warning: Unable to send event to channel, might be full or closed\n")
 			}
 		}
-	}()
 
-	// Handle ContractCallApproved events
-	go func() {
-		for event := range handler.ContractCallApprovedChan {
-			log.Info().Msgf("[EVMListener] Handling ContractCallApproved event: %s", event.Hash)
+		// Wait for next tick
+		<-ticker.C
+	}
+}
 
-			// Find related data
-			relayData, err := db.FindCosmosToEvmCallContractApproved(event)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to find cosmos to evm call contract")
-				continue
-			}
+func (ea *EvmAdapter) Close() {
+	if ea.client != nil {
+		ea.client.Close()
+	}
+}
 
-			// Create event if conditions met
-			if config.GlobalConfig.ChainEnv == "devnet" ||
-				config.GlobalConfig.ChainEnv == "testnet" ||
-				len(relayData) > 0 {
-				if err := db.CreateEvmContractCallApprovedEvent(event); err != nil {
-					log.Error().Err(err).Msg("Failed to create contract call approved event")
-				}
-			}
+// Add getter method for the channel
+func (ea *EvmAdapter) GetEventChannel() <-chan *types.EventEnvelope {
+	return ea.eventChan
+}
 
-			// Handle the event
-			if err := handleCosmosToEvmCallContractCompleteEvent(l, event, relayData); err != nil {
-				log.Error().Err(err).Msg("Failed to handle cosmos to evm call contract complete event")
-			}
+func (ea *EvmAdapter) listenEvents() {
+	for event := range ea.eventChan {
+		switch event.Component {
+		case "EvmAdapter":
+			ea.handleEvmEvent(*event)
+		default:
+			// Pass the event that not belong to DbAdapter
 		}
-	}()
+	}
+}
 
-	// Handle Executed events
-	go func() {
-		for event := range handler.ExecutedChan {
-			log.Info().Msgf("[EVMListener] Handling Executed event: %s", event.Hash)
+func (ea *EvmAdapter) SendEvent(event *types.EventEnvelope) {
+	ea.eventChan <- event
+	log.Debug().Msgf("[EvmAdapter] Sent event to channel: %v", event.Handler)
+}
 
-			if err := db.CreateEvmExecutedEvent(event); err != nil {
-				log.Error().Err(err).Msg("Failed to create EVM executed event")
-			}
+func (ea *EvmAdapter) handleEvmEvent(eventEnvelope types.EventEnvelope) {
+	switch eventEnvelope.Handler {
+	case "handleCosmosToEvmCallContractCompleteEvent":
+		results, err := ea.handleCosmosToEvmCallContractCompleteEvent(eventEnvelope.Data.(types.HandleCosmosToEvmCallContractCompleteEventData))
+		if err != nil {
+			log.Error().Err(err).Msg("[EvmAdapter] Failed to handle event")
 		}
-	}()
+
+		// Send to DbAdapter to update Status
+		for _, result := range results {
+			ea.SendEvent(&types.EventEnvelope{
+				Component: "DbAdapter",
+				Handler:   "UpdateEventStatus",
+				Data:      result,
+			})
+		}
+	}
 }

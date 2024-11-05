@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
@@ -31,6 +32,9 @@ type EvmNetworkConfig struct {
 	Gateway    string `mapstructure:"gateway"`
 	Finality   int    `mapstructure:"finality"`
 	PrivateKey string `mapstructure:"private_key"`
+	MaxRetry   int
+	RetryDelay time.Duration
+	TxTimeout  time.Duration
 }
 
 type CosmosNetworkConfig struct {

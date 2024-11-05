@@ -74,8 +74,8 @@ func NewEvmClients() ([]*EvmClient, error) {
 			finalityBlocks: network.Finality,
 			gatewayAddress: gatewayAddr,
 			gateway:        gateway,
-			maxRetry:       config.GlobalConfig.MaxRetry,
-			retryDelay:     time.Duration(config.GlobalConfig.RetryDelay) * time.Millisecond,
+			maxRetry:       viper.GetInt("MAX_RETRY"),
+			retryDelay:     time.Duration(viper.GetInt("RETRY_DELAY")) * time.Millisecond,
 			privateKey:     privateKey,
 			auth:           auth,
 		}
@@ -94,9 +94,10 @@ func (c *EvmClient) GetSenderAddress() string {
 }
 
 func (c *EvmClient) WaitForFinality(txHash string) (*types.Receipt, error) {
-	ctx := context.Background()
-	hash := common.HexToHash(txHash)
-	return bind.WaitMined(ctx, c.client, &hash)
+	return nil, nil
+	// ctx := context.Background()
+	// hash := common.HexToHash(txHash)
+	// return bind.WaitMined(ctx, c.client, &hash)
 }
 
 func (c *EvmClient) GatewayExecute(executeData []byte) (*types.Transaction, error) {

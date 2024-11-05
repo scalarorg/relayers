@@ -10,11 +10,6 @@ type HandleEvmToCosmosEventExecuteResult struct {
 	PacketSequence *int64 `json:"packetSequence,omitempty"`
 }
 
-type HandleCosmosToEvmCallContractCompleteEventExecuteResult struct {
-	ID     string
-	Status Status
-}
-
 type ContractCallSubmitted struct {
 	MessageID        string `json:"messageId"`
 	Sender           string `json:"sender"`

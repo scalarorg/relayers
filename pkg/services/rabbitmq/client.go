@@ -129,7 +129,7 @@ func (c *Client) Consume() error {
 			log.Debug().Interface("event", btcEvent).Msg("[RabbitMQ] Created BTC Event")
 
 			// Create the event in the database
-			err = db.CreateBtcCallContractEvent(btcEvent)
+			err = db.DbClient.CreateBtcCallContractEvent(btcEvent)
 			if err != nil {
 				log.Error().Err(err).Msg("[RabbitMQ] Failed to create BTC event in database")
 				msg.Nack(false, true) // Requeue the message

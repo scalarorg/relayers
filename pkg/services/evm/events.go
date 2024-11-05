@@ -1,31 +1,12 @@
 package evm
 
-import (
-	"strings"
-
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
-	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
-)
-
+/*
 // EvmListenerEvent represents a generic event listener interface
 type EvmListenerEvent[T interface{}, E types.Log] struct {
 	Name            string
 	GetEventFilter  func(gateway *contracts.IAxelarGateway) interface{}
 	IsAcceptedChain func(allowedChainIds []string, event T) bool
 	ParseEvent      func(currentChainName string, provider *ethclient.Client, event E, finalityBlocks uint64) (*EvmEvent[T], error)
-}
-
-// EvmEvent represents a generic event from an EVM chain with type parameter T
-type EvmEvent[T any] struct {
-	Hash             string
-	BlockNumber      uint64
-	LogIndex         uint
-	SourceChain      string
-	DestinationChain string
-	WaitForFinality  func() (*types.Receipt, error)
-	Args             T
 }
 
 // ContractCallEvent implementation
@@ -97,3 +78,29 @@ func contains(slice []string, str string) bool {
 	}
 	return false
 }
+
+type EventSubject[T any] struct {
+	subscribers []func(*EvmEvent[T])
+}
+
+func NewEventSubject[T any]() *EventSubject[T] {
+	return &EventSubject[T]{
+		subscribers: make([]func(*EvmEvent[T]), 0),
+	}
+}
+
+func (s *EventSubject[T]) Subscribe(handler func(*EvmEvent[T])) {
+	s.subscribers = append(s.subscribers, handler)
+}
+
+func (s *EventSubject[T]) Next(event *EvmEvent[T]) {
+	for _, subscriber := range s.subscribers {
+		subscriber(event)
+	}
+}
+
+type ContractCallApproved struct {
+	EventTypeName string
+	Event         *contracts.IAxelarGatewayContractCallApproved
+}
+*/
