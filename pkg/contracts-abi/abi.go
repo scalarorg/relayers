@@ -16,6 +16,28 @@ var eventAbis = map[string]string{
 			]
 		}
 	]`,
+	"ContractCall": `[
+		{
+			"type": "event",
+			"name": "ContractCall",
+			"inputs": [
+				{"indexed": true, "name": "sender", "type": "address"},
+				{"indexed": false, "name": "destinationChain", "type": "string"},
+				{"indexed": false, "name": "destinationContractAddress", "type": "string"},
+				{"indexed": true, "name": "payloadHash", "type": "bytes32"},
+				{"indexed": false, "name": "payload", "type": "bytes"}
+			]
+		}
+	]`,
+	"Executed": `[
+		{
+			"type": "event",
+			"name": "Executed",
+			"inputs": [
+				{"indexed": true, "name": "commandId", "type": "bytes32"}
+			]
+		}
+	]`,
 }
 
 // GetContractCallApprovedABI returns the ABI string for the ContractCallApproved event

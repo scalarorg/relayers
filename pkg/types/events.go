@@ -14,9 +14,11 @@ const (
 )
 
 type EventEnvelope struct {
-	Component string      // Which component should handle this
-	Handler   string      // Which method should handle this
-	Data      interface{} // The actual event data
+	Component          string      // Which component should handle this
+	SenderClientName   string      // Which client should handle this
+	ReceiverClientName string      // Which client should handle this
+	Handler            string      // Which method should handle this
+	Data               interface{} // The actual event data
 }
 
 type FindCosmosToEvmCallContractApproved struct {
@@ -25,11 +27,16 @@ type FindCosmosToEvmCallContractApproved struct {
 }
 
 type HandleCosmosToEvmCallContractCompleteEventData struct {
-	Event      *EvmEvent[contracts.IAxelarGatewayContractCallApproved]
+	Event      *EvmEvent[*contracts.IAxelarGatewayContractCallApproved]
 	RelayDatas []FindCosmosToEvmCallContractApproved
 }
 
 type HandleCosmosToEvmCallContractCompleteEventExecuteResult struct {
 	ID     string
 	Status Status
+}
+
+type WaitForTransactionData struct {
+	Hash  string
+	Event *EvmEvent[*contracts.IAxelarGatewayContractCall]
 }

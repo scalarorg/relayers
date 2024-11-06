@@ -15,16 +15,15 @@ import (
 )
 
 type ValidEvmEvent interface {
-	*contracts.IAxelarGatewayContractCallApproved
+	*contracts.IAxelarGatewayContractCallApproved |
+		*contracts.IAxelarGatewayContractCall
 }
 
 // parseAnyEvent is a generic function that parses any EVM event into a standardized EvmEvent structure
-func parseEvmEvent[T ValidEvmEvent](
+func parseEvmEventContractCallApproved[T *contracts.IAxelarGatewayContractCallApproved](
 	currentChainName string,
 	log eth_types.Log,
 ) (*types.EvmEvent[T], error) {
-	var eventArgs T
-
 	eventArgs, err := parseContractCallApproved(log)
 	if err != nil {
 		return nil, err
@@ -94,6 +93,146 @@ func parseContractCallApproved(
 	}
 
 	fmt.Printf("[EVMListener] [parseContractCallApproved] eventArgs: %+v\n", eventArgs)
+
+	return &eventArgs, nil
+}
+
+func parseEvmEventContractCall[T *contracts.IAxelarGatewayContractCall](
+	currentChainName string,
+	log eth_types.Log,
+) (*types.EvmEvent[T], error) {
+	eventArgs, err := parseContractCall(log)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the value of eventArgs using reflection
+	v := reflect.ValueOf(eventArgs).Elem()
+	sourceChain := currentChainName
+	if f := v.FieldByName("SourceChain"); f.IsValid() {
+		sourceChain = f.String()
+	}
+	destinationChain := currentChainName
+	if f := v.FieldByName("DestinationChain"); f.IsValid() {
+		destinationChain = f.String()
+	}
+
+	return &types.EvmEvent[T]{
+		Hash:             log.TxHash.Hex(),
+		BlockNumber:      log.BlockNumber,
+		LogIndex:         log.Index,
+		SourceChain:      sourceChain,
+		DestinationChain: destinationChain,
+		Args:             eventArgs,
+	}, nil
+}
+
+func parseContractCall(
+	log eth_types.Log,
+) (*contracts.IAxelarGatewayContractCall, error) {
+	event := struct {
+		Sender                     common.Address
+		DestinationChain           string
+		DestinationContractAddress string
+		PayloadHash                [32]byte
+		Payload                    []byte
+	}{}
+
+	contractAbi := contracts_abi.GetEventABI("ContractCall")
+	parsedAbi, err := abi.JSON(strings.NewReader(contractAbi))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ABI: %w", err)
+	}
+	if err := parsedAbi.UnpackIntoInterface(&event, "ContractCall", log.Data); err != nil {
+		return nil, fmt.Errorf("failed to unpack event: %w", err)
+	}
+
+	// Add validation for required fields
+	if len(event.DestinationChain) == 0 || !isValidUTF8(event.DestinationChain) {
+		return nil, fmt.Errorf("invalid destination chain value")
+	}
+
+	if len(event.DestinationContractAddress) == 0 || !isValidUTF8(event.DestinationContractAddress) {
+		return nil, fmt.Errorf("invalid destination address value")
+	}
+
+	var eventArgs contracts.IAxelarGatewayContractCall = contracts.IAxelarGatewayContractCall{
+		Sender:                     event.Sender,
+		DestinationChain:           event.DestinationChain,
+		DestinationContractAddress: event.DestinationContractAddress,
+		PayloadHash:                event.PayloadHash,
+		Payload:                    event.Payload,
+		Raw:                        log,
+	}
+
+	fmt.Printf("[EVMListener] [parseContractCall] eventArgs: %+v\n", eventArgs)
+
+	return &eventArgs, nil
+}
+
+func parseEvmEventExecute[T *contracts.IAxelarGatewayExecuted](
+	currentChainName string,
+	log eth_types.Log,
+) (*types.EvmEvent[T], error) {
+	eventArgs, err := parseExecute(log)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the value of eventArgs using reflection
+	v := reflect.ValueOf(eventArgs).Elem()
+	sourceChain := currentChainName
+	if f := v.FieldByName("SourceChain"); f.IsValid() {
+		sourceChain = f.String()
+	}
+	destinationChain := currentChainName
+	if f := v.FieldByName("DestinationChain"); f.IsValid() {
+		destinationChain = f.String()
+	}
+
+	return &types.EvmEvent[T]{
+		Hash:             log.TxHash.Hex(),
+		BlockNumber:      log.BlockNumber,
+		LogIndex:         log.Index,
+		SourceChain:      sourceChain,
+		DestinationChain: destinationChain,
+		Args:             eventArgs,
+	}, nil
+}
+
+func parseExecute(
+	log eth_types.Log,
+) (*contracts.IAxelarGatewayExecuted, error) {
+	event := struct {
+		CommandId [32]byte
+	}{}
+
+	contractAbi := contracts_abi.GetEventABI("Executed")
+	parsedAbi, err := abi.JSON(strings.NewReader(contractAbi))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ABI: %w", err)
+	}
+
+	// Check if log data size matches exactly what we expect (32 bytes for CommandId)
+	if len(log.Data) != 32 {
+		return nil, fmt.Errorf("unexpected log data size: got %d bytes, want 32 bytes", len(log.Data))
+	}
+
+	if err := parsedAbi.UnpackIntoInterface(&event, "Executed", log.Data); err != nil {
+		return nil, fmt.Errorf("failed to unpack event: %w", err)
+	}
+
+	// Add validation for required fields
+	if len(event.CommandId) == 0 {
+		return nil, fmt.Errorf("invalid command id value")
+	}
+
+	var eventArgs contracts.IAxelarGatewayExecuted = contracts.IAxelarGatewayExecuted{
+		CommandId: event.CommandId,
+		Raw:       log,
+	}
+
+	fmt.Printf("[EVMListener] [parseExecute] eventArgs: %+v\n", eventArgs)
 
 	return &eventArgs, nil
 }

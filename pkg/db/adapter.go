@@ -59,26 +59,27 @@ func (da *DatabaseAdapter) handleDatabaseEvent(eventEnvelope types.EventEnvelope
 	switch eventEnvelope.Handler {
 	case "FindCosmosToEvmCallContractApproved":
 		// Handle store operations
-		relayDatas, err := da.FindCosmosToEvmCallContractApproved(eventEnvelope.Data.(types.EvmEvent[contracts.IAxelarGatewayContractCallApproved]))
+		relayDatas, err := da.FindCosmosToEvmCallContractApproved(eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]))
 		if err != nil {
 			log.Error().Err(err).Msg("[DatabaseAdapter] [FindCosmosToEvmCallContractApproved] Error finding Cosmos to Evm Call Contract Approved")
 		}
 
 		if len(relayDatas) > 0 {
-			err = da.CreateEvmContractCallApprovedEvent(eventEnvelope.Data.(types.EvmEvent[contracts.IAxelarGatewayContractCallApproved]))
+			err = da.CreateEvmContractCallApprovedEvent(eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]))
 			if err != nil {
 				log.Error().Err(err).Msg("[DatabaseAdapter] [FindCosmosToEvmCallContractApproved] Error creating Evm Contract Call Approved")
 			}
 
 			// Create and send new event to EVMAdapter
 			nextEnvelopeData := types.HandleCosmosToEvmCallContractCompleteEventData{
-				Event:      eventEnvelope.Data.(*types.EvmEvent[contracts.IAxelarGatewayContractCallApproved]),
+				Event:      eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]),
 				RelayDatas: relayDatas,
 			}
 			evmEvent := types.EventEnvelope{
-				Component: "EvmAdapter",
-				Handler:   "handleCosmosToEvmCallContractCompleteEvent",
-				Data:      nextEnvelopeData,
+				Component:          "EvmAdapter",
+				ReceiverClientName: eventEnvelope.SenderClientName,
+				Handler:            "handleCosmosToEvmCallContractCompleteEvent",
+				Data:               nextEnvelopeData,
 			}
 			// Send the envelope to the channel
 			da.SendEvent(&evmEvent)
@@ -87,6 +88,26 @@ func (da *DatabaseAdapter) handleDatabaseEvent(eventEnvelope types.EventEnvelope
 		id := eventEnvelope.Data.(types.HandleCosmosToEvmCallContractCompleteEventExecuteResult).ID
 		status := eventEnvelope.Data.(types.HandleCosmosToEvmCallContractCompleteEventExecuteResult).Status
 		da.UpdateEventStatus(id, status)
+	case "CreateEvmCallContractEvent":
+		_, hash, err := da.CreateEvmCallContractEvent(eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCall]))
+		if err != nil {
+			log.Error().Err(err).Msg("[DatabaseAdapter] [CreateEvmCallContractEvent] Error creating Evm Contract Call")
+		}
+		// Send the hash to the next handler
+		nextEnvelopeData := types.WaitForTransactionData{
+			Hash:  hash,
+			Event: eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCall]),
+		}
+		evmEvent := types.EventEnvelope{
+			Component:          "EvmAdapter",
+			ReceiverClientName: eventEnvelope.SenderClientName,
+			Handler:            "waitForTransaction",
+			Data:               nextEnvelopeData,
+		}
+		// Send the envelope to the channel
+		da.SendEvent(&evmEvent)
+	case "CreateEvmExecutedEvent":
+		da.CreateEvmExecutedEvent(eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayExecuted]))
 
 	// Add more handlers as needed
 	default:

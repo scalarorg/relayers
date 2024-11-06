@@ -109,12 +109,8 @@ func (DbAdapter *DatabaseAdapter) UpdateEventStatusWithPacketSequence(id string,
 	return nil
 }
 
-func (DbAdapter *DatabaseAdapter) CreateEvmCallContractEvent(event types.EvmEvent[*contracts.IAxelarGatewayContractCall]) error {
+func (DbAdapter *DatabaseAdapter) CreateEvmCallContractEvent(event *types.EvmEvent[*contracts.IAxelarGatewayContractCall]) (*models.RelayData, string, error) {
 	id := fmt.Sprintf("%s-%d", strings.ToLower(event.Hash), event.LogIndex)
-	payloadBytes, err := hex.DecodeString(strings.TrimPrefix(string(event.Args.Payload), "0x"))
-	if err != nil {
-		return fmt.Errorf("failed to decode payload: %w", err)
-	}
 
 	data := models.RelayData{
 		ID:   id,
@@ -123,7 +119,7 @@ func (DbAdapter *DatabaseAdapter) CreateEvmCallContractEvent(event types.EvmEven
 		CallContract: &models.CallContract{
 			TxHash:          strings.ToLower(event.Hash),
 			BlockNumber:     new(int),
-			Payload:         payloadBytes,
+			Payload:         event.Args.Payload,
 			PayloadHash:     strings.ToLower(hex.EncodeToString(event.Args.PayloadHash[:])),
 			ContractAddress: strings.ToLower(event.Args.DestinationContractAddress),
 			SourceAddress:   strings.ToLower(event.Args.Sender.String()),
@@ -139,45 +135,21 @@ func (DbAdapter *DatabaseAdapter) CreateEvmCallContractEvent(event types.EvmEven
 	log.Debug().Msgf("[DatabaseClient] Create Evm Call Contract Event: %v", data)
 
 	result := DbAdapter.PostgresClient.Create(&data)
-	return result.Error
+	return &data, event.Hash, result.Error
 }
 
-func (DbAdapter *DatabaseAdapter) FindCosmosToEvmCallContractApproved(event types.EvmEvent[contracts.IAxelarGatewayContractCallApproved]) ([]types.FindCosmosToEvmCallContractApproved, error) {
+func (DbAdapter *DatabaseAdapter) FindCosmosToEvmCallContractApproved(event *types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]) ([]types.FindCosmosToEvmCallContractApproved, error) {
 	var datas []models.RelayData
-
-	// Using the existing RelayData and CallContract models for type safety
-	pendingQuery := models.RelayData{
-		Status: int(types.PENDING),
-		CallContract: &models.CallContract{
-			PayloadHash:     strings.ToLower(hex.EncodeToString(event.Args.PayloadHash[:])),
-			SourceAddress:   strings.ToLower(event.Args.SourceAddress),
-			ContractAddress: strings.ToLower(event.Args.ContractAddress.String()),
-		},
-	}
-
-	approvedQuery := models.RelayData{
-		Status: int(types.APPROVED),
-		CallContract: &models.CallContract{
-			PayloadHash:     strings.ToLower(hex.EncodeToString(event.Args.PayloadHash[:])),
-			SourceAddress:   strings.ToLower(event.Args.SourceAddress),
-			ContractAddress: strings.ToLower(event.Args.ContractAddress.String()),
-		},
-	}
 
 	result := DbAdapter.PostgresClient.
 		Preload("CallContract").
-		Where(map[string]interface{}{
-			"call_contract.payload_hash":     pendingQuery.CallContract.PayloadHash,
-			"call_contract.source_address":   pendingQuery.CallContract.SourceAddress,
-			"call_contract.contract_address": pendingQuery.CallContract.ContractAddress,
-			"status":                         pendingQuery.Status,
-		}).Or(map[string]interface{}{
-		"call_contract.payload_hash":     approvedQuery.CallContract.PayloadHash,
-		"call_contract.source_address":   approvedQuery.CallContract.SourceAddress,
-		"call_contract.contract_address": approvedQuery.CallContract.ContractAddress,
-		"status":                         approvedQuery.Status,
-	}).
-		Order("updated_at desc").
+		Joins("JOIN call_contracts ON relay_data.id = call_contracts.relay_data_id").
+		Where("call_contracts.payload_hash = ? AND call_contracts.source_address = ? AND call_contracts.contract_address = ? AND relay_data.status IN ?",
+			strings.ToLower(hex.EncodeToString(event.Args.PayloadHash[:])),
+			strings.ToLower(event.Args.SourceAddress),
+			strings.ToLower(event.Args.ContractAddress.String()),
+			[]int{int(types.PENDING), int(types.APPROVED)}).
+		Order("relay_data.updated_at desc").
 		Find(&datas)
 
 	if result.Error != nil {
@@ -196,7 +168,7 @@ func (DbAdapter *DatabaseAdapter) FindCosmosToEvmCallContractApproved(event type
 	return mappedResult, nil
 }
 
-func (DbAdapter *DatabaseAdapter) CreateEvmContractCallApprovedEvent(event types.EvmEvent[contracts.IAxelarGatewayContractCallApproved]) error {
+func (DbAdapter *DatabaseAdapter) CreateEvmContractCallApprovedEvent(event *types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]) error {
 	id := fmt.Sprintf("%s-%d-%d", event.Hash, event.Args.SourceEventIndex, event.LogIndex)
 	data := models.CallContractApproved{
 		ID:               id,
@@ -239,7 +211,7 @@ func (DbAdapter *DatabaseAdapter) UpdateEventStatus(id string, status types.Stat
 	return nil
 }
 
-func (DbAdapter *DatabaseAdapter) CreateEvmExecutedEvent(event types.EvmEvent[*contracts.IAxelarGatewayExecuted]) error {
+func (DbAdapter *DatabaseAdapter) CreateEvmExecutedEvent(event *types.EvmEvent[*contracts.IAxelarGatewayExecuted]) error {
 	id := fmt.Sprintf("%s-%d", event.Hash, event.LogIndex)
 	log.Debug().Msgf("[DatabaseClient] Create EvmExecuted: %s", id)
 
