@@ -21,7 +21,7 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/go-bip39"
 	grpc "google.golang.org/grpc"
-	evm_proto_types "github.com/scalarorg/xchains-core/x/evm/types"
+	evm_proto_types "github.com/axelarnetwork/axelar-core/x/evm/types"
 )
 
 type Client struct {

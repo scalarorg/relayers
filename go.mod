@@ -8,7 +8,7 @@ require (
 	cosmossdk.io/math v1.3.0
 	github.com/btcsuite/btcd v0.22.1
 	github.com/cometbft/cometbft v0.38.12
-	github.com/cosmos/cosmos-sdk v0.50.10
+	github.com/cosmos/cosmos-sdk v0.45.16
 	github.com/ethereum/go-ethereum v1.14.11
 	github.com/go-playground/validator/v10 v10.22.1
 	github.com/gorilla/websocket v1.5.3
@@ -245,7 +245,9 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/scalarorg/xchains-core => github.com/axelarnetwork/axelar-core v0.0.0-20241004034534-be99c1dfbdf2
+replace github.com/cosmos/cosmos-sdk => github.com/axelarnetwork/cosmos-sdk v0.45.17-0.20240321205000-47c0c80e20ca
+
+// replace github.com/scalarorg/xchains-core => github.com/axelarnetwork/axelar-core v0.0.0-20241004034534-be99c1dfbdf2
 
 // replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
