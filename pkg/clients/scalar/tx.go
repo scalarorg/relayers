@@ -2,6 +2,7 @@ package scalar_clients
 
 import (
 	"context"
+	"fmt"
 
 	"cosmossdk.io/math"
 	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
@@ -10,11 +11,17 @@ import (
 	client_tx "github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codec_types "github.com/cosmos/cosmos-sdk/codec/types"
+	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	signingtypes "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/cosmos/go-bip39"
+	grpc "google.golang.org/grpc"
+	evm_proto_types "github.com/scalarorg/xchains-core/x/evm/types"
 )
 
 type Client struct {
@@ -113,4 +120,84 @@ func (c *Client) QueryTx(ctx context.Context, hash []byte) (*ctypes.ResultTx, er
 		TxResult: res.TxResult,
 		Tx:       res.Tx,
 	}, nil
+}
+
+func (c *Client) QueryBalance(ctx context.Context, addr types.AccAddress) (*types.Coins, error) {
+	// Create gRPC connection
+	grpcConn, err := grpc.Dial(
+		// c.rpcEndpoint,
+		"localhost:9090",
+		grpc.WithInsecure(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gRPC connection: %w", err)
+	}
+	defer grpcConn.Close()
+
+	// Create bank query client
+	bankClient := banktypes.NewQueryClient(grpcConn)
+
+	// Query all balances
+	balanceResp, err := bankClient.AllBalances(ctx, &banktypes.QueryAllBalancesRequest{
+		Address: addr.String(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query balance: %w", err)
+	}
+
+	return &balanceResp.Balances, nil
+}
+
+func CreateAccountFromMnemonic(mnemonic string) (types.AccAddress, *secp256k1.PrivKey, error) {
+	// Derive the seed from mnemonic
+	seed := bip39.NewSeed(mnemonic, "")
+
+	// Create master key and derive the private key
+	// Using "m/44'/118'/0'/0/0" for Cosmos
+	master, ch := hd.ComputeMastersFromSeed(seed)
+	privKeyBytes, err := hd.DerivePrivateKeyForPath(master, ch, "m/44'/118'/0'/0/0")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Create private key and get address
+	privKey := &secp256k1.PrivKey{Key: privKeyBytes}
+	addr := types.AccAddress(privKey.PubKey().Address())
+
+	return addr, privKey, nil
+}
+
+// Add this new type definition
+type ConfirmGatewayTxRequest struct {
+	Sender string
+	Chain  string
+	TxId   []byte
+}
+
+const (
+	EvmProtobufPackage = "axelar.evm.v1beta1"
+)
+
+// Add this method to create the Any-wrapped message
+func CreateConfirmGatewayTxMsg(sender string, chain string, txId []byte) (*codec_types.Any, error) {
+	msg := &ConfirmGatewayTxRequest{
+		Sender: sender,
+		Chain:  chain,
+		TxId:   txId,
+	}
+
+	// Create Any type with the correct typeUrl
+	return codec_types.NewAnyWithValue(msg)
+}
+
+// Alternative method if you need to create the Any message manually
+func CreateConfirmGatewayTxMsgManual(sender string, chain string, txId []byte) *codec_types.Any {
+	return &codec_types.Any{
+		TypeUrl: "/" + EvmProtobufPackage + ".ConfirmGatewayTxRequest",
+		Value: ConfirmGatewayTxRequest{
+			Sender: sender,
+			Chain:  chain,
+			TxId:   txId,
+		}.Marshal(), // You'll need to implement Marshal() or use protobuf generated code
+	}
 }

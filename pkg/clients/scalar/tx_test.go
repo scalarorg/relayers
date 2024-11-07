@@ -108,11 +108,17 @@ func TestCheckAccountBalance(t *testing.T) {
 	client := scalar_clients.NewClient("http://localhost:26657")
 
 	// Create test wallet/account
-	privKey := secp256k1.GenPrivKey()
-	addr := types.AccAddress(privKey.PubKey().Address())
+	// privKey := secp256k1.GenPrivKey()
+	addr, privKey, err := scalar_clients.CreateAccountFromMnemonic("vibrant inject indoor parent sunny file warfare scissors cube wheat detail way ship come stem fitness trust thought broken tennis exclude glance insane lens")
+	require.NoError(t, err)
+	require.NotNil(t, addr)
+	require.NotNil(t, privKey)
 
 	// Check account balance
 	balanceResp, err := client.QueryBalance(context.Background(), addr)
+
+	fmt.Printf("balanceResp: %+v\n", balanceResp)
+
 	require.NoError(t, err)
 	require.NotNil(t, balanceResp)
 	require.Zero(t, balanceResp.AmountOf("stake").Int64(), "New account should have zero balance")

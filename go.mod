@@ -244,3 +244,17 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+replace github.com/scalarorg/xchains-core => github.com/axelarnetwork/axelar-core v0.0.0-20241004034534-be99c1dfbdf2
+
+// replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+
+// replace github.com/cosmos/cosmos-sdk/simapp => cosmossdk.io/simapp v0.0.0-20241106091321-d0d8585e8a99
+
+// replace github.com/cosmos/cosmos-sdk/store => cosmossdk.io/store v1.1.1
+
+// replace github.com/cosmos/cosmos-sdk/x/evidence => cosmossdk.io/x/evidence v0.1.1
+
+// replace github.com/cosmos/cosmos-sdk/x/feegrant => cosmossdk.io/x/feegrant v0.1.1
+
+// replace github.com/cosmos/cosmos-sdk/x/upgrade => cosmossdk.io/x/upgrade v0.1.4
