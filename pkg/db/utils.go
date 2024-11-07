@@ -14,7 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func SetupTestDB(eventChan chan *types.EventEnvelope) (*DatabaseAdapter, func(), error) {
+func SetupTestDB(busEventChan chan *types.EventEnvelope, receiverChanBufSize int) (*DatabaseAdapter, func(), error) {
 	ctx := context.Background()
 
 	dbName := "test_db"
@@ -107,8 +107,9 @@ func SetupTestDB(eventChan chan *types.EventEnvelope) (*DatabaseAdapter, func(),
 
 	// Create test DatabaseAdapter
 	testAdapter := &DatabaseAdapter{
-		PostgresClient: postgresDb,
-		EventChan:      eventChan,
+		PostgresClient:       postgresDb,
+		BusEventChan:         busEventChan,
+		BusEventReceiverChan: make(chan *types.EventEnvelope, receiverChanBufSize),
 	}
 	DbAdapter = testAdapter
 

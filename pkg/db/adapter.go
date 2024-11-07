@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/relayers/config"
 	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/types"
@@ -19,19 +20,21 @@ import (
 var DbAdapter *DatabaseAdapter
 
 type DatabaseAdapter struct {
-	PostgresClient *gorm.DB
-	MongoClient    *mongo.Client
-	MongoDatabase  *mongo.Database
-	EventChan      chan *types.EventEnvelope
+	PostgresClient       *gorm.DB
+	MongoClient          *mongo.Client
+	MongoDatabase        *mongo.Database
+	BusEventChan         chan *types.EventEnvelope
+	BusEventReceiverChan chan *types.EventEnvelope
 }
 
-func InitDatabaseClient() error {
+func InitDatabaseAdapter(config *config.Config, busEventChan chan *types.EventEnvelope, receiverChanBufSize int) error {
 	DbAdapter = &DatabaseAdapter{
-		EventChan: make(chan *types.EventEnvelope, 100),
+		BusEventChan:         busEventChan,
+		BusEventReceiverChan: make(chan *types.EventEnvelope, receiverChanBufSize),
 	}
 
 	var err error
-	DbAdapter.PostgresClient, err = NewPostgresClient()
+	DbAdapter.PostgresClient, err = NewPostgresClient(config)
 	if err != nil {
 		return err
 	}
@@ -43,8 +46,8 @@ func InitDatabaseClient() error {
 	return nil
 }
 
-func (da *DatabaseAdapter) ListenEvents() {
-	for event := range da.EventChan {
+func (da *DatabaseAdapter) ListenEventsFromBusChannel() {
+	for event := range da.BusEventReceiverChan {
 		switch event.Component {
 		case "DbAdapter":
 			fmt.Printf("Received event in database: %+v\n", event)
@@ -118,11 +121,11 @@ func (da *DatabaseAdapter) handleDatabaseEvent(eventEnvelope types.EventEnvelope
 }
 
 func (da *DatabaseAdapter) SendEvent(event *types.EventEnvelope) {
-	da.EventChan <- event
+	da.BusEventChan <- event
 	log.Debug().Msgf("[DatabaseAdapter] Sent event to channel: %v", event.Handler)
 }
 
-func NewPostgresClient() (*gorm.DB, error) {
+func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(viper.GetString("DATABASE_URL")), &gorm.Config{})
 	if err != nil {
 		return nil, err
@@ -135,7 +138,17 @@ func NewPostgresClient() (*gorm.DB, error) {
 		&models.CallContractApproved{},
 		&models.CommandExecuted{},
 		&models.Operatorship{},
+		&models.LastBlock{},
 	)
+
+	for _, evmNetwork := range config.EvmNetworks {
+		lastBlock := evmNetwork.LastBlock
+		db.Create(&models.LastBlock{
+			ChainName:   evmNetwork.Name,
+			BlockNumber: lastBlock,
+		})
+	}
+
 	if err != nil {
 		return nil, err
 	}

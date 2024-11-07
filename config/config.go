@@ -31,6 +31,7 @@ type EvmNetworkConfig struct {
 	RPCUrl     string `mapstructure:"rpc_url"`
 	Gateway    string `mapstructure:"gateway"`
 	Finality   int    `mapstructure:"finality"`
+	LastBlock  string `mapstructure:"last_block"`
 	PrivateKey string `mapstructure:"private_key"`
 	MaxRetry   int
 	RetryDelay time.Duration
@@ -105,8 +106,9 @@ func LoadEnv() error {
 func Load() error {
 	var cfg Config
 
+	configPath := viper.GetString("CONFIG_PATH")
 	chainEnv := viper.GetString("CHAIN_ENV")
-	dir := fmt.Sprintf("data/%s", chainEnv)
+	dir := fmt.Sprintf("%s/%s", configPath, chainEnv)
 
 	switch chainEnv {
 	case "local":
@@ -224,7 +226,7 @@ func Load() error {
 }
 
 func GetEvmPrivateKey(networkID string) (string, error) {
-	configChainsPath := viper.GetString("CONFIG_CHAINS")
+	configChainsPath := viper.GetString("CONFIG_CHAINS_RUNTIME_PATH")
 	configFile := fmt.Sprintf("%s/%s/config.json", configChainsPath, networkID)
 
 	// Check if config.json exists for the network

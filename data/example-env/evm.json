@@ -5,7 +5,8 @@
     "name": "ethereum-sepolia",
     "rpcUrl": "https://1rpc.io/sepolia",
     "gateway": "0xda8367783782EC92BaDae3e534a9FCcb3fa6eF1C",
-    "finality": 1
+    "finality": 1,
+    "lastBlock": "7007000"
   },
   {
     "chainId": "1337",
@@ -13,6 +14,7 @@
     "name": "ethereum-local",
     "rpcUrl": "http://evm-anvil:8545",
     "gateway": "",
-    "finality": 1
+    "finality": 1,
+    "lastBlock": "0"
   }
 ]

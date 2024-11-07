@@ -6,6 +6,11 @@ import (
 	"gorm.io/gorm"
 )
 
+type LastBlock struct {
+	ChainName   string `gorm:"primaryKey;type:varchar(255)"`
+	BlockNumber string `gorm:"type:numeric"`
+}
+
 type Operatorship struct {
 	ID   int `gorm:"primaryKey;autoIncrement"`
 	Hash string

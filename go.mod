@@ -15,8 +15,7 @@ require (
 	github.com/go-playground/validator/v10 v10.22.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/labstack/echo/v4 v4.12.0
-	github.com/miguelmota/go-ethereum-hdwallet v0.1.2
-	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/miguelmota/go-ethereum-hdwallet v0.1.1
 	github.com/rs/zerolog v1.33.0
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
@@ -156,6 +155,7 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20210601165009-122bf33a46e0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
@@ -167,7 +167,6 @@ require (
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
-	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
@@ -241,20 +240,21 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
+// ---- From xchains-core ----
 replace github.com/cosmos/cosmos-sdk => github.com/axelarnetwork/cosmos-sdk v0.45.17-0.20240321205000-47c0c80e20ca
-
-// replace github.com/scalarorg/xchains-core => github.com/axelarnetwork/axelar-core v0.0.0-20241004034534-be99c1dfbdf2
 
 replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
 replace github.com/tendermint/tendermint => github.com/cometbft/cometbft v0.34.31
 
-// replace github.com/cosmos/cosmos-sdk/simapp => cosmossdk.io/simapp v0.0.0-20241106091321-d0d8585e8a99
+// ---- Prometheus ----
+replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.15.0
 
-// replace github.com/cosmos/cosmos-sdk/store => cosmossdk.io/store v1.1.1
+replace github.com/prometheus/client_model => github.com/prometheus/client_model v0.3.0
 
-// replace github.com/cosmos/cosmos-sdk/x/evidence => cosmossdk.io/x/evidence v0.1.1
+replace github.com/prometheus/common => github.com/prometheus/common v0.42.0
 
-// replace github.com/cosmos/cosmos-sdk/x/feegrant => cosmossdk.io/x/feegrant v0.1.1
+replace github.com/prometheus/procfs => github.com/prometheus/procfs v0.9.0
 
-// replace github.com/cosmos/cosmos-sdk/x/upgrade => cosmossdk.io/x/upgrade v0.1.4
+// ---- BTC Suite ----
+replace github.com/btcsuite/btcd/btcec/v2 => github.com/btcsuite/btcd/btcec/v2 v2.3.2

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,26 @@ import (
 	"github.com/scalarorg/relayers/pkg/types"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+func (DbAdapter *DatabaseAdapter) GetLastBlock(chainName string) (*big.Int, error) {
+	var lastBlock models.LastBlock
+	result := DbAdapter.PostgresClient.Where("chain_name = ?", chainName).First(&lastBlock)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	lastBlockNumber, err := strconv.ParseInt(lastBlock.BlockNumber, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	return big.NewInt(lastBlockNumber), nil
+}
+
+func (DbAdapter *DatabaseAdapter) UpdateLastBlock(chainName string, lastBlock *big.Int) error {
+	result := DbAdapter.PostgresClient.Model(&models.LastBlock{}).Where("chain_name = ?", chainName).Updates(bson.M{
+		"block_number": lastBlock.String(),
+	})
+	return result.Error
+}
 
 func (DbAdapter *DatabaseAdapter) CreateBtcCallContractEvent(event *types.BtcEventTransaction) error {
 	id := fmt.Sprintf("%s-%d", strings.ToLower(event.TxHash), event.LogIndex)

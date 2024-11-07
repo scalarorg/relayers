@@ -10,6 +10,7 @@ import (
 	"github.com/scalarorg/relayers/internal/relayer"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/openobserve"
+	"github.com/scalarorg/relayers/pkg/types"
 	"github.com/spf13/viper"
 )
 
@@ -39,14 +40,17 @@ func main() {
 		panic("Failed to load config: " + err.Error())
 	}
 
+	// Initialize Event Bus channel
+	eventChan := make(chan *types.EventEnvelope, viper.GetInt("CHANNEL_BUFFER_SIZE"))
+
 	// Initialize global DatabaseClient
-	err := db.InitDatabaseClient()
+	err := db.InitDatabaseAdapter(config.GlobalConfig, eventChan, viper.GetInt("CHANNEL_BUFFER_SIZE"))
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create database client")
+		log.Fatal().Err(err).Msg("Failed to create database adapter")
 	}
 
 	// Initialize relayer service
-	service, err := relayer.NewService()
+	service, err := relayer.NewService(config.GlobalConfig, eventChan, viper.GetInt("CHANNEL_BUFFER_SIZE"))
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create relayer service")
 	}

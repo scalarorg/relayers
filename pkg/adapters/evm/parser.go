@@ -16,19 +16,91 @@ import (
 
 type ValidEvmEvent interface {
 	*contracts.IAxelarGatewayContractCallApproved |
-		*contracts.IAxelarGatewayContractCall
+		*contracts.IAxelarGatewayContractCall |
+		*contracts.IAxelarGatewayExecuted
 }
 
-// parseAnyEvent is a generic function that parses any EVM event into a standardized EvmEvent structure
-func parseEvmEventContractCallApproved[T *contracts.IAxelarGatewayContractCallApproved](
+func parseEvmEventToEnvelope(
 	currentChainName string,
 	log eth_types.Log,
-) (*types.EvmEvent[T], error) {
-	eventArgs, err := parseContractCallApproved(log)
+) (types.EventEnvelope, error) {
+	// Try parse the log into different events
+	eventArgs, err := parseLogIntoEventArgs(log)
 	if err != nil {
-		return nil, err
+		return types.EventEnvelope{}, err
 	}
 
+	envelope, err := parseEventIntoEnvelope(currentChainName, eventArgs, log)
+	if err != nil {
+		return types.EventEnvelope{}, err
+	}
+
+	return envelope, nil
+}
+
+func parseLogIntoEventArgs(log eth_types.Log) (any, error) {
+	// Try parsing as ContractCallApproved
+	if eventArgs, err := parseContractCallApproved(log); err == nil {
+		return eventArgs, nil
+	}
+
+	// Try parsing as ContractCall
+	if eventArgs, err := parseContractCall(log); err == nil {
+		return eventArgs, nil
+	}
+
+	// Try parsing as Execute
+	if eventArgs, err := parseExecute(log); err == nil {
+		return eventArgs, nil
+	}
+
+	return nil, fmt.Errorf("failed to parse log into any known event type")
+}
+
+func parseEventIntoEnvelope(currentChainName string, eventArgs any, log eth_types.Log) (types.EventEnvelope, error) {
+	switch args := eventArgs.(type) {
+	case *contracts.IAxelarGatewayContractCallApproved:
+		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayContractCallApproved](args, currentChainName, log)
+		if err != nil {
+			return types.EventEnvelope{}, err
+		}
+		return types.EventEnvelope{
+			Component:        "DbAdapter",
+			SenderClientName: currentChainName,
+			Handler:          "FindCosmosToEvmCallContractApproved",
+			Data:             event,
+		}, nil
+
+	case *contracts.IAxelarGatewayContractCall:
+		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayContractCall](args, currentChainName, log)
+		if err != nil {
+			return types.EventEnvelope{}, err
+		}
+		return types.EventEnvelope{
+			Component:        "DbAdapter",
+			SenderClientName: currentChainName,
+			Handler:          "CreateEvmCallContractEvent",
+			Data:             event,
+		}, nil
+
+	case *contracts.IAxelarGatewayExecuted:
+		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayExecuted](args, currentChainName, log)
+		if err != nil {
+			return types.EventEnvelope{}, err
+		}
+		return types.EventEnvelope{
+			Component:        "DbAdapter",
+			SenderClientName: currentChainName,
+			Handler:          "CreateEvmExecutedEvent",
+			Data:             event,
+		}, nil
+
+	default:
+		return types.EventEnvelope{}, fmt.Errorf("unknown event type: %T", eventArgs)
+	}
+}
+
+func parseEventArgsIntoEvent[T ValidEvmEvent](eventArgs T, currentChainName string, log eth_types.Log) (*types.EvmEvent[T], error) {
 	// Get the value of eventArgs using reflection
 	v := reflect.ValueOf(eventArgs).Elem()
 	sourceChain := currentChainName
@@ -48,6 +120,24 @@ func parseEvmEventContractCallApproved[T *contracts.IAxelarGatewayContractCallAp
 		DestinationChain: destinationChain,
 		Args:             eventArgs,
 	}, nil
+}
+
+// parseAnyEvent is a generic function that parses any EVM event into a standardized EvmEvent structure
+func parseEvmEventContractCallApproved[T *contracts.IAxelarGatewayContractCallApproved](
+	currentChainName string,
+	log eth_types.Log,
+) (*types.EvmEvent[T], error) {
+	eventArgs, err := parseContractCallApproved(log)
+	if err != nil {
+		return nil, err
+	}
+
+	event, err := parseEventArgsIntoEvent[T](eventArgs, currentChainName, log)
+	if err != nil {
+		return nil, err
+	}
+
+	return event, nil
 }
 
 func parseContractCallApproved(
@@ -106,25 +196,12 @@ func parseEvmEventContractCall[T *contracts.IAxelarGatewayContractCall](
 		return nil, err
 	}
 
-	// Get the value of eventArgs using reflection
-	v := reflect.ValueOf(eventArgs).Elem()
-	sourceChain := currentChainName
-	if f := v.FieldByName("SourceChain"); f.IsValid() {
-		sourceChain = f.String()
-	}
-	destinationChain := currentChainName
-	if f := v.FieldByName("DestinationChain"); f.IsValid() {
-		destinationChain = f.String()
+	event, err := parseEventArgsIntoEvent[T](eventArgs, currentChainName, log)
+	if err != nil {
+		return nil, err
 	}
 
-	return &types.EvmEvent[T]{
-		Hash:             log.TxHash.Hex(),
-		BlockNumber:      log.BlockNumber,
-		LogIndex:         log.Index,
-		SourceChain:      sourceChain,
-		DestinationChain: destinationChain,
-		Args:             eventArgs,
-	}, nil
+	return event, nil
 }
 
 func parseContractCall(
@@ -179,25 +256,12 @@ func parseEvmEventExecute[T *contracts.IAxelarGatewayExecuted](
 		return nil, err
 	}
 
-	// Get the value of eventArgs using reflection
-	v := reflect.ValueOf(eventArgs).Elem()
-	sourceChain := currentChainName
-	if f := v.FieldByName("SourceChain"); f.IsValid() {
-		sourceChain = f.String()
-	}
-	destinationChain := currentChainName
-	if f := v.FieldByName("DestinationChain"); f.IsValid() {
-		destinationChain = f.String()
+	event, err := parseEventArgsIntoEvent[T](eventArgs, currentChainName, log)
+	if err != nil {
+		return nil, err
 	}
 
-	return &types.EvmEvent[T]{
-		Hash:             log.TxHash.Hex(),
-		BlockNumber:      log.BlockNumber,
-		LogIndex:         log.Index,
-		SourceChain:      sourceChain,
-		DestinationChain: destinationChain,
-		Args:             eventArgs,
-	}, nil
+	return event, nil
 }
 
 func parseExecute(
