@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -143,9 +144,13 @@ func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
 
 	for _, evmNetwork := range config.EvmNetworks {
 		lastBlock := evmNetwork.LastBlock
+		lastBlockInt, err := strconv.ParseInt(lastBlock, 10, 64)
+		if err != nil {
+			return nil, err
+		}
 		db.Create(&models.LastBlock{
 			ChainName:   evmNetwork.Name,
-			BlockNumber: lastBlock,
+			BlockNumber: lastBlockInt,
 		})
 	}
 
@@ -160,10 +165,19 @@ func NewMongoClient() (*mongo.Client, *mongo.Database, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Create client options
-	clientOptions := options.Client().ApplyURI(viper.GetString("MONGODB_URI"))
+	mongoURI := viper.GetString("MONGODB_URI")
+	log.Info().Str("mongodb_uri", mongoURI).Msg("Initial MongoDB URI")
 
-	// Connect to MongoDB
+	// Create base client options
+	clientOptions := options.Client().ApplyURI(mongoURI)
+
+	// Set direct connection for local environment
+	chainEnv := viper.GetString("CHAIN_ENV")
+	if chainEnv == "local" {
+		log.Info().Msg("Local environment detected, using direct MongoDB connection")
+		clientOptions.SetDirect(true)
+	}
+
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to MongoDB: %w", err)

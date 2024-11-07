@@ -8,7 +8,7 @@ import (
 
 type LastBlock struct {
 	ChainName   string `gorm:"primaryKey;type:varchar(255)"`
-	BlockNumber string `gorm:"type:numeric"`
+	BlockNumber int64  `gorm:"type:bigint"`
 }
 
 type Operatorship struct {

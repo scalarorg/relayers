@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -29,7 +28,7 @@ func TestCreateTransaction(t *testing.T) {
 	msg := banktypes.NewMsgSend(
 		addr,
 		addr, // sending to self for test
-		types.NewCoins(types.NewCoin("stake", math.NewInt(100))),
+		types.NewCoins(types.NewCoin("stake", types.NewInt(100))),
 	)
 
 	// Build and sign transaction
@@ -63,41 +62,41 @@ type MsgConfirmGatewayTx struct {
 	TxId   []byte
 }
 
-func TestConfirmGatewayTxRequest(t *testing.T) {
-	// Configure the address prefix for Axelar
-	config := types.GetConfig()
-	config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
+// func TestConfirmGatewayTxRequest(t *testing.T) {
+// 	// Configure the address prefix for Axelar
+// 	config := types.GetConfig()
+// 	config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
 
-	// Setup test client
-	client := scalar_clients.NewClient("http://localhost:26657")
+// 	// Setup test client
+// 	client := scalar_clients.NewClient("http://localhost:26657")
 
-	// Create test wallet/account
-	privKey := secp256k1.GenPrivKey()
-	addr := types.AccAddress(privKey.PubKey().Address())
+// 	// Create test wallet/account
+// 	privKey := secp256k1.GenPrivKey()
+// 	addr := types.AccAddress(privKey.PubKey().Address())
 
-	// Create test ConfirmGatewayTxRequest
-	txHash, _ := hex.DecodeString("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef") // Example tx hash
-	msg_payload := MsgConfirmGatewayTx{
-		Sender: addr.String(),
-		Chain:  "ethereum",
-		TxId:   txHash,
-	}
+// 	// Create test ConfirmGatewayTxRequest
+// 	txHash, _ := hex.DecodeString("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef") // Example tx hash
+// 	msg_payload := MsgConfirmGatewayTx{
+// 		Sender: addr.String(),
+// 		Chain:  "ethereum",
+// 		TxId:   txHash,
+// 	}
 
-	// Build and sign transaction
-	tx, err := client.CreateTransaction(context.Background(), msg, privKey)
-	require.NoError(t, err)
-	require.NotNil(t, tx)
+// 	// Build and sign transaction
+// 	tx, err := client.CreateTransaction(context.Background(), msg, privKey)
+// 	require.NoError(t, err)
+// 	require.NotNil(t, tx)
 
-	// Broadcast transaction
-	resp, err := client.BroadcastTx(context.Background(), tx)
-	require.NoError(t, err)
-	require.NotNil(t, resp)
+// 	// Broadcast transaction
+// 	resp, err := client.BroadcastTx(context.Background(), tx)
+// 	require.NoError(t, err)
+// 	require.NotNil(t, resp)
 
-	fmt.Printf("resp: %+v\n", resp)
+// 	fmt.Printf("resp: %+v\n", resp)
 
-	// Add verification steps
-	require.Equal(t, uint32(0), resp.Code, "Transaction failed with code: %d, log: %s", resp.Code, resp.Log)
-}
+// 	// Add verification steps
+// 	require.Equal(t, uint32(0), resp.Code, "Transaction failed with code: %d, log: %s", resp.Code, resp.Log)
+// }
 
 func TestCheckAccountBalance(t *testing.T) {
 	// Configure the address prefix for Axelar

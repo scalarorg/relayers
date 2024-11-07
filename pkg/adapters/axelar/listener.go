@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
+	"github.com/scalarorg/relayers/pkg/types"
 )
 
 type AxelarListener struct {
@@ -67,7 +68,7 @@ func (al *AxelarListener) initWS(topicID string) (*websocket.Conn, error) {
 	return ws, nil
 }
 
-func (al *AxelarListener) Listen(ctx context.Context, event AxelarListenerEvent[any], ch chan<- interface{}) error {
+func (al *AxelarListener) Listen(ctx context.Context, event types.AxelarListenerEvent[any], ch chan<- interface{}) error {
 	ws, err := al.initWS(event.TopicID)
 	if err != nil {
 		return err

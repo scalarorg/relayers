@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -82,25 +83,52 @@ type RuntimeEvmNetworkConfig struct {
 }
 
 type Config struct {
-	RabbitMQ      RabbitMQConfig      `mapstructure:"rabbitmq"`
-	Axelar        CosmosNetworkConfig `mapstructure:"axelar"`
-	EvmNetworks   []EvmNetworkConfig  `mapstructure:"evm_networks"`
-	CosmosNetwork CosmosNetworkConfig `mapstructure:"cosmos_network"`
-	BtcNetworks   []BtcNetworkConfig  `mapstructure:"btc_networks"`
+	RabbitMQ      RabbitMQConfig        `mapstructure:"rabbitmq"`
+	Axelar        CosmosNetworkConfig   `mapstructure:"axelar"`
+	EvmNetworks   []EvmNetworkConfig    `mapstructure:"evm_networks"`
+	CosmosNetwork []CosmosNetworkConfig `mapstructure:"cosmos_network"`
+	BtcNetworks   []BtcNetworkConfig    `mapstructure:"btc_networks"`
 }
 
 var GlobalConfig *Config
 
 func LoadEnv() error {
-	viper.SetConfigFile(".env")
+	// Tell Viper to read from environment
 	viper.AutomaticEnv()
 
-	err := viper.ReadInConfig()
-	if err != nil {
-		return err
+	// Add support for .env files
+	viper.SetConfigName(".env.local") // name of config file (without extension)
+	viper.SetConfigType("env")        // type of config file
+	viper.AddConfigPath(".")          // look for config in the working directory
+
+	// Read the .env file
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			// Config file not found; ignore error if desired
+			fmt.Println("No .env.local file found")
+		} else {
+			// Config file was found but another error was produced
+			return fmt.Errorf("error reading config file: %w", err)
+		}
 	}
 
 	return nil
+}
+
+func ReadJsonArrayConfig[T any](filePath string) ([]T, error) {
+	// Read the file content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading file %s: %w", filePath, err)
+	}
+
+	// Unmarshal directly into slice
+	var result []T
+	if err := json.Unmarshal(content, &result); err != nil {
+		return nil, fmt.Errorf("error unmarshaling config from %s: %w", filePath, err)
+	}
+
+	return result, nil
 }
 
 func Load() error {
@@ -122,44 +150,32 @@ func Load() error {
 	}
 
 	// Read Axelar config from JSON file
-	viper.SetConfigFile(fmt.Sprintf("%s/axelar.json", dir))
-	viper.SetConfigType("json")
-
-	if err := viper.ReadInConfig(); err != nil {
-		return fmt.Errorf("error reading Axelar config: %w", err)
+	axelarContent, err := os.ReadFile(fmt.Sprintf("%s/axelar.json", dir))
+	if err != nil {
+		return fmt.Errorf("error reading Axelar config file: %w", err)
 	}
 
-	if err := viper.UnmarshalKey("axelar", &cfg.Axelar); err != nil {
+	var axelarConfig struct {
+		Axelar CosmosNetworkConfig `json:"axelar"`
+	}
+	if err := json.Unmarshal(axelarContent, &axelarConfig); err != nil {
 		return fmt.Errorf("error unmarshaling Axelar config: %w", err)
 	}
+	cfg.Axelar = axelarConfig.Axelar
 
 	axelarMnemonic := viper.GetString("AXELAR_MNEMONIC")
 	cfg.Axelar.Mnemonic = &axelarMnemonic
 
 	// Read BTC broadcast config
-	viper.SetConfigFile(fmt.Sprintf("%s/btc.json", dir))
-	viper.SetConfigType("json")
-
-	if err := viper.ReadInConfig(); err != nil {
+	btcBroadcastConfig, err := ReadJsonArrayConfig[BtcNetworkConfig](fmt.Sprintf("%s/btc.json", dir))
+	if err != nil {
 		return fmt.Errorf("error reading BTC broadcast config: %w", err)
 	}
 
-	var btcBroadcastConfig []BtcNetworkConfig
-	if err := viper.Unmarshal(&btcBroadcastConfig); err != nil {
-		return fmt.Errorf("error unmarshaling BTC broadcast config: %w", err)
-	}
-
 	// Read BTC signer config
-	viper.SetConfigFile(fmt.Sprintf("%s/btc-signer.json", dir))
-	viper.SetConfigType("json")
-
-	if err := viper.ReadInConfig(); err != nil {
+	btcSignerConfig, err := ReadJsonArrayConfig[BtcNetworkConfig](fmt.Sprintf("%s/btc-signer.json", dir))
+	if err != nil {
 		return fmt.Errorf("error reading BTC signer config: %w", err)
-	}
-
-	var btcSignerConfig []BtcNetworkConfig
-	if err := viper.Unmarshal(&btcSignerConfig); err != nil {
-		return fmt.Errorf("error unmarshaling BTC signer config: %w", err)
 	}
 
 	// Combine BTC configs
@@ -171,31 +187,21 @@ func Load() error {
 	}
 
 	// Read Cosmos network config from JSON file
-	viper.SetConfigFile(fmt.Sprintf("%s/cosmos.json", dir))
-	viper.SetConfigType("json")
-
-	if err := viper.ReadInConfig(); err != nil {
-		return fmt.Errorf("error reading Cosmos config: %w", err)
+	cosmosNetworks, err := ReadJsonArrayConfig[CosmosNetworkConfig](fmt.Sprintf("%s/cosmos.json", dir))
+	if err != nil {
+		return fmt.Errorf("error reading Cosmos network config: %w", err)
 	}
-
-	if err := viper.UnmarshalKey("cosmos_network", &cfg.CosmosNetwork); err != nil {
-		return fmt.Errorf("error unmarshaling Cosmos network config: %w", err)
-	}
+	cfg.CosmosNetwork = cosmosNetworks
 
 	cosmosMnemonic := viper.GetString("AXELAR_MNEMONIC")
-	cfg.CosmosNetwork.Mnemonic = &cosmosMnemonic
-
-	// Read EVM Network configs
-	viper.SetConfigFile(fmt.Sprintf("%s/evm.json", dir))
-	viper.SetConfigType("json")
-
-	if err := viper.ReadInConfig(); err != nil {
-		return fmt.Errorf("error reading EVM config file: %w", err)
+	for i := range cfg.CosmosNetwork {
+		cfg.CosmosNetwork[i].Mnemonic = &cosmosMnemonic
 	}
 
-	var evmNetworks []EvmNetworkConfig
-	if err := viper.Unmarshal(&evmNetworks); err != nil {
-		return fmt.Errorf("error unmarshaling EVM networks config: %w", err)
+	// Read EVM Network configs
+	evmNetworks, err := ReadJsonArrayConfig[EvmNetworkConfig](fmt.Sprintf("%s/evm.json", dir))
+	if err != nil {
+		return fmt.Errorf("error reading EVM network config: %w", err)
 	}
 
 	// Get EVM private keys and assign them to the corresponding networks
@@ -209,17 +215,17 @@ func Load() error {
 
 	cfg.EvmNetworks = evmNetworks
 
-	// Read RabbitMQ config from JSON file
-	viper.SetConfigFile(fmt.Sprintf("%s/rabbitmq.json", dir))
-	viper.SetConfigType("json")
+	// // Read RabbitMQ config from JSON file
+	// viper.SetConfigFile(fmt.Sprintf("%s/rabbitmq.json", dir))
+	// viper.SetConfigType("json")
 
-	if err := viper.ReadInConfig(); err != nil {
-		return fmt.Errorf("error reading RabbitMQ config: %w", err)
-	}
+	// if err := viper.ReadInConfig(); err != nil {
+	// 	return fmt.Errorf("error reading RabbitMQ config: %w", err)
+	// }
 
-	if err := viper.UnmarshalKey("rabbitmq", &cfg.RabbitMQ); err != nil {
-		return fmt.Errorf("error unmarshaling RabbitMQ config: %w", err)
-	}
+	// if err := viper.UnmarshalKey("rabbitmq", &cfg.RabbitMQ); err != nil {
+	// 	return fmt.Errorf("error unmarshaling RabbitMQ config: %w", err)
+	// }
 
 	GlobalConfig = &cfg
 	return nil
@@ -270,15 +276,12 @@ func GetEvmPrivateKey(networkID string) (string, error) {
 		}
 
 		privateKeyBytes := crypto.FromECDSA(privateKeyECDSA)
-		privateKey = "0x" + hex.EncodeToString(privateKeyBytes)
+		privateKey = hex.EncodeToString(privateKeyBytes)
 	}
 
 	if privateKey == "" {
 		return "", fmt.Errorf("no private key found for network %s", networkConfig.ID)
 	}
-
-	// You might want to use a proper logging library instead of fmt.Printf
-	fmt.Printf("[GetEvmPrivateKey] network: %s, privateKey: %s\n", networkConfig.ID, privateKey)
 
 	return privateKey, nil
 }

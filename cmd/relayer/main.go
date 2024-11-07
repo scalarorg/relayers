@@ -9,7 +9,6 @@ import (
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/internal/relayer"
 	"github.com/scalarorg/relayers/pkg/db"
-	"github.com/scalarorg/relayers/pkg/openobserve"
 	"github.com/scalarorg/relayers/pkg/types"
 	"github.com/spf13/viper"
 )
@@ -20,17 +19,17 @@ func main() {
 		panic("Failed to load environment variables: " + err.Error())
 	}
 
-	// Initialize OpenObserve
-	appName := viper.GetString("APP_NAME")
-	if viper.GetBool("IS_DEV") {
-		appName = appName + "-dev"
-	}
-	openobserve.Init(openobserve.OpenObserveConfig{
-		Endpoint:    viper.GetString("OPENOBSERVE_ENDPOINT"),
-		Credential:  viper.GetString("OPENOBSERVE_CREDENTIAL"),
-		ServiceName: appName,
-		Env:         viper.GetString("ENV"),
-	})
+	// // Initialize OpenObserve
+	// appName := viper.GetString("APP_NAME")
+	// if viper.GetBool("IS_DEV") {
+	// 	appName = appName + "-dev"
+	// }
+	// openobserve.Init(openobserve.OpenObserveConfig{
+	// 	Endpoint:    viper.GetString("OPENOBSERVE_ENDPOINT"),
+	// 	Credential:  viper.GetString("OPENOBSERVE_CREDENTIAL"),
+	// 	ServiceName: appName,
+	// 	Env:         viper.GetString("ENV"),
+	// })
 
 	// Initialize logger
 	config.InitLogger()

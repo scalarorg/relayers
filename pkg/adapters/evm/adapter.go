@@ -119,33 +119,43 @@ func (ea *EvmAdapter) Close() {
 }
 
 func (ea *EvmAdapter) PollEventsFromAllEvmNetworks(pollInterval time.Duration) {
-	// Create ticker for 1-minute intervals
+	// Create ticker for each EVM client
+	for _, evmClient := range ea.evmClients {
+		go ea.pollEvmNetwork(evmClient, pollInterval)
+	}
+
+	// Keep main routine running
+	select {}
+}
+
+// New helper function to poll individual network
+func (ea *EvmAdapter) pollEvmNetwork(evmClient *evm_clients.EvmClient, pollInterval time.Duration) {
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
 	for {
-		for _, evmClient := range ea.evmClients {
-			// query last block from db
-			lastBlock, err := db.DbAdapter.GetLastBlock(evmClient.ChainName)
-			if err != nil {
-				log.Error().Err(err).Msg("[EvmAdapter] Failed to get last block")
-				continue
-			}
+		// query last block from db
+		lastBlock, err := db.DbAdapter.GetLastBlock(evmClient.ChainName)
+		if err != nil {
+			log.Error().Err(err).Msg("[EvmAdapter] Failed to get last block")
+			continue
+		}
 
-			query := ethereum.FilterQuery{
-				FromBlock: lastBlock,
-				ToBlock:   nil,
-				Addresses: []common.Address{
-					evmClient.GatewayAddress,
-				},
-			}
+		query := ethereum.FilterQuery{
+			FromBlock: lastBlock,
+			ToBlock:   nil,
+			Addresses: []common.Address{
+				evmClient.GatewayAddress,
+			},
+		}
 
-			logs, err := evmClient.Client.FilterLogs(context.Background(), query)
-			if err != nil {
-				fmt.Printf("Failed to filter logs: %v\n", err)
-				continue
-			}
+		logs, err := evmClient.Client.FilterLogs(context.Background(), query)
+		if err != nil {
+			log.Error().Err(err).Msgf("[EvmAdapter] Failed to filter logs for %s", evmClient.ChainName)
+			continue
+		}
 
+		if len(logs) > 0 {
 			// Process logs
 			for _, log := range logs {
 				envelope, err := parseEvmEventToEnvelope(evmClient.ChainName, log)
@@ -157,7 +167,12 @@ func (ea *EvmAdapter) PollEventsFromAllEvmNetworks(pollInterval time.Duration) {
 			}
 
 			// Update last block to db
-			db.DbAdapter.UpdateLastBlock(evmClient.ChainName, big.NewInt(int64(logs[len(logs)-1].BlockNumber)))
+			err = db.DbAdapter.UpdateLastBlock(evmClient.ChainName, big.NewInt(int64(logs[len(logs)-1].BlockNumber)))
+			if err != nil {
+				log.Error().Err(err).Msgf("[EvmAdapter] Failed to update last block for %s", evmClient.ChainName)
+			} else {
+				log.Info().Msgf("[EvmAdapter] Updated last block for %s to %s", evmClient.ChainName, big.NewInt(int64(logs[len(logs)-1].BlockNumber)).String())
+			}
 		}
 
 		// Wait for next tick
@@ -179,7 +194,7 @@ func (ea *EvmAdapter) ListenEventsFromBusChannel() {
 
 func (ea *EvmAdapter) SendEvent(event *types.EventEnvelope) {
 	ea.BusEventChan <- event
-	log.Debug().Msgf("[EvmAdapter] Sent event to channel: %v", event.Handler)
+	log.Debug().Msgf("[EvmAdapter] Sent event to bus channel: %v", *event)
 }
 
 func (ea *EvmAdapter) handleEvmEvent(eventEnvelope types.EventEnvelope) {

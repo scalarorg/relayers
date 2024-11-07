@@ -1,0 +1,10 @@
+{
+    "chainId": "1337",
+    "id": "ethereum-local",
+    "name": "ethereum-local",
+    "mnemonic_evm": "test test test test test test test test test test test junk",
+    "mnemonic": "test test test test test test test test test test test test test test test test test test test test test test test test",
+    "walletIndex": "0",
+    "rpcUrl": "http://evm-local:8545/",
+    "keyPath": "/app/chains/ethereum-local/key"
+}

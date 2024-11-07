@@ -28,7 +28,7 @@ func ParseEvmEventCompletedEvent(event map[string][]string) (*types.ExecuteReque
 	errorMsg := fmt.Sprintf("Not found eventId: %s in DB. Skip to handle an event.", eventID)
 
 	// Use FindRelayDataById instead of direct DB query
-	relayData, err := db.FindRelayDataById(eventID, nil, nil)
+	relayData, err := db.DbAdapter.FindRelayDataById(eventID, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf(errorMsg)
 	}
@@ -36,8 +36,6 @@ func ParseEvmEventCompletedEvent(event map[string][]string) (*types.ExecuteReque
 	var payload []byte
 	if relayData.CallContract != nil {
 		payload = relayData.CallContract.Payload
-	} else if relayData.CallContractWithToken != nil {
-		payload = []byte(relayData.CallContractWithToken.Payload)
 	}
 
 	if payload == nil {
@@ -76,7 +74,7 @@ func ParseContractCallApprovedEvent(event map[string][]string) (*types.IBCEvent[
 	hash := strings.Split(eventID, "-")[0]
 
 	// Use FindRelayDataById instead of direct DB query
-	relayData, err := db.FindRelayDataById(eventID, nil, nil)
+	relayData, err := db.DbAdapter.FindRelayDataById(eventID, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("Not found eventId: %s in DB. Skip to handle ContractCallApproved event.", eventID)
 	}
@@ -84,8 +82,6 @@ func ParseContractCallApprovedEvent(event map[string][]string) (*types.IBCEvent[
 	var payload []byte
 	if relayData.CallContract != nil {
 		payload = relayData.CallContract.Payload
-	} else if relayData.CallContractWithToken != nil {
-		payload = []byte(relayData.CallContractWithToken.Payload)
 	}
 
 	if payload == nil {

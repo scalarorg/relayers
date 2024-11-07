@@ -37,21 +37,22 @@ func NewService(config *config.Config, eventChan chan *types.EventEnvelope, rece
 	// 	return nil, err
 	// }
 
-	// // Initialize RabbitMQ client
+	// Initialize RabbitMQ client
 	// err = rabbitmq.InitRabbitMQClient()
 	// if err != nil {
 	// 	return nil, err
 	// }
 
 	return &Service{
-		EvmAdapter: evmAdapter,
+		EvmAdapter:   evmAdapter,
+		BusEventChan: eventChan,
 	}, nil
 }
 
 func (s *Service) Start() error {
 	go func() {
 		for event := range s.BusEventChan {
-			log.Info().Msgf("Received event from: %+v to Component: %+v", event.SenderClientName, event.Component)
+			log.Info().Msgf("Received event: %v", event)
 			if event.Component == "DbAdapter" {
 				db.DbAdapter.BusEventReceiverChan <- event
 			} else if event.Component == "EvmAdapter" {

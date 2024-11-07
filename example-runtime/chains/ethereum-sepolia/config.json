@@ -1,0 +1,13 @@
+{
+    "chainId": "11155111",
+    "id": "ethereum-sepolia",
+    "name": "ethereum-sepolia",
+    "privateKey": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "rpcUrl": "https://eth-sepolia.g.alchemy.com/v2/nNbspp-yjKP9GtAcdKi8xcLnBTptR2Zx",
+    "keyPath": "/app/chains/key-ethereum-sepolia",
+    "gateway": "0x2bb588d7bb6faAA93f656C3C78fFc1bEAfd1813D",
+    "gasService": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "authWeighted": "0xE2e5d69ef6f7D4Cc88c918E6e0683162cB04A3B2",
+    "tokenDeployer": "0xc63d2BAF3eae96365446BB0B99068e8488BCEA11",
+    "sBtc": "0x871B122fe3257c29f338db5C0Ca1b7c11ADeFEB6"
+}

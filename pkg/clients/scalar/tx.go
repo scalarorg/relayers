@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"cosmossdk.io/math"
 	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -21,7 +20,6 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/go-bip39"
 	grpc "google.golang.org/grpc"
-	evm_proto_types "github.com/axelarnetwork/axelar-core/x/evm/types"
 )
 
 type Client struct {
@@ -49,7 +47,7 @@ func (c *Client) CreateTransaction(ctx context.Context, msg types.Msg, privKey c
 
 	// Set other transaction parameters
 	txBuilder.SetGasLimit(200000) // Adjust as needed
-	txBuilder.SetFeeAmount(types.NewCoins(types.NewCoin("stake", math.NewInt(1000))))
+	txBuilder.SetFeeAmount(types.NewCoins(types.NewCoin("stake", types.NewInt(1000))))
 	txBuilder.SetMemo("") // Optional memo
 
 	// Sign the transaction
@@ -61,7 +59,6 @@ func (c *Client) CreateTransaction(ctx context.Context, msg types.Msg, privKey c
 
 	// Sign the transaction
 	sigV2, err := client_tx.SignWithPrivKey(
-		ctx,
 		signing.SignMode_SIGN_MODE_DIRECT,
 		signerData,
 		txBuilder,
@@ -167,37 +164,37 @@ func CreateAccountFromMnemonic(mnemonic string) (types.AccAddress, *secp256k1.Pr
 	return addr, privKey, nil
 }
 
-// Add this new type definition
-type ConfirmGatewayTxRequest struct {
-	Sender string
-	Chain  string
-	TxId   []byte
-}
+// // Add this new type definition
+// type ConfirmGatewayTxRequest struct {
+// 	Sender string
+// 	Chain  string
+// 	TxId   []byte
+// }
 
-const (
-	EvmProtobufPackage = "axelar.evm.v1beta1"
-)
+// const (
+// 	EvmProtobufPackage = "axelar.evm.v1beta1"
+// )
 
-// Add this method to create the Any-wrapped message
-func CreateConfirmGatewayTxMsg(sender string, chain string, txId []byte) (*codec_types.Any, error) {
-	msg := &ConfirmGatewayTxRequest{
-		Sender: sender,
-		Chain:  chain,
-		TxId:   txId,
-	}
+// // Add this method to create the Any-wrapped message
+// func CreateConfirmGatewayTxMsg(sender string, chain string, txId []byte) (*codec_types.Any, error) {
+// 	msg := &ConfirmGatewayTxRequest{
+// 		Sender: sender,
+// 		Chain:  chain,
+// 		TxId:   txId,
+// 	}
 
-	// Create Any type with the correct typeUrl
-	return codec_types.NewAnyWithValue(msg)
-}
+// 	// Create Any type with the correct typeUrl
+// 	return codec_types.NewAnyWithValue(msg)
+// }
 
-// Alternative method if you need to create the Any message manually
-func CreateConfirmGatewayTxMsgManual(sender string, chain string, txId []byte) *codec_types.Any {
-	return &codec_types.Any{
-		TypeUrl: "/" + EvmProtobufPackage + ".ConfirmGatewayTxRequest",
-		Value: ConfirmGatewayTxRequest{
-			Sender: sender,
-			Chain:  chain,
-			TxId:   txId,
-		}.Marshal(), // You'll need to implement Marshal() or use protobuf generated code
-	}
-}
+// // Alternative method if you need to create the Any message manually
+// func CreateConfirmGatewayTxMsgManual(sender string, chain string, txId []byte) *codec_types.Any {
+// 	return &codec_types.Any{
+// 		TypeUrl: "/" + EvmProtobufPackage + ".ConfirmGatewayTxRequest",
+// 		Value: ConfirmGatewayTxRequest{
+// 			Sender: sender,
+// 			Chain:  chain,
+// 			TxId:   txId,
+// 		}.Marshal(), // You'll need to implement Marshal() or use protobuf generated code
+// 	}
+// }

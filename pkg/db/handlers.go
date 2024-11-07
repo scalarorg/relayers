@@ -22,17 +22,24 @@ func (DbAdapter *DatabaseAdapter) GetLastBlock(chainName string) (*big.Int, erro
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	lastBlockNumber, err := strconv.ParseInt(lastBlock.BlockNumber, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-	return big.NewInt(lastBlockNumber), nil
+	return big.NewInt(lastBlock.BlockNumber), nil
 }
 
 func (DbAdapter *DatabaseAdapter) UpdateLastBlock(chainName string, lastBlock *big.Int) error {
-	result := DbAdapter.PostgresClient.Model(&models.LastBlock{}).Where("chain_name = ?", chainName).Updates(bson.M{
-		"block_number": lastBlock.String(),
-	})
+	result := DbAdapter.PostgresClient.Model(&models.LastBlock{}).
+		Where("chain_name = ?", chainName).
+		Updates(map[string]interface{}{
+			"block_number": lastBlock.Int64(),
+		})
+
+	// If no record exists, create one
+	if result.RowsAffected == 0 {
+		result = DbAdapter.PostgresClient.Create(&models.LastBlock{
+			ChainName:   chainName,
+			BlockNumber: lastBlock.Int64(),
+		})
+	}
+
 	return result.Error
 }
 

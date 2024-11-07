@@ -6,7 +6,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/relayers/pkg/openobserve"
 	"github.com/spf13/viper"
 )
 
@@ -22,15 +21,15 @@ func InitLogger() {
 	var writer io.Writer
 	var subWriters []io.Writer = []io.Writer{}
 
-	o2Writer := openobserve.NewLogWriter(zerolog.InfoLevel)
+	// o2Writer := openobserve.NewLogWriter(zerolog.InfoLevel)
 	consoleWriter := zerolog.ConsoleWriter{Out: os.Stderr}
 
 	if viper.GetBool("IS_PROD") || viper.GetBool("IS_STAGING") {
 		subWriters = append(subWriters, os.Stdout)
-		subWriters = append(subWriters, o2Writer)
+		// subWriters = append(subWriters, o2Writer)
 	} else {
 		subWriters = append(subWriters, consoleWriter)
-		subWriters = append(subWriters, o2Writer)
+		// subWriters = append(subWriters, o2Writer)
 	}
 
 	if len(subWriters) >= 1 {
