@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  scalar-relayer-go:
+    container_name: scalar-xchains-relayer-go
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: "scalarorg/xchains-relayer-go"
+    env_file:
+      - .env.${ENVIRONMENT:-production}
+    environment:
+      - APP_NAME=relayer
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
