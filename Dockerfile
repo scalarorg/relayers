@@ -24,7 +24,7 @@ RUN apk add --no-cache ca-certificates
 WORKDIR /app
 
 # Copy the binary from builder
-COPY --from=builder /app/relayer .
+COPY --from=builder /app/relayer /usr/bin/relayer
 # Copy config files
 COPY --from=builder /app/data/example-env ./data/example-env
 
@@ -33,4 +33,4 @@ RUN mkdir -p data/local data/devnet data/testnet
 
 EXPOSE 8080
 
-CMD ["./relayer"]
+ENTRYPOINT [ "relayer"]
