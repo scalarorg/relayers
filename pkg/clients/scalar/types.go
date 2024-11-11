@@ -1,5 +1,7 @@
 package scalar
 
+import "github.com/scalarorg/relayers/pkg/types"
+
 // Add this new type definition
 
 const (
@@ -10,30 +12,39 @@ const (
 	IBCCompleteEventTopicId           = "tm.event='Tx' AND message.action='ExecuteMessage'"
 )
 
-type Config struct {
-	ChainID       string
-	Denom         string
-	RpcEndpoint   string
-	GasPrice      string
-	LcdEndpoint   string
-	WsEndpoint    string
-	Mnemonic      string
-	BroadcastMode string //"sync" or "async" or "block"
-}
-
-type Event struct {
+type ListenerEvent[T any] struct {
 	TopicId string
 	Type    string
+	Parser  func(events map[string][]string) (T, error)
 }
 
 var (
-	ContractCallApprovedEvent = Event{
+	ContractCallApprovedEvent = ListenerEvent[*types.IBCEvent[types.ContractCallApproved]]{
 		TopicId: ContractCallApprovedEventTopicId,
 		Type:    "axelar.evm.v1beta1.ContractCallApproved",
+		Parser:  ParseContractCallApprovedEvent,
 	}
-	EVMCompletedEvent = Event{
+	EVMCompletedEvent = ListenerEvent[*types.ExecuteRequest]{
 		TopicId: EVMCompletedEventTopicId,
 		Type:    "axelar.evm.v1beta1.EVMEventCompleted",
+		Parser:  ParseEvmEventCompletedEvent,
+	}
+
+	//For future use
+	ContractCallSubmittedEvent = ListenerEvent[*types.IBCEvent[types.ContractCallSubmitted]]{
+		TopicId: ContractCallEventTopicId,
+		Type:    "axelar.axelarnet.v1beta1.ContractCallSubmitted",
+		Parser:  ParseContractCallSubmittedEvent,
+	}
+	ContractCallWithTokenSubmittedEvent = ListenerEvent[*types.IBCEvent[types.ContractCallWithTokenSubmitted]]{
+		TopicId: ContractCallWithTokenEventTopicId,
+		Type:    "axelar.axelarnet.v1beta1.ContractCallWithTokenSubmitted",
+		Parser:  ParseContractCallWithTokenSubmittedEvent,
+	}
+	ExecuteMessageEvent = ListenerEvent[*types.IBCPacketEvent]{
+		TopicId: IBCCompleteEventTopicId,
+		Type:    "ExecuteMessage",
+		Parser:  ParseIBCCompleteEvent,
 	}
 )
 

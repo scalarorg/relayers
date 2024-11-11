@@ -1,4 +1,4 @@
-package axelar
+package scalar
 
 import (
 	"encoding/base64"

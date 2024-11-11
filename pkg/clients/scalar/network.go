@@ -14,12 +14,13 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	grpc "google.golang.org/grpc"
 )
 
-func createTxFactory(config *Config, txConfig client.TxConfig) client_tx.Factory {
+func createTxFactory(config *cosmos.CosmosNetworkConfig, txConfig client.TxConfig) client_tx.Factory {
 	factory := client_tx.Factory{}
 	factory.WithTxConfig(txConfig)
 	factory.WithChainID(config.ChainID)
@@ -33,7 +34,7 @@ func createTxFactory(config *Config, txConfig client.TxConfig) client_tx.Factory
 }
 
 type NetworkClient struct {
-	config      *Config
+	config      *cosmos.CosmosNetworkConfig
 	rpcEndpoint string
 	rpcClient   rpcclient.Client
 	addr        sdk.AccAddress
@@ -42,14 +43,14 @@ type NetworkClient struct {
 	txFactory   client_tx.Factory
 }
 
-func NewNetworkClient(config *Config, txConfig client.TxConfig) (*NetworkClient, error) {
+func NewNetworkClient(config *cosmos.CosmosNetworkConfig, txConfig client.TxConfig) (*NetworkClient, error) {
 	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic)
 	if err != nil {
 		return nil, err
 	}
 	var rpcClient rpcclient.Client
-	if config.RpcEndpoint != "" {
-		rpcClient, err = client.NewClientFromNode(config.RpcEndpoint)
+	if config.RPCUrl != "" {
+		rpcClient, err = client.NewClientFromNode(config.RPCUrl)
 		if err != nil {
 			return nil, err
 		}

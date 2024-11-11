@@ -4,19 +4,20 @@ import (
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/types"
+	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	scalar_clients "github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	DefaultConfig = scalar_clients.Config{
-		ChainID:     "scalar-testnet-1",
-		Denom:       "uatom",
-		RpcEndpoint: "http://localhost:26657",
-		GasPrice:    "0.001",
-		LcdEndpoint: "http://localhost:2317",
-		WsEndpoint:  "ws://localhost:26657/websocket",
-		Mnemonic:    "vibrant inject indoor parent sunny file warfare scissors cube wheat detail way ship come stem fitness trust thought broken tennis exclude glance insane lens",
+	DefaultConfig = cosmos.CosmosNetworkConfig{
+		ChainID:  "scalar-testnet-1",
+		Denom:    "uatom",
+		RPCUrl:   "http://localhost:26657",
+		GasPrice: "0.001",
+		LCDUrl:   "http://localhost:2317",
+		WS:       "ws://localhost:26657/websocket",
+		Mnemonic: "vibrant inject indoor parent sunny file warfare scissors cube wheat detail way ship come stem fitness trust thought broken tennis exclude glance insane lens",
 	}
 )
 
@@ -26,7 +27,7 @@ func TestCreateTransaction(t *testing.T) {
 	config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
 
 	// Setup test client
-	client, err := scalar_clients.NewClient(&DefaultConfig)
+	client, err := scalar_clients.NewClientFromConfig(&DefaultConfig)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 

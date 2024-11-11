@@ -7,6 +7,8 @@ import (
 	"github.com/axelarnetwork/axelar-core/utils"
 	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	nexus "github.com/axelarnetwork/axelar-core/x/nexus/exported"
+	"github.com/scalarorg/relayers/config"
+	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 
 	//tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -26,7 +28,19 @@ type Client struct {
 	// Add other necessary fields like chain ID, gas prices, etc.
 }
 
-func NewClient(config *Config) (*Client, error) {
+func NewClient(configPath string) (*Client, error) {
+	// Read Scalar config from JSON file
+	scalarCfgPath := fmt.Sprintf("%s/scalar.json", configPath)
+	scalarConfig, err := config.ReadJsonConfig[cosmos.CosmosNetworkConfig](scalarCfgPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read scalar config from file: %s, %w", scalarCfgPath, err)
+	}
+
+	scalarConfig.Mnemonic = config.GetScalarMnemonic()
+	return NewClientFromConfig(scalarConfig)
+}
+
+func NewClientFromConfig(config *cosmos.CosmosNetworkConfig) (*Client, error) {
 	txConfig := tx.NewTxConfig(codec.NewProtoCodec(codec_types.NewInterfaceRegistry()), []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
 	networkClient, err := NewNetworkClient(config, txConfig)
 	if err != nil {
@@ -61,7 +75,7 @@ func (c *Client) ConfirmEvmTx(ctx context.Context, chainName string, txId string
 }
 
 // https://github.com/cosmos/cosmos-sdk/blob/main/client/rpc/tx.go#L159
-func (c *Client) Subscribe(ctx context.Context, subscriber string, event Event, callback func(data tmtypes.TMEventData, err error) error) error {
+func (c *Client) Subscribe(ctx context.Context, subscriber string, event ListenerEvent[tmtypes.TMEventData], callback func(data tmtypes.TMEventData, err error) error) error {
 	eventCh, err := c.network.Subscribe(ctx, subscriber, event.TopicId)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to Event: %v, %w", event, err)
@@ -72,7 +86,13 @@ func (c *Client) Subscribe(ctx context.Context, subscriber string, event Event, 
 		if evt.Query != event.TopicId {
 			callback(nil, fmt.Errorf("event query is not match"))
 		} else {
-			callback(evt.Data, nil)
+			//Extract the data from the event
+			data, err := event.Parser(evt.Events)
+			if err != nil {
+				callback(nil, err)
+			} else {
+				callback(data, nil)
+			}
 		}
 	case <-ctx.Done():
 		return errors.ErrLogic.Wrapf("timed out waiting for event, the transaction could have already been included or wasn't yet included")

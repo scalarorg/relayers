@@ -1,4 +1,4 @@
-package evm_clients
+package evm
 
 import (
 	"context"
@@ -12,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/scalarorg/relayers/config"
 	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
+	"github.com/scalarorg/relayers/pkg/db"
+	"github.com/scalarorg/relayers/pkg/events"
 )
 
 type EvmClient struct {
@@ -20,10 +22,12 @@ type EvmClient struct {
 	GatewayAddress common.Address
 	Gateway        *contracts.IAxelarGateway
 	auth           *bind.TransactOpts
-	config         config.EvmNetworkConfig
+	config         EvmNetworkConfig
+	dbAdapter      db.DatabaseAdapter
+	eventBus       *events.EventBus
 }
 
-func NewEvmClient(config config.EvmNetworkConfig) (*EvmClient, error) {
+func NewEvmClient(config EvmNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*EvmClient, error) {
 	// Setup
 	ctx := context.Background()
 
@@ -68,10 +72,23 @@ func NewEvmClient(config config.EvmNetworkConfig) (*EvmClient, error) {
 	return evmClient, nil
 }
 
-func NewEvmClients(configs []config.EvmNetworkConfig) ([]*EvmClient, error) {
+func NewEvmClients(configPath string, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) ([]*EvmClient, error) {
+	evmCfgPath := fmt.Sprintf("%s/evm.json", configPath)
+	configs, err := config.ReadJsonArrayConfig[EvmNetworkConfig](evmCfgPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read electrum configs: %w", err)
+	}
+	//Inject evm private keys
+	for i := range configs {
+		privateKey, err := config.GetEvmPrivateKey(configs[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		configs[i].PrivateKey = privateKey
+	}
 	evmClients := make([]*EvmClient, 0, len(configs))
 	for _, config := range configs {
-		client, err := NewEvmClient(config)
+		client, err := NewEvmClient(config, dbAdapter, eventBus)
 		if err != nil {
 			return nil, err
 		}

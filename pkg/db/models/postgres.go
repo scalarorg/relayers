@@ -48,11 +48,11 @@ type CallContract struct {
 	ID                   string `gorm:"primaryKey;type:varchar(255)"`
 	TxHash               string `gorm:"type:varchar(255)"`
 	TxHex                []byte
-	BlockNumber          *int `gorm:"default:0"`
-	LogIndex             *int
-	ContractAddress      string  `gorm:"type:varchar(255)"`
-	Amount               *string `gorm:"type:varchar(255)"`
-	Symbol               *string `gorm:"type:varchar(255)"`
+	BlockNumber          int `gorm:"default:0"`
+	LogIndex             int
+	ContractAddress      string `gorm:"type:varchar(255)"`
+	Amount               uint64 `gorm:"type:bigint"`
+	Symbol               string `gorm:"type:varchar(255)"`
 	Payload              []byte
 	PayloadHash          string    `gorm:"type:varchar(255);uniqueIndex"`
 	SourceAddress        string    `gorm:"type:varchar(255)"`

@@ -1,34 +1,45 @@
 package relayer
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
-	"github.com/scalarorg/relayers/pkg/adapters/evm"
+	"github.com/scalarorg/relayers/pkg/clients/electrs"
+	"github.com/scalarorg/relayers/pkg/clients/evm"
+	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
-	"github.com/scalarorg/relayers/pkg/types"
+	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/spf13/viper"
 )
 
 type Service struct {
-	EvmAdapter   *evm.EvmAdapter
-	BusEventChan chan *types.EventEnvelope
+	DbAdapter    *db.DatabaseAdapter
+	EventBus     *events.EventBus
+	Electrs      []*electrs.Client
+	EvmClients   []*evm.EvmClient
+	ScalarClient *scalar.Client
 }
 
-func NewService(config *config.Config, eventChan chan *types.EventEnvelope, receiverChanBufSize int) (*Service, error) {
+func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
+	eventBus *events.EventBus) (*Service, error) {
 	var err error
 
-	// // Initialize Axelar service
-	// err = axelar.InitAxelarAdapter()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// Initialize EVM service
-	evmAdapter, err := evm.NewEvmAdapter(config.EvmNetworks, eventChan, receiverChanBufSize)
+	// Initialize Scalar client
+	scalarClient, err := scalar.NewClient(config.ConfigPath)
 	if err != nil {
 		return nil, err
+	}
+	// Initialize Electrs clients
+	electrsClients, err := electrs.NewElectrumClients(config.ConfigPath, dbAdapter, eventBus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create electrum clients: %w", err)
+	}
+	// Initialize EVM clients
+	evmClients, err := evm.NewEvmClients(config.ConfigPath, dbAdapter, eventBus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create evm clients: %w", err)
 	}
 
 	// // Initialize BTC service
@@ -37,15 +48,12 @@ func NewService(config *config.Config, eventChan chan *types.EventEnvelope, rece
 	// 	return nil, err
 	// }
 
-	// Initialize RabbitMQ client
-	// err = rabbitmq.InitRabbitMQClient()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	return &Service{
-		EvmAdapter:   evmAdapter,
-		BusEventChan: eventChan,
+		DbAdapter:    dbAdapter,
+		EventBus:     eventBus,
+		Electrs:      electrsClients,
+		EvmClients:   evmClients,
+		ScalarClient: scalarClient,
 	}, nil
 }
 

@@ -107,11 +107,10 @@ func SetupTestDB(busEventChan chan *types.EventEnvelope, receiverChanBufSize int
 
 	// Create test DatabaseAdapter
 	testAdapter := &DatabaseAdapter{
-		PostgresClient:       postgresDb,
-		BusEventChan:         busEventChan,
-		BusEventReceiverChan: make(chan *types.EventEnvelope, receiverChanBufSize),
+		PostgresClient: postgresDb,
+		// BusEventChan:         busEventChan,
+		// BusEventReceiverChan: make(chan *types.EventEnvelope, receiverChanBufSize),
 	}
-	DbAdapter = testAdapter
 
 	// Return cleanup function
 	cleanup := func() {
