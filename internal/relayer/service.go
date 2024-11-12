@@ -1,8 +1,8 @@
 package relayer
 
 import (
+	"context"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
@@ -11,7 +11,6 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
-	"github.com/spf13/viper"
 )
 
 type Service struct {
@@ -27,7 +26,7 @@ func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
 	var err error
 
 	// Initialize Scalar client
-	scalarClient, err := scalar.NewClient(config.ConfigPath)
+	scalarClient, err := scalar.NewClient(config.ConfigPath, dbAdapter, eventBus)
 	if err != nil {
 		return nil, err
 	}
@@ -57,24 +56,18 @@ func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
 	}, nil
 }
 
-func (s *Service) Start() error {
-	go func() {
-		for event := range s.BusEventChan {
-			log.Info().Msgf("Received event: %v", event)
-			if event.Component == "DbAdapter" {
-				db.DbAdapter.BusEventReceiverChan <- event
-			} else if event.Component == "EvmAdapter" {
-				s.EvmAdapter.BusEventReceiverChan <- event
-			}
-		}
-	}()
+func (s *Service) Start(ctx context.Context) error {
 
-	go db.DbAdapter.ListenEventsFromBusChannel()
-
-	go s.EvmAdapter.ListenEventsFromBusChannel()
-
-	s.EvmAdapter.PollEventsFromAllEvmNetworks(time.Duration(viper.GetInt("POLL_INTERVAL")) * time.Second)
-
+	//Start electrum clients
+	for _, client := range s.Electrs {
+		go client.Start(ctx)
+	}
+	//Start evm clients
+	for _, client := range s.EvmClients {
+		go client.Start(ctx)
+	}
+	//Start scalar client
+	go s.ScalarClient.Start(ctx)
 	return nil
 }
 

@@ -14,11 +14,8 @@ const (
 )
 
 type EventEnvelope struct {
-	Component          string      // Which component should handle this
-	SenderClientName   string      // Which client should handle this
-	ReceiverClientName string      // Which client should handle this
-	Handler            string      // Which method should handle this
-	Data               interface{} // The actual event data
+	EventName string      // The name of the event in format "ComponentName.EventName"
+	Data      interface{} // The actual event data
 }
 
 type FindCosmosToEvmCallContractApproved struct {

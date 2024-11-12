@@ -3,42 +3,61 @@ package db
 import (
 	"encoding/hex"
 	"fmt"
-	"math/big"
-	"strconv"
 	"strings"
 
-	"github.com/btcsuite/btcd/btcjson"
 	"github.com/rs/zerolog/log"
 	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/types"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-func (db *DatabaseAdapter) GetLastBlock(chainName string) (*big.Int, error) {
-	var lastBlock models.LastBlock
+func (db *DatabaseAdapter) CreateSingleValue(value interface{}) error {
+	result := db.PostgresClient.Create(value)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
+
+func (db *DatabaseAdapter) CreateBatchValue(values interface{}, batchSize int) error {
+	result := db.PostgresClient.CreateInBatches(values, batchSize)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
+
+func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName string) (*models.EventCheckPoint, error) {
+	var lastBlock models.EventCheckPoint
 	result := db.PostgresClient.Where("chain_name = ?", chainName).First(&lastBlock)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	return big.NewInt(lastBlock.BlockNumber), nil
+	return &lastBlock, nil
 }
 
-func (db *DatabaseAdapter) UpdateLastBlock(chainName string, lastBlock *big.Int) error {
-	result := db.PostgresClient.Model(&models.LastBlock{}).
-		Where("chain_name = ?", chainName).
-		Updates(map[string]interface{}{
-			"block_number": lastBlock.Int64(),
-		})
-
-	// If no record exists, create one
-	if result.RowsAffected == 0 {
-		result = db.PostgresClient.Create(&models.LastBlock{
-			ChainName:   chainName,
-			BlockNumber: lastBlock.Int64(),
-		})
+func (db *DatabaseAdapter) UpdateLastEventCheckPoint(chainName string, lastBlock int64, eventKey string) error {
+	value := models.EventCheckPoint{
+		ChainName:   chainName,
+		BlockNumber: lastBlock,
+		EventKey:    eventKey,
+	}
+	result := db.PostgresClient.Clauses(
+		clause.OnConflict{
+			Columns: []clause.Column{{Name: "chain_name"}},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"block_number": lastBlock,
+				"event_key":    eventKey,
+			}),
+		},
+	).Create(&value)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update last event check point: %w", result.Error)
 	}
 
-	return result.Error
+	return nil
 }
 
 func (db *DatabaseAdapter) CreateRelayDatas(datas []models.RelayData) error {
@@ -80,20 +99,25 @@ func (db *DatabaseAdapter) FindRelayDataById(id string, includeCallContract, inc
 
 	return &relayData, nil
 }
+func (db *DatabaseAdapter) updateRelayData(id string, data interface{}) (tx *gorm.DB) {
+	result := db.PostgresClient.Model(&models.RelayData{}).Where("id = ?", id).Updates(data)
+	if result.Error != nil {
+		log.Error().Msgf("[DatabaseAdapter] [updateRelayData] %s: %v", id, result.Error)
+	}
+	log.Debug().Msgf("[DatabaseAdapter] [updateRelayData] %s: %v", id, data)
+	return result
+}
 
 // --- For Setup and Run Evm and Cosmos Relayer ---
-func (db *DatabaseAdapter) UpdateEventStatusWithPacketSequence(id string, status types.Status, sequence *int) error {
+func (db *DatabaseAdapter) UpdateRelayDataStatueWithPacketSequence(id string, status types.Status, sequence *int) error {
 	data := models.RelayData{
 		Status:         int(status),
 		PacketSequence: sequence,
 	}
-
-	result := db.PostgresClient.Model(&models.RelayData{}).Where("id = ?", id).Updates(data)
-	if result.Error != nil {
-		return result.Error
+	updateResult := db.updateRelayData(id, data)
+	if updateResult.Error != nil {
+		return updateResult.Error
 	}
-
-	log.Info().Msgf("[DBUpdate] %v", data)
 	return nil
 }
 
@@ -156,35 +180,6 @@ func (db *DatabaseAdapter) FindCosmosToEvmCallContractApproved(event *types.EvmE
 	return mappedResult, nil
 }
 
-func (db *DatabaseAdapter) CreateEvmContractCallApprovedEvent(event *types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]) error {
-	id := fmt.Sprintf("%s-%d-%d", event.Hash, event.Args.SourceEventIndex, event.LogIndex)
-	data := models.CallContractApproved{
-		ID:               id,
-		SourceChain:      event.SourceChain,
-		DestinationChain: event.DestinationChain,
-		TxHash:           strings.ToLower(event.Hash),
-		BlockNumber:      int(event.BlockNumber),
-		LogIndex:         int(event.LogIndex),
-		CommandId:        hex.EncodeToString(event.Args.CommandId[:]),
-		SourceAddress:    strings.ToLower(event.Args.SourceAddress),
-		ContractAddress:  strings.ToLower(event.Args.ContractAddress.String()),
-		PayloadHash:      strings.ToLower(hex.EncodeToString(event.Args.PayloadHash[:])),
-		SourceTxHash:     strings.ToLower(hex.EncodeToString(event.Args.SourceTxHash[:])),
-		SourceEventIndex: int(event.Args.SourceEventIndex.Int64()),
-	}
-
-	log.Debug().Msgf("[DatabaseClient] Create EvmContractCallApproved: %v", data)
-
-	result := db.PostgresClient.Create(&data)
-	if result.Error != nil {
-		log.Error().Msgf("[DatabaseClient] Create DB with error: %v", result.Error)
-		return result.Error
-	}
-
-	log.Debug().Msgf("[DatabaseClient] Create DB result: %v", data)
-	return nil
-}
-
 func (db *DatabaseAdapter) UpdateEventStatus(id string, status types.Status) error {
 	data := models.RelayData{
 		Status: int(status),
@@ -208,8 +203,8 @@ func (db *DatabaseAdapter) CreateEvmExecutedEvent(event *types.EvmEvent[*contrac
 		SourceChain:      event.SourceChain,
 		DestinationChain: event.DestinationChain,
 		TxHash:           event.Hash,
-		BlockNumber:      int(event.BlockNumber),
-		LogIndex:         int(event.LogIndex),
+		BlockNumber:      event.BlockNumber,
+		LogIndex:         event.LogIndex,
 		CommandId:        hex.EncodeToString(event.Args.CommandId[:]),
 		Status:           int(types.SUCCESS),
 	}
@@ -242,6 +237,18 @@ func (db *DatabaseAdapter) GetBurningTx(payloadHash string) (string, error) {
 
 	return hex.EncodeToString(relayData.CallContract.Payload), nil
 }
+func (db *DatabaseAdapter) UpdateContractCallApproved(messageID string, executeHash string) error {
+	updateData := map[string]interface{}{
+		"execute_hash": executeHash,
+		"status":       types.APPROVED,
+	}
+	record := db.PostgresClient.Model(&models.RelayData{}).Where("id = ?", messageID).Updates(updateData)
+	if record.Error != nil {
+		return record.Error
+	}
+	log.Info().Msgf("[DatabaseAdapter] [UpdateContractCallApproved]: RelayData[%s]", messageID)
+	return nil
+}
 
 // func (db *DatabaseAdapter) GetChainConfig(sourceChain string) (models.ChainConfig, error) {
 // 	var chainConfig models.ChainConfig
@@ -265,144 +272,144 @@ func (db *DatabaseAdapter) GetBurningTx(payloadHash string) (string, error) {
 // 	return chainConfig, nil
 // }
 
-func (db *DatabaseAdapter) UpdateCosmosToEvmEvent(event interface{}, txHash *string) error {
-	var messageID string
-	switch e := event.(type) {
-	case *types.IBCEvent[types.ContractCallSubmitted]:
-		messageID = e.Args.MessageID
-	case *types.IBCEvent[types.ContractCallWithTokenSubmitted]:
-		messageID = e.Args.MessageID
-	default:
-		return fmt.Errorf("unsupported event type: %T", event)
-	}
-	// If no transaction hash is provided, return early
-	if txHash == nil {
-		return nil
-	}
+// func (db *DatabaseAdapter) UpdateCosmosToEvmEvent(event interface{}, txHash *string) error {
+// 	var messageID string
+// 	switch e := event.(type) {
+// 	case *types.IBCEvent[types.ContractCallSubmitted]:
+// 		messageID = e.Args.MessageID
+// 	case *types.IBCEvent[types.ContractCallWithTokenSubmitted]:
+// 		messageID = e.Args.MessageID
+// 	default:
+// 		return fmt.Errorf("unsupported event type: %T", event)
+// 	}
+// 	// If no transaction hash is provided, return early
+// 	if txHash == nil {
+// 		return nil
+// 	}
 
-	lowercaseHash := strings.ToLower(*txHash)
-	data := models.RelayData{
-		ID:          messageID,
-		ExecuteHash: &lowercaseHash,
-		Status:      int(types.APPROVED),
-	}
+// 	lowercaseHash := strings.ToLower(*txHash)
+// 	data := models.RelayData{
+// 		ID:          messageID,
+// 		ExecuteHash: &lowercaseHash,
+// 		Status:      int(types.APPROVED),
+// 	}
 
-	result := db.PostgresClient.Model(&models.RelayData{}).Where("id = ?", messageID).Updates(data)
-	if result.Error != nil {
-		return result.Error
-	}
+// 	result := db.PostgresClient.Model(&models.RelayData{}).Where("id = ?", messageID).Updates(data)
+// 	if result.Error != nil {
+// 		return result.Error
+// 	}
 
-	log.Info().Msgf("[DatabaseClient] [Evm ContractCallApproved]: %v", data)
-	return nil
-}
+// 	log.Info().Msgf("[DatabaseClient] [Evm ContractCallApproved]: %v", data)
+// 	return nil
+// }
 
-func (db *DatabaseAdapter) HandleMultipleEvmToBtcEventsTx(event interface{}, tx *btcjson.GetTransactionResult, refTxHash, batchedCommandId string) error {
-	// Extract common fields based on event type
-	var sourceChain, destinationChain, messageID, sender, contractAddress, payloadHash, hash string
-	var messageIDIndex int
+// func (db *DatabaseAdapter) HandleMultipleEvmToBtcEventsTx(event interface{}, tx *btcjson.GetTransactionResult, refTxHash, batchedCommandId string) error {
+// 	// Extract common fields based on event type
+// 	var sourceChain, destinationChain, messageID, sender, contractAddress, payloadHash, hash string
+// 	var messageIDIndex int
 
-	switch e := event.(type) {
-	case *types.IBCEvent[types.ContractCallSubmitted]:
-		sourceChain = e.Args.SourceChain
-		destinationChain = e.Args.DestinationChain
-		messageID = e.Args.MessageID
-		sender = e.Args.Sender
-		contractAddress = e.Args.ContractAddress
-		payloadHash = e.Args.PayloadHash
-		hash = e.Hash
-		parts := strings.Split(messageID, "-")
-		if len(parts) > 1 {
-			if idx, err := strconv.Atoi(parts[1]); err == nil {
-				messageIDIndex = idx
-			}
-		}
-	case *types.IBCEvent[types.ContractCallWithTokenSubmitted]:
-		sourceChain = e.Args.SourceChain
-		destinationChain = e.Args.DestinationChain
-		messageID = e.Args.MessageID
-		sender = e.Args.Sender
-		contractAddress = e.Args.ContractAddress
-		payloadHash = e.Args.PayloadHash
-		hash = e.Hash
-		parts := strings.Split(messageID, "-")
-		if len(parts) > 1 {
-			if idx, err := strconv.Atoi(parts[1]); err == nil {
-				messageIDIndex = idx
-			}
-		}
-	default:
-		return fmt.Errorf("unsupported event type: %T", event)
-	}
+// 	switch e := event.(type) {
+// 	case *types.IBCEvent[types.ContractCallSubmitted]:
+// 		sourceChain = e.Args.SourceChain
+// 		destinationChain = e.Args.DestinationChain
+// 		messageID = e.Args.MessageID
+// 		sender = e.Args.Sender
+// 		contractAddress = e.Args.ContractAddress
+// 		payloadHash = e.Args.PayloadHash
+// 		hash = e.Hash
+// 		parts := strings.Split(messageID, "-")
+// 		if len(parts) > 1 {
+// 			if idx, err := strconv.Atoi(parts[1]); err == nil {
+// 				messageIDIndex = idx
+// 			}
+// 		}
+// 	case *types.IBCEvent[types.ContractCallWithTokenSubmitted]:
+// 		sourceChain = e.Args.SourceChain
+// 		destinationChain = e.Args.DestinationChain
+// 		messageID = e.Args.MessageID
+// 		sender = e.Args.Sender
+// 		contractAddress = e.Args.ContractAddress
+// 		payloadHash = e.Args.PayloadHash
+// 		hash = e.Hash
+// 		parts := strings.Split(messageID, "-")
+// 		if len(parts) > 1 {
+// 			if idx, err := strconv.Atoi(parts[1]); err == nil {
+// 				messageIDIndex = idx
+// 			}
+// 		}
+// 	default:
+// 		return fmt.Errorf("unsupported event type: %T", event)
+// 	}
 
-	if tx == nil {
-		return nil
-	}
+// 	if tx == nil {
+// 		return nil
+// 	}
 
-	// Use the extracted fields in your data structures
-	TxIDLower := strings.ToLower(tx.TxID)
-	contractCallData := models.RelayData{
-		ExecuteHash: &TxIDLower,
-		Status:      int(types.SUCCESS),
-	}
+// 	// Use the extracted fields in your data structures
+// 	TxIDLower := strings.ToLower(tx.TxID)
+// 	contractCallData := models.RelayData{
+// 		ExecuteHash: &TxIDLower,
+// 		Status:      int(types.SUCCESS),
+// 	}
 
-	contractCallApprovedData := models.CallContractApproved{
-		ID:               messageID,
-		SourceChain:      sourceChain,
-		DestinationChain: destinationChain,
-		TxHash:           strings.ToLower(hash),
-		BlockNumber:      int(tx.BlockIndex),
-		LogIndex:         0,
-		CommandId:        batchedCommandId,
-		SourceAddress:    sender,
-		ContractAddress:  strings.ToLower(contractAddress),
-		PayloadHash:      strings.ToLower(payloadHash),
-		SourceTxHash:     strings.ToLower(hash),
-		SourceEventIndex: messageIDIndex,
-	}
+// 	contractCallApprovedData := models.CallContractApproved{
+// 		ID:               messageID,
+// 		SourceChain:      sourceChain,
+// 		DestinationChain: destinationChain,
+// 		TxHash:           strings.ToLower(hash),
+// 		BlockNumber:      uint64(tx.BlockIndex),
+// 		LogIndex:         0,
+// 		CommandId:        batchedCommandId,
+// 		SourceAddress:    sender,
+// 		ContractAddress:  strings.ToLower(contractAddress),
+// 		PayloadHash:      strings.ToLower(payloadHash),
+// 		SourceTxHash:     strings.ToLower(hash),
+// 		SourceEventIndex: uint64(messageIDIndex),
+// 	}
 
-	amount := strconv.FormatFloat(tx.Amount, 'f', -1, 64)
-	executedData := models.CommandExecuted{
-		ID:               messageID,
-		SourceChain:      sourceChain,
-		DestinationChain: destinationChain,
-		TxHash:           strings.ToLower(tx.TxID),
-		BlockNumber:      int(tx.BlockIndex),
-		LogIndex:         0,
-		CommandId:        batchedCommandId,
-		Status:           int(types.SUCCESS),
-		ReferenceTxHash:  &refTxHash,
-		Amount:           &amount,
-	}
+// 	amount := strconv.FormatFloat(tx.Amount, 'f', -1, 64)
+// 	executedData := models.CommandExecuted{
+// 		ID:               messageID,
+// 		SourceChain:      sourceChain,
+// 		DestinationChain: destinationChain,
+// 		TxHash:           strings.ToLower(tx.TxID),
+// 		BlockNumber:      tx.BlockIndex,
+// 		LogIndex:         0,
+// 		CommandId:        batchedCommandId,
+// 		Status:           int(types.SUCCESS),
+// 		ReferenceTxHash:  &refTxHash,
+// 		Amount:           &amount,
+// 	}
 
-	// Begin transaction
-	txDbClient := db.PostgresClient.Begin()
-	if txDbClient.Error != nil {
-		return txDbClient.Error
-	}
+// 	// Begin transaction
+// 	txDbClient := db.PostgresClient.Begin()
+// 	if txDbClient.Error != nil {
+// 		return txDbClient.Error
+// 	}
 
-	// Update RelayData
-	if err := txDbClient.Model(&models.RelayData{}).Where("id = ?", messageID).Updates(contractCallData).Error; err != nil {
-		txDbClient.Rollback()
-		return err
-	}
+// 	// Update RelayData
+// 	if err := txDbClient.Model(&models.RelayData{}).Where("id = ?", messageID).Updates(contractCallData).Error; err != nil {
+// 		txDbClient.Rollback()
+// 		return err
+// 	}
 
-	// Create CallContractApproved
-	if err := txDbClient.Create(&contractCallApprovedData).Error; err != nil {
-		txDbClient.Rollback()
-		return err
-	}
+// 	// Create CallContractApproved
+// 	if err := txDbClient.Create(&contractCallApprovedData).Error; err != nil {
+// 		txDbClient.Rollback()
+// 		return err
+// 	}
 
-	// Create CommandExecuted
-	if err := txDbClient.Create(&executedData).Error; err != nil {
-		txDbClient.Rollback()
-		return err
-	}
+// 	// Create CommandExecuted
+// 	if err := txDbClient.Create(&executedData).Error; err != nil {
+// 		txDbClient.Rollback()
+// 		return err
+// 	}
 
-	// Commit transaction
-	if err := txDbClient.Commit().Error; err != nil {
-		return err
-	}
+// 	// Commit transaction
+// 	if err := txDbClient.Commit().Error; err != nil {
+// 		return err
+// 	}
 
-	log.Info().Msgf("[DatabaseClient] [HandleMultipleEvmToBtcEventsTx]: %+v", executedData)
-	return nil
-}
+// 	log.Info().Msgf("[DatabaseClient] [HandleMultipleEvmToBtcEventsTx]: %+v", executedData)
+// 	return nil
+// }

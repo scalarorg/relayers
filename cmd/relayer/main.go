@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,8 +11,6 @@ import (
 	"github.com/scalarorg/relayers/internal/relayer"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
-	"github.com/scalarorg/relayers/pkg/types"
-	"github.com/spf13/viper"
 )
 
 func main() {
@@ -35,11 +34,8 @@ func main() {
 		panic("Failed to load config: " + err.Error())
 	}
 
-	// Initialize Event Bus channel
-	eventChan := make(chan *types.EventEnvelope, viper.GetInt("CHANNEL_BUFFER_SIZE"))
-
 	// Initialize global DatabaseClient
-	eventBus := events.GetEventBus(&config.EventBus)
+	eventBus := events.GetEventBus(&config.GlobalConfig.EventBus)
 	dbAdapter, err := db.NewDatabaseAdapter(config.GlobalConfig)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create database adapter")
@@ -52,7 +48,7 @@ func main() {
 	}
 
 	// Start relayer service
-	err = service.Start()
+	err = service.Start(context.TODO())
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to start relayer service")
 	}

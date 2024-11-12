@@ -6,9 +6,11 @@ import (
 	"gorm.io/gorm"
 )
 
-type LastBlock struct {
+type EventCheckPoint struct {
+	gorm.Model
 	ChainName   string `gorm:"primaryKey;type:varchar(255)"`
 	BlockNumber int64  `gorm:"type:bigint"`
+	EventKey    string `gorm:"type:varchar(255)"`
 }
 
 type Operatorship struct {
@@ -34,8 +36,8 @@ type CommandExecuted struct {
 	SourceChain      string `gorm:"type:varchar(255)"`
 	DestinationChain string `gorm:"type:varchar(255)"`
 	TxHash           string `gorm:"type:varchar(255)"`
-	BlockNumber      int
-	LogIndex         int
+	BlockNumber      uint64
+	LogIndex         uint
 	CommandId        string
 	Status           int       `gorm:"default:0"`
 	ReferenceTxHash  *string   `gorm:"type:varchar(255)"`
@@ -48,8 +50,8 @@ type CallContract struct {
 	ID                   string `gorm:"primaryKey;type:varchar(255)"`
 	TxHash               string `gorm:"type:varchar(255)"`
 	TxHex                []byte
-	BlockNumber          int `gorm:"default:0"`
-	LogIndex             int
+	BlockNumber          uint64 `gorm:"default:0"`
+	LogIndex             uint
 	ContractAddress      string `gorm:"type:varchar(255)"`
 	Amount               uint64 `gorm:"type:bigint"`
 	Symbol               string `gorm:"type:varchar(255)"`
@@ -89,12 +91,12 @@ type CallContractApproved struct {
 	SourceChain      string `gorm:"type:varchar(255)"`
 	DestinationChain string `gorm:"type:varchar(255)"`
 	TxHash           string `gorm:"type:varchar(255)"`
-	BlockNumber      int
-	LogIndex         int
+	BlockNumber      uint64
+	LogIndex         uint
 	SourceAddress    string `gorm:"type:varchar(255)"`
 	ContractAddress  string `gorm:"type:varchar(255)"`
 	SourceTxHash     string `gorm:"type:varchar(255)"`
-	SourceEventIndex int
+	SourceEventIndex uint64
 	PayloadHash      string `gorm:"type:varchar(255)"`
 	CommandId        string
 	CallContractID   *string       `gorm:"type:varchar(255);unique"`

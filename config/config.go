@@ -1,14 +1,10 @@
 package config
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
-	"github.com/scalarorg/relayers/pkg/types"
 	"github.com/spf13/viper"
 )
 
@@ -26,7 +22,6 @@ type RabbitMQConfig struct {
 }
 
 type EventBusConfig struct {
-	EventChan chan *types.EventEnvelope
 }
 
 type BtcNetworkConfig struct {
@@ -50,6 +45,7 @@ type Config struct {
 	ChainEnv          string         `mapstructure:"chain_env"`
 	ConnnectionString string         `mapstructure:"connection_string"` // Postgres db connection string
 	ScalarMnemonic    string         `mapstructure:"scalar_mnemonic"`
+	EvmPrivateKey     string         `mapstructure:"evm_private_key"`
 	EventBus          EventBusConfig `mapstructure:"event_bus"`
 	//Broadcast node config, don't need to be signed
 	BtcNetworks []BtcNetworkConfig `mapstructure:"btc_networks"`
@@ -118,6 +114,7 @@ func injectEnvConfig(cfg *Config) error {
 	cfg.ChainEnv = viper.GetString("CHAIN_ENV")
 	cfg.ConnnectionString = viper.GetString("DATABASE_URL")
 	cfg.ScalarMnemonic = viper.GetString("SCALAR_MNEMONIC")
+	cfg.EvmPrivateKey = viper.GetString("EVM_PRIVATE_KEY")
 	return nil
 }
 
@@ -179,58 +176,4 @@ func Load() error {
 }
 func GetScalarMnemonic() string {
 	return GlobalConfig.ScalarMnemonic
-}
-func GetEvmPrivateKey(networkID string) (string, error) {
-	configChainsPath := viper.GetString("CONFIG_CHAINS_RUNTIME_PATH")
-	configFile := fmt.Sprintf("%s/%s/config.json", configChainsPath, networkID)
-
-	// Check if config.json exists for the network
-	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		return "", fmt.Errorf("no config file found for network ID %s", networkID)
-	}
-
-	// Create a new Viper instance
-	v := viper.New()
-	v.SetConfigFile(configFile)
-	v.SetConfigType("json")
-
-	if err := v.ReadInConfig(); err != nil {
-		return "", fmt.Errorf("error reading config file %s: %w", configFile, err)
-	}
-
-	var networkConfig RuntimeEvmNetworkConfig
-	if err := v.Unmarshal(&networkConfig); err != nil {
-		return "", fmt.Errorf("error unmarshaling config from %s: %w", configFile, err)
-	}
-
-	var privateKey string
-
-	if networkConfig.PrivateKey != nil && *networkConfig.PrivateKey != "" {
-		privateKey = *networkConfig.PrivateKey
-	} else if networkConfig.Mnemonic != nil && networkConfig.WalletIndex != nil {
-		wallet, err := hdwallet.NewFromMnemonic(*networkConfig.Mnemonic)
-		if err != nil {
-			return "", fmt.Errorf("failed to create wallet from mnemonic: %w", err)
-		}
-
-		path := hdwallet.MustParseDerivationPath(fmt.Sprintf("m/44'/60'/0'/0/%s", *networkConfig.WalletIndex))
-		account, err := wallet.Derive(path, true)
-		if err != nil {
-			return "", fmt.Errorf("failed to derive account: %w", err)
-		}
-
-		privateKeyECDSA, err := wallet.PrivateKey(account)
-		if err != nil {
-			return "", fmt.Errorf("failed to get private key: %w", err)
-		}
-
-		privateKeyBytes := crypto.FromECDSA(privateKeyECDSA)
-		privateKey = hex.EncodeToString(privateKeyBytes)
-	}
-
-	if privateKey == "" {
-		return "", fmt.Errorf("no private key found for network %s", networkConfig.ID)
-	}
-
-	return privateKey, nil
 }

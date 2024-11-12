@@ -27,8 +27,8 @@ func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayDa
 		From: c.config.SourceChain,
 		CallContract: &models.CallContract{
 			TxHash:          vaultTx.TxHash,
-			BlockNumber:     vaultTx.Height,
-			LogIndex:        vaultTx.TxPosition,
+			BlockNumber:     uint64(vaultTx.Height),
+			LogIndex:        uint(vaultTx.TxPosition),
 			ContractAddress: strings.ToLower(vaultTx.DestContractAddress),
 			//Do not confuse this with Btc Sender address
 			SourceAddress:   strings.ToLower(vaultTx.DestRecipientAddress),

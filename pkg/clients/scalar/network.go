@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	axltypes "github.com/axelarnetwork/axelar-core/x/axelarnet/types"
 	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
@@ -37,6 +38,7 @@ type NetworkClient struct {
 	config      *cosmos.CosmosNetworkConfig
 	rpcEndpoint string
 	rpcClient   rpcclient.Client
+	grpcConn    *grpc.ClientConn
 	addr        sdk.AccAddress
 	privKey     *secp256k1.PrivKey
 	txConfig    client.TxConfig
@@ -55,6 +57,10 @@ func NewNetworkClient(config *cosmos.CosmosNetworkConfig, txConfig client.TxConf
 			return nil, err
 		}
 	}
+	grpcConn, err := grpc.NewClient(config.RPCUrl)
+	if err != nil {
+		return nil, err
+	}
 	// wsClient, err := rpchttp.New(config.WsEndpoint, "/websocket")
 	// if err != nil {
 	// 	return nil, err
@@ -63,6 +69,7 @@ func NewNetworkClient(config *cosmos.CosmosNetworkConfig, txConfig client.TxConf
 	networkClient := &NetworkClient{
 		config:    config,
 		rpcClient: rpcClient,
+		grpcConn:  grpcConn,
 		addr:      addr,
 		privKey:   privKey,
 		txConfig:  txConfig,
@@ -70,13 +77,49 @@ func NewNetworkClient(config *cosmos.CosmosNetworkConfig, txConfig client.TxConf
 	}
 	return networkClient, nil
 }
+func (c *NetworkClient) NewQueryServiceClient() emvtypes.QueryServiceClient {
+	return emvtypes.NewQueryServiceClient(c.grpcConn)
+}
+func (c *NetworkClient) NewMsgServiceClient() axltypes.MsgServiceClient {
+	return axltypes.NewMsgServiceClient(c.grpcConn)
+}
 
 // https://github.com/cosmos/cosmos-sdk/blob/main/client/tx/tx.go#L31
 func (c *NetworkClient) ConfirmEvmTx(ctx context.Context, msg *emvtypes.ConfirmGatewayTxsRequest) (*sdk.TxResponse, error) {
+	return c.SignAndBroadcastMsgs(ctx, msg)
+}
+
+func (c *NetworkClient) SignCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
+	req := emvtypes.NewSignCommandsRequest(
+		c.getAddress(),
+		destinationChain)
+
+	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign commands request: %w", err)
+	}
+	return txRes, nil
+}
+func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, payload string) (*sdk.TxResponse, error) {
+	payloadBytes := []byte(payload)
+	req := axltypes.NewRouteMessage(
+		c.getAddress(),
+		c.getFeegranter(),
+		id,
+		payloadBytes,
+	)
+	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign commands request: %w", err)
+	}
+	return txRes, nil
+}
+
+func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 	//1. Build unsigned transaction using txFactory
 	txf := c.txFactory
 	// Every required params are set in the txFactory
-	txBuilder, err := txf.BuildUnsignedTx(msg)
+	txBuilder, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +143,6 @@ func (c *NetworkClient) ConfirmEvmTx(ctx context.Context, msg *emvtypes.ConfirmG
 
 	return result, nil
 }
-
 func (c *NetworkClient) signTx(ctx context.Context, txBuilder client.TxBuilder, overwriteSig bool) error {
 	txf := c.txFactory
 	//2. Sign the transaction
@@ -255,6 +297,42 @@ func (c *NetworkClient) UnSubscribeAll(ctx context.Context, subscriber string) e
 	}
 	return node.UnsubscribeAll(ctx, subscriber)
 }
+func (c *NetworkClient) QueryPendingCommand(ctx context.Context, destinationChain string) ([]emvtypes.QueryCommandResponse, error) {
+	req := &emvtypes.PendingCommandsRequest{
+		Chain: destinationChain,
+	}
+	resp, err := c.NewQueryServiceClient().PendingCommands(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query pending commands: %w", err)
+	}
+
+	return resp.Commands, nil
+}
+
+func (c *NetworkClient) QueryBatchedCommands(ctx context.Context, destinationChain string, batchedCommandId string) (*emvtypes.BatchedCommandsResponse, error) {
+	req := &emvtypes.BatchedCommandsRequest{
+		Chain: destinationChain,
+		Id:    batchedCommandId,
+	}
+	resp, err := c.NewQueryServiceClient().BatchedCommands(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query batched commands: %w", err)
+	}
+	return resp, nil
+}
+func (c *NetworkClient) QueryRouteMessageRequest(ctx context.Context, id string, payload string) (*axltypes.RouteMessageResponse, error) {
+	req := &axltypes.RouteMessageRequest{
+		Sender:     c.getAddress(),
+		ID:         id,
+		Payload:    []byte(payload),
+		Feegranter: c.getAddress(),
+	}
+	resp, err := c.NewMsgServiceClient().RouteMessage(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query route message request: %w", err)
+	}
+	return resp, nil
+}
 
 // func (c *NetworkClient) QueryTx(ctx context.Context, hash []byte) (*ctypes.ResultTx, error) {
 // 	// Query by hash
@@ -300,6 +378,9 @@ func (c *NetworkClient) QueryBalance(ctx context.Context, addr sdk.AccAddress) (
 
 // Get Broadcast Address from config (privatekey or mnemonic)
 func (c *NetworkClient) getAddress() sdk.AccAddress {
+	return c.addr
+}
+func (c *NetworkClient) getFeegranter() sdk.AccAddress {
 	return c.addr
 }
 func (c *NetworkClient) GetNode() (rpcclient.Client, error) {

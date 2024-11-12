@@ -9,12 +9,6 @@ type AxelarListenerEvent[T any] struct {
 	ParseEvent func(events map[string][]string) (T, error)
 }
 
-// ExecuteRequest represents an execute request
-type ExecuteRequest struct {
-	ID      string `json:"id"`
-	Payload string `json:"payload"`
-}
-
 // IBCEvent represents a generic IBC event with generic type T for Args
 type IBCEvent[T any] struct {
 	Hash        string `json:"hash"`

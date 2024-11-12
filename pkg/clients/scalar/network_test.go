@@ -3,14 +3,20 @@ package scalar_test
 import (
 	"testing"
 
-	"github.com/cosmos/cosmos-sdk/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
-	scalar_clients "github.com/scalarorg/relayers/pkg/clients/scalar"
+	"github.com/scalarorg/relayers/pkg/clients/scalar"
+	"github.com/scalarorg/relayers/pkg/db"
+	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	DefaultConfig = cosmos.CosmosNetworkConfig{
+	DefaultConfig = config.Config{
+		ChainEnv: "testnet",
+	}
+	DefaultCosmosNetworkConfig = cosmos.CosmosNetworkConfig{
 		ChainID:  "scalar-testnet-1",
 		Denom:    "uatom",
 		RPCUrl:   "http://localhost:26657",
@@ -23,11 +29,14 @@ var (
 
 func TestCreateTransaction(t *testing.T) {
 	// Configure the address prefix for Axelar
-	config := types.GetConfig()
-	config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
+	sdk.GetConfig().SetBech32PrefixForAccount("axelar", "axelarvaloper")
 
 	// Setup test client
-	client, err := scalar_clients.NewClientFromConfig(&DefaultConfig)
+	dbAdapter, err := db.NewDatabaseAdapter(&DefaultConfig)
+	require.NoError(t, err)
+	eventBusConfig := config.EventBusConfig{}
+	eventBus := events.NewEventBus(&eventBusConfig)
+	client, err := scalar.NewClientFromConfig(&DefaultCosmosNetworkConfig, dbAdapter, eventBus)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 

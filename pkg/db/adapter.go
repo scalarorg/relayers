@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -150,20 +149,8 @@ func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
 		&models.CallContractApproved{},
 		&models.CommandExecuted{},
 		&models.Operatorship{},
-		&models.LastBlock{},
+		&models.EventCheckPoint{},
 	)
-
-	for _, evmNetwork := range config.EvmNetworks {
-		lastBlock := evmNetwork.LastBlock
-		lastBlockInt, err := strconv.ParseInt(lastBlock, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		db.Create(&models.LastBlock{
-			ChainName:   evmNetwork.Name,
-			BlockNumber: lastBlockInt,
-		})
-	}
 
 	if err != nil {
 		return nil, err

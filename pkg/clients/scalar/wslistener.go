@@ -1,4 +1,4 @@
-package axelar
+package scalar
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/relayers/config"
+	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/scalarorg/relayers/pkg/types"
 )
 
@@ -19,13 +19,13 @@ type AxelarListener struct {
 	maxRetries int
 }
 
-func NewAxelarListener() (*AxelarListener, error) {
-	if config.GlobalConfig.Axelar.RPCUrl == "" {
-		return nil, fmt.Errorf("axelar RPC URL is not configured")
+func NewAxelarListener(config *cosmos.CosmosNetworkConfig) (*AxelarListener, error) {
+	if config.RPCUrl == "" {
+		return nil, fmt.Errorf("scalar RPC URL is not configured")
 	}
 
 	return &AxelarListener{
-		wsURL:      config.GlobalConfig.Axelar.RPCUrl,
+		wsURL:      config.RPCUrl,
 		wsMap:      make(map[string]*websocket.Conn),
 		maxRetries: -1, // infinite retries, like TypeScript version
 	}, nil
