@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -11,26 +11,31 @@ import (
 	"github.com/scalarorg/relayers/internal/relayer"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-func main() {
-	// // Initialize OpenObserve
-	// appName := viper.GetString("APP_NAME")
-	// if viper.GetBool("IS_DEV") {
-	// 	appName = appName + "-dev"
-	// }
-	// openobserve.Init(openobserve.OpenObserveConfig{
-	// 	Endpoint:    viper.GetString("OPENOBSERVE_ENDPOINT"),
-	// 	Credential:  viper.GetString("OPENOBSERVE_CREDENTIAL"),
-	// 	ServiceName: appName,
-	// 	Env:         viper.GetString("ENV"),
-	// })
+var (
+	environment string
+	rootCmd     = &cobra.Command{
+		Use:   "relayer",
+		Short: "Scalar Relayer",
+		Run:   run,
+	}
+)
 
+// Execute executes the root command.
+func Execute() error {
+	return rootCmd.Execute()
+}
+
+func run(cmd *cobra.Command, args []string) {
 	// Initialize logger
 	config.InitLogger()
-
+	// Initialize OpenObserve
+	initObserve()
 	// Load and initialize global config
-	if err := config.Load(); err != nil {
+	if err := config.Load(environment); err != nil {
 		panic("Failed to load config: " + err.Error())
 	}
 
@@ -60,4 +65,28 @@ func main() {
 
 	log.Info().Msg("Shutting down relayer...")
 	service.Stop()
+}
+
+func initObserve() {
+	// // Initialize OpenObserve
+	// appName := viper.GetString("APP_NAME")
+	// if viper.GetBool("IS_DEV") {
+	// 	appName = appName + "-dev"
+	// }
+	// openobserve.Init(openobserve.OpenObserveConfig{
+	// 	Endpoint:    viper.GetString("OPENOBSERVE_ENDPOINT"),
+	// 	Credential:  viper.GetString("OPENOBSERVE_CREDENTIAL"),
+	// 	ServiceName: appName,
+	// 	Env:         viper.GetString("ENV"),
+	// })
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringVar(
+		&environment,
+		"env",
+		"local",
+		"Environment name to  to the configuration file",
+	)
+	viper.BindPFlag("env", rootCmd.PersistentFlags().Lookup("env"))
 }

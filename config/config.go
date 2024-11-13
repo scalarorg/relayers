@@ -36,14 +36,14 @@ type Config struct {
 
 var GlobalConfig *Config
 
-func LoadEnv() error {
+func LoadEnv(environment string) error {
 	// Tell Viper to read from environment
 	viper.AutomaticEnv()
 
 	// Add support for .env files
-	viper.SetConfigName(".env.local") // name of config file (without extension)
-	viper.SetConfigType("env")        // type of config file
-	viper.AddConfigPath(".")          // look for config in the working directory
+	viper.SetConfigName(".env." + environment) // name of config file (without extension)
+	viper.SetConfigType("env")                 // type of config file
+	viper.AddConfigPath(".")                   // look for config in the working directory
 
 	// Read the .env file
 	if err := viper.ReadInConfig(); err != nil {
@@ -93,8 +93,8 @@ func ReadJsonConfig[T any](filePath string) (*T, error) {
 
 func injectEnvConfig(cfg *Config) error {
 	//Set config environment variables
+	cfg.ChainEnv = "local"
 	cfg.ConfigPath = viper.GetString("CONFIG_PATH")
-	cfg.ChainEnv = viper.GetString("CHAIN_ENV")
 	cfg.ConnnectionString = viper.GetString("DATABASE_URL")
 	cfg.ScalarMnemonic = viper.GetString("SCALAR_MNEMONIC")
 	cfg.EvmPrivateKey = viper.GetString("EVM_PRIVATE_KEY")
@@ -102,9 +102,9 @@ func injectEnvConfig(cfg *Config) error {
 	return nil
 }
 
-func Load() error {
+func Load(environment string) error {
 	// Load environment variables into viper
-	if err := LoadEnv(); err != nil {
+	if err := LoadEnv(environment); err != nil {
 		panic("Failed to load environment variables: " + err.Error())
 	}
 	var cfg Config
