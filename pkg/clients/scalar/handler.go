@@ -2,6 +2,7 @@ package scalar
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
 )
@@ -47,8 +49,9 @@ func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBC
 	// Todo:After the executeData is broadcasted,
 	// Update status of the RelayerData to Approved
 	c.eventBus.BroadcastEvent(&types.EventEnvelope{
-		EventName: events.EVENT_SCALAR_CONTRACT_CALL_APPROVED,
-		Data:      executeData,
+		EventType:        events.EVENT_SCALAR_CONTRACT_CALL_APPROVED,
+		DestinationChain: destinationChain,
+		Data:             executeData,
 	},
 	)
 	return nil
@@ -114,6 +117,16 @@ func (c *Client) handleEVMCompletedEvent(ctx context.Context, event *IBCEvent[EV
 
 func (c *Client) preprocessEVMCompletedEvent(event *IBCEvent[EVMEventCompleted]) error {
 	log.Debug().Msgf("EVMCompletedEvent: %v", event)
+	//Load payload from the db
+	includeCallContract := true
+	queryOption := &db.QueryOptions{
+		IncludeCallContract: &includeCallContract,
+	}
+	relayData, err := c.dbAdapter.FindRelayDataById(event.Args.ID, queryOption)
+	if err != nil {
+		return fmt.Errorf("failed to get payload: %w", err)
+	}
+	event.Args.Payload = hex.EncodeToString(relayData.CallContract.Payload)
 	return nil
 }
 

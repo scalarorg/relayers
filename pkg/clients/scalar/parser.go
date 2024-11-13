@@ -43,14 +43,17 @@ func ParseContractCallApprovedEvent(event map[string][]string) (*IBCEvent[Contra
 	}, nil
 }
 
-func ParseEvmEventCompletedEvent(event map[string][]string) (*IBCEvent[string], error) {
+func ParseEvmEventCompletedEvent(event map[string][]string) (*IBCEvent[EVMEventCompleted], error) {
 	eventID := removeQuote(event["axelar.evm.v1beta1.EVMEventCompleted.event_id"][0])
-
-	return &IBCEvent[string]{
+	args := EVMEventCompleted{
+		ID:      eventID,
+		Payload: "",
+	}
+	return &IBCEvent[EVMEventCompleted]{
 		Hash:        event["tx.hash"][0],
 		SrcChannel:  event["write_acknowledgement.packet_src_channel"][0],
 		DestChannel: event["write_acknowledgement.packet_dst_channel"][0],
-		Args:        eventID,
+		Args:        args,
 	}, nil
 }
 

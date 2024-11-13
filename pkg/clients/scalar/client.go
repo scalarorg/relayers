@@ -22,7 +22,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	"github.com/ethereum/go-ethereum/common"
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 type Client struct {
@@ -66,11 +65,10 @@ func NewClientFromConfig(config *cosmos.CosmosNetworkConfig, dbAdapter *db.Datab
 func (c *Client) Start(ctx context.Context) error {
 	go func() {
 		if _, err := Subscribe(ctx, c, ContractCallApprovedEvent,
-			func(data tmtypes.TMEventData, err error) error {
+			func(event *IBCEvent[ContractCallApproved], err error) error {
 				if err != nil {
 					return err
 				}
-				event := data.(*IBCEvent[ContractCallApproved])
 				return c.handleContractCallApprovedEvent(ctx, event)
 			}); err != nil {
 			log.Printf("Failed to subscribe to ContractCallApprovedEvent: %v", err)
@@ -78,11 +76,10 @@ func (c *Client) Start(ctx context.Context) error {
 	}()
 	go func() {
 		if _, err := Subscribe(ctx, c, EVMCompletedEvent,
-			func(data tmtypes.TMEventData, err error) error {
+			func(event *IBCEvent[EVMEventCompleted], err error) error {
 				if err != nil {
 					return err
 				}
-				event := data.(*IBCEvent[EVMEventCompleted])
 				return c.handleEVMCompletedEvent(ctx, event)
 			}); err != nil {
 			log.Printf("Failed to subscribe to EVMCompletedEvent: %v", err)
@@ -95,7 +92,7 @@ func (c *Client) Start(ctx context.Context) error {
 func Subscribe[T any](ctx context.Context,
 	c *Client,
 	event ListenerEvent[T],
-	callback func(data tmtypes.TMEventData, err error) error) (string, error) {
+	callback EventHandlerCallBack[T]) (string, error) {
 	subscriberName := "relayer"
 	eventCh, err := c.network.Subscribe(ctx, subscriberName, event.TopicId)
 	if err != nil {

@@ -14,6 +14,7 @@ const (
 	ExecuteMessageEventTopicId        = "tm.event='Tx' AND message.action='ExecuteMessage'"
 )
 
+type EventHandlerCallBack[T any] func(event *T, err error) error
 type ListenerEvent[T any] struct {
 	TopicId string
 	Type    string
@@ -76,7 +77,7 @@ var (
 		Type:    "axelar.evm.v1beta1.ContractCallApproved",
 		Parser:  ParseContractCallApprovedEvent,
 	}
-	EVMCompletedEvent = ListenerEvent[IBCEvent[string]]{
+	EVMCompletedEvent = ListenerEvent[IBCEvent[EVMEventCompleted]]{
 		TopicId: EVMCompletedEventTopicId,
 		Type:    "axelar.evm.v1beta1.EVMEventCompleted",
 		Parser:  ParseEvmEventCompletedEvent,

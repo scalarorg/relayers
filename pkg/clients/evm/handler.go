@@ -29,7 +29,7 @@ func (ec *EvmClient) handleContractCall(event *contracts.IAxelarGatewayContractC
 	}
 	//2. Send to the bus
 	ec.eventBus.BroadcastEvent(&types.EventEnvelope{
-		EventName: events.EVENT_EVM_CONTRACT_CALL,
+		EventType: events.EVENT_EVM_CONTRACT_CALL,
 		Data:      event,
 	})
 	return nil
@@ -52,9 +52,11 @@ func (ec *EvmClient) handleContractCallApproved(event *contracts.IAxelarGatewayC
 		return fmt.Errorf("failed to create contract call approved: %w", err)
 	}
 	//2. Send to the bus
+	destinationChain := extractDestChainFromEvmGwContractCallApproved(event)
 	ec.eventBus.BroadcastEvent(&types.EventEnvelope{
-		EventName: events.EVENT_EVM_CONTRACT_CALL_APPROVED,
-		Data:      event,
+		EventType:        events.EVENT_EVM_CONTRACT_CALL_APPROVED,
+		DestinationChain: destinationChain,
+		Data:             event,
 	})
 	return nil
 }
@@ -79,7 +81,7 @@ func (ec *EvmClient) handleCommandExecuted(event *contracts.IAxelarGatewayExecut
 	}
 	//2. Send to the bus
 	ec.eventBus.BroadcastEvent(&types.EventEnvelope{
-		EventName: events.EVENT_EVM_COMMAND_EXECUTED,
+		EventType: events.EVENT_EVM_COMMAND_EXECUTED,
 		Data:      event,
 	})
 	return nil

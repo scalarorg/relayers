@@ -14,8 +14,9 @@ const (
 )
 
 type EventEnvelope struct {
-	EventName string      // The name of the event in format "ComponentName.EventName"
-	Data      interface{} // The actual event data
+	DestinationChain string      // The source chain of the event
+	EventType        string      // The name of the event in format "ComponentName.EventName"
+	Data             interface{} // The actual event data
 }
 
 type FindCosmosToEvmCallContractApproved struct {
