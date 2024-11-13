@@ -25,7 +25,9 @@ go.work.sum
 .env
 .env*.local
 .env*.production
-
+# Macos system files
+.DS_Store
+# Runtime data
 runtime
 
 data/local

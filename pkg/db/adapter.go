@@ -3,14 +3,11 @@ package db
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
-	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db/models"
-	"github.com/scalarorg/relayers/pkg/types"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -18,116 +15,129 @@ import (
 	"gorm.io/gorm"
 )
 
-var DbAdapter *DatabaseAdapter
+var dbAdapter *DatabaseAdapter
 
 type DatabaseAdapter struct {
-	PostgresClient       *gorm.DB
-	MongoClient          *mongo.Client
-	MongoDatabase        *mongo.Database
-	BusEventChan         chan *types.EventEnvelope
-	BusEventReceiverChan chan *types.EventEnvelope
+	PostgresClient *gorm.DB
+	// MongoClient    *mongo.Client
+	// MongoDatabase  *mongo.Database
+	// BusEventChan         chan *types.EventEnvelope
+	// BusEventReceiverChan chan *types.EventEnvelope
 }
 
-func InitDatabaseAdapter(config *config.Config, busEventChan chan *types.EventEnvelope, receiverChanBufSize int) error {
-	DbAdapter = &DatabaseAdapter{
-		BusEventChan:         busEventChan,
-		BusEventReceiverChan: make(chan *types.EventEnvelope, receiverChanBufSize),
-	}
-
-	var err error
-	DbAdapter.PostgresClient, err = NewPostgresClient(config)
-	if err != nil {
-		return err
-	}
-	DbAdapter.MongoClient, DbAdapter.MongoDatabase, err = NewMongoClient()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (da *DatabaseAdapter) ListenEventsFromBusChannel() {
-	for event := range da.BusEventReceiverChan {
-		switch event.Component {
-		case "DbAdapter":
-			fmt.Printf("Received event in database: %+v\n", event)
-			da.handleDatabaseEvent(*event)
-		default:
-			// Pass the event that not belong to DbAdapter
-		}
-	}
-}
-
-func (da *DatabaseAdapter) handleDatabaseEvent(eventEnvelope types.EventEnvelope) {
-	switch eventEnvelope.Handler {
-	case "FindCosmosToEvmCallContractApproved":
-		// Handle store operations
-		relayDatas, err := da.FindCosmosToEvmCallContractApproved(eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]))
+func NewDatabaseAdapter(config *config.Config) (*DatabaseAdapter, error) {
+	if dbAdapter == nil {
+		pgClient, err := NewPostgresClient(config)
 		if err != nil {
-			log.Error().Err(err).Msg("[DatabaseAdapter] [FindCosmosToEvmCallContractApproved] Error finding Cosmos to Evm Call Contract Approved")
+			return nil, fmt.Errorf("failed to create postgres client: %w", err)
 		}
-
-		if len(relayDatas) > 0 {
-			err = da.CreateEvmContractCallApprovedEvent(eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]))
-			if err != nil {
-				log.Error().Err(err).Msg("[DatabaseAdapter] [FindCosmosToEvmCallContractApproved] Error creating Evm Contract Call Approved")
-			}
-
-			// Create and send new event to EVMAdapter
-			nextEnvelopeData := types.HandleCosmosToEvmCallContractCompleteEventData{
-				Event:      eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]),
-				RelayDatas: relayDatas,
-			}
-			evmEvent := types.EventEnvelope{
-				Component:          "EvmAdapter",
-				ReceiverClientName: eventEnvelope.SenderClientName,
-				Handler:            "handleCosmosToEvmCallContractCompleteEvent",
-				Data:               nextEnvelopeData,
-			}
-			// Send the envelope to the channel
-			da.SendEvent(&evmEvent)
+		dbAdapter = &DatabaseAdapter{
+			PostgresClient: pgClient,
 		}
-	case "UpdateEventStatus":
-		id := eventEnvelope.Data.(types.HandleCosmosToEvmCallContractCompleteEventExecuteResult).ID
-		status := eventEnvelope.Data.(types.HandleCosmosToEvmCallContractCompleteEventExecuteResult).Status
-		da.UpdateEventStatus(id, status)
-	case "CreateEvmCallContractEvent":
-		_, hash, err := da.CreateEvmCallContractEvent(eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCall]))
-		if err != nil {
-			log.Error().Err(err).Msg("[DatabaseAdapter] [CreateEvmCallContractEvent] Error creating Evm Contract Call")
-		}
-		// Send the hash to the next handler
-		nextEnvelopeData := types.WaitForTransactionData{
-			Hash:  hash,
-			Event: eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCall]),
-		}
-		evmEvent := types.EventEnvelope{
-			Component:          "EvmAdapter",
-			ReceiverClientName: eventEnvelope.SenderClientName,
-			Handler:            "waitForTransaction",
-			Data:               nextEnvelopeData,
-		}
-		// Send the envelope to the channel
-		da.SendEvent(&evmEvent)
-	case "CreateEvmExecutedEvent":
-		da.CreateEvmExecutedEvent(eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayExecuted]))
-
-	// Add more handlers as needed
-	default:
-		log.Warn().
-			Str("handler", eventEnvelope.Handler).
-			Msg("Unknown database event handler")
 	}
+	return dbAdapter, nil
 }
 
-func (da *DatabaseAdapter) SendEvent(event *types.EventEnvelope) {
-	da.BusEventChan <- event
-	log.Debug().Msgf("[DatabaseAdapter] Sent event to channel: %v", event.Handler)
-}
+// func InitDatabaseAdapter(config *config.Config, busEventChan chan *types.EventEnvelope, receiverChanBufSize int) error {
+// 	DbAdapter = &DatabaseAdapter{
+// 		BusEventChan:         busEventChan,
+// 		BusEventReceiverChan: make(chan *types.EventEnvelope, receiverChanBufSize),
+// 	}
+
+// 	var err error
+// 	DbAdapter.PostgresClient, err = NewPostgresClient(config)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	DbAdapter.MongoClient, DbAdapter.MongoDatabase, err = NewMongoClient()
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	return nil
+// }
+
+// func (da *DatabaseAdapter) ListenEventsFromBusChannel() {
+// 	for event := range da.BusEventReceiverChan {
+// 		switch event.Component {
+// 		case "DbAdapter":
+// 			fmt.Printf("Received event in database: %+v\n", event)
+// 			da.handleDatabaseEvent(*event)
+// 		default:
+// 			// Pass the event that not belong to DbAdapter
+// 		}
+// 	}
+// }
+
+// func (da *DatabaseAdapter) handleDatabaseEvent(eventEnvelope types.EventEnvelope) {
+// 	switch eventEnvelope.Handler {
+// 	case "FindCosmosToEvmCallContractApproved":
+// 		// Handle store operations
+// 		relayDatas, err := da.FindCosmosToEvmCallContractApproved(eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]))
+// 		if err != nil {
+// 			log.Error().Err(err).Msg("[DatabaseAdapter] [FindCosmosToEvmCallContractApproved] Error finding Cosmos to Evm Call Contract Approved")
+// 		}
+
+// 		if len(relayDatas) > 0 {
+// 			err = da.CreateEvmContractCallApprovedEvent(eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]))
+// 			if err != nil {
+// 				log.Error().Err(err).Msg("[DatabaseAdapter] [FindCosmosToEvmCallContractApproved] Error creating Evm Contract Call Approved")
+// 			}
+
+// 			// Create and send new event to EVMAdapter
+// 			nextEnvelopeData := types.HandleCosmosToEvmCallContractCompleteEventData{
+// 				Event:      eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]),
+// 				RelayDatas: relayDatas,
+// 			}
+// 			evmEvent := types.EventEnvelope{
+// 				Component:          "EvmAdapter",
+// 				ReceiverClientName: eventEnvelope.SenderClientName,
+// 				Handler:            "handleCosmosToEvmCallContractCompleteEvent",
+// 				Data:               nextEnvelopeData,
+// 			}
+// 			// Send the envelope to the channel
+// 			da.SendEvent(&evmEvent)
+// 		}
+// 	case "UpdateEventStatus":
+// 		id := eventEnvelope.Data.(types.HandleCosmosToEvmCallContractCompleteEventExecuteResult).ID
+// 		status := eventEnvelope.Data.(types.HandleCosmosToEvmCallContractCompleteEventExecuteResult).Status
+// 		da.UpdateEventStatus(id, status)
+// 	case "CreateEvmCallContractEvent":
+// 		_, hash, err := da.CreateEvmCallContractEvent(eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCall]))
+// 		if err != nil {
+// 			log.Error().Err(err).Msg("[DatabaseAdapter] [CreateEvmCallContractEvent] Error creating Evm Contract Call")
+// 		}
+// 		// Send the hash to the next handler
+// 		nextEnvelopeData := types.WaitForTransactionData{
+// 			Hash:  hash,
+// 			Event: eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayContractCall]),
+// 		}
+// 		evmEvent := types.EventEnvelope{
+// 			Component:          "EvmAdapter",
+// 			ReceiverClientName: eventEnvelope.SenderClientName,
+// 			Handler:            "waitForTransaction",
+// 			Data:               nextEnvelopeData,
+// 		}
+// 		// Send the envelope to the channel
+// 		da.SendEvent(&evmEvent)
+// 	case "CreateEvmExecutedEvent":
+// 		da.CreateEvmExecutedEvent(eventEnvelope.Data.(*types.EvmEvent[*contracts.IAxelarGatewayExecuted]))
+
+// 	// Add more handlers as needed
+// 	default:
+// 		log.Warn().
+// 			Str("handler", eventEnvelope.Handler).
+// 			Msg("Unknown database event handler")
+// 	}
+// }
+
+// func (da *DatabaseAdapter) SendEvent(event *types.EventEnvelope) {
+// 	da.BusEventChan <- event
+// 	log.Debug().Msgf("[DatabaseAdapter] Sent event to channel: %v", event.Handler)
+// }
 
 func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
-	db, err := gorm.Open(postgres.Open(viper.GetString("DATABASE_URL")), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(config.ConnnectionString), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -139,20 +149,8 @@ func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
 		&models.CallContractApproved{},
 		&models.CommandExecuted{},
 		&models.Operatorship{},
-		&models.LastBlock{},
+		&models.EventCheckPoint{},
 	)
-
-	for _, evmNetwork := range config.EvmNetworks {
-		lastBlock := evmNetwork.LastBlock
-		lastBlockInt, err := strconv.ParseInt(lastBlock, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		db.Create(&models.LastBlock{
-			ChainName:   evmNetwork.Name,
-			BlockNumber: lastBlockInt,
-		})
-	}
 
 	if err != nil {
 		return nil, err

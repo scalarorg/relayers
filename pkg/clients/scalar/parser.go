@@ -1,4 +1,4 @@
-package axelar
+package scalar
 
 import (
 	"encoding/base64"
@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/scalarorg/relayers/pkg/db"
-	"github.com/scalarorg/relayers/pkg/types"
 )
 
 func decodeBase64(str string) string {
@@ -23,82 +20,22 @@ func removeQuote(str string) string {
 	return strings.Trim(str, "\"'")
 }
 
-func ParseEvmEventCompletedEvent(event map[string][]string) (*types.ExecuteRequest, error) {
-	eventID := removeQuote(event["axelar.evm.v1beta1.EVMEventCompleted.event_id"][0])
-	errorMsg := fmt.Sprintf("Not found eventId: %s in DB. Skip to handle an event.", eventID)
-
-	// Use FindRelayDataById instead of direct DB query
-	relayData, err := db.DbAdapter.FindRelayDataById(eventID, nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf(errorMsg)
-	}
-
-	var payload []byte
-	if relayData.CallContract != nil {
-		payload = relayData.CallContract.Payload
-	}
-
-	if payload == nil {
-		return nil, fmt.Errorf(errorMsg)
-	}
-
-	return &types.ExecuteRequest{
-		ID:      eventID,
-		Payload: fmt.Sprintf("%x", payload),
-	}, nil
-}
-
-func ParseContractCallSubmittedEvent(event map[string][]string) (*types.IBCEvent[types.ContractCallSubmitted], error) {
-	key := "axelar.axelarnet.v1beta1.ContractCallSubmitted"
-	data := types.ContractCallSubmitted{
-		MessageID:        removeQuote(event[key+".message_id"][0]),
-		Sender:           removeQuote(event[key+".sender"][0]),
-		SourceChain:      removeQuote(event[key+".source_chain"][0]),
-		DestinationChain: removeQuote(event[key+".destination_chain"][0]),
-		ContractAddress:  removeQuote(event[key+".contract_address"][0]),
-		Payload:          "0x" + decodeBase64(removeQuote(event[key+".payload"][0])),
-		PayloadHash:      "0x" + decodeBase64(removeQuote(event[key+".payload_hash"][0])),
-	}
-
-	return &types.IBCEvent[types.ContractCallSubmitted]{
-		Hash:        event["tx.hash"][0],
-		SrcChannel:  event["write_acknowledgement.packet_src_channel"][0],
-		DestChannel: event["write_acknowledgement.packet_dst_channel"][0],
-		Args:        data,
-	}, nil
-}
-
-func ParseContractCallApprovedEvent(event map[string][]string) (*types.IBCEvent[types.ContractCallSubmitted], error) {
+func ParseContractCallApprovedEvent(event map[string][]string) (*IBCEvent[ContractCallApproved], error) {
 	key := "axelar.evm.v1beta1.ContractCallApproved"
 	eventID := removeQuote(event[key+".event_id"][0])
 	hash := strings.Split(eventID, "-")[0]
 
-	// Use FindRelayDataById instead of direct DB query
-	relayData, err := db.DbAdapter.FindRelayDataById(eventID, nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("Not found eventId: %s in DB. Skip to handle ContractCallApproved event.", eventID)
-	}
-
-	var payload []byte
-	if relayData.CallContract != nil {
-		payload = relayData.CallContract.Payload
-	}
-
-	if payload == nil {
-		return nil, fmt.Errorf("Not found eventId: %s in DB. Skip to handle ContractCallApproved event.", eventID)
-	}
-
-	data := types.ContractCallSubmitted{
+	data := ContractCallApproved{
 		MessageID:        eventID,
 		Sender:           removeQuote(event[key+".sender"][0]),
 		SourceChain:      removeQuote(event[key+".chain"][0]),
 		DestinationChain: removeQuote(event[key+".destination_chain"][0]),
 		ContractAddress:  removeQuote(event[key+".contract_address"][0]),
-		Payload:          "0x" + fmt.Sprintf("%x", payload),
+		Payload:          "", //Payload will be get from RelayData.CallContract.Payload with filter by eventID
 		PayloadHash:      "0x" + decodeBase64(removeQuote(event[key+".payload_hash"][0])),
 	}
 
-	return &types.IBCEvent[types.ContractCallSubmitted]{
+	return &IBCEvent[ContractCallApproved]{
 		Hash:        hash,
 		SrcChannel:  event["write_acknowledgement.packet_src_channel"][0],
 		DestChannel: event["write_acknowledgement.packet_dst_channel"][0],
@@ -106,30 +43,33 @@ func ParseContractCallApprovedEvent(event map[string][]string) (*types.IBCEvent[
 	}, nil
 }
 
-func ParseContractCallWithTokenSubmittedEvent(event map[string][]string) (*types.IBCEvent[types.ContractCallWithTokenSubmitted], error) {
-	key := "axelar.axelarnet.v1beta1.ContractCallWithTokenSubmitted"
-	var asset struct {
-		Amount string `json:"amount"`
-		Denom  string `json:"denom"`
+func ParseEvmEventCompletedEvent(event map[string][]string) (*IBCEvent[EVMEventCompleted], error) {
+	eventID := removeQuote(event["axelar.evm.v1beta1.EVMEventCompleted.event_id"][0])
+	args := EVMEventCompleted{
+		ID:      eventID,
+		Payload: "",
 	}
-	err := json.Unmarshal([]byte(event[key+".asset"][0]), &asset)
-	if err != nil {
-		return nil, err
-	}
+	return &IBCEvent[EVMEventCompleted]{
+		Hash:        event["tx.hash"][0],
+		SrcChannel:  event["write_acknowledgement.packet_src_channel"][0],
+		DestChannel: event["write_acknowledgement.packet_dst_channel"][0],
+		Args:        args,
+	}, nil
+}
 
-	data := types.ContractCallWithTokenSubmitted{
+func ParseContractCallSubmittedEvent(event map[string][]string) (*IBCEvent[ContractCallSubmitted], error) {
+	key := "axelar.axelarnet.v1beta1.ContractCallSubmitted"
+	data := ContractCallSubmitted{
 		MessageID:        removeQuote(event[key+".message_id"][0]),
 		Sender:           removeQuote(event[key+".sender"][0]),
 		SourceChain:      removeQuote(event[key+".source_chain"][0]),
 		DestinationChain: removeQuote(event[key+".destination_chain"][0]),
 		ContractAddress:  removeQuote(event[key+".contract_address"][0]),
-		Amount:           asset.Amount,
-		Symbol:           asset.Denom,
 		Payload:          "0x" + decodeBase64(removeQuote(event[key+".payload"][0])),
 		PayloadHash:      "0x" + decodeBase64(removeQuote(event[key+".payload_hash"][0])),
 	}
 
-	return &types.IBCEvent[types.ContractCallWithTokenSubmitted]{
+	return &IBCEvent[ContractCallSubmitted]{
 		Hash:        event["tx.hash"][0],
 		SrcChannel:  event["write_acknowledgement.packet_src_channel"][0],
 		DestChannel: event["write_acknowledgement.packet_dst_channel"][0],
@@ -137,7 +77,37 @@ func ParseContractCallWithTokenSubmittedEvent(event map[string][]string) (*types
 	}, nil
 }
 
-func ParseIBCCompleteEvent(event map[string][]string) (*types.IBCPacketEvent, error) {
+func ParseContractCallWithTokenSubmittedEvent(event map[string][]string) (*IBCEvent[ContractCallWithTokenSubmitted], error) {
+	key := "axelar.axelarnet.v1beta1.ContractCallWithTokenSubmitted"
+	var asset struct {
+		Amount string `json:"amount"`
+		Denom  string `json:"denom"`
+	}
+
+	data := ContractCallWithTokenSubmitted{
+		MessageID:        removeQuote(event[key+".message_id"][0]),
+		Sender:           removeQuote(event[key+".sender"][0]),
+		SourceChain:      removeQuote(event[key+".source_chain"][0]),
+		DestinationChain: removeQuote(event[key+".destination_chain"][0]),
+		ContractAddress:  removeQuote(event[key+".contract_address"][0]),
+		Payload:          "0x" + decodeBase64(removeQuote(event[key+".payload"][0])),
+		PayloadHash:      "0x" + decodeBase64(removeQuote(event[key+".payload_hash"][0])),
+	}
+
+	err := json.Unmarshal([]byte(event[key+".asset"][0]), &asset)
+	if err == nil {
+		data.Amount = asset.Amount
+		data.Symbol = asset.Denom
+	}
+	return &IBCEvent[ContractCallWithTokenSubmitted]{
+		Hash:        event["tx.hash"][0],
+		SrcChannel:  event["write_acknowledgement.packet_src_channel"][0],
+		DestChannel: event["write_acknowledgement.packet_dst_channel"][0],
+		Args:        data,
+	}, nil
+}
+
+func ParseExecuteMessageEvent(event map[string][]string) (*IBCPacketEvent, error) {
 	packetData := event["send_packet.packet_data"][0]
 	if packetData == "" {
 		return nil, fmt.Errorf("packet_data not found")
@@ -158,7 +128,7 @@ func ParseIBCCompleteEvent(event map[string][]string) (*types.IBCPacketEvent, er
 		return nil, err
 	}
 
-	data := types.IBCPacketEvent{
+	data := IBCPacketEvent{
 		Sequence:    int(sequence),
 		Amount:      packetDataStruct.Amount,
 		Denom:       packetDataStruct.Denom,

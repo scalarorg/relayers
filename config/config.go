@@ -1,14 +1,10 @@
 package config
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
-	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/spf13/viper"
 )
 
@@ -25,28 +21,7 @@ type RabbitMQConfig struct {
 	StopHeight  *int64 `mapstructure:"stop_height"`
 }
 
-type EvmNetworkConfig struct {
-	ChainID    string `mapstructure:"chain_id"`
-	ID         string `mapstructure:"id"`
-	Name       string `mapstructure:"name"`
-	RPCUrl     string `mapstructure:"rpc_url"`
-	Gateway    string `mapstructure:"gateway"`
-	Finality   int    `mapstructure:"finality"`
-	LastBlock  string `mapstructure:"last_block"`
-	PrivateKey string `mapstructure:"private_key"`
-	MaxRetry   int
-	RetryDelay time.Duration
-	TxTimeout  time.Duration
-}
-
-type CosmosNetworkConfig struct {
-	ChainID  string  `mapstructure:"chain_id"`
-	RPCUrl   string  `mapstructure:"rpc_url"`
-	LCDUrl   string  `mapstructure:"lcd_url"`
-	WS       string  `mapstructure:"ws"`
-	Denom    string  `mapstructure:"denom"`
-	Mnemonic *string `mapstructure:"mnemonic"`
-	GasPrice string  `mapstructure:"gas_price"`
+type EventBusConfig struct {
 }
 
 type BtcNetworkConfig struct {
@@ -65,29 +40,15 @@ type BtcNetworkConfig struct {
 	Gateway    *string `mapstructure:"gateway,omitempty"`
 }
 
-type RuntimeEvmNetworkConfig struct {
-	ChainID       string  `mapstructure:"chainId"`
-	ID            string  `mapstructure:"id"`
-	Name          string  `mapstructure:"name"`
-	MnemonicEvm   *string `mapstructure:"mnemonic_evm,omitempty"`
-	Mnemonic      *string `mapstructure:"mnemonic,omitempty"`
-	WalletIndex   *string `mapstructure:"walletIndex,omitempty"`
-	RPCUrl        string  `mapstructure:"rpcUrl"`
-	KeyPath       string  `mapstructure:"keyPath"`
-	PrivateKey    *string `mapstructure:"privateKey,omitempty"`
-	Gateway       *string `mapstructure:"gateway,omitempty"`
-	GasService    *string `mapstructure:"gasService,omitempty"`
-	AuthWeighted  *string `mapstructure:"authWeighted,omitempty"`
-	TokenDeployer *string `mapstructure:"tokenDeployer,omitempty"`
-	SBtc          *string `mapstructure:"sBtc,omitempty"`
-}
-
 type Config struct {
-	RabbitMQ      RabbitMQConfig        `mapstructure:"rabbitmq"`
-	Axelar        CosmosNetworkConfig   `mapstructure:"axelar"`
-	EvmNetworks   []EvmNetworkConfig    `mapstructure:"evm_networks"`
-	CosmosNetwork []CosmosNetworkConfig `mapstructure:"cosmos_network"`
-	BtcNetworks   []BtcNetworkConfig    `mapstructure:"btc_networks"`
+	ConfigPath        string         `mapstructure:"config_path"`
+	ChainEnv          string         `mapstructure:"chain_env"`
+	ConnnectionString string         `mapstructure:"connection_string"` // Postgres db connection string
+	ScalarMnemonic    string         `mapstructure:"scalar_mnemonic"`
+	EvmPrivateKey     string         `mapstructure:"evm_private_key"`
+	EventBus          EventBusConfig `mapstructure:"event_bus"`
+	//Broadcast node config, don't need to be signed
+	BtcNetworks []BtcNetworkConfig `mapstructure:"btc_networks"`
 }
 
 var GlobalConfig *Config
@@ -131,14 +92,43 @@ func ReadJsonArrayConfig[T any](filePath string) ([]T, error) {
 	return result, nil
 }
 
+func ReadJsonConfig[T any](filePath string) (*T, error) {
+	// Read the file content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading file %s: %w", filePath, err)
+	}
+
+	// Unmarshal directly into slice
+	var result T
+	if err := json.Unmarshal(content, &result); err != nil {
+		return nil, fmt.Errorf("error unmarshaling config from %s: %w", filePath, err)
+	}
+
+	return &result, nil
+}
+
+func injectEnvConfig(cfg *Config) error {
+	//Set config environment variables
+	cfg.ConfigPath = viper.GetString("CONFIG_PATH")
+	cfg.ChainEnv = viper.GetString("CHAIN_ENV")
+	cfg.ConnnectionString = viper.GetString("DATABASE_URL")
+	cfg.ScalarMnemonic = viper.GetString("SCALAR_MNEMONIC")
+	cfg.EvmPrivateKey = viper.GetString("EVM_PRIVATE_KEY")
+	return nil
+}
+
 func Load() error {
+	// Load environment variables into viper
+	if err := LoadEnv(); err != nil {
+		panic("Failed to load environment variables: " + err.Error())
+	}
 	var cfg Config
+	injectEnvConfig(&cfg)
 
-	configPath := viper.GetString("CONFIG_PATH")
-	chainEnv := viper.GetString("CHAIN_ENV")
-	dir := fmt.Sprintf("%s/%s", configPath, chainEnv)
+	dir := fmt.Sprintf("%s/%s", cfg.ConfigPath, cfg.ChainEnv)
 
-	switch chainEnv {
+	switch cfg.ChainEnv {
 	case "local":
 		fmt.Println("[getConfig] Using local configuration")
 	case "devnet":
@@ -146,25 +136,8 @@ func Load() error {
 	case "testnet":
 		fmt.Println("[getConfig] Using testnet configuration")
 	default:
-		return fmt.Errorf("[getConfig] Invalid CHAIN_ENV: %s", chainEnv)
+		return fmt.Errorf("[getConfig] Invalid CHAIN_ENV: %s", cfg.ChainEnv)
 	}
-
-	// Read Axelar config from JSON file
-	axelarContent, err := os.ReadFile(fmt.Sprintf("%s/axelar.json", dir))
-	if err != nil {
-		return fmt.Errorf("error reading Axelar config file: %w", err)
-	}
-
-	var axelarConfig struct {
-		Axelar CosmosNetworkConfig `json:"axelar"`
-	}
-	if err := json.Unmarshal(axelarContent, &axelarConfig); err != nil {
-		return fmt.Errorf("error unmarshaling Axelar config: %w", err)
-	}
-	cfg.Axelar = axelarConfig.Axelar
-
-	axelarMnemonic := viper.GetString("AXELAR_MNEMONIC")
-	cfg.Axelar.Mnemonic = &axelarMnemonic
 
 	// Read BTC broadcast config
 	btcBroadcastConfig, err := ReadJsonArrayConfig[BtcNetworkConfig](fmt.Sprintf("%s/btc.json", dir))
@@ -186,35 +159,6 @@ func Load() error {
 		cfg.BtcNetworks[i].PrivateKey = &privateKey
 	}
 
-	// Read Cosmos network config from JSON file
-	cosmosNetworks, err := ReadJsonArrayConfig[CosmosNetworkConfig](fmt.Sprintf("%s/cosmos.json", dir))
-	if err != nil {
-		return fmt.Errorf("error reading Cosmos network config: %w", err)
-	}
-	cfg.CosmosNetwork = cosmosNetworks
-
-	cosmosMnemonic := viper.GetString("AXELAR_MNEMONIC")
-	for i := range cfg.CosmosNetwork {
-		cfg.CosmosNetwork[i].Mnemonic = &cosmosMnemonic
-	}
-
-	// Read EVM Network configs
-	evmNetworks, err := ReadJsonArrayConfig[EvmNetworkConfig](fmt.Sprintf("%s/evm.json", dir))
-	if err != nil {
-		return fmt.Errorf("error reading EVM network config: %w", err)
-	}
-
-	// Get EVM private keys and assign them to the corresponding networks
-	for i, evmNetwork := range evmNetworks {
-		privateKey, err := GetEvmPrivateKey(evmNetwork.ID)
-		if err != nil {
-			return fmt.Errorf("failed to get EVM private key for network %s: %w", evmNetwork.ID, err)
-		}
-		evmNetworks[i].PrivateKey = privateKey
-	}
-
-	cfg.EvmNetworks = evmNetworks
-
 	// // Read RabbitMQ config from JSON file
 	// viper.SetConfigFile(fmt.Sprintf("%s/rabbitmq.json", dir))
 	// viper.SetConfigType("json")
@@ -230,58 +174,6 @@ func Load() error {
 	GlobalConfig = &cfg
 	return nil
 }
-
-func GetEvmPrivateKey(networkID string) (string, error) {
-	configChainsPath := viper.GetString("CONFIG_CHAINS_RUNTIME_PATH")
-	configFile := fmt.Sprintf("%s/%s/config.json", configChainsPath, networkID)
-
-	// Check if config.json exists for the network
-	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		return "", fmt.Errorf("no config file found for network ID %s", networkID)
-	}
-
-	// Create a new Viper instance
-	v := viper.New()
-	v.SetConfigFile(configFile)
-	v.SetConfigType("json")
-
-	if err := v.ReadInConfig(); err != nil {
-		return "", fmt.Errorf("error reading config file %s: %w", configFile, err)
-	}
-
-	var networkConfig RuntimeEvmNetworkConfig
-	if err := v.Unmarshal(&networkConfig); err != nil {
-		return "", fmt.Errorf("error unmarshaling config from %s: %w", configFile, err)
-	}
-
-	var privateKey string
-
-	if networkConfig.PrivateKey != nil && *networkConfig.PrivateKey != "" {
-		privateKey = *networkConfig.PrivateKey
-	} else if networkConfig.Mnemonic != nil && networkConfig.WalletIndex != nil {
-		wallet, err := hdwallet.NewFromMnemonic(*networkConfig.Mnemonic)
-		if err != nil {
-			return "", fmt.Errorf("failed to create wallet from mnemonic: %w", err)
-		}
-
-		path := hdwallet.MustParseDerivationPath(fmt.Sprintf("m/44'/60'/0'/0/%s", *networkConfig.WalletIndex))
-		account, err := wallet.Derive(path, true)
-		if err != nil {
-			return "", fmt.Errorf("failed to derive account: %w", err)
-		}
-
-		privateKeyECDSA, err := wallet.PrivateKey(account)
-		if err != nil {
-			return "", fmt.Errorf("failed to get private key: %w", err)
-		}
-
-		privateKeyBytes := crypto.FromECDSA(privateKeyECDSA)
-		privateKey = hex.EncodeToString(privateKeyBytes)
-	}
-
-	if privateKey == "" {
-		return "", fmt.Errorf("no private key found for network %s", networkConfig.ID)
-	}
-
-	return privateKey, nil
+func GetScalarMnemonic() string {
+	return GlobalConfig.ScalarMnemonic
 }

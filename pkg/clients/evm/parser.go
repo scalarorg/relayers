@@ -20,24 +20,11 @@ type ValidEvmEvent interface {
 		*contracts.IAxelarGatewayExecuted
 }
 
-func parseEvmEventToEnvelope(
-	currentChainName string,
-	log eth_types.Log,
-) (types.EventEnvelope, error) {
-	// Try parse the log into different events
-	eventArgs, err := parseLogIntoEventArgs(log)
-	if err != nil {
-		return types.EventEnvelope{}, err
-	}
-
-	envelope, err := parseEventIntoEnvelope(currentChainName, eventArgs, log)
-	if err != nil {
-		return types.EventEnvelope{}, err
-	}
-
-	return envelope, nil
+// Todo: Check if this is the correct way to extract the destination chain
+// Maybe add destination chain to the event.Log
+func extractDestChainFromEvmGwContractCallApproved(event *contracts.IAxelarGatewayContractCallApproved) string {
+	return event.SourceChain
 }
-
 func parseLogIntoEventArgs(log eth_types.Log) (any, error) {
 	// Try parsing as ContractCallApproved
 	if eventArgs, err := parseContractCallApproved(log); err == nil {
@@ -57,48 +44,48 @@ func parseLogIntoEventArgs(log eth_types.Log) (any, error) {
 	return nil, fmt.Errorf("failed to parse log into any known event type")
 }
 
-func parseEventIntoEnvelope(currentChainName string, eventArgs any, log eth_types.Log) (types.EventEnvelope, error) {
-	switch args := eventArgs.(type) {
-	case *contracts.IAxelarGatewayContractCallApproved:
-		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayContractCallApproved](args, currentChainName, log)
-		if err != nil {
-			return types.EventEnvelope{}, err
-		}
-		return types.EventEnvelope{
-			Component:        "DbAdapter",
-			SenderClientName: currentChainName,
-			Handler:          "FindCosmosToEvmCallContractApproved",
-			Data:             event,
-		}, nil
+// func parseEventIntoEnvelope(currentChainName string, eventArgs any, log eth_types.Log) (types.EventEnvelope, error) {
+// 	switch args := eventArgs.(type) {
+// 	case *contracts.IAxelarGatewayContractCallApproved:
+// 		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayContractCallApproved](args, currentChainName, log)
+// 		if err != nil {
+// 			return types.EventEnvelope{}, err
+// 		}
+// 		return types.EventEnvelope{
+// 			Component:        "DbAdapter",
+// 			SenderClientName: currentChainName,
+// 			Handler:          "FindCosmosToEvmCallContractApproved",
+// 			Data:             event,
+// 		}, nil
 
-	case *contracts.IAxelarGatewayContractCall:
-		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayContractCall](args, currentChainName, log)
-		if err != nil {
-			return types.EventEnvelope{}, err
-		}
-		return types.EventEnvelope{
-			Component:        "DbAdapter",
-			SenderClientName: currentChainName,
-			Handler:          "CreateEvmCallContractEvent",
-			Data:             event,
-		}, nil
+// 	case *contracts.IAxelarGatewayContractCall:
+// 		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayContractCall](args, currentChainName, log)
+// 		if err != nil {
+// 			return types.EventEnvelope{}, err
+// 		}
+// 		return types.EventEnvelope{
+// 			Component:        "DbAdapter",
+// 			SenderClientName: currentChainName,
+// 			Handler:          "CreateEvmCallContractEvent",
+// 			Data:             event,
+// 		}, nil
 
-	case *contracts.IAxelarGatewayExecuted:
-		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayExecuted](args, currentChainName, log)
-		if err != nil {
-			return types.EventEnvelope{}, err
-		}
-		return types.EventEnvelope{
-			Component:        "DbAdapter",
-			SenderClientName: currentChainName,
-			Handler:          "CreateEvmExecutedEvent",
-			Data:             event,
-		}, nil
+// 	case *contracts.IAxelarGatewayExecuted:
+// 		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayExecuted](args, currentChainName, log)
+// 		if err != nil {
+// 			return types.EventEnvelope{}, err
+// 		}
+// 		return types.EventEnvelope{
+// 			Component:        "DbAdapter",
+// 			SenderClientName: currentChainName,
+// 			Handler:          "CreateEvmExecutedEvent",
+// 			Data:             event,
+// 		}, nil
 
-	default:
-		return types.EventEnvelope{}, fmt.Errorf("unknown event type: %T", eventArgs)
-	}
-}
+// 	default:
+// 		return types.EventEnvelope{}, fmt.Errorf("unknown event type: %T", eventArgs)
+// 	}
+// }
 
 func parseEventArgsIntoEvent[T ValidEvmEvent](eventArgs T, currentChainName string, log eth_types.Log) (*types.EvmEvent[T], error) {
 	// Get the value of eventArgs using reflection

@@ -1,17 +1,7 @@
 package evm
 
 import (
-	"context"
-	"fmt"
-	"math/big"
-	"time"
-
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/relayers/config"
 	evm_clients "github.com/scalarorg/relayers/pkg/clients/evm"
-	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/types"
 )
 
@@ -94,143 +84,143 @@ type EvmAdapter struct {
 	evmClients           []*evm_clients.EvmClient
 }
 
-// Rename from NewEvmListeners02 to NewEvmAdapter
-func NewEvmAdapter(configs []config.EvmNetworkConfig, busEventChan chan *types.EventEnvelope, receiverChanBufSize int) (*EvmAdapter, error) {
-	evmClients, err := evm_clients.NewEvmClients(configs)
-	if err != nil {
-		return nil, err
-	}
+// // Rename from NewEvmListeners02 to NewEvmAdapter
+// func NewEvmAdapter(configs []config.EvmNetworkConfig, busEventChan chan *types.EventEnvelope, receiverChanBufSize int) (*EvmAdapter, error) {
+// 	evmClients, err := evm_clients.NewEvmClients(configs)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	adapter := &EvmAdapter{
-		BusEventChan:         busEventChan,
-		BusEventReceiverChan: make(chan *types.EventEnvelope, receiverChanBufSize),
-		evmClients:           evmClients,
-	}
+// 	adapter := &EvmAdapter{
+// 		BusEventChan:         busEventChan,
+// 		BusEventReceiverChan: make(chan *types.EventEnvelope, receiverChanBufSize),
+// 		evmClients:           evmClients,
+// 	}
 
-	return adapter, nil
-}
+// 	return adapter, nil
+// }
 
-func (ea *EvmAdapter) Close() {
-	for _, evmClient := range ea.evmClients {
-		if evmClient.Client != nil {
-			evmClient.Client.Close()
-		}
-	}
-}
+// func (ea *EvmAdapter) Close() {
+// 	for _, evmClient := range ea.evmClients {
+// 		if evmClient.Client != nil {
+// 			evmClient.Client.Close()
+// 		}
+// 	}
+// }
 
-func (ea *EvmAdapter) PollEventsFromAllEvmNetworks(pollInterval time.Duration) {
-	// Create ticker for each EVM client
-	for _, evmClient := range ea.evmClients {
-		go ea.pollEvmNetwork(evmClient, pollInterval)
-	}
+// func (ea *EvmAdapter) PollEventsFromAllEvmNetworks(pollInterval time.Duration) {
+// 	// Create ticker for each EVM client
+// 	for _, evmClient := range ea.evmClients {
+// 		go ea.pollEvmNetwork(evmClient, pollInterval)
+// 	}
 
-	// Keep main routine running
-	select {}
-}
+// 	// Keep main routine running
+// 	select {}
+// }
 
-// New helper function to poll individual network
-func (ea *EvmAdapter) pollEvmNetwork(evmClient *evm_clients.EvmClient, pollInterval time.Duration) {
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
+// // New helper function to poll individual network
+// func (ea *EvmAdapter) pollEvmNetwork(evmClient *evm_clients.EvmClient, pollInterval time.Duration) {
+// 	ticker := time.NewTicker(pollInterval)
+// 	defer ticker.Stop()
 
-	for {
-		// query last block from db
-		lastBlock, err := db.DbAdapter.GetLastBlock(evmClient.ChainName)
-		if err != nil {
-			log.Error().Err(err).Msg("[EvmAdapter] Failed to get last block")
-			continue
-		}
+// 	for {
+// 		// query last block from db
+// 		lastBlock, err := db.DbAdapter.GetLastBlock(evmClient.ChainName)
+// 		if err != nil {
+// 			log.Error().Err(err).Msg("[EvmAdapter] Failed to get last block")
+// 			continue
+// 		}
 
-		query := ethereum.FilterQuery{
-			FromBlock: lastBlock,
-			ToBlock:   nil,
-			Addresses: []common.Address{
-				evmClient.GatewayAddress,
-			},
-		}
+// 		query := ethereum.FilterQuery{
+// 			FromBlock: lastBlock,
+// 			ToBlock:   nil,
+// 			Addresses: []common.Address{
+// 				evmClient.GatewayAddress,
+// 			},
+// 		}
 
-		logs, err := evmClient.Client.FilterLogs(context.Background(), query)
-		if err != nil {
-			log.Error().Err(err).Msgf("[EvmAdapter] Failed to filter logs for %s", evmClient.ChainName)
-			continue
-		}
+// 		logs, err := evmClient.Client.FilterLogs(context.Background(), query)
+// 		if err != nil {
+// 			log.Error().Err(err).Msgf("[EvmAdapter] Failed to filter logs for %s", evmClient.ChainName)
+// 			continue
+// 		}
 
-		if len(logs) > 0 {
-			// Process logs
-			for _, log := range logs {
-				envelope, err := parseEvmEventToEnvelope(evmClient.ChainName, log)
-				if err != nil {
-					continue
-				}
+// 		if len(logs) > 0 {
+// 			// Process logs
+// 			for _, log := range logs {
+// 				envelope, err := parseEvmEventToEnvelope(evmClient.ChainName, log)
+// 				if err != nil {
+// 					continue
+// 				}
 
-				ea.SendEvent(&envelope)
-			}
+// 				ea.SendEvent(&envelope)
+// 			}
 
-			// Update last block to db
-			err = db.DbAdapter.UpdateLastBlock(evmClient.ChainName, big.NewInt(int64(logs[len(logs)-1].BlockNumber)))
-			if err != nil {
-				log.Error().Err(err).Msgf("[EvmAdapter] Failed to update last block for %s", evmClient.ChainName)
-			} else {
-				log.Info().Msgf("[EvmAdapter] Updated last block for %s to %s", evmClient.ChainName, big.NewInt(int64(logs[len(logs)-1].BlockNumber)).String())
-			}
-		}
+// 			// Update last block to db
+// 			err = db.DbAdapter.UpdateLastBlock(evmClient.ChainName, big.NewInt(int64(logs[len(logs)-1].BlockNumber)))
+// 			if err != nil {
+// 				log.Error().Err(err).Msgf("[EvmAdapter] Failed to update last block for %s", evmClient.ChainName)
+// 			} else {
+// 				log.Info().Msgf("[EvmAdapter] Updated last block for %s to %s", evmClient.ChainName, big.NewInt(int64(logs[len(logs)-1].BlockNumber)).String())
+// 			}
+// 		}
 
-		// Wait for next tick
-		<-ticker.C
-	}
-}
+// 		// Wait for next tick
+// 		<-ticker.C
+// 	}
+// }
 
-func (ea *EvmAdapter) ListenEventsFromBusChannel() {
-	for event := range ea.BusEventReceiverChan {
-		switch event.Component {
-		case "EvmAdapter":
-			fmt.Printf("Received event in EvmAdapter: %+v\n", event)
-			ea.handleEvmEvent(*event)
-		default:
-			// Pass the event that not belong to DbAdapter
-		}
-	}
-}
+// func (ea *EvmAdapter) ListenEventsFromBusChannel() {
+// 	for event := range ea.BusEventReceiverChan {
+// 		switch event.Component {
+// 		case "EvmAdapter":
+// 			fmt.Printf("Received event in EvmAdapter: %+v\n", event)
+// 			ea.handleEvmEvent(*event)
+// 		default:
+// 			// Pass the event that not belong to DbAdapter
+// 		}
+// 	}
+// }
 
-func (ea *EvmAdapter) SendEvent(event *types.EventEnvelope) {
-	ea.BusEventChan <- event
-	log.Debug().Msgf("[EvmAdapter] Sent event to bus channel: %v", *event)
-}
+// func (ea *EvmAdapter) SendEvent(event *types.EventEnvelope) {
+// 	ea.BusEventChan <- event
+// 	log.Debug().Msgf("[EvmAdapter] Sent event to bus channel: %v", *event)
+// }
 
-func (ea *EvmAdapter) handleEvmEvent(eventEnvelope types.EventEnvelope) {
-	evmClientName := eventEnvelope.ReceiverClientName
-	var evmClient *evm_clients.EvmClient
-	for _, client := range ea.evmClients {
-		if client.ChainName == evmClientName {
-			evmClient = client
-			break
-		}
-	}
-	switch eventEnvelope.Handler {
-	case "handleCosmosToEvmCallContractCompleteEvent":
-		results, err := ea.handleCosmosToEvmCallContractCompleteEvent(evmClient, eventEnvelope.Data.(types.HandleCosmosToEvmCallContractCompleteEventData))
-		if err != nil {
-			log.Error().Err(err).Msg("[EvmAdapter] Failed to handle event")
-		}
+// func (ea *EvmAdapter) handleEvmEvent(eventEnvelope types.EventEnvelope) {
+// 	evmClientName := eventEnvelope.ReceiverClientName
+// 	var evmClient *evm_clients.EvmClient
+// 	for _, client := range ea.evmClients {
+// 		if client.ChainName == evmClientName {
+// 			evmClient = client
+// 			break
+// 		}
+// 	}
+// 	switch eventEnvelope.Handler {
+// 	case "handleCosmosToEvmCallContractCompleteEvent":
+// 		results, err := ea.handleCosmosToEvmCallContractCompleteEvent(evmClient, eventEnvelope.Data.(types.HandleCosmosToEvmCallContractCompleteEventData))
+// 		if err != nil {
+// 			log.Error().Err(err).Msg("[EvmAdapter] Failed to handle event")
+// 		}
 
-		// Send to DbAdapter to update Status
-		for _, result := range results {
-			ea.SendEvent(&types.EventEnvelope{
-				Component:        "DbAdapter",
-				SenderClientName: evmClientName,
-				Handler:          "UpdateEventStatus",
-				Data:             result,
-			})
-		}
-	case "waitForTransaction":
-		hash := eventEnvelope.Data.(types.WaitForTransactionData).Hash
-		event := eventEnvelope.Data.(types.WaitForTransactionData).Event
-		ea.handleWaitForTransaction(evmClient, hash)
-		ea.SendEvent(&types.EventEnvelope{
-			Component:        "AxelarAdapter",
-			SenderClientName: evmClientName,
-			Handler:          "handleEvmToCosmosEvent",
-			Data:             event,
-		})
-	}
-}
+// 		// Send to DbAdapter to update Status
+// 		for _, result := range results {
+// 			ea.SendEvent(&types.EventEnvelope{
+// 				Component:        "DbAdapter",
+// 				SenderClientName: evmClientName,
+// 				Handler:          "UpdateEventStatus",
+// 				Data:             result,
+// 			})
+// 		}
+// 	case "waitForTransaction":
+// 		hash := eventEnvelope.Data.(types.WaitForTransactionData).Hash
+// 		event := eventEnvelope.Data.(types.WaitForTransactionData).Event
+// 		ea.handleWaitForTransaction(evmClient, hash)
+// 		ea.SendEvent(&types.EventEnvelope{
+// 			Component:        "AxelarAdapter",
+// 			SenderClientName: evmClientName,
+// 			Handler:          "handleEvmToCosmosEvent",
+// 			Data:             event,
+// 		})
+// 	}
+// }
