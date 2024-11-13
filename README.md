@@ -7,8 +7,7 @@ Relayer for cross chain liquidity
 Duplicate and edit:
 
 - From `.env.example` into `.env.local`
-- From `data/example-env` into `data/local`
-- From `example-runtime/chains` into `runtime/chains`
+- From `data/example` into `data/local`
 
 Then run:
 

@@ -3,6 +3,7 @@ package scalar
 // Add this new type definition
 
 const (
+	SCALAR_NETWORK_NAME           = "Scalar.Network"
 	SCALAR_CONTRACT_CALL_APPROVED = "Scalar.ContractCallApproved"
 	SCALAR_COMMAND_EXECUTED       = "Scalar.CommandExecuted"
 

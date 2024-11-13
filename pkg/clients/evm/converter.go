@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
+	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db/models"
 )
 

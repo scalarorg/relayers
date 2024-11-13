@@ -5,7 +5,6 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/db/models"
-	"github.com/scalarorg/relayers/pkg/types"
 	"gorm.io/gorm/clause"
 )
 
@@ -56,7 +55,7 @@ func (db *DatabaseAdapter) UpdateLastEventCheckPoint(chainName string, lastBlock
 	return nil
 }
 
-func (db *DatabaseAdapter) UpdateEventStatus(id string, status types.Status) error {
+func (db *DatabaseAdapter) UpdateEventStatus(id string, status RelayDataStatus) error {
 	data := models.RelayData{
 		Status: int(status),
 	}

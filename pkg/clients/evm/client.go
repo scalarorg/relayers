@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
-	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
+	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 )
@@ -66,7 +66,7 @@ func NewEvmClient(config EvmNetworkConfig, dbAdapter *db.DatabaseAdapter, eventB
 	if err != nil {
 		return nil, fmt.Errorf("failed to create auth for network %s: %w", config.Name, err)
 	}
-
+	auth.GasLimit = config.GasLimit
 	evmClient := &EvmClient{
 		Client:         client,
 		ChainName:      config.Name,

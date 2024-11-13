@@ -10,9 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
-	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
+	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/events"
-	"github.com/scalarorg/relayers/pkg/types"
 )
 
 func (ec *EvmClient) handleContractCall(event *contracts.IAxelarGatewayContractCall) error {
@@ -28,7 +27,7 @@ func (ec *EvmClient) handleContractCall(event *contracts.IAxelarGatewayContractC
 		return fmt.Errorf("failed to create evm contract call: %w", err)
 	}
 	//2. Send to the bus
-	ec.eventBus.BroadcastEvent(&types.EventEnvelope{
+	ec.eventBus.BroadcastEvent(&events.EventEnvelope{
 		EventType: events.EVENT_EVM_CONTRACT_CALL,
 		Data:      event,
 	})
@@ -53,7 +52,7 @@ func (ec *EvmClient) handleContractCallApproved(event *contracts.IAxelarGatewayC
 	}
 	//2. Send to the bus
 	destinationChain := extractDestChainFromEvmGwContractCallApproved(event)
-	ec.eventBus.BroadcastEvent(&types.EventEnvelope{
+	ec.eventBus.BroadcastEvent(&events.EventEnvelope{
 		EventType:        events.EVENT_EVM_CONTRACT_CALL_APPROVED,
 		DestinationChain: destinationChain,
 		Data:             event,
@@ -80,7 +79,7 @@ func (ec *EvmClient) handleCommandExecuted(event *contracts.IAxelarGatewayExecut
 		return fmt.Errorf("failed to create evm executed: %w", err)
 	}
 	//2. Send to the bus
-	ec.eventBus.BroadcastEvent(&types.EventEnvelope{
+	ec.eventBus.BroadcastEvent(&events.EventEnvelope{
 		EventType: events.EVENT_EVM_COMMAND_EXECUTED,
 		Data:      event,
 	})

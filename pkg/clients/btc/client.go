@@ -2,6 +2,7 @@ package btc
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 
@@ -11,13 +12,15 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
+	"github.com/scalarorg/relayers/pkg/db"
+	"github.com/scalarorg/relayers/pkg/events"
 )
 
-var BtcClients []*BtcClient
-
 type BtcClient struct {
-	client *rpcclient.Client
-	config *config.BtcNetworkConfig
+	config    *BtcNetworkConfig
+	client    *rpcclient.Client
+	dbAdapter *db.DatabaseAdapter
+	eventBus  *events.EventBus
 }
 
 type BtcClientInterface interface {
@@ -25,35 +28,61 @@ type BtcClientInterface interface {
 	TestMempoolAccept(txs []*wire.MsgTx, maxFeeRatePerKb float64) ([]*btcjson.TestMempoolAcceptResult, error)
 }
 
-func NewBtcClients(configs []config.BtcNetworkConfig) error {
-	for _, cfg := range configs {
-		// Create a new instance of config for each client
-		clientConfig := cfg
-
-		// Configure connection
-		connCfg := &rpcclient.ConnConfig{
-			Host:         fmt.Sprintf("%s:%d", clientConfig.Host, clientConfig.Port),
-			User:         clientConfig.User,
-			Pass:         clientConfig.Password,
-			HTTPPostMode: true,
-			DisableTLS:   clientConfig.SSL == nil || !*clientConfig.SSL,
+func NewBtcClients(configPath string, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) ([]*BtcClient, error) {
+	// Read Scalar config from JSON file
+	btcCfgPath := fmt.Sprintf("%s/btc.json", configPath)
+	configs, err := config.ReadJsonArrayConfig[BtcNetworkConfig](btcCfgPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read btc config from file: %s, %w", btcCfgPath, err)
+	}
+	btcClients := make([]*BtcClient, 0, len(configs))
+	for _, btcConfig := range configs {
+		if btcConfig.PrivateKey == "" {
+			if config.GlobalConfig.BtcPrivateKey == "" {
+				return nil, fmt.Errorf("Common btc private key is not set")
+			}
+			btcConfig.PrivateKey = config.GlobalConfig.BtcPrivateKey
 		}
-
-		// Create new client
-		client, err := rpcclient.New(connCfg, nil)
+		client, err := newBtcClientFromConfig(&btcConfig, dbAdapter, eventBus)
 		if err != nil {
-			return fmt.Errorf("failed to create BTC client for network %s: %w", clientConfig.Network, err)
+			return nil, err
 		}
+		btcClients = append(btcClients, client)
+	}
+	return btcClients, nil
+}
 
-		BtcClients = append(BtcClients, &BtcClient{
-			client: client,
-			config: &clientConfig,
-		})
+func newBtcClientFromConfig(config *BtcNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*BtcClient, error) {
+	// Configure connection
+	connCfg := &rpcclient.ConnConfig{
+		Host:         fmt.Sprintf("%s:%d", config.Host, config.Port),
+		User:         config.User,
+		Pass:         config.Password,
+		HTTPPostMode: true,
+		DisableTLS:   config.SSL == nil || !*config.SSL,
 	}
 
-	if len(BtcClients) == 0 {
-		return fmt.Errorf("no BTC client was initialized")
+	// Create new client
+	client, err := rpcclient.New(connCfg, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create BTC client for network %s: %w", config.Network, err)
 	}
+	btcClient := &BtcClient{
+		client:   client,
+		config:   config,
+		eventBus: eventBus,
+	}
+	return btcClient, nil
+}
+
+func (c *BtcClient) Start(ctx context.Context) error {
+	//Subscribe to the event bus
+	receiver := c.eventBus.Subscribe(c.config.ChainID)
+	go func() {
+		for event := range receiver {
+			c.handleEventBusMessage(event)
+		}
+	}()
 	return nil
 }
 
@@ -71,11 +100,11 @@ func NewBtcClients(configs []config.BtcNetworkConfig) error {
 // 	return &tx, nil
 // }
 
-func (c *BtcClient) Config() *config.BtcNetworkConfig {
+func (c *BtcClient) Config() *BtcNetworkConfig {
 	return c.config
 }
 
-func (c *BtcClient) SendTx(tx *wire.MsgTx, maxFeeRate *float64) (*chainhash.Hash, error) {
+func (c *BtcClient) BroadcastTx(tx *wire.MsgTx, maxFeeRate *float64) (*chainhash.Hash, error) {
 	// If testnet4, create Command then call c.RpcClient.SendCmd(cmd)
 	if c.config.Network == "testnet4" {
 		rawTx, err := CreateRawTx(tx)
@@ -92,6 +121,13 @@ func (c *BtcClient) SendTx(tx *wire.MsgTx, maxFeeRate *float64) (*chainhash.Hash
 		// Otherwise, call c.RpcClient.SendRawTransaction(tx, true)x
 		return c.client.SendRawTransaction(tx, true)
 	}
+}
+func (c *BtcClient) BroadcastRawTx(signedPsbtHex string, maxFeeRate *float64) (*chainhash.Hash, error) {
+	cmd := c.creatSendRawTransactionCmd(signedPsbtHex, maxFeeRate)
+	res := c.client.SendCmd(cmd)
+	// Cast the response to FutureTestMempoolAcceptResult and call Receive
+	future := rpcclient.FutureSendRawTransactionResult(res)
+	return future.Receive()
 }
 
 // if maxFeeRate is not nil, set the feeSetting parameter

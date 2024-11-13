@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
+	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

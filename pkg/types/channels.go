@@ -1,6 +1,6 @@
 package types
 
-import contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
+import contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 
 type EventChan chan *contracts.IAxelarGatewayContractCallApproved
 

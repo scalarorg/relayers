@@ -11,7 +11,9 @@ import (
 	"github.com/scalarorg/go-electrum/electrum/types"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/common"
+	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
+	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
 )
 
@@ -106,8 +108,13 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to store relay data to the db")
 	}
-	//2. Send to the event bus
-
+	//2. Send to the event bus with destination chain is scalar for confirmation
+	grouped := c.GroupVaultTxsByDestinationChain(relayDatas)
+	c.eventBus.BroadcastEvent(&events.EventEnvelope{
+		EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
+		DestinationChain: scalar.SCALAR_NETWORK_NAME,
+		Data:             grouped,
+	})
 }
 
 // Todo: Log and validate incomming message
@@ -117,4 +124,13 @@ func (c *Client) PreProcessMessages(vaultTxs []types.VaultTransaction) error {
 		log.Debug().Msgf("Received vaultTx with key=>%v; stakerAddress=>%v; stakerPubkey=>%v", vaultTx.Key, vaultTx.StakerAddress, vaultTx.StakerPubkey)
 	}
 	return nil
+}
+
+// GroupVaultTxsByDestinationChain groups vault transactions by their destination chain
+func (c *Client) GroupVaultTxsByDestinationChain(relayDatas []models.RelayData) map[string][]string {
+	grouped := make(map[string][]string)
+	for _, item := range relayDatas {
+		grouped[item.To] = append(grouped[item.To], item.CallContract.TxHash)
+	}
+	return grouped
 }

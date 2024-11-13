@@ -3,11 +3,11 @@ package scalar
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/axelarnetwork/axelar-core/utils"
 	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	nexus "github.com/axelarnetwork/axelar-core/x/nexus/exported"
+	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/scalarorg/relayers/pkg/db"
@@ -25,6 +25,7 @@ import (
 )
 
 type Client struct {
+	networkConfig  *cosmos.CosmosNetworkConfig
 	txConfig       client.TxConfig
 	network        *NetworkClient
 	dbAdapter      *db.DatabaseAdapter
@@ -53,6 +54,7 @@ func NewClientFromConfig(config *cosmos.CosmosNetworkConfig, dbAdapter *db.Datab
 	}
 	subscriberName := fmt.Sprintf("subscriber-%s", config.ChainID)
 	client := &Client{
+		networkConfig:  config,
 		txConfig:       tx.NewTxConfig(codec.NewProtoCodec(codec_types.NewInterfaceRegistry()), []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT}),
 		network:        networkClient,
 		subscriberName: subscriberName,
@@ -83,6 +85,16 @@ func (c *Client) Start(ctx context.Context) error {
 				return c.handleEVMCompletedEvent(ctx, event)
 			}); err != nil {
 			log.Printf("Failed to subscribe to EVMCompletedEvent: %v", err)
+		}
+	}()
+
+	receiver := c.eventBus.Subscribe(SCALAR_NETWORK_NAME)
+	go func() {
+		for event := range receiver {
+			err := c.handleEventBusMessage(event)
+			if err != nil {
+				log.Error().Msgf("Failed to handle event bus message: %v", err)
+			}
 		}
 	}()
 	return nil
@@ -118,7 +130,24 @@ func Subscribe[T any](ctx context.Context,
 	return subscriberName, nil
 }
 
-// Todo: Seperate the function for BTC and EVM
+func (c *Client) ConfirmTxs(ctx context.Context, chainName string, txIds []string) (*sdk.TxResponse, error) {
+	//1. Create Confirm message request
+	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
+	txHashs := make([]emvtypes.Hash, len(txIds))
+	for i, txId := range txIds {
+		txHashs[i] = emvtypes.Hash(common.HexToHash(txId))
+	}
+	msg := emvtypes.NewConfirmGatewayTxsRequest(c.network.getAddress(), nexusChain, txHashs)
+
+	//2. Sign and broadcast the payload using the network client, which has the private key
+	confirmTx, err := c.network.ConfirmEvmTx(ctx, msg)
+	if err != nil {
+		return nil, err
+	}
+	log.Info().Msgf("[ScalarClient] [ConfirmTxs] %v", confirmTx)
+	return confirmTx, nil
+}
+
 func (c *Client) ConfirmBtcTx(ctx context.Context, chainName string, txId string) (*sdk.TxResponse, error) {
 	return c.ConfirmEvmTx(ctx, chainName, txId)
 }

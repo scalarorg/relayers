@@ -1,18 +1,30 @@
 version: '3.8'
 
 services:
-  scalar-relayer-go:
-    container_name: scalar-xchains-relayer-go
+  db:
+    container_name: relayer-db
+    hostname: relayer-db
+    image: postgres:14.9-alpine3.18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-relayer}
+    volumes:
+      - ./runtime/db:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: always
+
+  relayer:
+    container_name: relayer
     build:
       context: .
       dockerfile: Dockerfile
-    image: "scalarorg/xchains-relayer-go"
+    image: "scalarorg/relayer"
     env_file:
       - .env.${ENVIRONMENT:-production}
     environment:
       - APP_NAME=relayer
     volumes:
-      - ./data:/app/data
-    ports:
-      - "8080:8080"
+      - ./runtime/data:/app/data
     restart: unless-stopped

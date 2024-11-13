@@ -9,8 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	eth_types "github.com/ethereum/go-ethereum/core/types"
-	contracts_abi "github.com/scalarorg/relayers/pkg/contracts-abi"
-	contracts "github.com/scalarorg/relayers/pkg/contracts/generated"
+	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/types"
 )
 
@@ -18,6 +17,17 @@ type ValidEvmEvent interface {
 	*contracts.IAxelarGatewayContractCallApproved |
 		*contracts.IAxelarGatewayContractCall |
 		*contracts.IAxelarGatewayExecuted
+}
+
+func getScalarGwExecuteAbi() (*abi.ABI, error) {
+	if scalarGwExecuteAbi == nil {
+		var err error
+		scalarGwExecuteAbi, err = contracts.IAxelarExecutableMetaData.GetAbi()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return scalarGwExecuteAbi, nil
 }
 
 // Todo: Check if this is the correct way to extract the destination chain
@@ -140,12 +150,11 @@ func parseContractCallApproved(
 		SourceEventIndex *big.Int
 	}{}
 
-	contractAbi := contracts_abi.GetEventABI("ContractCallApproved")
-	parsedAbi, err := abi.JSON(strings.NewReader(contractAbi))
+	abi, err := getScalarGwExecuteAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
-	if err := parsedAbi.UnpackIntoInterface(&event, "ContractCallApproved", log.Data); err != nil {
+	if err := abi.UnpackIntoInterface(&event, "ContractCallApproved", log.Data); err != nil {
 		return nil, fmt.Errorf("failed to unpack event: %w", err)
 	}
 
@@ -202,12 +211,11 @@ func parseContractCall(
 		Payload                    []byte
 	}{}
 
-	contractAbi := contracts_abi.GetEventABI("ContractCall")
-	parsedAbi, err := abi.JSON(strings.NewReader(contractAbi))
+	abi, err := getScalarGwExecuteAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
-	if err := parsedAbi.UnpackIntoInterface(&event, "ContractCall", log.Data); err != nil {
+	if err := abi.UnpackIntoInterface(&event, "ContractCall", log.Data); err != nil {
 		return nil, fmt.Errorf("failed to unpack event: %w", err)
 	}
 
@@ -257,9 +265,7 @@ func parseExecute(
 	event := struct {
 		CommandId [32]byte
 	}{}
-
-	contractAbi := contracts_abi.GetEventABI("Executed")
-	parsedAbi, err := abi.JSON(strings.NewReader(contractAbi))
+	abi, err := getScalarGwExecuteAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
@@ -269,7 +275,7 @@ func parseExecute(
 		return nil, fmt.Errorf("unexpected log data size: got %d bytes, want 32 bytes", len(log.Data))
 	}
 
-	if err := parsedAbi.UnpackIntoInterface(&event, "Executed", log.Data); err != nil {
+	if err := abi.UnpackIntoInterface(&event, "Executed", log.Data); err != nil {
 		return nil, fmt.Errorf("failed to unpack event: %w", err)
 	}
 

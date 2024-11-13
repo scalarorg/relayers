@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/scalarorg/relayers/pkg/db/models"
-	"github.com/scalarorg/relayers/pkg/types"
+	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -14,7 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func SetupTestDB(busEventChan chan *types.EventEnvelope, receiverChanBufSize int) (*DatabaseAdapter, func(), error) {
+func SetupTestDB(busEventChan chan *events.EventEnvelope, receiverChanBufSize int) (*DatabaseAdapter, func(), error) {
 	ctx := context.Background()
 
 	dbName := "test_db"
@@ -71,7 +71,7 @@ func SetupTestDB(busEventChan chan *types.EventEnvelope, receiverChanBufSize int
 		ID:     "test-id",
 		From:   "cosmos",
 		To:     "sepolia",
-		Status: int(types.PENDING),
+		Status: int(PENDING),
 		CallContract: &models.CallContract{
 			PayloadHash:     "0000000000000000000000000000000000000000000000000000000000000000",
 			SourceAddress:   "0x24a1db57fa3ecafcbad91d6ef068439aceeae090",
@@ -85,7 +85,7 @@ func SetupTestDB(busEventChan chan *types.EventEnvelope, receiverChanBufSize int
 		ID:     "test-id-2",
 		From:   "cosmos",
 		To:     "sepolia",
-		Status: int(types.APPROVED),
+		Status: int(APPROVED),
 		CallContract: &models.CallContract{
 			PayloadHash:     "0000000000000000000000000000000000000000000000000000000000000000",
 			SourceAddress:   "0x24a1db57fa3ecafcbad91d6ef068439aceeae090",

@@ -2,12 +2,11 @@ package events
 
 import (
 	"github.com/scalarorg/relayers/config"
-	"github.com/scalarorg/relayers/pkg/types"
 )
 
 var eventBus *EventBus
 
-type Channels []chan<- *types.EventEnvelope
+type Channels []chan<- *EventEnvelope
 
 // Store array of channels by destination chain
 type EventBus struct {
@@ -32,15 +31,15 @@ func (eb *EventBus) filterChannels(destinationChain string) Channels {
 	return eb.channels[destinationChain]
 }
 
-func (eb *EventBus) BroadcastEvent(event *types.EventEnvelope) {
+func (eb *EventBus) BroadcastEvent(event *EventEnvelope) {
 	channels := eb.filterChannels(event.DestinationChain)
 	for _, channel := range channels {
 		channel <- event
 	}
 }
 
-func (eb *EventBus) Subscribe(destinationChain string) <-chan *types.EventEnvelope {
-	sender := make(chan *types.EventEnvelope)
+func (eb *EventBus) Subscribe(destinationChain string) <-chan *EventEnvelope {
+	sender := make(chan *EventEnvelope)
 	channels := eb.channels[destinationChain]
 	channels = append(channels, sender)
 	return sender

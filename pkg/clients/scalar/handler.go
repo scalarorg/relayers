@@ -11,8 +11,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/db"
+	relaydata "github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
-	"github.com/scalarorg/relayers/pkg/types"
 )
 
 func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBCEvent[ContractCallApproved]) error {
@@ -48,9 +48,10 @@ func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBC
 	// 5. Broadcast the execute data to the Event bus
 	// Todo:After the executeData is broadcasted,
 	// Update status of the RelayerData to Approved
-	c.eventBus.BroadcastEvent(&types.EventEnvelope{
+	c.eventBus.BroadcastEvent(&events.EventEnvelope{
 		EventType:        events.EVENT_SCALAR_CONTRACT_CALL_APPROVED,
 		DestinationChain: destinationChain,
+		MessageID:        event.Args.MessageID,
 		Data:             executeData,
 	},
 	)
@@ -87,7 +88,7 @@ func (c *Client) handleEVMCompletedEvent(ctx context.Context, event *IBCEvent[EV
 	if err != nil {
 		return err
 	}
-	status := types.FAILED
+	status := relaydata.FAILED
 	var sequence *int = nil
 	//1. Sign and broadcast RouteMessageRequest
 	txRes, err := c.network.SendRouteMessageRequest(ctx, event.Args.ID, event.Args.Payload)
@@ -97,7 +98,7 @@ func (c *Client) handleEVMCompletedEvent(ctx context.Context, event *IBCEvent[EV
 	log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] txRes: %v", txRes)
 	if strings.Contains(txRes.RawLog, "already executed") {
 		log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] Already sent an executed tx for %s. Marked it as success.", event.Args.ID)
-		status = types.SUCCESS
+		status = relaydata.SUCCESS
 	} else {
 		log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] Executed RouteMessageRequest %s.", txRes.TxHash)
 		attrValue := findEventAttribute(txRes.Logs[0].Events, "send_packet", "packet_sequence")
@@ -105,7 +106,7 @@ func (c *Client) handleEVMCompletedEvent(ctx context.Context, event *IBCEvent[EV
 			value, _ := strconv.Atoi(attrValue)
 			sequence = &value
 		}
-		status = types.FAILED
+		status = relaydata.FAILED
 	}
 	//2. Update the db
 	err = c.dbAdapter.UpdateRelayDataStatueWithPacketSequence(event.Args.ID, status, sequence)

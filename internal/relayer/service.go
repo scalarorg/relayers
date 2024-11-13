@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
+	"github.com/scalarorg/relayers/pkg/clients/btc"
 	"github.com/scalarorg/relayers/pkg/clients/electrs"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
@@ -16,9 +17,10 @@ import (
 type Service struct {
 	DbAdapter    *db.DatabaseAdapter
 	EventBus     *events.EventBus
+	ScalarClient *scalar.Client
 	Electrs      []*electrs.Client
 	EvmClients   []*evm.EvmClient
-	ScalarClient *scalar.Client
+	BtcClient    []*btc.BtcClient
 }
 
 func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
@@ -41,18 +43,19 @@ func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
 		return nil, fmt.Errorf("failed to create evm clients: %w", err)
 	}
 
-	// // Initialize BTC service
-	// err = btc.NewBtcClients(config.GlobalConfig.BtcNetworks)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	// Initialize BTC service
+	btcClients, err := btc.NewBtcClients(config.ConfigPath, dbAdapter, eventBus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create btc clients: %w", err)
+	}
 
 	return &Service{
 		DbAdapter:    dbAdapter,
 		EventBus:     eventBus,
+		ScalarClient: scalarClient,
 		Electrs:      electrsClients,
 		EvmClients:   evmClients,
-		ScalarClient: scalarClient,
+		BtcClient:    btcClients,
 	}, nil
 }
 

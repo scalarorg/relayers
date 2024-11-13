@@ -41,6 +41,6 @@ var eventAbis = map[string]string{
 }
 
 // GetContractCallApprovedABI returns the ABI string for the ContractCallApproved event
-func GetEventABI(name string) string {
-	return eventAbis[name]
-}
+// func GetEventABI(name string) string {
+// 	return eventAbis[name]
+// }

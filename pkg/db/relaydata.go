@@ -1,13 +1,11 @@
 package db
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/db/models"
-	"github.com/scalarorg/relayers/pkg/types"
 	"gorm.io/gorm"
 )
 
@@ -30,10 +28,22 @@ func (db *DatabaseAdapter) updateRelayData(id string, data interface{}) (tx *gor
 }
 
 // --- For Setup and Run Evm and Cosmos Relayer ---
-func (db *DatabaseAdapter) UpdateRelayDataStatueWithPacketSequence(id string, status types.Status, sequence *int) error {
+func (db *DatabaseAdapter) UpdateRelayDataStatueWithPacketSequence(id string, status RelayDataStatus, sequence *int) error {
 	data := models.RelayData{
 		Status:         int(status),
 		PacketSequence: sequence,
+	}
+	updateResult := db.updateRelayData(id, data)
+	if updateResult.Error != nil {
+		return updateResult.Error
+	}
+	return nil
+}
+
+func (db *DatabaseAdapter) UpdateRelayDataStatueWithExecuteHash(id string, status RelayDataStatus, executeHash *string) error {
+	data := models.RelayData{
+		Status:      int(status),
+		ExecuteHash: executeHash,
 	}
 	updateResult := db.updateRelayData(id, data)
 	if updateResult.Error != nil {
@@ -63,7 +73,7 @@ func (db *DatabaseAdapter) FindRelayDataById(id string, option *QueryOptions) (*
 	return &relayData, nil
 }
 
-func (db *DatabaseAdapter) GetBurningTx(payloadHash string) (string, error) {
+func (db *DatabaseAdapter) FindPayloadByHash(payloadHash string) ([]byte, error) {
 	var relayData models.RelayData
 
 	result := db.PostgresClient.
@@ -72,12 +82,12 @@ func (db *DatabaseAdapter) GetBurningTx(payloadHash string) (string, error) {
 		First(&relayData)
 
 	if result.Error != nil {
-		return "", result.Error
+		return nil, fmt.Errorf("failed to find payload by hash: %w", result.Error)
 	}
 
 	if relayData.CallContract == nil || len(relayData.CallContract.Payload) == 0 {
-		return "", fmt.Errorf("PayloadNotFound")
+		return nil, fmt.Errorf("payload not found")
 	}
 
-	return hex.EncodeToString(relayData.CallContract.Payload), nil
+	return relayData.CallContract.Payload, nil
 }
