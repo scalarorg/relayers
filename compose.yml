@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  db:
+  relayer-db:
     container_name: relayer-db
     hostname: relayer-db
     image: postgres:14.9-alpine3.18
@@ -15,14 +15,14 @@ services:
       - "5432:5432"
     restart: always
 
-  relayer:
-    container_name: relayer
+  relayer-app:
+    container_name: relayer-app
     build:
       context: .
       dockerfile: Dockerfile
     image: "scalarorg/relayer"
     env_file:
-      - .env.${ENVIRONMENT:-production}
+      - .env
     environment:
       - APP_NAME=relayer
     volumes:

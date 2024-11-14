@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/db/models"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -28,26 +29,21 @@ func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName string) (*models.Eve
 	var lastBlock models.EventCheckPoint
 	result := db.PostgresClient.Where("chain_name = ?", chainName).First(&lastBlock)
 	if result.Error != nil {
-		return nil, result.Error
+		return nil, fmt.Errorf("failed to get last event check point: %w", result.Error)
 	}
 	return &lastBlock, nil
 }
 
-func (db *DatabaseAdapter) UpdateLastEventCheckPoint(chainName string, lastBlock int64, eventKey string) error {
-	value := models.EventCheckPoint{
-		ChainName:   chainName,
-		BlockNumber: lastBlock,
-		EventKey:    eventKey,
-	}
-	result := db.PostgresClient.Clauses(
+func UpdateLastEventCheckPoint(db *gorm.DB, value *models.EventCheckPoint) error {
+	result := db.Clauses(
 		clause.OnConflict{
 			Columns: []clause.Column{{Name: "chain_name"}},
 			DoUpdates: clause.Assignments(map[string]interface{}{
-				"block_number": lastBlock,
-				"event_key":    eventKey,
+				"block_number": value.BlockNumber,
+				"event_key":    value.EventKey,
 			}),
 		},
-	).Create(&value)
+	).Create(value)
 	if result.Error != nil {
 		return fmt.Errorf("failed to update last event check point: %w", result.Error)
 	}

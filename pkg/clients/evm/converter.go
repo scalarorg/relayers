@@ -14,7 +14,7 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IAxelarGatewayC
 	senderAddress := event.Sender.String()
 	relayData := models.RelayData{
 		ID:   id,
-		From: c.config.ChainID,
+		From: c.evmConfig.GetId(),
 		To:   event.DestinationChain,
 		CallContract: &models.CallContract{
 			TxHash:        event.Raw.TxHash.String(),
@@ -44,7 +44,7 @@ func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IAxelarGate
 	relayData := models.CallContractApproved{
 		ID:               id,
 		SourceChain:      event.SourceChain,
-		DestinationChain: c.config.ChainID,
+		DestinationChain: c.evmConfig.GetId(),
 		TxHash:           strings.ToLower(txHash),
 		BlockNumber:      event.Raw.BlockNumber,
 		LogIndex:         event.Raw.Index,
@@ -62,8 +62,8 @@ func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IAxelarGatewayEx
 	id := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
 	cmdExecuted := models.CommandExecuted{
 		ID:               id,
-		SourceChain:      c.config.ChainID,
-		DestinationChain: c.config.ChainID,
+		SourceChain:      c.evmConfig.GetId(),
+		DestinationChain: c.evmConfig.GetId(),
 		TxHash:           strings.ToLower(event.Raw.TxHash.String()),
 		BlockNumber:      uint64(event.Raw.BlockNumber),
 		LogIndex:         uint(event.Raw.Index),

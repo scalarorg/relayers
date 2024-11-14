@@ -25,6 +25,7 @@ import (
 )
 
 type Client struct {
+	globalConfig   *config.Config
 	networkConfig  *cosmos.CosmosNetworkConfig
 	txConfig       client.TxConfig
 	network        *NetworkClient
@@ -34,19 +35,19 @@ type Client struct {
 	// Add other necessary fields like chain ID, gas prices, etc.
 }
 
-func NewClient(configPath string, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*Client, error) {
+func NewClient(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*Client, error) {
 	// Read Scalar config from JSON file
-	scalarCfgPath := fmt.Sprintf("%s/scalar.json", configPath)
+	scalarCfgPath := fmt.Sprintf("%s/scalar.json", globalConfig.ConfigPath)
 	scalarConfig, err := config.ReadJsonConfig[cosmos.CosmosNetworkConfig](scalarCfgPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read scalar config from file: %s, %w", scalarCfgPath, err)
 	}
 
-	scalarConfig.Mnemonic = config.GetScalarMnemonic()
-	return NewClientFromConfig(scalarConfig, dbAdapter, eventBus)
+	scalarConfig.Mnemonic = globalConfig.ScalarMnemonic
+	return NewClientFromConfig(globalConfig, scalarConfig, dbAdapter, eventBus)
 }
 
-func NewClientFromConfig(config *cosmos.CosmosNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*Client, error) {
+func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*Client, error) {
 	txConfig := tx.NewTxConfig(codec.NewProtoCodec(codec_types.NewInterfaceRegistry()), []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
 	networkClient, err := NewNetworkClient(config, txConfig)
 	if err != nil {
@@ -54,6 +55,7 @@ func NewClientFromConfig(config *cosmos.CosmosNetworkConfig, dbAdapter *db.Datab
 	}
 	subscriberName := fmt.Sprintf("subscriber-%s", config.ChainID)
 	client := &Client{
+		globalConfig:   globalConfig,
 		networkConfig:  config,
 		txConfig:       tx.NewTxConfig(codec.NewProtoCodec(codec_types.NewInterfaceRegistry()), []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT}),
 		network:        networkClient,
@@ -65,6 +67,15 @@ func NewClientFromConfig(config *cosmos.CosmosNetworkConfig, dbAdapter *db.Datab
 }
 
 func (c *Client) Start(ctx context.Context) error {
+	receiver := c.eventBus.Subscribe(SCALAR_NETWORK_NAME)
+	go func() {
+		for event := range receiver {
+			err := c.handleEventBusMessage(event)
+			if err != nil {
+				log.Error().Msgf("Failed to handle event bus message: %v", err)
+			}
+		}
+	}()
 	go func() {
 		if _, err := Subscribe(ctx, c, ContractCallApprovedEvent,
 			func(event *IBCEvent[ContractCallApproved], err error) error {
@@ -85,16 +96,6 @@ func (c *Client) Start(ctx context.Context) error {
 				return c.handleEVMCompletedEvent(ctx, event)
 			}); err != nil {
 			log.Printf("Failed to subscribe to EVMCompletedEvent: %v", err)
-		}
-	}()
-
-	receiver := c.eventBus.Subscribe(SCALAR_NETWORK_NAME)
-	go func() {
-		for event := range receiver {
-			err := c.handleEventBusMessage(event)
-			if err != nil {
-				log.Error().Msgf("Failed to handle event bus message: %v", err)
-			}
 		}
 	}()
 	return nil

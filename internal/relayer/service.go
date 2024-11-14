@@ -28,23 +28,23 @@ func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
 	var err error
 
 	// Initialize Scalar client
-	scalarClient, err := scalar.NewClient(config.ConfigPath, dbAdapter, eventBus)
+	scalarClient, err := scalar.NewClient(config, dbAdapter, eventBus)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create scalar client: %w", err)
 	}
 	// Initialize Electrs clients
-	electrsClients, err := electrs.NewElectrumClients(config.ConfigPath, dbAdapter, eventBus)
+	electrsClients, err := electrs.NewElectrumClients(config, dbAdapter, eventBus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create electrum clients: %w", err)
 	}
 	// Initialize EVM clients
-	evmClients, err := evm.NewEvmClients(config.ConfigPath, dbAdapter, eventBus)
+	evmClients, err := evm.NewEvmClients(config, dbAdapter, eventBus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create evm clients: %w", err)
 	}
 
 	// Initialize BTC service
-	btcClients, err := btc.NewBtcClients(config.ConfigPath, dbAdapter, eventBus)
+	btcClients, err := btc.NewBtcClients(config, dbAdapter, eventBus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create btc clients: %w", err)
 	}

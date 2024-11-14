@@ -129,12 +129,12 @@ func (ec *EvmClient) Execute(
 }
 
 func (ec *EvmClient) SubmitTx(tx *ethtypes.Transaction, retryAttempt int) (*ethtypes.Receipt, error) {
-	if retryAttempt >= ec.config.MaxRetry {
+	if retryAttempt >= ec.evmConfig.MaxRetry {
 		return nil, fmt.Errorf("max retry exceeded")
 	}
 
 	// Create a new context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), ec.config.TxTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), ec.evmConfig.TxTimeout)
 	defer cancel()
 
 	// Log transaction details
@@ -147,14 +147,14 @@ func (ec *EvmClient) SubmitTx(tx *ethtypes.Transaction, retryAttempt int) (*etht
 	if err != nil {
 		log.Error().
 			Err(err).
-			Str("rpcUrl", ec.config.RPCUrl).
+			Str("rpcUrl", ec.evmConfig.RPCUrl).
 			Str("walletAddress", ec.auth.From.String()).
 			Str("to", tx.To().String()).
 			Str("data", hex.EncodeToString(tx.Data())).
 			Msg("[EvmClient.SubmitTx] Failed to submit transaction")
 
 		// Sleep before retry
-		time.Sleep(ec.config.RetryDelay)
+		time.Sleep(ec.evmConfig.RetryDelay)
 
 		log.Debug().
 			Int("attempt", retryAttempt+1).
@@ -177,7 +177,7 @@ func (ec *EvmClient) SubmitTx(tx *ethtypes.Transaction, retryAttempt int) (*etht
 }
 
 func (ec *EvmClient) WaitForTransaction(hash string) (*ethtypes.Receipt, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ec.config.TxTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), ec.evmConfig.TxTimeout)
 	defer cancel()
 
 	txHash := common.HexToHash(hash)

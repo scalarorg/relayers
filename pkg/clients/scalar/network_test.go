@@ -13,9 +13,7 @@ import (
 )
 
 var (
-	DefaultConfig = config.Config{
-		ChainEnv: "testnet",
-	}
+	DefaultGlobalConfig        = config.Config{}
 	DefaultCosmosNetworkConfig = cosmos.CosmosNetworkConfig{
 		ChainID:  "scalar-testnet-1",
 		Denom:    "uatom",
@@ -32,11 +30,11 @@ func TestCreateTransaction(t *testing.T) {
 	sdk.GetConfig().SetBech32PrefixForAccount("axelar", "axelarvaloper")
 
 	// Setup test client
-	dbAdapter, err := db.NewDatabaseAdapter(&DefaultConfig)
+	dbAdapter, err := db.NewDatabaseAdapter(&DefaultGlobalConfig)
 	require.NoError(t, err)
 	eventBusConfig := config.EventBusConfig{}
 	eventBus := events.NewEventBus(&eventBusConfig)
-	client, err := scalar.NewClientFromConfig(&DefaultCosmosNetworkConfig, dbAdapter, eventBus)
+	client, err := scalar.NewClientFromConfig(&DefaultGlobalConfig, &DefaultCosmosNetworkConfig, dbAdapter, eventBus)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 

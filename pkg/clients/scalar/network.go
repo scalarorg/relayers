@@ -15,10 +15,12 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func createTxFactory(config *cosmos.CosmosNetworkConfig, txConfig client.TxConfig) client_tx.Factory {
@@ -46,26 +48,34 @@ type NetworkClient struct {
 }
 
 func NewNetworkClient(config *cosmos.CosmosNetworkConfig, txConfig client.TxConfig) (*NetworkClient, error) {
+	txFactory := createTxFactory(config, txConfig)
 	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic)
 	if err != nil {
 		return nil, err
 	}
 	var rpcClient rpcclient.Client
+	var grpcConn *grpc.ClientConn
 	if config.RPCUrl != "" {
+		log.Info().Msgf("Scalr RPCUrl: %s", config.RPCUrl)
 		rpcClient, err = client.NewClientFromNode(config.RPCUrl)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create RPC client: %w", err)
+		}
+		//Todo: Remove insecure credentials
+		opts := []grpc.DialOption{
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		}
+		grpcConn, err = grpc.NewClient(config.RPCUrl, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gRPC client: %w", err)
 		}
 	}
-	grpcConn, err := grpc.NewClient(config.RPCUrl)
-	if err != nil {
-		return nil, err
-	}
+
 	// wsClient, err := rpchttp.New(config.WsEndpoint, "/websocket")
 	// if err != nil {
 	// 	return nil, err
 	// }
-	txFactory := createTxFactory(config, txConfig)
+
 	networkClient := &NetworkClient{
 		config:    config,
 		rpcClient: rpcClient,

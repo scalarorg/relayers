@@ -1,4 +1,4 @@
 #!/bin/bash
 
 source .env
-go run cmd/relayer/main.go
+go run ./main.go --env ${1:-""}

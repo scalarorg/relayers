@@ -59,7 +59,7 @@ func SetupTestDB(busEventChan chan *events.EventEnvelope, receiverChanBufSize in
 		&models.CallContract{},
 		&models.CallContractApproved{},
 		&models.CommandExecuted{},
-		&models.Operatorship{},
+		&models.ProtocolInfo{},
 	)
 	if err != nil {
 		return nil, nil, err

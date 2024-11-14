@@ -35,19 +35,20 @@ func run(cmd *cobra.Command, args []string) {
 	// Initialize OpenObserve
 	initObserve()
 	// Load and initialize global config
-	if err := config.Load(environment); err != nil {
+	log.Info().Msgf("Running relayer with environment: %s", environment)
+	if err := config.LoadEnv(environment); err != nil {
 		panic("Failed to load config: " + err.Error())
 	}
-
+	evtBusConfig := config.EventBusConfig{}
+	eventBus := events.GetEventBus(&evtBusConfig)
 	// Initialize global DatabaseClient
-	eventBus := events.GetEventBus(&config.GlobalConfig.EventBus)
-	dbAdapter, err := db.NewDatabaseAdapter(config.GlobalConfig)
+	dbAdapter, err := db.NewDatabaseAdapter(&config.GlobalConfig)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create database adapter")
 	}
 
 	// Initialize relayer service
-	service, err := relayer.NewService(config.GlobalConfig, dbAdapter, eventBus)
+	service, err := relayer.NewService(&config.GlobalConfig, dbAdapter, eventBus)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create relayer service")
 	}
@@ -85,7 +86,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(
 		&environment,
 		"env",
-		"local",
+		"",
 		"Environment name to  to the configuration file",
 	)
 	viper.BindPFlag("env", rootCmd.PersistentFlags().Lookup("env"))

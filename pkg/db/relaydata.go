@@ -9,11 +9,22 @@ import (
 	"gorm.io/gorm"
 )
 
-func (db *DatabaseAdapter) CreateRelayDatas(datas []models.RelayData) error {
+func (db *DatabaseAdapter) CreateRelayDatas(datas []models.RelayData, lastCheckpoint *models.EventCheckPoint) error {
 	log.Info().Msgf("Creating %d relay data records", len(datas))
-	result := db.PostgresClient.CreateInBatches(&datas, 100)
-	if result.Error != nil {
-		return result.Error
+	log.Debug().Msgf("Creating relaydatas: %+v", datas)
+	//Up date checkpoint and relayDatas in a transaction
+	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		result := tx.CreateInBatches(&datas, 100)
+		if result.Error != nil {
+			return result.Error
+		}
+		if lastCheckpoint != nil {
+			UpdateLastEventCheckPoint(tx, lastCheckpoint)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create relay data: %w", err)
 	}
 	return nil
 }
@@ -85,7 +96,7 @@ func (db *DatabaseAdapter) FindPayloadByHash(payloadHash string) ([]byte, error)
 		return nil, fmt.Errorf("failed to find payload by hash: %w", result.Error)
 	}
 
-	if relayData.CallContract == nil || len(relayData.CallContract.Payload) == 0 {
+	if len(relayData.CallContract.Payload) == 0 {
 		return nil, fmt.Errorf("payload not found")
 	}
 
