@@ -42,7 +42,9 @@ func NewClient(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, event
 	if err != nil {
 		return nil, fmt.Errorf("failed to read scalar config from file: %s, %w", scalarCfgPath, err)
 	}
-
+	if globalConfig.ScalarMnemonic == "" {
+		return nil, fmt.Errorf("scalar mnemonic is not set")
+	}
 	scalarConfig.Mnemonic = globalConfig.ScalarMnemonic
 	return NewClientFromConfig(globalConfig, scalarConfig, dbAdapter, eventBus)
 }
@@ -134,18 +136,19 @@ func Subscribe[T any](ctx context.Context,
 func (c *Client) ConfirmTxs(ctx context.Context, chainName string, txIds []string) (*sdk.TxResponse, error) {
 	//1. Create Confirm message request
 	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
+	log.Debug().Msgf("[ScalarClient] [ConfirmTxs] Broadcast for confirmation txs from chain %s: %v", nexusChain, txIds)
 	txHashs := make([]emvtypes.Hash, len(txIds))
 	for i, txId := range txIds {
 		txHashs[i] = emvtypes.Hash(common.HexToHash(txId))
 	}
 	msg := emvtypes.NewConfirmGatewayTxsRequest(c.network.getAddress(), nexusChain, txHashs)
-
 	//2. Sign and broadcast the payload using the network client, which has the private key
 	confirmTx, err := c.network.ConfirmEvmTx(ctx, msg)
 	if err != nil {
+		log.Error().Msgf("[ScalarClient] [ConfirmTxs] error from network client: %v", err)
 		return nil, err
 	}
-	log.Info().Msgf("[ScalarClient] [ConfirmTxs] %v", confirmTx)
+	log.Debug().Msgf("[ScalarClient] [ConfirmTxs] %v", confirmTx)
 	return confirmTx, nil
 }
 

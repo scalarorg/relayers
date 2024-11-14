@@ -11,7 +11,6 @@ import (
 
 func (db *DatabaseAdapter) CreateRelayDatas(datas []models.RelayData, lastCheckpoint *models.EventCheckPoint) error {
 	log.Info().Msgf("Creating %d relay data records", len(datas))
-	log.Debug().Msgf("Creating relaydatas: %+v", datas)
 	//Up date checkpoint and relayDatas in a transaction
 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
 		result := tx.CreateInBatches(&datas, 100)

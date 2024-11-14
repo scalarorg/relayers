@@ -70,7 +70,13 @@ func (s *Service) Start(ctx context.Context) error {
 		go client.Start(ctx)
 	}
 	//Start scalar client
-	go s.ScalarClient.Start(ctx)
+	go func() {
+		err := s.ScalarClient.Start(ctx)
+		if err != nil {
+			log.Error().Msgf("Start scalar client with error %+v", err)
+		}
+	}()
+
 	return nil
 }
 

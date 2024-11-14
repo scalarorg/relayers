@@ -64,7 +64,7 @@ func NewElectrumClient(globalConfig *config.Config, config *Config, dbAdapter *d
 		},
 		MethodTimeout:   time.Second,
 		PingInterval:    -1,
-		SoftwareVersion: "testclient",
+		SoftwareVersion: "scalar-relayer",
 	})
 	if err != nil {
 		log.Error().Err(err).Msgf("Failed to connect to electrum server at %s", rpcEndpoint)
@@ -84,13 +84,14 @@ func (c *Client) Start(ctx context.Context) error {
 	//Set batch size from config or default value
 	params = append(params, c.electrumConfig.BatchSize)
 	lastCheckpoint := c.getLastCheckpoint()
+	log.Debug().Msgf("[ElectrumClient] [Start] Last checkpoint: %v", lastCheckpoint)
 	if lastCheckpoint.EventKey != "" {
 		params = append(params, lastCheckpoint.EventKey)
 	} else if c.electrumConfig.LastVaultTx != "" {
 		params = append(params, c.electrumConfig.LastVaultTx)
 	}
 
-	log.Debug().Msgf("Subscribing to vault transactions with params: %v", params)
+	log.Debug().Msgf("[ElectrumClient] [Start] Subscribing to vault transactions with params: %v", params)
 	c.electrs.VaultTransactionSubscribe(ctx, c.vaultTxMessageHandler, params...)
 	return nil
 }
@@ -99,8 +100,12 @@ func (c *Client) Start(ctx context.Context) error {
 // Todo: Add some logging, metric and error handling if needed
 func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err error) error {
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to receive vault transaction")
+		log.Warn().Msgf("[ElectrumClient] [vaultTxMessageHandler] Failed to receive vault transaction: %v", err)
 		return fmt.Errorf("failed to receive vault transaction: %w", err)
+	}
+	if len(vaultTxs) == 0 {
+		log.Debug().Msg("[ElectrumClient] [vaultTxMessageHandler] No vault transactions received")
+		return nil
 	}
 	c.PreProcessMessages(vaultTxs)
 	//1. parse vault transactions to relay data

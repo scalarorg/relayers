@@ -23,17 +23,20 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func createTxFactory(config *cosmos.CosmosNetworkConfig, txConfig client.TxConfig) client_tx.Factory {
+func createTxFactory(config *cosmos.CosmosNetworkConfig, txConfig client.TxConfig) (client_tx.Factory, error) {
 	factory := client_tx.Factory{}
-	factory.WithTxConfig(txConfig)
-	factory.WithChainID(config.ChainID)
-	factory.WithGas(200000) // Adjust as needed
+	factory = factory.WithTxConfig(txConfig)
+	if config.ChainID == "" {
+		return factory, fmt.Errorf("chain ID is required")
+	}
+	factory = factory.WithChainID(config.ChainID)
+	factory = factory.WithGas(200000) // Adjust as needed
 	//Direct Sign mode with single signer
-	factory.WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
-	factory.WithMemo("") // Optional memo
-	factory.WithSequence(0)
-	factory.WithAccountNumber(0)
-	return factory
+	factory = factory.WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
+	factory = factory.WithMemo("") // Optional memo
+	factory = factory.WithSequence(0)
+	factory = factory.WithAccountNumber(0)
+	return factory, nil
 }
 
 type NetworkClient struct {
@@ -48,11 +51,15 @@ type NetworkClient struct {
 }
 
 func NewNetworkClient(config *cosmos.CosmosNetworkConfig, txConfig client.TxConfig) (*NetworkClient, error) {
-	txFactory := createTxFactory(config, txConfig)
+	txFactory, err := createTxFactory(config, txConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tx factory: %w", err)
+	}
 	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create account from mnemonic: %w", err)
 	}
+	log.Info().Msgf("Scalar NetworkClient created with broadcaster address: %s", addr.String())
 	var rpcClient rpcclient.Client
 	var grpcConn *grpc.ClientConn
 	if config.RPCUrl != "" {
@@ -133,7 +140,7 @@ func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Ms
 	if err != nil {
 		return nil, err
 	}
-	txBuilder.SetFeeGranter(c.addr)
+	// txBuilder.SetFeeGranter(c.addr)
 	err = c.signTx(ctx, txBuilder, true)
 
 	if err != nil {

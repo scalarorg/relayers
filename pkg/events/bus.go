@@ -36,7 +36,6 @@ func (eb *EventBus) filterChannels(destinationChain string) Channels {
 
 func (eb *EventBus) BroadcastEvent(event *EventEnvelope) {
 	channels := eb.filterChannels(event.DestinationChain)
-	log.Debug().Msgf("Broadcasting event to %d listeners for %s", len(channels), event.DestinationChain)
 	for _, channel := range channels {
 		channel <- event
 	}

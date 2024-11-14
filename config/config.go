@@ -105,7 +105,7 @@ func (c *Config) AddChainConfig(chainConfig IChainConfig) {
 	c.ChainConfigs[chainConfig.GetChainId()] = chainConfig
 }
 func (c *Config) GetStringIdByChainId(chainId uint64) (string, error) {
-	log.Debug().Msgf("Getting string id for chainId: %d", chainId)
+	// log.Debug().Msgf("Getting string id for chainId: %d", chainId)
 	chainConfig, ok := c.ChainConfigs[chainId]
 	if !ok {
 		return "", fmt.Errorf("chain not found for chainId: %d", chainId)
