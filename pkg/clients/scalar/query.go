@@ -1,30 +1,33 @@
 package scalar
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 
 	axltypes "github.com/axelarnetwork/axelar-core/x/axelarnet/types"
 	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
+	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	auth "github.com/cosmos/cosmos-sdk/x/auth/types"
-	gogogrpc "github.com/cosmos/gogoproto/grpc"
+	//gogogrpc "github.com/cosmos/gogoproto/grpc"
 	//pbgrpc "github.com/gogo/protobuf/grpc"
 )
 
 type QueryClient struct {
-	grpcConn           gogogrpc.ClientConn
+	clientCtx          *client.Context
 	evmQueryClient     emvtypes.QueryServiceClient
 	msgQueryClient     axltypes.MsgServiceClient
 	accountQueryClient auth.QueryClient
 }
 
-func NewQueryClient(grpcConn gogogrpc.ClientConn) *QueryClient {
-	evmQueryClient := emvtypes.NewQueryServiceClient(grpcConn)
-	msgQueryClient := axltypes.NewMsgServiceClient(grpcConn)
-	accountQueryClient := auth.NewQueryClient(grpcConn)
+func NewQueryClient(clientCtx *client.Context) *QueryClient {
+	evmQueryClient := emvtypes.NewQueryServiceClient(clientCtx)
+	msgQueryClient := axltypes.NewMsgServiceClient(clientCtx)
+	accountQueryClient := auth.NewQueryClient(clientCtx)
 	return &QueryClient{
-		grpcConn:           grpcConn,
+		clientCtx:          clientCtx,
 		evmQueryClient:     evmQueryClient,
 		msgQueryClient:     msgQueryClient,
 		accountQueryClient: accountQueryClient,
@@ -68,7 +71,7 @@ func (c *QueryClient) QueryRouteMessageRequest(ctx context.Context, sender sdk.A
 	}
 	return resp, nil
 }
-func (c *QueryClient) QueryAccount(ctx context.Context, address sdk.AccAddress) (*auth.BaseAccount, error) {
+func (c *QueryClient) QueryAccount(ctx context.Context, address sdk.AccAddress) (map[string]any, error) {
 	req := &auth.QueryAccountRequest{Address: address.String()}
 	resp, err := c.accountQueryClient.Account(ctx, req)
 	if err != nil {
@@ -77,13 +80,20 @@ func (c *QueryClient) QueryAccount(ctx context.Context, address sdk.AccAddress) 
 	if resp.Account == nil {
 		return nil, fmt.Errorf("account value is nil")
 	}
-	var account auth.BaseAccount
-	err = account.Unmarshal(resp.Account.Value)
+	buf := &bytes.Buffer{}
+	clientCtx := c.clientCtx.WithOutput(buf)
+	err = clientCtx.PrintProto(resp.Account)
+	// var account auth.BaseAccount
+	// err = account.Unmarshal(resp.Account.Value)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to unmarshal account: %w", err)
+	// }
+	var account map[string]any
+	err = json.Unmarshal(buf.Bytes(), &account)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal account: %w", err)
 	}
-
-	return &account, nil
+	return account, nil
 }
 
 // func (c *NetworkClient) QueryTx(ctx context.Context, hash []byte) (*ctypes.ResultTx, error) {

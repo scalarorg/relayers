@@ -3,7 +3,9 @@ package scalar_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -67,11 +69,26 @@ func TestCosmosGrpcClient(t *testing.T) {
 	}
 	buf := &bytes.Buffer{}
 	ctx := clientCtx.WithOutput(buf)
+	ctx.OutputFormat = "json"
 	err = ctx.PrintProto(resp.Account)
 	assert.NoError(t, err)
 	log.Info().Msgf("resp: %s", buf.String())
-	var account auth.BaseAccount
-	err = ctx.Codec.UnpackAny(resp.Account, &account)
-	assert.NoError(t, err)
-	log.Info().Msgf("Base Account: %+v", &account)
+	var account map[string]any
+	//var account auth.BaseAccount
+	//account.Unmarshal(resp.Account.Value)
+
+	//err = ctx.Codec.UnpackAny(resp.Account, &account)
+	//log.Info().Msgf("UnpackAny Account: %+v", account) //-> missing
+	// err = gogoproto.Unmarshal(resp.Account.Value, &account)
+	//err = ctx.Codec.UnmarshalInterfaceJSON(buf.Bytes(), &account)
+	// assert.NoError(t, err)
+	json.Unmarshal(buf.Bytes(), &account)
+	sequence, err := strconv.ParseUint(account["sequence"].(string), 10, 64)
+	if err != nil {
+		log.Error().Msgf("failed to parse sequence: %+v", err)
+	}
+	log.Info().Msgf("Sequence: %+v", sequence)
+	// log.Info().Msgf("Json unmarshal: %+v", account.GetSequence())
+
+	log.Info().Msgf("Account: %+v", account)
 }

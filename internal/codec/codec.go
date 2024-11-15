@@ -2,11 +2,14 @@ package codec
 
 import (
 	//Importing the types package is necessary to register the codec
+	"fmt"
+
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/types"
 
 	//Importing the secp256k1 package is necessary to register the type /cosmos.crypto.secp256k1.PubKey for the codec
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	_ "github.com/cosmos/cosmos-sdk/crypto/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/gogo/protobuf/proto"
 	"google.golang.org/grpc/encoding"
@@ -24,7 +27,8 @@ func init() {
 	authtypes.RegisterInterfaces(interfaceRegistry)
 	//Register the secp256k1 pubkey type
 	interfaceRegistry.RegisterImplementations((*proto.Message)(nil), &secp256k1.PubKey{})
-	interfaceRegistry.RegisterImplementations((*proto.Message)(nil), &authtypes.BaseAccount{})
+	gogoCodec := GogoEnabled{Codec: encoding.GetCodec(encproto.Name)}
+	fmt.Println(gogoCodec.Name())
 	encoding.RegisterCodec(GogoEnabled{Codec: encoding.GetCodec(encproto.Name)})
 	protoCodec = codec.NewProtoCodec(interfaceRegistry)
 }

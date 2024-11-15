@@ -9,4 +9,6 @@ type CosmosNetworkConfig struct {
 	Mnemonic      string `mapstructure:"mnemonic"`
 	GasPrice      string `mapstructure:"gas_price"`
 	BroadcastMode string `mapstructure:"broadcast_mode"`
+	MaxRetries    int    `mapstructure:"max_retries"`
+	RetryInterval int64  `mapstructure:"retry_interval"` //milliseconds
 }

@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
 
 	axltypes "github.com/axelarnetwork/axelar-core/x/axelarnet/types"
 	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
@@ -67,7 +70,7 @@ func NewNetworkClient(config *cosmos.CosmosNetworkConfig, queryClient *QueryClie
 	// if err != nil {
 	// 	return nil, err
 	// }
-	resp, err := queryClient.QueryAccount(context.Background(), addr)
+	account, err := queryClient.QueryAccount(context.Background(), addr)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +79,10 @@ func NewNetworkClient(config *cosmos.CosmosNetworkConfig, queryClient *QueryClie
 		return nil, fmt.Errorf("failed to create tx factory: %w", err)
 	}
 	//Get account sequence number from network
-	sequenceNumber := resp.Sequence
+	sequenceNumber, err := strconv.ParseUint(account["sequence"].(string), 10, 64)
+	if err != nil {
+		log.Error().Msgf("failed to parse sequence: %+v", err)
+	}
 	networkClient := &NetworkClient{
 		config:         config,
 		rpcClient:      rpcClient,
@@ -129,6 +135,8 @@ func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, 
 	}
 	return txRes, nil
 }
+
+// Inject account number and sequence number into txFactory for signing
 func (c *NetworkClient) createTxFactory(ctx context.Context) tx.Factory {
 	txf := c.txFactory
 	resp, err := c.queryClient.QueryAccount(ctx, c.getAddress())
@@ -136,36 +144,35 @@ func (c *NetworkClient) createTxFactory(ctx context.Context) tx.Factory {
 		log.Error().Msgf("failed to get account: %+v", err)
 	} else {
 		log.Debug().Msgf("[ScalarClient] [NetworkClient] account: %v", resp)
-		txf = txf.WithAccountNumber(resp.AccountNumber)
-		txf = txf.WithSequence(resp.Sequence)
+		accountNumber, err := strconv.ParseUint(resp["account_number"].(string), 10, 64)
+		if err != nil {
+			log.Error().Msgf("failed to parse account number: %+v", err)
+		}
+		sequenceNumber, err := strconv.ParseUint(resp["sequence"].(string), 10, 64)
+		if err != nil {
+			log.Error().Msgf("failed to parse sequence: %+v", err)
+		}
+		txf = txf.WithAccountNumber(accountNumber)
+		//If sequence number is greater than current sequence number, update the sequence number
+		//This is to avoid the situation where the transaction is not included in the next block
+		//Then account sequence number is not updated on the server side
+		if sequenceNumber >= txf.Sequence() {
+			txf = txf.WithSequence(sequenceNumber)
+		}
 	}
 	return txf
 }
 func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 	//1. Build unsigned transaction using txFactory
-	txf := c.createTxFactory(ctx)
+	txf := c.txFactory
 	// Every required params are set in the txFactory
 	txBuilder, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
 	}
 	txBuilder.SetFeeGranter(c.addr)
-	err = c.signTx(txBuilder, true)
-
-	if err != nil {
-		return nil, err
-	}
-
-	//2. Encode the transaction for Broadcasting
-	txBytes, err := c.txConfig.TxEncoder()(txBuilder.GetTx())
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := c.BroadcastTx(ctx, txBytes)
-	if err != nil {
-		return nil, err
-	}
+	//Try to sign and broadcast the transaction until success or reach max retry
+	result, err := c.trySignAndBroadcastMsgs(ctx, txBuilder)
 	if result != nil && result.Code == 0 {
 		log.Debug().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] success broadcast tx with tx hash: %s", result.TxHash)
 		//Update sequence and account number
@@ -175,8 +182,46 @@ func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Ms
 	}
 	return result, nil
 }
-func (c *NetworkClient) signTx(txBuilder sdkclient.TxBuilder, overwriteSig bool) error {
-	txf := c.txFactory
+func (c *NetworkClient) trySignAndBroadcastMsgs(ctx context.Context, txBuilder sdkclient.TxBuilder) (*sdk.TxResponse, error) {
+	var err error
+	var result *sdk.TxResponse
+	for i := 0; i < c.config.MaxRetries; i++ {
+		txf := c.createTxFactory(ctx)
+		log.Debug().Msgf("[ScalarNetworkClient] [trySignAndBroadcastMsgs] account sequence: %d", txf.Sequence())
+		c.txFactory = txf
+		err = c.signTx(txf, txBuilder, true)
+
+		if err != nil {
+			return nil, err
+		}
+
+		//2. Encode the transaction for Broadcasting
+		var txBytes []byte
+		txBytes, err = c.txConfig.TxEncoder()(txBuilder.GetTx())
+		if err != nil {
+			return nil, err
+		}
+
+		result, err = c.BroadcastTx(ctx, txBytes)
+		//Return if success
+		//Or error it not nil
+		if result != nil && result.Code == 0 || err != nil {
+			return result, err
+		}
+
+		//Sleep for a while if error is nil
+		//Or error "account sequence mismatch"
+		if result != nil && result.Code > 0 && strings.Contains(result.RawLog, "account sequence mismatch") {
+			log.Debug().Msgf("[ScalarNetworkClient] [trySignAndBroadcast] sleep for %d milliseconds due to error: %s", c.config.RetryInterval, result.RawLog)
+			time.Sleep(time.Duration(c.config.RetryInterval) * time.Millisecond)
+		} else {
+			return result, nil
+		}
+	}
+	log.Error().Msgf("[ScalarNetworkClient] [trySignAndBroadcast] failed to broadcast tx after %d retries", c.config.MaxRetries)
+	return result, err
+}
+func (c *NetworkClient) signTx(txf tx.Factory, txBuilder sdkclient.TxBuilder, overwriteSig bool) error {
 	//2. Sign the transaction
 	signerData := authsigning.SignerData{
 		ChainID:       txf.ChainID(),
@@ -233,7 +278,6 @@ func (c *NetworkClient) signTx(txBuilder sdkclient.TxBuilder, overwriteSig bool)
 		Data:     &sigData,
 		Sequence: txf.Sequence(),
 	}
-
 	if overwriteSig {
 		return txBuilder.SetSignatures(sigV2)
 	}
