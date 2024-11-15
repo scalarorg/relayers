@@ -10,12 +10,15 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/cosmos/cosmos-sdk v0.45.16
 	github.com/cosmos/go-bip39 v1.0.0
+	github.com/cosmos/gogoproto v1.7.0
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/go-playground/validator/v10 v10.22.1
+	github.com/gogo/protobuf v1.3.3
 	github.com/gorilla/websocket v1.5.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/rs/zerolog v1.33.0
 	github.com/scalarorg/go-electrum v0.0.0-20241107025440-a56c397247b7
+	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
 	github.com/tendermint/tendermint v0.34.27
@@ -71,7 +74,6 @@ require (
 	github.com/cosmos/btcutil v1.0.5 // indirect
 	github.com/cosmos/cosmos-db v1.0.2 // indirect
 	github.com/cosmos/cosmos-proto v1.0.0-beta.5 // indirect
-	github.com/cosmos/gogoproto v1.7.0 // indirect
 	github.com/cosmos/gorocksdb v1.2.0 // indirect
 	github.com/cosmos/iavl v0.19.5 // indirect
 	github.com/cosmos/ibc-go/v4 v4.6.0 // indirect
@@ -106,7 +108,6 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
-	github.com/gogo/protobuf v1.3.3 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/glog v1.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -186,7 +187,6 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
-	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
@@ -240,6 +240,8 @@ replace github.com/cosmos/cosmos-sdk => github.com/axelarnetwork/cosmos-sdk v0.4
 replace github.com/CosmWasm/wasmd => github.com/axelarnetwork/wasmd v0.33.1-0.20241022183459-add3571298b2
 
 replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+
+replace google.golang.org/grpc => google.golang.org/grpc v1.58.3
 
 replace github.com/tendermint/tendermint => github.com/cometbft/cometbft v0.34.31
 

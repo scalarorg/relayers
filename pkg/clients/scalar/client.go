@@ -29,6 +29,7 @@ type Client struct {
 	networkConfig  *cosmos.CosmosNetworkConfig
 	txConfig       client.TxConfig
 	network        *NetworkClient
+	queryClient    *QueryClient
 	dbAdapter      *db.DatabaseAdapter
 	eventBus       *events.EventBus
 	subscriberName string //Use as subscriber for networkClient
@@ -51,16 +52,36 @@ func NewClient(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, event
 
 func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*Client, error) {
 	txConfig := tx.NewTxConfig(codec.NewProtoCodec(codec_types.NewInterfaceRegistry()), []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
-	networkClient, err := NewNetworkClient(config, txConfig)
+	subscriberName := fmt.Sprintf("subscriber-%s", config.ChainID)
+	//Set default broadcast mode is sync
+	if config.BroadcastMode == "" {
+		config.BroadcastMode = "sync"
+	}
+	clientCtx, err := CreateClientContext(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client context: %w", err)
+	}
+	var queryClient *QueryClient
+	// if config.GrpcAddress != "" {
+	// 	log.Info().Msgf("Create Grpc client to address: %s", config.GrpcAddress)
+	// 	dialOpts := []grpc.DialOption{
+	// 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	// 	}
+	// 	grpcConn, err := grpc.NewClient(config.GrpcAddress, dialOpts...)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to create gRPC client: %w", err)
+	// 	}
+	queryClient = NewQueryClient(clientCtx)
+	networkClient, err := NewNetworkClient(config, queryClient, txConfig)
 	if err != nil {
 		return nil, err
 	}
-	subscriberName := fmt.Sprintf("subscriber-%s", config.ChainID)
 	client := &Client{
 		globalConfig:   globalConfig,
 		networkConfig:  config,
 		txConfig:       tx.NewTxConfig(codec.NewProtoCodec(codec_types.NewInterfaceRegistry()), []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT}),
 		network:        networkClient,
+		queryClient:    queryClient,
 		subscriberName: subscriberName,
 		dbAdapter:      dbAdapter,
 		eventBus:       eventBus,
@@ -86,9 +107,13 @@ func (c *Client) Start(ctx context.Context) error {
 				}
 				return c.handleContractCallApprovedEvent(ctx, event)
 			}); err != nil {
-			log.Printf("Failed to subscribe to ContractCallApprovedEvent: %v", err)
+			log.Debug().Msgf("Failed to subscribe to ContractCallApprovedEvent: %v", err)
 		}
 	}()
+	//Start rpc client
+	if err := c.network.Start(); err != nil {
+		return fmt.Errorf("failed to start rpc client: %w", err)
+	}
 	go func() {
 		if _, err := Subscribe(ctx, c, EVMCompletedEvent,
 			func(event *IBCEvent[EVMEventCompleted], err error) error {
@@ -97,7 +122,7 @@ func (c *Client) Start(ctx context.Context) error {
 				}
 				return c.handleEVMCompletedEvent(ctx, event)
 			}); err != nil {
-			log.Printf("Failed to subscribe to EVMCompletedEvent: %v", err)
+			log.Debug().Msgf("Failed to subscribe to EVMCompletedEvent: %v", err)
 		}
 	}()
 	return nil
@@ -143,13 +168,18 @@ func (c *Client) ConfirmTxs(ctx context.Context, chainName string, txIds []strin
 	}
 	msg := emvtypes.NewConfirmGatewayTxsRequest(c.network.getAddress(), nexusChain, txHashs)
 	//2. Sign and broadcast the payload using the network client, which has the private key
-	confirmTx, err := c.network.ConfirmEvmTx(ctx, msg)
+	confirmTx, err := c.network.SignAndBroadcastMsgs(ctx, msg)
 	if err != nil {
 		log.Error().Msgf("[ScalarClient] [ConfirmTxs] error from network client: %v", err)
 		return nil, err
 	}
-	log.Debug().Msgf("[ScalarClient] [ConfirmTxs] %v", confirmTx)
-	return confirmTx, nil
+	if confirmTx != nil && confirmTx.Code != 0 {
+		log.Error().Msgf("[ScalarClient] [ConfirmTxs] error from network client: %v", confirmTx.RawLog)
+		return nil, fmt.Errorf("error from network client: %v", confirmTx.RawLog)
+	} else {
+		log.Debug().Msgf("[ScalarClient] [ConfirmTxs] success broadcast confirmation txs with tx hash: %s", confirmTx.TxHash)
+		return confirmTx, nil
+	}
 }
 
 func (c *Client) ConfirmBtcTx(ctx context.Context, chainName string, txId string) (*sdk.TxResponse, error) {

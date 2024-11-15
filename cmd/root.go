@@ -6,8 +6,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
+	_ "github.com/scalarorg/relayers/internal/codec"
 	"github.com/scalarorg/relayers/internal/relayer"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
@@ -83,6 +85,7 @@ func initObserve() {
 }
 
 func init() {
+
 	rootCmd.PersistentFlags().StringVar(
 		&environment,
 		"env",
@@ -90,4 +93,13 @@ func init() {
 		"Environment name to  to the configuration file",
 	)
 	viper.BindPFlag("env", rootCmd.PersistentFlags().Lookup("env"))
+	//Set account prefix for scalar
+	setCosmosAccountPrefix()
+}
+
+func setCosmosAccountPrefix() {
+	config := types.GetConfig()
+	config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
+	config.SetBech32PrefixForConsensusNode("axelar", "axelarvalcons")
+	config.SetBech32PrefixForValidator("axelar", "axelarvaloper")
 }

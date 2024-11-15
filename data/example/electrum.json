@@ -4,7 +4,7 @@
         "port": 60001,
         "user": "user",
         "password": "password",
-        "batchSize": 1,
+        "batchSize": 2,
         "lastVaultTx": "",
         "sourceChain": "bitcoin-testnet4"
     }
