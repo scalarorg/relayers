@@ -22,7 +22,7 @@ func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBC
 	}
 	//1. Get pending command from Scalar network
 	destinationChain := event.Args.DestinationChain
-	pendingCommands, err := c.network.QueryPendingCommand(ctx, destinationChain)
+	pendingCommands, err := c.queryClient.QueryPendingCommand(ctx, destinationChain)
 	log.Debug().Msgf("Pending command: %v", pendingCommands)
 	if len(pendingCommands) > 0 {
 		return fmt.Errorf("no pending command found")
@@ -63,14 +63,14 @@ func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string
 	if batchCommandId == "" {
 		return "", fmt.Errorf("failed to find batch command id")
 	}
-	res, err := c.network.QueryBatchedCommands(ctx, destinationChain, batchCommandId)
+	res, err := c.queryClient.QueryBatchedCommands(ctx, destinationChain, batchCommandId)
 	for {
 		if err != nil {
 			return "", fmt.Errorf("failed to get batched commands: %w", err)
 		}
 		if res.Status != 3 {
 			time.Sleep(3 * time.Second)
-			res, err = c.network.QueryBatchedCommands(ctx, destinationChain, batchCommandId)
+			res, err = c.queryClient.QueryBatchedCommands(ctx, destinationChain, batchCommandId)
 		}
 		return res.ExecuteData, nil
 	}
@@ -93,7 +93,7 @@ func (c *Client) handleEVMCompletedEvent(ctx context.Context, event *IBCEvent[EV
 	//1. Sign and broadcast RouteMessageRequest
 	txRes, err := c.network.SendRouteMessageRequest(ctx, event.Args.ID, event.Args.Payload)
 	if err != nil {
-		log.Error().Msgf("failed to send route message request: %w", err)
+		log.Error().Msgf("failed to send route message request: %+v", err)
 	}
 	log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] txRes: %v", txRes)
 	if strings.Contains(txRes.RawLog, "already executed") {

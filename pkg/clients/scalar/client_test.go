@@ -1,77 +1,77 @@
 package scalar_test
 
 import (
-	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
+	"bytes"
+	"context"
+	"fmt"
+	"testing"
+
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/ethereum/go-ethereum/common"
+	auth "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/rs/zerolog/log"
+
+	"github.com/scalarorg/relayers/pkg/clients/cosmos"
+	"github.com/scalarorg/relayers/pkg/clients/scalar"
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc/encoding"
+	"google.golang.org/grpc/encoding/proto"
 )
 
-type RelayerTx struct {
-	txConfig client.TxConfig
-}
+const (
+	cosmosAddress = "axelar17a5k3uxm2cj8te80yyaykgmqvfd7hh8rgjz7hk"
+	scalarRpcUrl  = "http://localhost:26657"
+)
 
-func NewRelayerTx(txConfig client.TxConfig) *RelayerTx {
-	return &RelayerTx{txConfig: txConfig}
-}
-func (r *RelayerTx) CreateConfirmTxPayload(sender sdk.AccAddress, chain string, txId string) (client.TxBuilder, error) {
-	txHash := emvtypes.Hash(common.HexToHash(txId))
-
-	msg := emvtypes.NewConfirmGatewayTxRequest(sender, chain, txHash)
-
-	// Create a new transaction builder
-	txBuilder := r.txConfig.NewTxBuilder()
-	// Set the message
-	err := txBuilder.SetMsgs(msg)
-	if err != nil {
-		return nil, err
+var (
+	protoCodec   = encoding.GetCodec(proto.Name)
+	scalarConfig = &cosmos.CosmosNetworkConfig{
+		ChainID: "scalar-testnet-1",
+		RPCUrl:  scalarRpcUrl,
 	}
-	txBuilder = r.SetExtraParams(txBuilder)
-	return txBuilder, nil
+	err        error
+	clientCtx  *client.Context
+	accAddress sdk.AccAddress
+)
+
+func TestMain(m *testing.M) {
+	config := types.GetConfig()
+	config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
+	clientCtx, err = scalar.CreateClientContext(scalarConfig)
+	if err != nil {
+		log.Error().Msgf("failed to create client context: %+v", err)
+	}
+	m.Run()
 }
-func (r *RelayerTx) SetExtraParams(txBuilder client.TxBuilder) client.TxBuilder {
-	txBuilder.SetGasLimit(200000) // Adjust as needed
-	txBuilder.SetFeeAmount(types.NewCoins(types.NewCoin("stake", types.NewInt(1000))))
-	txBuilder.SetMemo("") // Optional memo
-	return txBuilder
+func TestAccountAddress(t *testing.T) {
+	accAddress, err := sdk.AccAddressFromBech32(cosmosAddress)
+	if err != nil {
+		log.Error().Msgf("failed to get accAddress: %+v", err)
+	}
+	log.Info().Msgf("accAddress: %+v, string value %s", accAddress, accAddress.String())
+	assert.Equal(t, accAddress.String(), cosmosAddress)
 }
 
-// func (r *RelayerTx) CreateTransaction(ctx context.Context, msg types.Msg) (client.TxBuilder, error) {
-// 	// Create a new transaction builder
-// 	txBuilder := r.txConfig.NewTxBuilder()
-
-// 	// Set the message
-// 	err := txBuilder.SetMsgs(msg)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	txBuilder = r.SetExtraParams(txBuilder)
-
-// 	// Sign the transaction
-// 	signerData := signingtypes.SignerData{
-// 		ChainID:       "your-chain-id",
-// 		AccountNumber: 0, // Get from account query
-// 		Sequence:      0, // Get from account query
-// 	}
-// 	// Sign the transaction
-// 	sigV2, err := client_tx.SignWithPrivKey(
-// 		ctx,
-// 		signing.SignMode_SIGN_MODE_DIRECT,
-// 		signerData,
-// 		txBuilder,
-// 		privKey,
-// 		c.txConfig,
-// 		uint64(0),
-// 	)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	err = txBuilder.SetSignatures(sigV2)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return txBuilder, nil
-// }
+func TestCosmosGrpcClient(t *testing.T) {
+	fmt.Println("TestCosmosGrpcClient")
+	assert.NotNil(t, clientCtx)
+	authClient := auth.NewQueryClient(clientCtx)
+	assert.NotNil(t, authClient)
+	assert.NotNil(t, protoCodec)
+	resp, err := authClient.Account(context.Background(), &auth.QueryAccountRequest{Address: cosmosAddress})
+	assert.NoError(t, err)
+	if err != nil {
+		fmt.Printf("failed to query account: %+v", err)
+		log.Error().Msgf("failed to query account: %+v", err)
+	}
+	buf := &bytes.Buffer{}
+	ctx := clientCtx.WithOutput(buf)
+	err = ctx.PrintProto(resp.Account)
+	assert.NoError(t, err)
+	log.Info().Msgf("resp: %s", buf.String())
+	var account auth.BaseAccount
+	err = ctx.Codec.UnpackAny(resp.Account, &account)
+	assert.NoError(t, err)
+	log.Info().Msgf("Base Account: %+v", &account)
+}

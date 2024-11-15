@@ -28,10 +28,7 @@ func (db *DatabaseAdapter) CreateBatchValue(values interface{}, batchSize int) e
 func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName string) (*models.EventCheckPoint, error) {
 	var lastBlock models.EventCheckPoint
 	result := db.PostgresClient.Where("chain_name = ?", chainName).First(&lastBlock)
-	if result.Error != nil {
-		return nil, fmt.Errorf("failed to get last event check point: %w", result.Error)
-	}
-	return &lastBlock, nil
+	return &lastBlock, result.Error
 }
 
 func UpdateLastEventCheckPoint(db *gorm.DB, value *models.EventCheckPoint) error {
