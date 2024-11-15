@@ -1,6 +1,7 @@
 package events
 
 import (
+	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 )
 
@@ -18,7 +19,9 @@ type EventBus struct {
 // - Event buffer size
 // - Event receiver buffer size
 func NewEventBus(config *config.EventBusConfig) *EventBus {
-	return &EventBus{}
+	return &EventBus{
+		channels: make(map[string]Channels),
+	}
 }
 
 func GetEventBus(config *config.EventBusConfig) *EventBus {
@@ -39,8 +42,12 @@ func (eb *EventBus) BroadcastEvent(event *EventEnvelope) {
 }
 
 func (eb *EventBus) Subscribe(destinationChain string) <-chan *EventEnvelope {
+	log.Debug().Msgf("Subscribing to %s", destinationChain)
 	sender := make(chan *EventEnvelope)
-	channels := eb.channels[destinationChain]
-	channels = append(channels, sender)
+	if eb.channels[destinationChain] == nil {
+		eb.channels[destinationChain] = []chan<- *EventEnvelope{sender}
+	} else {
+		eb.channels[destinationChain] = append(eb.channels[destinationChain], sender)
+	}
 	return sender
 }

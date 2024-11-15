@@ -18,15 +18,14 @@ import (
 	"github.com/scalarorg/relayers/pkg/events"
 )
 
-const COMPONENT_NAME = "EvmClient"
-
 type EvmClient struct {
+	globalConfig            *config.Config
+	evmConfig               *EvmNetworkConfig
 	Client                  *ethclient.Client
 	ChainName               string
 	GatewayAddress          common.Address
 	Gateway                 *contracts.IAxelarGateway
 	auth                    *bind.TransactOpts
-	config                  EvmNetworkConfig
 	dbAdapter               *db.DatabaseAdapter
 	eventBus                *events.EventBus
 	subContractCall         event.Subscription
@@ -34,67 +33,86 @@ type EvmClient struct {
 	subExecuted             event.Subscription
 }
 
-func NewEvmClient(config EvmNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*EvmClient, error) {
+func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*EvmClient, error) {
 	// Setup
 	ctx := context.Background()
 
 	// Connect to a test network
-	rpc, err := rpc.DialContext(ctx, config.RPCUrl)
+	rpc, err := rpc.DialContext(ctx, evmConfig.RPCUrl)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to EVM network %s: %w", config.Name, err)
+		return nil, fmt.Errorf("failed to connect to EVM network %s: %w", evmConfig.Name, err)
 	}
-
 	client := ethclient.NewClient(rpc)
-
-	// Initialize the contract
-	gatewayAddress := common.HexToAddress(config.Gateway)
-
-	gateway, err := contracts.NewIAxelarGateway(gatewayAddress, client)
+	gateway, gatewayAddress, err := createGateway(evmConfig, client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize gateway contract for network %s: %w", config.Name, err)
+		return nil, fmt.Errorf("failed to create gateway for network %s: %w", evmConfig.Name, err)
 	}
-
-	privateKey, err := crypto.HexToECDSA(config.PrivateKey)
+	auth, err := createEvmAuth(evmConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key for network %s: %w", config.Name, err)
+		//Not fatal, we can still use the gateway without auth
+		//auth is only used for sending transaction
+		log.Warn().Msgf("failed to create auth for network %s: %v", evmConfig.Name, err)
 	}
-	chainID, ok := new(big.Int).SetString(config.ChainID, 10)
-	if !ok {
-		return nil, fmt.Errorf("invalid chain ID for network %s", config.Name)
-	}
-	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create auth for network %s: %w", config.Name, err)
-	}
-	auth.GasLimit = config.GasLimit
 	evmClient := &EvmClient{
+		globalConfig:   globalConfig,
+		evmConfig:      evmConfig,
 		Client:         client,
-		ChainName:      config.Name,
-		GatewayAddress: gatewayAddress,
+		GatewayAddress: *gatewayAddress,
 		Gateway:        gateway,
 		auth:           auth,
-		config:         config,
 	}
 
 	return evmClient, nil
 }
+func createGateway(evmConfig *EvmNetworkConfig, client *ethclient.Client) (*contracts.IAxelarGateway, *common.Address, error) {
+	if evmConfig.Gateway == "" {
+		return nil, nil, fmt.Errorf("gateway address is not set for network %s", evmConfig.Name)
+	}
+	gatewayAddress := common.HexToAddress(evmConfig.Gateway)
+	gateway, err := contracts.NewIAxelarGateway(gatewayAddress, client)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize gateway contract for network %s: %w", evmConfig.Name, err)
+	}
+	return gateway, &gatewayAddress, nil
+}
 
-func NewEvmClients(configPath string, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) ([]*EvmClient, error) {
-	evmCfgPath := fmt.Sprintf("%s/evm.json", configPath)
+func createEvmAuth(evmConfig *EvmNetworkConfig) (*bind.TransactOpts, error) {
+	if evmConfig.PrivateKey == "" {
+		return nil, fmt.Errorf("private key is not set for network %s", evmConfig.Name)
+	}
+	privateKey, err := crypto.HexToECDSA(evmConfig.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key for network %s: %w", evmConfig.Name, err)
+	}
+	chainID := big.NewInt(int64(evmConfig.ChainID))
+	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create auth for network %s: %w", evmConfig.Name, err)
+	}
+	auth.GasLimit = evmConfig.GasLimit
+	return auth, nil
+}
+
+func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) ([]*EvmClient, error) {
+	if globalConfig == nil || globalConfig.ConfigPath == "" {
+		return nil, fmt.Errorf("config path is not set")
+	}
+	evmCfgPath := fmt.Sprintf("%s/evm.json", globalConfig.ConfigPath)
 	configs, err := config.ReadJsonArrayConfig[EvmNetworkConfig](evmCfgPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read electrum configs: %w", err)
 	}
-	//Inject evm private keys
-	for i := range configs {
-		preparePrivateKey(&configs[i])
-	}
+
 	evmClients := make([]*EvmClient, 0, len(configs))
-	for _, config := range configs {
-		client, err := NewEvmClient(config, dbAdapter, eventBus)
+	for _, evmConfig := range configs {
+		//Inject evm private keys
+		preparePrivateKey(&evmConfig)
+		client, err := NewEvmClient(globalConfig, &evmConfig, dbAdapter, eventBus)
 		if err != nil {
-			return nil, err
+			log.Warn().Msgf("Failed to create evm client for %s: %v", evmConfig.GetName(), err)
+			continue
 		}
+		globalConfig.AddChainConfig(config.IChainConfig(&evmConfig))
 		evmClients = append(evmClients, client)
 	}
 
@@ -189,7 +207,7 @@ func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) error {
 }
 
 func (c *EvmClient) Start(ctx context.Context) error {
-	watchOpts := bind.WatchOpts{Start: &c.config.LastBlock, Context: ctx}
+	watchOpts := bind.WatchOpts{Start: &c.evmConfig.LastBlock, Context: ctx}
 	//Listen to the gateway ContractCallEvent
 	//This event is initiated by user
 	//1. User call protocol's smart contract on the evm
@@ -209,7 +227,7 @@ func (c *EvmClient) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to watch EVMExecutedEvent: %w", err)
 	}
 	//Subscribe to the event bus
-	receiver := c.eventBus.Subscribe(c.config.ChainID)
+	receiver := c.eventBus.Subscribe(c.evmConfig.GetId())
 	go func() {
 		for event := range receiver {
 			log.Info().Msgf("EVM contract call: %v", event)

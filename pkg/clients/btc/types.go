@@ -4,10 +4,12 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 )
 
+const COMPONENT_NAME = "BtcClient"
+
 type BtcNetworkConfig struct {
 	Network    string  `mapstructure:"network"`
 	ID         string  `mapstructure:"id"`
-	ChainID    string  `mapstructure:"chain_id"`
+	ChainID    uint64  `mapstructure:"chain_id"`
 	Name       string  `mapstructure:"name"`
 	Type       string  `mapstructure:"type"`
 	Host       string  `mapstructure:"host"`
@@ -17,6 +19,16 @@ type BtcNetworkConfig struct {
 	SSL        *bool   `mapstructure:"ssl,omitempty"`
 	PrivateKey string  `mapstructure:"private_key,omitempty"`
 	Address    *string `mapstructure:"address,omitempty"`
+}
+
+func (c *BtcNetworkConfig) GetChainId() uint64 {
+	return c.ChainID
+}
+func (c *BtcNetworkConfig) GetId() string {
+	return c.ID
+}
+func (c *BtcNetworkConfig) GetName() string {
+	return c.Name
 }
 
 type ExecuteParams struct {

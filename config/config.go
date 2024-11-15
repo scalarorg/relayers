@@ -5,57 +5,57 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
-
-type RabbitMQConfig struct {
-	Host        string `mapstructure:"host"`
-	Port        int    `mapstructure:"port"`
-	User        string `mapstructure:"user"`
-	Password    string `mapstructure:"password"`
-	Queue       string `mapstructure:"queue"`
-	QueueType   string `mapstructure:"queue_type"`
-	RoutingKey  string `mapstructure:"routing_key"`
-	SourceChain string `mapstructure:"source_chain"`
-	Enabled     *bool  `mapstructure:"enabled"`
-	StopHeight  *int64 `mapstructure:"stop_height"`
-}
 
 type EventBusConfig struct {
 }
 
-type Config struct {
-	ConfigPath        string         `mapstructure:"config_path"`
-	ChainEnv          string         `mapstructure:"chain_env"`
-	ConnnectionString string         `mapstructure:"connection_string"` // Postgres db connection string
-	ScalarMnemonic    string         `mapstructure:"scalar_mnemonic"`
-	EvmPrivateKey     string         `mapstructure:"evm_private_key"`
-	BtcPrivateKey     string         `mapstructure:"btc_private_key"`
-	EventBus          EventBusConfig `mapstructure:"event_bus"`
+type IChainConfig interface {
+	GetId() string      //String identifier for the chain for example ethereum-sepolia
+	GetChainId() uint64 //Integer identifier for the chain for example 11155111
+	GetName() string    //Name of the chain for example Ethereum Sepolia
 }
 
-var GlobalConfig *Config
+type Config struct {
+	ConfigPath        string                  `mapstructure:"config_path"`
+	ConnnectionString string                  `mapstructure:"database_url"` // Postgres db connection string
+	ScalarMnemonic    string                  `mapstructure:"scalar_mnemonic"`
+	EvmPrivateKey     string                  `mapstructure:"evm_private_key"`
+	BtcPrivateKey     string                  `mapstructure:"btc_private_key"`
+	ChainConfigs      map[uint64]IChainConfig `mapstructure:"chain_configs"` //Store all valid chain configs
+}
 
-func LoadEnv() error {
+var GlobalConfig Config
+
+func LoadEnv(environment string) error {
 	// Tell Viper to read from environment
 	viper.AutomaticEnv()
-
 	// Add support for .env files
-	viper.SetConfigName(".env.local") // name of config file (without extension)
-	viper.SetConfigType("env")        // type of config file
-	viper.AddConfigPath(".")          // look for config in the working directory
-
+	if environment == "" {
+		viper.SetConfigFile(".env") // Set config file
+	} else {
+		viper.SetConfigName(environment)
+		viper.SetConfigType("env")
+	}
+	viper.AddConfigPath(".") // look for config in the working directory
+	fmt.Println("[LoadEnv] ReadInConfig for environment:", environment)
 	// Read the .env file
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			// Config file not found; ignore error if desired
-			fmt.Println("No .env.local file found")
+			fmt.Printf("No %s.env file found", environment)
 		} else {
 			// Config file was found but another error was produced
 			return fmt.Errorf("error reading config file: %w", err)
 		}
 	}
-
+	viper.Unmarshal(&GlobalConfig)
+	// Initialize an empty chain configs map
+	GlobalConfig.ChainConfigs = make(map[uint64]IChainConfig)
+	log.Info().Msgf("Loaded config: %+v", GlobalConfig)
+	//injectEnvConfig(&GlobalConfig)
 	return nil
 }
 
@@ -91,39 +91,32 @@ func ReadJsonConfig[T any](filePath string) (*T, error) {
 	return &result, nil
 }
 
-func injectEnvConfig(cfg *Config) error {
-	//Set config environment variables
-	cfg.ConfigPath = viper.GetString("CONFIG_PATH")
-	cfg.ChainEnv = viper.GetString("CHAIN_ENV")
-	cfg.ConnnectionString = viper.GetString("DATABASE_URL")
-	cfg.ScalarMnemonic = viper.GetString("SCALAR_MNEMONIC")
-	cfg.EvmPrivateKey = viper.GetString("EVM_PRIVATE_KEY")
-	cfg.BtcPrivateKey = viper.GetString("BTC_PRIVATE_KEY")
-	return nil
+// func injectEnvConfig(cfg *Config) error {
+// 	//Set config environment variables
+// 	cfg.ConfigPath = viper.GetString("CONFIG_PATH")
+// 	cfg.ConnnectionString = viper.GetString("DATABASE_URL")
+// 	cfg.ScalarMnemonic = viper.GetString("SCALAR_MNEMONIC")
+// 	cfg.EvmPrivateKey = viper.GetString("EVM_PRIVATE_KEY")
+// 	cfg.BtcPrivateKey = viper.GetString("BTC_PRIVATE_KEY")
+// 	return nil
+// }
+
+func (c *Config) AddChainConfig(chainConfig IChainConfig) {
+	c.ChainConfigs[chainConfig.GetChainId()] = chainConfig
+}
+func (c *Config) GetStringIdByChainId(chainId uint64) (string, error) {
+	// log.Debug().Msgf("Getting string id for chainId: %d", chainId)
+	chainConfig, ok := c.ChainConfigs[chainId]
+	if !ok {
+		return "", fmt.Errorf("chain not found for chainId: %d", chainId)
+	}
+	return chainConfig.GetId(), nil
 }
 
-func Load() error {
-	// Load environment variables into viper
-	if err := LoadEnv(); err != nil {
-		panic("Failed to load environment variables: " + err.Error())
+func (c *Config) GetChainConfigById(chainId uint64) (IChainConfig, error) {
+	chainConfig, ok := c.ChainConfigs[chainId]
+	if !ok {
+		return nil, fmt.Errorf("chain not found for chainId: %d", chainId)
 	}
-	var cfg Config
-	injectEnvConfig(&cfg)
-
-	switch cfg.ChainEnv {
-	case "local":
-		fmt.Println("[getConfig] Using local configuration")
-	case "devnet":
-		fmt.Println("[getConfig] Using devnet configuration")
-	case "testnet":
-		fmt.Println("[getConfig] Using testnet configuration")
-	default:
-		return fmt.Errorf("[getConfig] Invalid CHAIN_ENV: %s", cfg.ChainEnv)
-	}
-
-	GlobalConfig = &cfg
-	return nil
-}
-func GetScalarMnemonic() string {
-	return GlobalConfig.ScalarMnemonic
+	return chainConfig, nil
 }

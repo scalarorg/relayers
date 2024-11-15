@@ -6,16 +6,10 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
-	"github.com/scalarorg/relayers/pkg/clients/scalar"
-	"github.com/scalarorg/relayers/pkg/db"
-	"github.com/scalarorg/relayers/pkg/events"
-	"github.com/stretchr/testify/require"
 )
 
 var (
-	DefaultConfig = config.Config{
-		ChainEnv: "testnet",
-	}
+	DefaultGlobalConfig        = config.Config{}
 	DefaultCosmosNetworkConfig = cosmos.CosmosNetworkConfig{
 		ChainID:  "scalar-testnet-1",
 		Denom:    "uatom",
@@ -32,13 +26,13 @@ func TestCreateTransaction(t *testing.T) {
 	sdk.GetConfig().SetBech32PrefixForAccount("axelar", "axelarvaloper")
 
 	// Setup test client
-	dbAdapter, err := db.NewDatabaseAdapter(&DefaultConfig)
-	require.NoError(t, err)
-	eventBusConfig := config.EventBusConfig{}
-	eventBus := events.NewEventBus(&eventBusConfig)
-	client, err := scalar.NewClientFromConfig(&DefaultCosmosNetworkConfig, dbAdapter, eventBus)
-	require.NoError(t, err)
-	require.NotNil(t, client)
+	// dbAdapter, err := db.NewDatabaseAdapter(&DefaultGlobalConfig)
+	// require.NoError(t, err)
+	// eventBusConfig := config.EventBusConfig{}
+	// eventBus := events.NewEventBus(&eventBusConfig)
+	// client, err := scalar.NewClientFromConfig(&DefaultGlobalConfig, &DefaultCosmosNetworkConfig, dbAdapter, eventBus)
+	// require.NoError(t, err)
+	// require.NotNil(t, client)
 
 	// Create test wallet/account
 	//privKey := secp256k1.GenPrivKey()

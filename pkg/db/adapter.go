@@ -137,6 +137,9 @@ func NewDatabaseAdapter(config *config.Config) (*DatabaseAdapter, error) {
 // }
 
 func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
+	if config == nil || config.ConnnectionString == "" {
+		return nil, fmt.Errorf("config is nil or connnection string is empty")
+	}
 	db, err := gorm.Open(postgres.Open(config.ConnnectionString), &gorm.Config{})
 	if err != nil {
 		return nil, err
@@ -148,7 +151,7 @@ func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
 		&models.CallContract{},
 		&models.CallContractApproved{},
 		&models.CommandExecuted{},
-		&models.Operatorship{},
+		&models.ProtocolInfo{},
 		&models.EventCheckPoint{},
 	)
 

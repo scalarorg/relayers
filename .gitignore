@@ -23,13 +23,11 @@ go.work.sum
 
 # env file
 .env
-.env*.local
-.env*.production
+.env.*
+*.env
 # Macos system files
 .DS_Store
 # Runtime data
 runtime
 
-data/local
-data/devnet
-data/testnet
+data/*

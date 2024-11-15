@@ -20,7 +20,11 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 
 func (c *Client) handleElectrsVaultTransaction(chainTxHashs map[string][]string) error {
 	for chainName, txHashs := range chainTxHashs {
-		c.ConfirmTxs(context.Background(), chainName, txHashs)
+		_, err := c.ConfirmTxs(context.Background(), chainName, txHashs)
+		if err != nil {
+			log.Error().Msgf("[ScalarClient] [handleElectrsVaultTransaction] error: %v", err)
+			return err
+		}
 	}
 	return nil
 }

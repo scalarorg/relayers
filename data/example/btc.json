@@ -1,7 +1,7 @@
 [
     {
         "network": "testnet",
-        "chainId": "2",
+        "chainId": 2,
         "id": "bitcoin-testnet",
         "name": "Bitcoin Testnet3",
         "gateway": "0xda8367783782EC92BaDae3e534a9FCcb3fa6eF1C",
@@ -15,7 +15,7 @@
     },
     {
         "network": "testnet4",
-        "chainId": "3",
+        "chainId": 3,
         "id": "bitcoin-testnet4",
         "name": "Bitcoin Testnet4",
         "gateway": "0xda8367783782EC92BaDae3e534a9FCcb3fa6eF1C",

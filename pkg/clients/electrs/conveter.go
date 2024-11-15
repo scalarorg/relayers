@@ -24,7 +24,7 @@ func (c *Client) CreateRelayDatas(vaultTxs []types.VaultTransaction) ([]models.R
 
 func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayData, error) {
 	relayData := models.RelayData{
-		From: c.config.SourceChain,
+		From: c.electrumConfig.SourceChain,
 		CallContract: &models.CallContract{
 			TxHash:          vaultTx.TxHash,
 			BlockNumber:     uint64(vaultTx.Height),
@@ -38,13 +38,13 @@ func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayDa
 			Symbol:          "",
 		},
 	}
-	chainName, err := c.commonConfig.GetChainNameById(vaultTx.DestChainId)
+	destinationChainName, err := c.globalConfig.GetStringIdByChainId(vaultTx.DestChainId)
 	if err != nil {
 		return relayData, fmt.Errorf("Chain not found for input chainId: %d, %w	", vaultTx.DestChainId, err)
 	}
-	relayData.To = chainName
-	//For btc vault tx, the log index is always 0
-	relayData.ID = fmt.Sprintf("%s-%d", strings.ToLower(vaultTx.TxHash), 0)
+	relayData.To = destinationChainName
+	//For btc vault tx, the log index is tx position in the block
+	relayData.ID = fmt.Sprintf("%s-%d", strings.ToLower(vaultTx.TxHash), vaultTx.TxPosition)
 
 	// Convert VaultTxHex and Payload to byte slices
 	txHexBytes, err := hex.DecodeString(strings.TrimPrefix(vaultTx.TxContent, "0x"))

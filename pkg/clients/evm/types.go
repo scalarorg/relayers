@@ -6,12 +6,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 )
 
+const COMPONENT_NAME = "EvmClient"
+
 var scalarGwExecuteAbi *abi.ABI
 
 type Byte32 [32]byte
 type Bytes []byte
 type EvmNetworkConfig struct {
-	ChainID    string `mapstructure:"chain_id"`
+	ChainID    uint64 `mapstructure:"chain_id"`
 	ID         string `mapstructure:"id"`
 	Name       string `mapstructure:"name"`
 	RPCUrl     string `mapstructure:"rpc_url"`
@@ -23,6 +25,16 @@ type EvmNetworkConfig struct {
 	MaxRetry   int
 	RetryDelay time.Duration
 	TxTimeout  time.Duration
+}
+
+func (c *EvmNetworkConfig) GetChainId() uint64 {
+	return c.ChainID
+}
+func (c *EvmNetworkConfig) GetId() string {
+	return c.ID
+}
+func (c *EvmNetworkConfig) GetName() string {
+	return c.Name
 }
 
 type DecodedExecuteData struct {

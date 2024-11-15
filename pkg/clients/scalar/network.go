@@ -8,80 +8,95 @@ import (
 	axltypes "github.com/axelarnetwork/axelar-core/x/axelarnet/types"
 	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	"github.com/cosmos/cosmos-sdk/client"
+	sdkclient "github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
-	client_tx "github.com/cosmos/cosmos-sdk/client/tx"
+	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
-	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	grpc "google.golang.org/grpc"
 )
 
-func createTxFactory(config *cosmos.CosmosNetworkConfig, txConfig client.TxConfig) client_tx.Factory {
-	factory := client_tx.Factory{}
-	factory.WithTxConfig(txConfig)
-	factory.WithChainID(config.ChainID)
-	factory.WithGas(200000) // Adjust as needed
+func createDefaultTxFactory(config *cosmos.CosmosNetworkConfig, txConfig client.TxConfig) (tx.Factory, error) {
+	factory := tx.Factory{}
+	factory = factory.WithTxConfig(txConfig)
+	if config.ChainID == "" {
+		return factory, fmt.Errorf("chain ID is required")
+	}
+	factory = factory.WithChainID(config.ChainID)
+	factory = factory.WithGas(200000) // Adjust as needed
 	//Direct Sign mode with single signer
-	factory.WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
-	factory.WithMemo("") // Optional memo
-	factory.WithSequence(0)
-	factory.WithAccountNumber(0)
-	return factory
+	factory = factory.WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
+	factory = factory.WithMemo("") // Optional memo
+	factory = factory.WithFees(sdk.NewCoin("uaxl", sdk.NewInt(20000)).String())
+	return factory, nil
 }
 
 type NetworkClient struct {
-	config      *cosmos.CosmosNetworkConfig
-	rpcEndpoint string
-	rpcClient   rpcclient.Client
-	grpcConn    *grpc.ClientConn
-	addr        sdk.AccAddress
-	privKey     *secp256k1.PrivKey
-	txConfig    client.TxConfig
-	txFactory   client_tx.Factory
+	config         *cosmos.CosmosNetworkConfig
+	rpcEndpoint    string
+	rpcClient      rpcclient.Client
+	queryClient    *QueryClient
+	addr           sdk.AccAddress
+	privKey        *secp256k1.PrivKey
+	txConfig       client.TxConfig
+	txFactory      tx.Factory
+	sequenceNumber uint64
 }
 
-func NewNetworkClient(config *cosmos.CosmosNetworkConfig, txConfig client.TxConfig) (*NetworkClient, error) {
+func NewNetworkClient(config *cosmos.CosmosNetworkConfig, queryClient *QueryClient, txConfig client.TxConfig) (*NetworkClient, error) {
 	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create account from mnemonic: %w", err)
 	}
+	log.Info().Msgf("Scalar NetworkClient created with broadcaster address: %s", addr.String())
 	var rpcClient rpcclient.Client
 	if config.RPCUrl != "" {
+		log.Info().Msgf("Create rpc client with url: %s", config.RPCUrl)
 		rpcClient, err = client.NewClientFromNode(config.RPCUrl)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create RPC client: %w", err)
 		}
 	}
-	grpcConn, err := grpc.NewClient(config.RPCUrl)
-	if err != nil {
-		return nil, err
-	}
+
 	// wsClient, err := rpchttp.New(config.WsEndpoint, "/websocket")
 	// if err != nil {
 	// 	return nil, err
 	// }
-	txFactory := createTxFactory(config, txConfig)
+	resp, err := queryClient.QueryAccount(context.Background(), addr)
+	if err != nil {
+		return nil, err
+	}
+	txFactory, err := createDefaultTxFactory(config, txConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tx factory: %w", err)
+	}
+	//Get account sequence number from network
+	sequenceNumber := resp.Sequence
 	networkClient := &NetworkClient{
-		config:    config,
-		rpcClient: rpcClient,
-		grpcConn:  grpcConn,
-		addr:      addr,
-		privKey:   privKey,
-		txConfig:  txConfig,
-		txFactory: txFactory,
+		config:         config,
+		rpcClient:      rpcClient,
+		queryClient:    queryClient,
+		addr:           addr,
+		privKey:        privKey,
+		txConfig:       txConfig,
+		txFactory:      txFactory,
+		sequenceNumber: sequenceNumber,
 	}
 	return networkClient, nil
 }
-func (c *NetworkClient) NewQueryServiceClient() emvtypes.QueryServiceClient {
-	return emvtypes.NewQueryServiceClient(c.grpcConn)
-}
-func (c *NetworkClient) NewMsgServiceClient() axltypes.MsgServiceClient {
-	return axltypes.NewMsgServiceClient(c.grpcConn)
+
+// Start connections: rpc, websocket...
+func (c *NetworkClient) Start() error {
+	rpcClient, err := c.GetRpcClient()
+	if err != nil {
+		return fmt.Errorf("failed to get client: %w", err)
+	}
+	return rpcClient.Start()
 }
 
 // https://github.com/cosmos/cosmos-sdk/blob/main/client/tx/tx.go#L31
@@ -114,17 +129,28 @@ func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, 
 	}
 	return txRes, nil
 }
-
+func (c *NetworkClient) createTxFactory(ctx context.Context) tx.Factory {
+	txf := c.txFactory
+	resp, err := c.queryClient.QueryAccount(ctx, c.getAddress())
+	if err != nil {
+		log.Error().Msgf("failed to get account: %+v", err)
+	} else {
+		log.Debug().Msgf("[ScalarClient] [NetworkClient] account: %v", resp)
+		txf = txf.WithAccountNumber(resp.AccountNumber)
+		txf = txf.WithSequence(resp.Sequence)
+	}
+	return txf
+}
 func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 	//1. Build unsigned transaction using txFactory
-	txf := c.txFactory
+	txf := c.createTxFactory(ctx)
 	// Every required params are set in the txFactory
 	txBuilder, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
 	}
 	txBuilder.SetFeeGranter(c.addr)
-	err = c.signTx(ctx, txBuilder, true)
+	err = c.signTx(txBuilder, true)
 
 	if err != nil {
 		return nil, err
@@ -140,10 +166,16 @@ func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Ms
 	if err != nil {
 		return nil, err
 	}
-
+	if result != nil && result.Code == 0 {
+		log.Debug().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] success broadcast tx with tx hash: %s", result.TxHash)
+		//Update sequence and account number
+		c.txFactory = c.txFactory.WithSequence(c.txFactory.Sequence() + 1)
+	} else {
+		log.Error().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] failed to broadcast tx: %+v", result)
+	}
 	return result, nil
 }
-func (c *NetworkClient) signTx(ctx context.Context, txBuilder client.TxBuilder, overwriteSig bool) error {
+func (c *NetworkClient) signTx(txBuilder sdkclient.TxBuilder, overwriteSig bool) error {
 	txf := c.txFactory
 	//2. Sign the transaction
 	signerData := authsigning.SignerData{
@@ -236,8 +268,8 @@ func (c *NetworkClient) BroadcastTx(ctx context.Context, txBytes []byte) (*sdk.T
 }
 
 func (c *NetworkClient) BroadcastTxSync(ctx context.Context, txBytes []byte) (*sdk.TxResponse, error) {
-	node, err := c.GetNode()
-	res, err := node.BroadcastTxSync(context.Background(), txBytes)
+	rpcClient, err := c.GetRpcClient()
+	res, err := rpcClient.BroadcastTxSync(context.Background(), txBytes)
 	if errRes := client.CheckTendermintError(err, txBytes); errRes != nil {
 		return errRes, nil
 	}
@@ -245,20 +277,20 @@ func (c *NetworkClient) BroadcastTxSync(ctx context.Context, txBytes []byte) (*s
 	return sdk.NewResponseFormatBroadcastTx(res), err
 }
 func (c *NetworkClient) BroadcastTxAsync(ctx context.Context, txBytes []byte) (*sdk.TxResponse, error) {
-	node, err := c.GetNode()
+	rpcClient, err := c.GetRpcClient()
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := node.BroadcastTxAsync(context.Background(), txBytes)
-	if errRes := client.CheckTendermintError(err, txBytes); errRes != nil {
+	res, err := rpcClient.BroadcastTxAsync(context.Background(), txBytes)
+	if errRes := sdkclient.CheckTendermintError(err, txBytes); errRes != nil {
 		return errRes, nil
 	}
 
 	return sdk.NewResponseFormatBroadcastTx(res), err
 }
 func (c *NetworkClient) BroadcastTxCommit(ctx context.Context, txBytes []byte) (*sdk.TxResponse, error) {
-	node, err := c.GetNode()
+	node, err := c.GetRpcClient()
 	if err != nil {
 		return nil, err
 	}
@@ -275,105 +307,27 @@ func (c *NetworkClient) BroadcastTxCommit(ctx context.Context, txBytes []byte) (
 }
 
 func (c *NetworkClient) Subscribe(ctx context.Context, subscriber string, query string) (<-chan ctypes.ResultEvent, error) {
-	node, err := c.GetNode()
+	client, err := c.GetRpcClient()
 	if err != nil {
 		return nil, err
 	}
-	return node.Subscribe(ctx, subscriber, query)
+	return client.Subscribe(ctx, subscriber, query)
 }
 
 func (c *NetworkClient) UnSubscribe(ctx context.Context, subscriber string, query string) error {
-	node, err := c.GetNode()
+	client, err := c.GetRpcClient()
 	if err != nil {
 		return err
 	}
-	return node.Unsubscribe(ctx, subscriber, query)
+	return client.Unsubscribe(ctx, subscriber, query)
 }
 
 func (c *NetworkClient) UnSubscribeAll(ctx context.Context, subscriber string) error {
-	node, err := c.GetNode()
+	client, err := c.GetRpcClient()
 	if err != nil {
 		return err
 	}
-	return node.UnsubscribeAll(ctx, subscriber)
-}
-func (c *NetworkClient) QueryPendingCommand(ctx context.Context, destinationChain string) ([]emvtypes.QueryCommandResponse, error) {
-	req := &emvtypes.PendingCommandsRequest{
-		Chain: destinationChain,
-	}
-	resp, err := c.NewQueryServiceClient().PendingCommands(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query pending commands: %w", err)
-	}
-
-	return resp.Commands, nil
-}
-
-func (c *NetworkClient) QueryBatchedCommands(ctx context.Context, destinationChain string, batchedCommandId string) (*emvtypes.BatchedCommandsResponse, error) {
-	req := &emvtypes.BatchedCommandsRequest{
-		Chain: destinationChain,
-		Id:    batchedCommandId,
-	}
-	resp, err := c.NewQueryServiceClient().BatchedCommands(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query batched commands: %w", err)
-	}
-	return resp, nil
-}
-func (c *NetworkClient) QueryRouteMessageRequest(ctx context.Context, id string, payload string) (*axltypes.RouteMessageResponse, error) {
-	req := &axltypes.RouteMessageRequest{
-		Sender:     c.getAddress(),
-		ID:         id,
-		Payload:    []byte(payload),
-		Feegranter: c.getAddress(),
-	}
-	resp, err := c.NewMsgServiceClient().RouteMessage(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query route message request: %w", err)
-	}
-	return resp, nil
-}
-
-// func (c *NetworkClient) QueryTx(ctx context.Context, hash []byte) (*ctypes.ResultTx, error) {
-// 	// Query by hash
-// 	res, err := c.rpcClient.Tx(ctx, hash, false)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &ctypes.ResultTx{
-// 		Hash:     hash,
-// 		Height:   res.Height,
-// 		Index:    res.Index,
-// 		TxResult: res.TxResult,
-// 		Tx:       res.Tx,
-// 	}, nil
-// }
-
-func (c *NetworkClient) QueryBalance(ctx context.Context, addr sdk.AccAddress) (*sdk.Coins, error) {
-	// Create gRPC connection
-	grpcConn, err := grpc.Dial(
-		// c.rpcEndpoint,
-		"localhost:9090",
-		grpc.WithInsecure(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gRPC connection: %w", err)
-	}
-	defer grpcConn.Close()
-
-	// Create bank query client
-	bankClient := banktypes.NewQueryClient(grpcConn)
-
-	// Query all balances
-	balanceResp, err := bankClient.AllBalances(ctx, &banktypes.QueryAllBalancesRequest{
-		Address: addr.String(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to query balance: %w", err)
-	}
-
-	return &balanceResp.Balances, nil
+	return client.UnsubscribeAll(ctx, subscriber)
 }
 
 // Get Broadcast Address from config (privatekey or mnemonic)
@@ -383,7 +337,7 @@ func (c *NetworkClient) getAddress() sdk.AccAddress {
 func (c *NetworkClient) getFeegranter() sdk.AccAddress {
 	return c.addr
 }
-func (c *NetworkClient) GetNode() (rpcclient.Client, error) {
+func (c *NetworkClient) GetRpcClient() (rpcclient.Client, error) {
 	if c.rpcClient == nil {
 		return nil, errors.New("no RPC client is defined in offline mode")
 	}
