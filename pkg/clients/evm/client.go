@@ -227,14 +227,16 @@ func (c *EvmClient) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to watch EVMExecutedEvent: %w", err)
 	}
 	//Subscribe to the event bus
-	receiver := c.eventBus.Subscribe(c.evmConfig.GetId())
-	go func() {
-		for event := range receiver {
-			log.Info().Msgf("EVM contract call: %v", event)
-			c.handleEventBusMessage(event)
+	if c.eventBus != nil {
+		receiver := c.eventBus.Subscribe(c.evmConfig.GetId())
+		go func() {
+			for event := range receiver {
+				log.Info().Msgf("EVM contract call: %v", event)
+				c.handleEventBusMessage(event)
 
-		}
-	}()
+			}
+		}()
+	}
 	return nil
 }
 

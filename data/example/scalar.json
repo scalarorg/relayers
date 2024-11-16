@@ -4,7 +4,7 @@
   "gasPrice": "0.0125",
   "rpcUrl": "http://localhost:26657",
   "lcdUrl": "http://localhost:2317",
-  "ws": "ws://scalarnode1:26657/websocket",
+  "wsUrl": "ws://localhost:26657/websocket",
   "maxRetries": 3,
   "retryInterval": 2000,
   "broadcastMode": "sync"

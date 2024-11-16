@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -66,10 +65,6 @@ func NewNetworkClient(config *cosmos.CosmosNetworkConfig, queryClient *QueryClie
 		}
 	}
 
-	// wsClient, err := rpchttp.New(config.WsEndpoint, "/websocket")
-	// if err != nil {
-	// 	return nil, err
-	// }
 	account, err := queryClient.QueryAccount(context.Background(), addr)
 	if err != nil {
 		return nil, err
@@ -77,11 +72,6 @@ func NewNetworkClient(config *cosmos.CosmosNetworkConfig, queryClient *QueryClie
 	txFactory, err := createDefaultTxFactory(config, txConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx factory: %w", err)
-	}
-	//Get account sequence number from network
-	sequenceNumber, err := strconv.ParseUint(account["sequence"].(string), 10, 64)
-	if err != nil {
-		log.Error().Msgf("failed to parse sequence: %+v", err)
 	}
 	networkClient := &NetworkClient{
 		config:         config,
@@ -91,7 +81,7 @@ func NewNetworkClient(config *cosmos.CosmosNetworkConfig, queryClient *QueryClie
 		privKey:        privKey,
 		txConfig:       txConfig,
 		txFactory:      txFactory,
-		sequenceNumber: sequenceNumber,
+		sequenceNumber: account.Sequence,
 	}
 	return networkClient, nil
 }
@@ -112,7 +102,7 @@ func (c *NetworkClient) ConfirmEvmTx(ctx context.Context, msg *emvtypes.ConfirmG
 
 func (c *NetworkClient) SignCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
 	req := emvtypes.NewSignCommandsRequest(
-		c.getAddress(),
+		c.GetAddress(),
 		destinationChain)
 
 	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
@@ -124,7 +114,7 @@ func (c *NetworkClient) SignCommandsRequest(ctx context.Context, destinationChai
 func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, payload string) (*sdk.TxResponse, error) {
 	payloadBytes := []byte(payload)
 	req := axltypes.NewRouteMessage(
-		c.getAddress(),
+		c.GetAddress(),
 		c.getFeegranter(),
 		id,
 		payloadBytes,
@@ -139,25 +129,17 @@ func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, 
 // Inject account number and sequence number into txFactory for signing
 func (c *NetworkClient) createTxFactory(ctx context.Context) tx.Factory {
 	txf := c.txFactory
-	resp, err := c.queryClient.QueryAccount(ctx, c.getAddress())
+	resp, err := c.queryClient.QueryAccount(ctx, c.GetAddress())
 	if err != nil {
 		log.Error().Msgf("failed to get account: %+v", err)
 	} else {
 		log.Debug().Msgf("[ScalarClient] [NetworkClient] account: %v", resp)
-		accountNumber, err := strconv.ParseUint(resp["account_number"].(string), 10, 64)
-		if err != nil {
-			log.Error().Msgf("failed to parse account number: %+v", err)
-		}
-		sequenceNumber, err := strconv.ParseUint(resp["sequence"].(string), 10, 64)
-		if err != nil {
-			log.Error().Msgf("failed to parse sequence: %+v", err)
-		}
-		txf = txf.WithAccountNumber(accountNumber)
+		txf = txf.WithAccountNumber(resp.AccountNumber)
 		//If sequence number is greater than current sequence number, update the sequence number
 		//This is to avoid the situation where the transaction is not included in the next block
 		//Then account sequence number is not updated on the server side
-		if sequenceNumber >= txf.Sequence() {
-			txf = txf.WithSequence(sequenceNumber)
+		if resp.Sequence >= txf.Sequence() {
+			txf = txf.WithSequence(resp.Sequence)
 		}
 	}
 	return txf
@@ -355,7 +337,12 @@ func (c *NetworkClient) Subscribe(ctx context.Context, subscriber string, query 
 	if err != nil {
 		return nil, err
 	}
-	return client.Subscribe(ctx, subscriber, query)
+	log.Debug().Msgf("[ScalarNetworkClient] [Subscribe] query: %s", query)
+	res, err := client.Subscribe(ctx, subscriber, query)
+	if err != nil {
+		log.Error().Msgf("[ScalarNetworkClient] [Subscribe] error: %v", err)
+	}
+	return res, err
 }
 
 func (c *NetworkClient) UnSubscribe(ctx context.Context, subscriber string, query string) error {
@@ -363,6 +350,7 @@ func (c *NetworkClient) UnSubscribe(ctx context.Context, subscriber string, quer
 	if err != nil {
 		return err
 	}
+	log.Debug().Msgf("[ScalarNetworkClient] [UnSubscribe] query: %s", query)
 	return client.Unsubscribe(ctx, subscriber, query)
 }
 
@@ -375,7 +363,7 @@ func (c *NetworkClient) UnSubscribeAll(ctx context.Context, subscriber string) e
 }
 
 // Get Broadcast Address from config (privatekey or mnemonic)
-func (c *NetworkClient) getAddress() sdk.AccAddress {
+func (c *NetworkClient) GetAddress() sdk.AccAddress {
 	return c.addr
 }
 func (c *NetworkClient) getFeegranter() sdk.AccAddress {
