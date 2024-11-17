@@ -18,7 +18,7 @@ var (
 		ChainID:   11155111,
 		ID:        "ethereum-sepolia",
 		Name:      "Ethereum sepolia",
-		RPCUrl:    "https://eth-sepolia.g.alchemy.com/v2/nNbspp-yjKP9GtAcdKi8xcLnBTptR2Zx",
+		RPCUrl:    "wss://eth-sepolia.g.alchemy.com/v2/nNbspp-yjKP9GtAcdKi8xcLnBTptR2Zx",
 		Gateway:   "0x2bb588d7bb6faAA93f656C3C78fFc1bEAfd1813D",
 		Finality:  1,
 		LastBlock: 7061000,
@@ -43,12 +43,13 @@ func TestEvmClientListenContractCallEvent(t *testing.T) {
 	if err != nil {
 		log.Error().Msgf("failed to watch ContractCallEvent: %v", err)
 	}
-	go func() {
-		for event := range sink {
-			log.Info().Msgf("Contract call: %v", event)
-		}
-	}()
 	if subContractCall != nil {
+		log.Info().Msg("Subscribed to ContractCallEvent successfully. Waiting for events...")
+		go func() {
+			for event := range sink {
+				log.Info().Msgf("Contract call: %v", event)
+			}
+		}()
 		go func() {
 			errChan := subContractCall.Err()
 			if err := <-errChan; err != nil {
@@ -57,6 +58,7 @@ func TestEvmClientListenContractCallEvent(t *testing.T) {
 		}()
 		defer subContractCall.Unsubscribe()
 	}
+	select {}
 }
 func TestEvmClientListenContractCallApprovedEvent(t *testing.T) {
 

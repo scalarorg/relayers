@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -33,12 +34,25 @@ type EvmClient struct {
 	subExecuted             event.Subscription
 }
 
+// This function is used to adjust the rpc url to the ws prefix
+// format: ws:// -> http://
+// format: wss:// -> https://
+// Todo: Improve this implementation
+
+func adjustRpcUrl(rpcUrl string) string {
+	if strings.HasPrefix(rpcUrl, "http") {
+		return strings.Replace(rpcUrl, "http", "ws", 1)
+	}
+	return rpcUrl
+}
+
 func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*EvmClient, error) {
 	// Setup
 	ctx := context.Background()
 
 	// Connect to a test network
-	rpc, err := rpc.DialContext(ctx, evmConfig.RPCUrl)
+	rpcUrl := adjustRpcUrl(evmConfig.RPCUrl)
+	rpc, err := rpc.DialContext(ctx, rpcUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to EVM network %s: %w", evmConfig.Name, err)
 	}
