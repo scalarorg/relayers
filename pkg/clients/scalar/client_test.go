@@ -14,6 +14,7 @@ import (
 	auth "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/rs/zerolog/log"
 
+	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/stretchr/testify/assert"
@@ -22,15 +23,24 @@ import (
 )
 
 const (
-	cosmosAddress = "axelar17a5k3uxm2cj8te80yyaykgmqvfd7hh8rgjz7hk"
-	scalarRpcUrl  = "http://localhost:26657"
+	cosmosAddress        = "axelar17a5k3uxm2cj8te80yyaykgmqvfd7hh8rgjz7hk"
+	scalarRpcUrl         = "http://localhost:26657"
+	chainNameBtcTestnet4 = "bitcoin-testnet4"
 )
 
 var (
-	protoCodec   = encoding.GetCodec(proto.Name)
-	scalarConfig = &cosmos.CosmosNetworkConfig{
-		ChainID: "scalar-testnet-1",
-		RPCUrl:  scalarRpcUrl,
+	protoCodec          = encoding.GetCodec(proto.Name)
+	DefaultGlobalConfig = config.Config{}
+	ScalarNetworkConfig = cosmos.CosmosNetworkConfig{
+		ChainID:       "scalar-testnet-1",
+		Denom:         "scalar",
+		RPCUrl:        "http://localhost:26657",
+		GasPrice:      "0.001",
+		LCDUrl:        "http://localhost:2317",
+		WSUrl:         "ws://localhost:26657/websocket",
+		MaxRetries:    3,
+		RetryInterval: int64(1000),
+		Mnemonic:      "latin total dream gesture brain bunker truly stove left video cost transfer guide occur bicycle oxygen world ready witness exhibit federal salute half day",
 	}
 	err        error
 	clientCtx  *client.Context
@@ -40,7 +50,7 @@ var (
 func TestMain(m *testing.M) {
 	config := types.GetConfig()
 	config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
-	clientCtx, err = scalar.CreateClientContext(scalarConfig)
+	clientCtx, err = scalar.CreateClientContext(&ScalarNetworkConfig)
 	if err != nil {
 		log.Error().Msgf("failed to create client context: %+v", err)
 	}
@@ -88,7 +98,5 @@ func TestCosmosGrpcClient(t *testing.T) {
 		log.Error().Msgf("failed to parse sequence: %+v", err)
 	}
 	log.Info().Msgf("Sequence: %+v", sequence)
-	// log.Info().Msgf("Json unmarshal: %+v", account.GetSequence())
-
 	log.Info().Msgf("Account: %+v", account)
 }

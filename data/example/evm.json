@@ -3,10 +3,10 @@
     "chainId": 11155111,
     "id": "ethereum-sepolia",
     "name": "ethereum-sepolia",
-    "rpcUrl": "https://1rpc.io/sepolia",
-    "gateway": "0xda8367783782EC92BaDae3e534a9FCcb3fa6eF1C",
+    "rpcUrl": "https://eth-sepolia.g.alchemy.com/v2/nNbspp-yjKP9GtAcdKi8xcLnBTptR2Zx",
+    "gateway": "0x2bb588d7bb6faAA93f656C3C78fFc1bEAfd1813D",
     "finality": 1,
-    "lastBlock": 7007000
+    "lastBlock": 7061000
   },
   {
     "chainId": 1337,

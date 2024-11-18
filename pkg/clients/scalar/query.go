@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	axltypes "github.com/axelarnetwork/axelar-core/x/axelarnet/types"
 	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	auth "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/rs/zerolog/log"
 	//gogogrpc "github.com/cosmos/gogoproto/grpc"
 	//pbgrpc "github.com/gogo/protobuf/grpc"
 )
@@ -71,7 +73,7 @@ func (c *QueryClient) QueryRouteMessageRequest(ctx context.Context, sender sdk.A
 	}
 	return resp, nil
 }
-func (c *QueryClient) QueryAccount(ctx context.Context, address sdk.AccAddress) (map[string]any, error) {
+func (c *QueryClient) QueryAccount(ctx context.Context, address sdk.AccAddress) (*auth.BaseAccount, error) {
 	req := &auth.QueryAccountRequest{Address: address.String()}
 	resp, err := c.accountQueryClient.Account(ctx, req)
 	if err != nil {
@@ -80,20 +82,45 @@ func (c *QueryClient) QueryAccount(ctx context.Context, address sdk.AccAddress) 
 	if resp.Account == nil {
 		return nil, fmt.Errorf("account value is nil")
 	}
-	buf := &bytes.Buffer{}
-	clientCtx := c.clientCtx.WithOutput(buf)
-	err = clientCtx.PrintProto(resp.Account)
-	// var account auth.BaseAccount
+	var account auth.BaseAccount
+	err = c.UnmarshalAccount(resp, &account)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal account: %w", err)
+	}
+	return &account, nil
+}
+
+// Todo: Add code for more correct unmarshal
+func (c *QueryClient) UnmarshalAccount(resp *auth.QueryAccountResponse, account *auth.BaseAccount) error {
 	// err = account.Unmarshal(resp.Account.Value)
 	// if err != nil {
 	// 	return nil, fmt.Errorf("failed to unmarshal account: %w", err)
 	// }
-	var account map[string]any
-	err = json.Unmarshal(buf.Bytes(), &account)
+	buf := &bytes.Buffer{}
+	clientCtx := c.clientCtx.WithOutput(buf)
+	err := clientCtx.PrintProto(resp.Account)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal account: %w", err)
+		return fmt.Errorf("failed to print proto: %w", err)
 	}
-	return account, nil
+	var accountMap map[string]any
+	err = json.Unmarshal(buf.Bytes(), &accountMap)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal account: %w", err)
+	}
+	log.Debug().Msgf("accountMap: %v", accountMap)
+	account.Address = accountMap["address"].(string)
+	account.AccountNumber, err = strconv.ParseUint(accountMap["account_number"].(string), 10, 64)
+	if err != nil {
+		log.Error().Msgf("failed to parse account number: %+v", err)
+	}
+	account.Sequence, err = strconv.ParseUint(accountMap["sequence"].(string), 10, 64)
+	if err != nil {
+		log.Error().Msgf("failed to parse sequence: %+v", err)
+	}
+	//pubKey := secp256k1.PubKey{}
+	//pubKey.Key = accountMap["public_key"].(map[string]any)["key"].(string)
+	//account.PubKey = &pubKey
+	return nil
 }
 
 // func (c *NetworkClient) QueryTx(ctx context.Context, hash []byte) (*ctypes.ResultTx, error) {

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 func decodeBase64(str string) string {
@@ -21,6 +23,7 @@ func removeQuote(str string) string {
 }
 
 func ParseContractCallApprovedEvent(event map[string][]string) (*IBCEvent[ContractCallApproved], error) {
+	log.Debug().Msgf("Received ContractCallApproved event: %v", event)
 	key := "axelar.evm.v1beta1.ContractCallApproved"
 	eventID := removeQuote(event[key+".event_id"][0])
 	hash := strings.Split(eventID, "-")[0]
@@ -44,6 +47,7 @@ func ParseContractCallApprovedEvent(event map[string][]string) (*IBCEvent[Contra
 }
 
 func ParseEvmEventCompletedEvent(event map[string][]string) (*IBCEvent[EVMEventCompleted], error) {
+	log.Debug().Msgf("Received EVMEventCompleted event: %v", event)
 	eventID := removeQuote(event["axelar.evm.v1beta1.EVMEventCompleted.event_id"][0])
 	args := EVMEventCompleted{
 		ID:      eventID,
@@ -56,7 +60,10 @@ func ParseEvmEventCompletedEvent(event map[string][]string) (*IBCEvent[EVMEventC
 		Args:        args,
 	}, nil
 }
-
+func ParseAllEvent(event map[string][]string) (*IBCEvent[any], error) {
+	log.Debug().Msgf("Received event: %v", event)
+	return nil, nil
+}
 func ParseContractCallSubmittedEvent(event map[string][]string) (*IBCEvent[ContractCallSubmitted], error) {
 	key := "axelar.axelarnet.v1beta1.ContractCallSubmitted"
 	data := ContractCallSubmitted{

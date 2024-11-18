@@ -4,7 +4,7 @@ type CosmosNetworkConfig struct {
 	ChainID       string `mapstructure:"chain_id"`
 	RPCUrl        string `mapstructure:"rpc_url"`
 	LCDUrl        string `mapstructure:"lcd_url"`
-	WS            string `mapstructure:"ws"`
+	WSUrl         string `mapstructure:"ws_url"`
 	Denom         string `mapstructure:"denom"`
 	Mnemonic      string `mapstructure:"mnemonic"`
 	GasPrice      string `mapstructure:"gas_price"`
