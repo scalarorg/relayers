@@ -6,6 +6,15 @@ import (
 
 const COMPONENT_NAME = "BtcClient"
 
+type SigningType int
+
+const (
+	CUSTODIAL_ONLY SigningType = iota
+	USER_PROTOCOL
+	USER_CUSTODIAL
+	PROTOCOL_CUSTODIAL
+)
+
 type BtcNetworkConfig struct {
 	Network    string  `mapstructure:"network"`
 	ID         string  `mapstructure:"id"`
@@ -19,6 +28,7 @@ type BtcNetworkConfig struct {
 	SSL        *bool   `mapstructure:"ssl,omitempty"`
 	PrivateKey string  `mapstructure:"private_key,omitempty"`
 	Address    *string `mapstructure:"address,omitempty"`
+	MaxFeeRate float64 `mapstructure:"max_fee_rate,omitempty"`
 }
 
 func (c *BtcNetworkConfig) GetChainId() uint64 {
@@ -29,15 +39,6 @@ func (c *BtcNetworkConfig) GetId() string {
 }
 func (c *BtcNetworkConfig) GetName() string {
 	return c.Name
-}
-
-type ExecuteParams struct {
-	SourceChain      string
-	SourceAddress    string
-	ContractAddress  string
-	PayloadHash      [32]byte
-	SourceTxHash     [32]byte
-	SourceEventIndex uint64
 }
 
 // Todo: When xchains core user separated module for handling btc execution data,

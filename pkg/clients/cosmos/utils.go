@@ -1,4 +1,4 @@
-package scalar
+package cosmos
 
 import (
 	"github.com/cosmos/cosmos-sdk/crypto/hd"

@@ -27,8 +27,8 @@ type Client struct {
 	globalConfig   *config.Config
 	networkConfig  *cosmos.CosmosNetworkConfig
 	txConfig       client.TxConfig
-	network        *NetworkClient
-	queryClient    *QueryClient
+	network        *cosmos.NetworkClient
+	queryClient    *cosmos.QueryClient
 	dbAdapter      *db.DatabaseAdapter
 	eventBus       *events.EventBus
 	subscriberName string //Use as subscriber for networkClient
@@ -64,11 +64,11 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 	if config.BroadcastMode == "" {
 		config.BroadcastMode = "sync"
 	}
-	clientCtx, err := CreateClientContext(config)
+	clientCtx, err := cosmos.CreateClientContext(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client context: %w", err)
 	}
-	var queryClient *QueryClient
+	var queryClient *cosmos.QueryClient
 	// if config.GrpcAddress != "" {
 	// 	log.Info().Msgf("Create Grpc client to address: %s", config.GrpcAddress)
 	// 	dialOpts := []grpc.DialOption{
@@ -78,8 +78,8 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 	// 	if err != nil {
 	// 		return nil, fmt.Errorf("failed to create gRPC client: %w", err)
 	// 	}
-	queryClient = NewQueryClient(clientCtx)
-	networkClient, err := NewNetworkClient(config, queryClient, txConfig)
+	queryClient = cosmos.NewQueryClient(clientCtx)
+	networkClient, err := cosmos.NewNetworkClient(config, queryClient, txConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (c *Client) Start(ctx context.Context) error {
 
 // https://github.com/cosmos/cosmos-sdk/blob/main/client/rpc/tx.go#L159
 func Subscribe[T any](ctx context.Context,
-	network *NetworkClient,
+	network *cosmos.NetworkClient,
 	event ListenerEvent[T],
 	callback EventHandlerCallBack[T]) (string, error) {
 	eventCh, err := network.Subscribe(ctx, event.Type, event.TopicId)

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 const COMPONENT_NAME = "EvmClient"
@@ -48,4 +49,14 @@ type DecodedExecuteData struct {
 	Weights    []uint64
 	Threshold  uint64
 	Signatures []Bytes
+}
+
+type EvmEvent[T any] struct {
+	Hash             string
+	BlockNumber      uint64
+	LogIndex         uint
+	SourceChain      string
+	DestinationChain string
+	WaitForFinality  func() (*types.Receipt, error)
+	Args             T
 }

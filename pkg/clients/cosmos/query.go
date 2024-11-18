@@ -1,4 +1,4 @@
-package scalar
+package cosmos
 
 import (
 	"bytes"

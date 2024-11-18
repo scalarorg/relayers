@@ -1,4 +1,4 @@
-package scalar
+package cosmos
 
 import (
 	"context"
@@ -18,12 +18,11 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
-func createDefaultTxFactory(config *cosmos.CosmosNetworkConfig, txConfig client.TxConfig) (tx.Factory, error) {
+func createDefaultTxFactory(config *CosmosNetworkConfig, txConfig client.TxConfig) (tx.Factory, error) {
 	factory := tx.Factory{}
 	factory = factory.WithTxConfig(txConfig)
 	if config.ChainID == "" {
@@ -39,7 +38,7 @@ func createDefaultTxFactory(config *cosmos.CosmosNetworkConfig, txConfig client.
 }
 
 type NetworkClient struct {
-	config         *cosmos.CosmosNetworkConfig
+	config         *CosmosNetworkConfig
 	rpcEndpoint    string
 	rpcClient      rpcclient.Client
 	queryClient    *QueryClient
@@ -50,7 +49,7 @@ type NetworkClient struct {
 	sequenceNumber uint64
 }
 
-func NewNetworkClient(config *cosmos.CosmosNetworkConfig, queryClient *QueryClient, txConfig client.TxConfig) (*NetworkClient, error) {
+func NewNetworkClient(config *CosmosNetworkConfig, queryClient *QueryClient, txConfig client.TxConfig) (*NetworkClient, error) {
 	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create account from mnemonic: %w", err)

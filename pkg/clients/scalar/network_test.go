@@ -15,16 +15,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/internal/codec"
-	"github.com/scalarorg/relayers/pkg/clients/scalar"
+	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSubscribeContractCallApprovedEvent(t *testing.T) {
 	txConfig := tx.NewTxConfig(codec.GetProtoCodec(), []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
-	clientCtx, err := scalar.CreateClientContext(&ScalarNetworkConfig)
+	clientCtx, err := cosmos.CreateClientContext(&ScalarNetworkConfig)
 	require.NoError(t, err)
-	queryClient := scalar.NewQueryClient(clientCtx)
-	networkClient, err := scalar.NewNetworkClient(&ScalarNetworkConfig, queryClient, txConfig)
+	queryClient := cosmos.NewQueryClient(clientCtx)
+	networkClient, err := cosmos.NewNetworkClient(&ScalarNetworkConfig, queryClient, txConfig)
 	require.NoError(t, err)
 	require.NotNil(t, networkClient)
 	err = networkClient.Start()

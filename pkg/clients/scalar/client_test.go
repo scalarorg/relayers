@@ -16,7 +16,6 @@ import (
 
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
-	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/encoding"
 	"google.golang.org/grpc/encoding/proto"
@@ -50,7 +49,7 @@ var (
 func TestMain(m *testing.M) {
 	config := types.GetConfig()
 	config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
-	clientCtx, err = scalar.CreateClientContext(&ScalarNetworkConfig)
+	clientCtx, err = cosmos.CreateClientContext(&ScalarNetworkConfig)
 	if err != nil {
 		log.Error().Msgf("failed to create client context: %+v", err)
 	}
