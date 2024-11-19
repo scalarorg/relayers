@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
 )
 
 const COMPONENT_NAME = "EvmClient"
@@ -36,6 +37,9 @@ func (c *EvmNetworkConfig) GetId() string {
 }
 func (c *EvmNetworkConfig) GetName() string {
 	return c.Name
+}
+func (c *EvmNetworkConfig) GetFamily() string {
+	return chain.ChainTypeEVM.String()
 }
 
 type DecodedExecuteData struct {

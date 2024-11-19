@@ -15,16 +15,17 @@ type EventBusConfig struct {
 type IChainConfig interface {
 	GetId() string      //String identifier for the chain for example ethereum-sepolia
 	GetChainId() uint64 //Integer identifier for the chain for example 11155111
+	GetFamily() string  //Family of the chain for example evm
 	GetName() string    //Name of the chain for example Ethereum Sepolia
 }
-
+type ChainFamily map[uint64]IChainConfig
 type Config struct {
-	ConfigPath        string                  `mapstructure:"config_path"`
-	ConnnectionString string                  `mapstructure:"database_url"` // Postgres db connection string
-	ScalarMnemonic    string                  `mapstructure:"scalar_mnemonic"`
-	EvmPrivateKey     string                  `mapstructure:"evm_private_key"`
-	BtcPrivateKey     string                  `mapstructure:"btc_private_key"`
-	ChainConfigs      map[uint64]IChainConfig `mapstructure:"chain_configs"` //Store all valid chain configs
+	ConfigPath        string                 `mapstructure:"config_path"`
+	ConnnectionString string                 `mapstructure:"database_url"` // Postgres db connection string
+	ScalarMnemonic    string                 `mapstructure:"scalar_mnemonic"`
+	EvmPrivateKey     string                 `mapstructure:"evm_private_key"`
+	BtcPrivateKey     string                 `mapstructure:"btc_private_key"`
+	ChainConfigs      map[string]ChainFamily `mapstructure:"chain_configs"` //Store all valid chain configs
 }
 
 var GlobalConfig Config
@@ -53,7 +54,7 @@ func LoadEnv(environment string) error {
 	}
 	viper.Unmarshal(&GlobalConfig)
 	// Initialize an empty chain configs map
-	GlobalConfig.ChainConfigs = make(map[uint64]IChainConfig)
+	GlobalConfig.ChainConfigs = make(map[string]ChainFamily)
 	log.Info().Msgf("Loaded config: %+v", GlobalConfig)
 	//injectEnvConfig(&GlobalConfig)
 	return nil
@@ -102,19 +103,31 @@ func ReadJsonConfig[T any](filePath string) (*T, error) {
 // }
 
 func (c *Config) AddChainConfig(chainConfig IChainConfig) {
-	c.ChainConfigs[chainConfig.GetChainId()] = chainConfig
+	family := chainConfig.GetFamily()
+	if _, ok := c.ChainConfigs[family]; !ok {
+		c.ChainConfigs[family] = make(ChainFamily)
+	}
+	c.ChainConfigs[family][chainConfig.GetChainId()] = chainConfig
 }
-func (c *Config) GetStringIdByChainId(chainId uint64) (string, error) {
+func (c *Config) GetStringIdByChainId(chainFamily string, chainId uint64) (string, error) {
 	// log.Debug().Msgf("Getting string id for chainId: %d", chainId)
-	chainConfig, ok := c.ChainConfigs[chainId]
+	family, ok := c.ChainConfigs[chainFamily]
+	if !ok {
+		return "", fmt.Errorf("chain not found for chainId: %d", chainId)
+	}
+	chainConfig, ok := family[chainId]
 	if !ok {
 		return "", fmt.Errorf("chain not found for chainId: %d", chainId)
 	}
 	return chainConfig.GetId(), nil
 }
 
-func (c *Config) GetChainConfigById(chainId uint64) (IChainConfig, error) {
-	chainConfig, ok := c.ChainConfigs[chainId]
+func (c *Config) GetChainConfigById(chainFamily string, chainId uint64) (IChainConfig, error) {
+	family, ok := c.ChainConfigs[chainFamily]
+	if !ok {
+		return nil, fmt.Errorf("chain not found for chainId: %d", chainId)
+	}
+	chainConfig, ok := family[chainId]
 	if !ok {
 		return nil, fmt.Errorf("chain not found for chainId: %d", chainId)
 	}

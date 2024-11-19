@@ -31,7 +31,9 @@ var (
 	protoCodec          = encoding.GetCodec(proto.Name)
 	DefaultGlobalConfig = config.Config{}
 	CosmosNetworkConfig = cosmos.CosmosNetworkConfig{
-		ChainID:       "scalar-testnet-1",
+		ChainID:       111,
+		ID:            "scalar-testnet-1",
+		Name:          "scalar-testnet-1",
 		Denom:         "scalar",
 		RPCUrl:        "http://localhost:26657",
 		GasPrice:      0.001,

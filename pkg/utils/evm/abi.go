@@ -10,8 +10,31 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	evmutils "github.com/scalarorg/bitcoin-vault/go-utils/evm"
 	"github.com/scalarorg/go-electrum/electrum/types"
 )
+
+func CalculateStakingPayload(vaultTx *types.VaultTransaction) ([]byte, string, error) {
+	toAddress, err := hex.DecodeString(vaultTx.DestRecipientAddress)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to decode toAddress: %w", err)
+	}
+	var toAddressBytes [20]byte
+	copy(toAddressBytes[:], toAddress)
+
+	// Convert hex string to [32]byte
+	txHash, err := hex.DecodeString(strings.TrimPrefix(vaultTx.TxHash, "0x"))
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to decode txHash: %w", err)
+	}
+	var txHashBytes [32]byte
+	copy(txHashBytes[:], txHash)
+	payloadBytes, payloadHash, err := evmutils.CalculateStakingPayloadHash(toAddressBytes, int64(vaultTx.Amount), txHashBytes)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to calculate payload: %w", err)
+	}
+	return payloadBytes, hex.EncodeToString(payloadHash), nil
+}
 
 // Calculate payload and payload hash
 // Todo: implement this in the bitcoin-vault lib then call it via ffi or in some pure golang code

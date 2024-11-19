@@ -1,10 +1,12 @@
 package electrs
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
 
+	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
 	"github.com/scalarorg/go-electrum/electrum/types"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/utils/evm"
@@ -38,9 +40,16 @@ func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayDa
 			Symbol:          "",
 		},
 	}
-	destinationChainName, err := c.globalConfig.GetStringIdByChainId(vaultTx.DestChainId)
+	//parse chain id to chain name
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, vaultTx.DestChain)
+	destinationChain := chain.NewDestinationChainFromBytes(buf)
+	if destinationChain == nil {
+		return relayData, fmt.Errorf("invalid destination chain: %d", vaultTx.DestChain)
+	}
+	destinationChainName, err := c.globalConfig.GetStringIdByChainId(destinationChain.ChainType.String(), destinationChain.ChainID)
 	if err != nil {
-		return relayData, fmt.Errorf("Chain not found for input chainId: %d, %w	", vaultTx.DestChainId, err)
+		return relayData, fmt.Errorf("chain not found for input chainId: %v, %w	", destinationChain, err)
 	}
 	relayData.To = destinationChainName
 	//For btc vault tx, the log index is tx position in the block
@@ -52,7 +61,7 @@ func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayDa
 		return relayData, fmt.Errorf("failed to decode VaultTxHex: %w", err)
 	}
 	relayData.CallContract.TxHex = txHexBytes
-	payloadBytes, payloadHash, err := evm.CalculatePayload(&vaultTx)
+	payloadBytes, payloadHash, err := evm.CalculateStakingPayload(&vaultTx)
 	if err != nil {
 		return relayData, fmt.Errorf("failed to decode Payload: %w", err)
 	}

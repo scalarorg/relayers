@@ -13,7 +13,7 @@ import (
 
 func CreateClientContext(config *CosmosNetworkConfig) (*client.Context, error) {
 	clientCtx := client.Context{
-		ChainID: config.ChainID,
+		ChainID: config.ID,
 	}
 	if config.RPCUrl != "" {
 		log.Info().Msgf("Create rpcClient using RPC URL: %s", config.RPCUrl)

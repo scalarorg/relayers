@@ -1,6 +1,7 @@
 package btc
 
 import (
+	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 )
 
@@ -39,6 +40,9 @@ func (c *BtcNetworkConfig) GetId() string {
 }
 func (c *BtcNetworkConfig) GetName() string {
 	return c.Name
+}
+func (c *BtcNetworkConfig) GetFamily() string {
+	return chain.ChainTypeBitcoin.String()
 }
 
 // Todo: When xchains core user separated module for handling btc execution data,

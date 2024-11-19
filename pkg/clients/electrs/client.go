@@ -113,6 +113,12 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to convert vault transaction to relay data")
 		return fmt.Errorf("failed to convert vault transaction to relay data: %w", err)
+	} else {
+		payloadHashes := make([]string, len(relayDatas))
+		for i, relayData := range relayDatas {
+			payloadHashes[i] = relayData.CallContract.PayloadHash
+		}
+		log.Debug().Msgf("Successfully stored %d vault transactions to relay data, payload hashes: %v", len(relayDatas), payloadHashes)
 	}
 	//2. update last checkpoint
 	lastCheckpoint := c.getLastCheckpoint()

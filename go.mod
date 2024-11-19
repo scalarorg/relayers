@@ -30,7 +30,10 @@ require (
 	gorm.io/gorm v1.25.12
 )
 
-require github.com/cosmos/gogoproto v1.7.0 // indirect
+require (
+	github.com/cosmos/gogoproto v1.7.0 // indirect
+	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241119032340-74af8c39aa6d // indirect
+)
 
 require (
 	cosmossdk.io/core v0.11.1 // indirect
@@ -51,7 +54,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/speakeasy v0.1.1-0.20220910012023-760eaf8b6816 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
-	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
+	github.com/btcsuite/btcd/btcutil v1.1.6
 	github.com/btcsuite/btcd/btcutil/psbt v1.1.9
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f // indirect
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd // indirect
@@ -233,7 +236,9 @@ require (
 )
 
 // ---- Scalar ----
-// replace github.com/scalarorg/go-electrum => ../go-electrum
+replace github.com/scalarorg/go-electrum => ../go-electrum
+
+replace github.com/scalarorg/bitcoin-vault/go-utils => ../bitcoin-vault/go-utils
 
 // Temporary replacement for rosetta support
 replace github.com/cosmos/cosmos-sdk => github.com/axelarnetwork/cosmos-sdk v0.45.17-0.20240321205000-47c0c80e20ca

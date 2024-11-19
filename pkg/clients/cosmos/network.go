@@ -25,10 +25,10 @@ import (
 func createDefaultTxFactory(config *CosmosNetworkConfig, txConfig client.TxConfig) (tx.Factory, error) {
 	factory := tx.Factory{}
 	factory = factory.WithTxConfig(txConfig)
-	if config.ChainID == "" {
+	if config.ID == "" {
 		return factory, fmt.Errorf("chain ID is required")
 	}
-	factory = factory.WithChainID(config.ChainID)
+	factory = factory.WithChainID(config.ID)
 	//Todo: estimate gas each time broadcast tx
 	factory = factory.WithGas(0) // Adjust in estimateGas()
 	factory = factory.WithGasAdjustment(DEFAULT_GAS_ADJUSTMENT)
@@ -137,7 +137,7 @@ func (c *NetworkClient) createTxFactory(ctx context.Context) tx.Factory {
 	if err != nil {
 		log.Error().Msgf("failed to get account: %+v", err)
 	} else {
-		log.Debug().Msgf("[ScalarClient] [NetworkClient] account: %v", resp)
+		log.Debug().Msgf("[ScalarClient] [NetworkClient] account number: %v, sequence number: %v", resp.AccountNumber, resp.Sequence)
 		txf = txf.WithAccountNumber(resp.AccountNumber)
 		//If sequence number is greater than current sequence number, update the sequence number
 		//This is to avoid the situation where the transaction is not included in the next block
@@ -169,6 +169,9 @@ func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Ms
 	txBuilder.SetFeeGranter(c.addr)
 	//Try to sign and broadcast the transaction until success or reach max retry
 	result, err := c.trySignAndBroadcastMsgs(ctx, txBuilder)
+	if err != nil {
+		return nil, err
+	}
 	if result != nil && result.Code == 0 {
 		log.Debug().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] success broadcast tx with tx hash: %s", result.TxHash)
 		//Update sequence and account number
@@ -310,12 +313,15 @@ func (c *NetworkClient) BroadcastTx(ctx context.Context, txBytes []byte) (*sdk.T
 
 func (c *NetworkClient) BroadcastTxSync(ctx context.Context, txBytes []byte) (*sdk.TxResponse, error) {
 	rpcClient, err := c.GetRpcClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rpc client: %w", err)
+	}
 	res, err := rpcClient.BroadcastTxSync(context.Background(), txBytes)
 	if errRes := client.CheckTendermintError(err, txBytes); errRes != nil {
 		return errRes, nil
 	}
-
-	return sdk.NewResponseFormatBroadcastTx(res), err
+	txResponse := sdk.NewResponseFormatBroadcastTx(res)
+	return txResponse, err
 }
 func (c *NetworkClient) BroadcastTxAsync(ctx context.Context, txBytes []byte) (*sdk.TxResponse, error) {
 	rpcClient, err := c.GetRpcClient()
@@ -327,8 +333,8 @@ func (c *NetworkClient) BroadcastTxAsync(ctx context.Context, txBytes []byte) (*
 	if errRes := sdkclient.CheckTendermintError(err, txBytes); errRes != nil {
 		return errRes, nil
 	}
-
-	return sdk.NewResponseFormatBroadcastTx(res), err
+	txResponse := sdk.NewResponseFormatBroadcastTx(res)
+	return txResponse, err
 }
 func (c *NetworkClient) BroadcastTxCommit(ctx context.Context, txBytes []byte) (*sdk.TxResponse, error) {
 	node, err := c.GetRpcClient()
@@ -344,7 +350,8 @@ func (c *NetworkClient) BroadcastTxCommit(ctx context.Context, txBytes []byte) (
 	if errRes := client.CheckTendermintError(err, txBytes); errRes != nil {
 		return errRes, nil
 	}
-	return sdk.NewResponseFormatBroadcastTxCommit(res), err
+	txResponse := sdk.NewResponseFormatBroadcastTxCommit(res)
+	return txResponse, err
 }
 
 func (c *NetworkClient) Subscribe(ctx context.Context, subscriber string, query string) (<-chan ctypes.ResultEvent, error) {

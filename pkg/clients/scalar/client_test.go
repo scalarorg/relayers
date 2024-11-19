@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	auth "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/rs/zerolog/log"
@@ -31,7 +30,9 @@ var (
 	protoCodec          = encoding.GetCodec(proto.Name)
 	DefaultGlobalConfig = config.Config{}
 	ScalarNetworkConfig = cosmos.CosmosNetworkConfig{
-		ChainID:       "scalar-testnet-1",
+		ChainID:       111,
+		ID:            "scalar-testnet-1",
+		Name:          "scalar-testnet-1",
 		Denom:         "scalar",
 		RPCUrl:        "http://localhost:26657",
 		GasPrice:      0.001,
@@ -46,15 +47,15 @@ var (
 	accAddress sdk.AccAddress
 )
 
-func TestMain(m *testing.M) {
-	config := types.GetConfig()
-	config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
-	clientCtx, err = cosmos.CreateClientContext(&ScalarNetworkConfig)
-	if err != nil {
-		log.Error().Msgf("failed to create client context: %+v", err)
-	}
-	m.Run()
-}
+//	func TestMain(m *testing.M) {
+//		config := types.GetConfig()
+//		config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
+//		clientCtx, err = cosmos.CreateClientContext(&ScalarNetworkConfig)
+//		if err != nil {
+//			log.Error().Msgf("failed to create client context: %+v", err)
+//		}
+//		m.Run()
+//	}
 func TestAccountAddress(t *testing.T) {
 	accAddress, err := sdk.AccAddressFromBech32(cosmosAddress)
 	if err != nil {

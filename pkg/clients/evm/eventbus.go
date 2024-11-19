@@ -12,7 +12,7 @@ func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
 	log.Info().Msgf("[EvmClient] [handleEventBusMessage]: %v", event)
 	switch event.EventType {
 	case events.EVENT_SCALAR_CONTRACT_CALL_APPROVED:
-		//Broadcast from scalar.handleContractCallApprovedEvent
+		//Emitted from scalar.handleContractCallApprovedEvent with event.Data as executeData
 		return ec.handleScalarContractCallApproved(event.MessageID, event.Data.(string))
 
 	}
