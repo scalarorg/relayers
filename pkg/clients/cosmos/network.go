@@ -29,11 +29,16 @@ func createDefaultTxFactory(config *CosmosNetworkConfig, txConfig client.TxConfi
 		return factory, fmt.Errorf("chain ID is required")
 	}
 	factory = factory.WithChainID(config.ChainID)
-	factory = factory.WithGas(200000) // Adjust as needed
+	//Todo: estimate gas each time broadcast tx
+	factory = factory.WithGas(0) // Adjust in estimateGas()
+	factory = factory.WithGasAdjustment(DEFAULT_GAS_ADJUSTMENT)
+	//factory = factory.WithGasPrices(config.GasPrice)
+	// factory = factory.WithFees(sdk.NewCoin("uaxl", sdk.NewInt(20000)).String())
+
 	//Direct Sign mode with single signer
 	factory = factory.WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
 	factory = factory.WithMemo("") // Optional memo
-	factory = factory.WithFees(sdk.NewCoin("uaxl", sdk.NewInt(20000)).String())
+
 	return factory, nil
 }
 
@@ -145,12 +150,22 @@ func (c *NetworkClient) createTxFactory(ctx context.Context) tx.Factory {
 }
 func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 	//1. Build unsigned transaction using txFactory
-	txf := c.txFactory
+	txf := c.createTxFactory(ctx)
+	//Estimate fees
+	simRes, adjusted, err := tx.CalculateGas(c.queryClient.GetClientCtx(), txf, msgs...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate gas: %w", err)
+	}
+	fees := int64(txf.GasAdjustment() * float64(simRes.GasInfo.GasUsed) * c.config.GasPrice)
+	txf = txf.WithGas(adjusted)
+	txf = txf.WithFees(sdk.NewCoin(c.config.Denom, sdk.NewInt(fees)).String())
+	log.Debug().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] estimated gas: %v, gasPrice: %v, fees: %v", adjusted, c.config.GasPrice, txf.Fees())
 	// Every required params are set in the txFactory
 	txBuilder, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
 	}
+
 	txBuilder.SetFeeGranter(c.addr)
 	//Try to sign and broadcast the transaction until success or reach max retry
 	result, err := c.trySignAndBroadcastMsgs(ctx, txBuilder)
@@ -163,6 +178,7 @@ func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Ms
 	}
 	return result, nil
 }
+
 func (c *NetworkClient) trySignAndBroadcastMsgs(ctx context.Context, txBuilder sdkclient.TxBuilder) (*sdk.TxResponse, error) {
 	var err error
 	var result *sdk.TxResponse

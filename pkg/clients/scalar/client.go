@@ -3,6 +3,7 @@ package scalar
 import (
 	"context"
 	"fmt"
+	"math"
 
 	"github.com/axelarnetwork/axelar-core/utils"
 	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
@@ -63,6 +64,10 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 	//Set default broadcast mode is sync
 	if config.BroadcastMode == "" {
 		config.BroadcastMode = "sync"
+	}
+	//Check if float gas price is 0, set default value is 0.0125
+	if math.Abs(config.GasPrice*1000) < 0.000001 {
+		config.GasPrice = 0.0125
 	}
 	clientCtx, err := cosmos.CreateClientContext(config)
 	if err != nil {

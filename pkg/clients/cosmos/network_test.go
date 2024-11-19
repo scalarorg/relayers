@@ -1,4 +1,4 @@
-package scalar_test
+package cosmos_test
 
 import (
 	"context"
@@ -9,22 +9,49 @@ import (
 	"github.com/axelarnetwork/axelar-core/utils"
 	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	nexus "github.com/axelarnetwork/axelar-core/x/nexus/exported"
+	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/internal/codec"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/encoding"
+	"google.golang.org/grpc/encoding/proto"
+)
+
+const (
+	chainNameBtcTestnet4 = "bitcoin-testnet4"
+)
+
+var (
+	protoCodec          = encoding.GetCodec(proto.Name)
+	DefaultGlobalConfig = config.Config{}
+	CosmosNetworkConfig = cosmos.CosmosNetworkConfig{
+		ChainID:       "scalar-testnet-1",
+		Denom:         "scalar",
+		RPCUrl:        "http://localhost:26657",
+		GasPrice:      0.001,
+		LCDUrl:        "http://localhost:2317",
+		WSUrl:         "ws://localhost:26657/websocket",
+		MaxRetries:    3,
+		RetryInterval: int64(1000),
+		Mnemonic:      "latin total dream gesture brain bunker truly stove left video cost transfer guide occur bicycle oxygen world ready witness exhibit federal salute half day",
+	}
+	err        error
+	clientCtx  *client.Context
+	accAddress sdk.AccAddress
 )
 
 func TestSubscribeContractCallApprovedEvent(t *testing.T) {
 	txConfig := tx.NewTxConfig(codec.GetProtoCodec(), []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
-	clientCtx, err := cosmos.CreateClientContext(&ScalarNetworkConfig)
+	clientCtx, err := cosmos.CreateClientContext(&CosmosNetworkConfig)
 	require.NoError(t, err)
 	queryClient := cosmos.NewQueryClient(clientCtx)
-	networkClient, err := cosmos.NewNetworkClient(&ScalarNetworkConfig, queryClient, txConfig)
+	networkClient, err := cosmos.NewNetworkClient(&CosmosNetworkConfig, queryClient, txConfig)
 	require.NoError(t, err)
 	require.NotNil(t, networkClient)
 	err = networkClient.Start()

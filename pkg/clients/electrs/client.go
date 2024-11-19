@@ -129,11 +129,17 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 		return fmt.Errorf("failed to store relay data to the db: %w", err)
 	}
 	//4. Send to the event bus with destination chain is scalar for confirmation
-	grouped := c.GroupVaultTxsByDestinationChain(relayDatas)
+	confirmTxs := events.ConfirmTxsRequest{
+		ChainName: c.electrumConfig.SourceChain,
+		TxHashs:   make([]string, len(relayDatas)),
+	}
+	for i, item := range relayDatas {
+		confirmTxs.TxHashs[i] = item.CallContract.TxHash
+	}
 	c.eventBus.BroadcastEvent(&events.EventEnvelope{
 		EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
 		DestinationChain: scalar.SCALAR_NETWORK_NAME,
-		Data:             grouped,
+		Data:             confirmTxs,
 	})
 	return nil
 }
@@ -160,13 +166,4 @@ func (c *Client) PreProcessMessages(vaultTxs []types.VaultTransaction) error {
 		log.Debug().Msgf("Received vaultTx with key=>%v; stakerAddress=>%v; stakerPubkey=>%v", vaultTx.Key, vaultTx.StakerAddress, vaultTx.StakerPubkey)
 	}
 	return nil
-}
-
-// GroupVaultTxsByDestinationChain groups vault transactions by their destination chain
-func (c *Client) GroupVaultTxsByDestinationChain(relayDatas []models.RelayData) map[string][]string {
-	grouped := make(map[string][]string)
-	for _, item := range relayDatas {
-		grouped[item.To] = append(grouped[item.To], item.CallContract.TxHash)
-	}
-	return grouped
 }

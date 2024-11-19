@@ -34,7 +34,7 @@ var (
 		ChainID:       "scalar-testnet-1",
 		Denom:         "scalar",
 		RPCUrl:        "http://localhost:26657",
-		GasPrice:      "0.001",
+		GasPrice:      0.001,
 		LCDUrl:        "http://localhost:2317",
 		WSUrl:         "ws://localhost:26657/websocket",
 		MaxRetries:    3,

@@ -11,6 +11,7 @@ import (
 	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/tx"
 	auth "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/rs/zerolog/log"
 	//gogogrpc "github.com/cosmos/gogoproto/grpc"
@@ -18,22 +19,29 @@ import (
 )
 
 type QueryClient struct {
-	clientCtx          *client.Context
-	evmQueryClient     emvtypes.QueryServiceClient
-	msgQueryClient     axltypes.MsgServiceClient
-	accountQueryClient auth.QueryClient
+	clientCtx             *client.Context
+	evmQueryServiceClient emvtypes.QueryServiceClient
+	msgServiceClient      axltypes.MsgServiceClient
+	txServiceClient       tx.ServiceClient
+	accountQueryClient    auth.QueryClient
 }
 
 func NewQueryClient(clientCtx *client.Context) *QueryClient {
-	evmQueryClient := emvtypes.NewQueryServiceClient(clientCtx)
-	msgQueryClient := axltypes.NewMsgServiceClient(clientCtx)
+	evmQueryServiceClient := emvtypes.NewQueryServiceClient(clientCtx)
+	msgServiceClient := axltypes.NewMsgServiceClient(clientCtx)
 	accountQueryClient := auth.NewQueryClient(clientCtx)
+	txServiceClient := tx.NewServiceClient(clientCtx)
 	return &QueryClient{
-		clientCtx:          clientCtx,
-		evmQueryClient:     evmQueryClient,
-		msgQueryClient:     msgQueryClient,
-		accountQueryClient: accountQueryClient,
+		clientCtx:             clientCtx,
+		evmQueryServiceClient: evmQueryServiceClient,
+		msgServiceClient:      msgServiceClient,
+		txServiceClient:       txServiceClient,
+		accountQueryClient:    accountQueryClient,
 	}
+}
+
+func (c *QueryClient) GetClientCtx() *client.Context {
+	return c.clientCtx
 }
 
 func (c *QueryClient) QueryBatchedCommands(ctx context.Context, destinationChain string, batchedCommandId string) (*emvtypes.BatchedCommandsResponse, error) {
@@ -41,7 +49,7 @@ func (c *QueryClient) QueryBatchedCommands(ctx context.Context, destinationChain
 		Chain: destinationChain,
 		Id:    batchedCommandId,
 	}
-	resp, err := c.evmQueryClient.BatchedCommands(ctx, req)
+	resp, err := c.evmQueryServiceClient.BatchedCommands(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query batched commands: %w", err)
 	}
@@ -52,7 +60,7 @@ func (c *QueryClient) QueryPendingCommand(ctx context.Context, destinationChain 
 	req := &emvtypes.PendingCommandsRequest{
 		Chain: destinationChain,
 	}
-	resp, err := c.evmQueryClient.PendingCommands(ctx, req)
+	resp, err := c.evmQueryServiceClient.PendingCommands(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query pending commands: %w", err)
 	}
@@ -67,7 +75,7 @@ func (c *QueryClient) QueryRouteMessageRequest(ctx context.Context, sender sdk.A
 		Payload:    []byte(payload),
 		Feegranter: feegranter,
 	}
-	resp, err := c.msgQueryClient.RouteMessage(ctx, req)
+	resp, err := c.msgServiceClient.RouteMessage(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query route message request: %w", err)
 	}

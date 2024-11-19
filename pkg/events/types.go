@@ -25,3 +25,7 @@ type SignatureRequest struct {
 	ExecuteParams *types.ExecuteParams
 	Base64Psbt    string
 }
+type ConfirmTxsRequest struct {
+	ChainName string
+	TxHashs   []string
+}
