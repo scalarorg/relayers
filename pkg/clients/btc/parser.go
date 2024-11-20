@@ -3,13 +3,12 @@ package btc
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	"github.com/scalarorg/relayers/pkg/types"
 )
 
 func ParseExecuteParams(params []byte) (*types.ExecuteParams, error) {
-	args, err := evm.AbiUnpack(params, abi.StringTy, abi.StringTy, abi.AddressTy, abi.FixedBytesTy, abi.FixedBytesTy, abi.IntTy)
+	args, err := evm.AbiUnpack(params, "string", "string", "address", "byte32", "byte32", "int")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse execute params: %w", err)
 	}

@@ -18,15 +18,15 @@ type ValidEvmEvent interface {
 		*contracts.IAxelarGatewayExecuted
 }
 
-func getScalarGwExecuteAbi() (*abi.ABI, error) {
-	if scalarGwExecuteAbi == nil {
+func getScalarGatewayAbi() (*abi.ABI, error) {
+	if scalarGatewayAbi == nil {
 		var err error
-		scalarGwExecuteAbi, err = contracts.IAxelarExecutableMetaData.GetAbi()
+		scalarGatewayAbi, err = contracts.IAxelarGatewayMetaData.GetAbi()
 		if err != nil {
 			return nil, err
 		}
 	}
-	return scalarGwExecuteAbi, nil
+	return scalarGatewayAbi, nil
 }
 
 // Todo: Check if this is the correct way to extract the destination chain
@@ -149,7 +149,7 @@ func parseContractCallApproved(
 		SourceEventIndex *big.Int
 	}{}
 
-	abi, err := getScalarGwExecuteAbi()
+	abi, err := getScalarGatewayAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
@@ -210,7 +210,7 @@ func parseContractCall(
 		Payload                    []byte
 	}{}
 
-	abi, err := getScalarGwExecuteAbi()
+	abi, err := getScalarGatewayAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
@@ -264,7 +264,7 @@ func parseExecute(
 	event := struct {
 		CommandId [32]byte
 	}{}
-	abi, err := getScalarGwExecuteAbi()
+	abi, err := getScalarGatewayAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}

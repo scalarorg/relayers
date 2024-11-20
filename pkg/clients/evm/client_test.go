@@ -2,7 +2,6 @@ package evm_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -26,15 +25,15 @@ var (
 	evmClient *evm.EvmClient
 )
 
-func TestMain(m *testing.M) {
-	var err error
-	log.Info().Msgf("Creating evm client with config: %v", evmConfig)
-	evmClient, err = evm.NewEvmClient(globalConfig, evmConfig, nil, nil)
-	if err != nil {
-		log.Error().Msgf("failed to create evm client: %v", err)
-	}
-	os.Exit(m.Run())
-}
+//	func TestMain(m *testing.M) {
+//		var err error
+//		log.Info().Msgf("Creating evm client with config: %v", evmConfig)
+//		evmClient, err = evm.NewEvmClient(globalConfig, evmConfig, nil, nil)
+//		if err != nil {
+//			log.Error().Msgf("failed to create evm client: %v", err)
+//		}
+//		os.Exit(m.Run())
+//	}
 func TestEvmClientListenContractCallEvent(t *testing.T) {
 	watchOpts := bind.WatchOpts{Start: &evmConfig.LastBlock, Context: context.Background()}
 	sink := make(chan *contracts.IAxelarGatewayContractCall)

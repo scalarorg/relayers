@@ -4,15 +4,16 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
 )
 
 const COMPONENT_NAME = "EvmClient"
 
-var scalarGwExecuteAbi *abi.ABI
+var scalarGatewayAbi *abi.ABI
 
-type Byte32 [32]byte
+type Byte32 [32]uint8
 type Bytes []byte
 type EvmNetworkConfig struct {
 	ChainID    uint64 `mapstructure:"chain_id"`
@@ -45,14 +46,14 @@ func (c *EvmNetworkConfig) GetFamily() string {
 type DecodedExecuteData struct {
 	//Data
 	ChainId    uint64
-	CommandIds []Byte32
+	CommandIds [][32]byte
 	Commands   []string
-	Params     []Bytes
+	Params     [][]byte
 	//Proof
-	Operators  []string
+	Operators  []common.Address
 	Weights    []uint64
 	Threshold  uint64
-	Signatures []Bytes
+	Signatures []string
 }
 
 type EvmEvent[T any] struct {
