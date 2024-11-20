@@ -93,7 +93,10 @@ func (c *BtcClient) Start(ctx context.Context) error {
 	receiver := c.eventBus.Subscribe(c.btcConfig.GetId())
 	go func() {
 		for event := range receiver {
-			c.handleEventBusMessage(event)
+			err := c.handleEventBusMessage(event)
+			if err != nil {
+				log.Error().Msgf("failed to handle event bus message: %v", err)
+			}
 		}
 	}()
 	return nil

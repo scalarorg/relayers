@@ -127,9 +127,13 @@ func (c *Client) Start(ctx context.Context) error {
 	if err != nil {
 		log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] error: %v", err)
 	}
-	err = subscribeAllEvent(ctx, c.network, c.handleAnyEvents)
+	// err = subscribeAllNewBlockEvent(ctx, c.network, c.handleAnyEvents)
+	// if err != nil {
+	// 	log.Error().Msgf("[ScalarClient] [subscribeAllEvent] Failed: %v", err)
+	// }
+	err = subscribeAllTxEvent(ctx, c.network)
 	if err != nil {
-		log.Error().Msgf("[ScalarClient] [subscribeAllEvent] Failed: %v", err)
+		log.Error().Msgf("[ScalarClient] [subscribeAllTxEvent] Failed: %v", err)
 	}
 	return nil
 }
@@ -137,13 +141,10 @@ func (c *Client) Start(ctx context.Context) error {
 func subscribeContractCallApprovedEvent(ctx context.Context, network *cosmos.NetworkClient,
 	callback func(ctx context.Context, events []IBCEvent[ContractCallApproved]) error) error {
 	if _, err := Subscribe(ctx, network, ContractCallApprovedEvent,
-		func(events []IBCEvent[ContractCallApproved], err error) {
+		func(events []IBCEvent[ContractCallApproved]) {
+			err := callback(ctx, events)
 			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
-			}
-			err = callback(ctx, events)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] callback error: %v", err)
+				log.Error().Msgf("[ScalarClient] [ContractCallApprovedHandler] callback error: %v", err)
 			}
 		}); err != nil {
 		log.Debug().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] Failed: %v", err)
@@ -156,13 +157,10 @@ func subscribeContractCallApprovedEvent(ctx context.Context, network *cosmos.Net
 func subscribeSignCommandsEvent(ctx context.Context, network *cosmos.NetworkClient,
 	callback func(ctx context.Context, events []IBCEvent[SignCommands]) error) error {
 	if _, err := Subscribe(ctx, network, SignCommandsEvent,
-		func(events []IBCEvent[SignCommands], err error) {
+		func(events []IBCEvent[SignCommands]) {
+			err := callback(ctx, events)
 			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
-			}
-			err = callback(ctx, events)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] callback error: %v", err)
+				log.Error().Msgf("[ScalarClient] [SignCommandsHandler] callback error: %v", err)
 			}
 
 		}); err != nil {
@@ -177,13 +175,10 @@ func subscribeSignCommandsEvent(ctx context.Context, network *cosmos.NetworkClie
 func subscribeEVMCompletedEvent(ctx context.Context, network *cosmos.NetworkClient,
 	callback func(ctx context.Context, events []IBCEvent[EVMEventCompleted]) error) error {
 	if _, err := Subscribe(ctx, network, EVMCompletedEvent,
-		func(events []IBCEvent[EVMEventCompleted], err error) {
+		func(events []IBCEvent[EVMEventCompleted]) {
+			err := callback(ctx, events)
 			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] error: %v", err)
-			}
-			err = callback(ctx, events)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] callback error: %v", err)
+				log.Error().Msgf("[ScalarClient] [EVMCompletedHandler] callback error: %v", err)
 			}
 		}); err != nil {
 		log.Debug().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] Failed: %v", err)
@@ -193,24 +188,44 @@ func subscribeEVMCompletedEvent(ctx context.Context, network *cosmos.NetworkClie
 	}
 	return nil
 }
-func subscribeAllEvent(ctx context.Context, network *cosmos.NetworkClient,
+func subscribeAllNewBlockEvent(ctx context.Context, network *cosmos.NetworkClient,
 	callback func(ctx context.Context, events []IBCEvent[any]) error) error {
 	//Subscribe to all events for debug purpose
-	if _, err := Subscribe(ctx, network, AllEvent,
-		func(events []IBCEvent[any], err error) {
+	if _, err := Subscribe(ctx, network, AllNewBlockEvent,
+		func(events []IBCEvent[any]) {
+			err := callback(ctx, events)
 			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeAllEvent] error: %v", err)
-			}
-			err = callback(ctx, events)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeAllEvent] callback error: %v", err)
+				log.Error().Msgf("[ScalarClient] [AllNewBlockHandler] callback error: %v", err)
 			}
 
 		}); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeAllEvent] Failed: %v", err)
+		log.Debug().Msgf("[ScalarClient] [subscribeAllNewBlockEvent] Failed: %v", err)
 		return err
 	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeAllEvent] success")
+		log.Debug().Msgf("[ScalarClient] [subscribeAllNewBlockEvent] success")
+	}
+	return nil
+}
+
+func subscribeAllTxEvent(ctx context.Context, network *cosmos.NetworkClient) error {
+	//Subscribe to all events for debug purpose
+	TxEvent := ListenerEvent[any]{
+		Type: "Tx",
+		//TopicId: "tm.event='Tx'",
+		TopicId: "tm.event='*'",
+		Parser: func(events map[string][]string) ([]any, error) {
+			log.Debug().Msgf("[ScalarClient] [AllTxHandler] events: %v", events)
+			return nil, nil
+		},
+	}
+	callback := func(events []any) {
+		log.Debug().Msgf("[ScalarClient] [subscribeAllTxEvent] events: %v", events)
+	}
+	if _, err := Subscribe(ctx, network, TxEvent, callback); err != nil {
+		log.Debug().Msgf("[ScalarClient] [subscribeAllTxEvent] Failed: %v", err)
+		return err
+	} else {
+		log.Debug().Msgf("[ScalarClient] [subscribeAllTxEvent] success")
 	}
 	return nil
 }
@@ -224,25 +239,29 @@ func Subscribe[T any](ctx context.Context,
 	if err != nil {
 		return "", fmt.Errorf("failed to subscribe to Event: %v, %w", event, err)
 	}
-	defer network.UnSubscribeAll(context.Background(), event.Type) //nolint:errcheck // ignore
 	//Handle the event in a separate goroutine
 	go func() {
-		select {
-		case evt := <-eventCh:
-			log.Debug().Msgf("Received event from query: %v", evt.Query)
-			if evt.Query != event.TopicId {
-				callback(nil, fmt.Errorf("event query is not match"))
-			} else {
-				//Extract the data from the event
-				data, err := event.Parser(evt.Events)
-				if err != nil {
-					callback(nil, err)
+		for {
+			select {
+			case evt := <-eventCh:
+				if evt.Query != event.TopicId {
+					log.Debug().Msgf("[ScalarClient] [Subscribe] Event query is not match query: %v, topicId: %s", evt.Query, event.TopicId)
 				} else {
-					callback(data, nil)
+					//Extract the data from the event
+					data, err := event.Parser(evt.Events)
+					if err != nil {
+						log.Debug().Msgf("[ScalarClient] [Subscribe] parser event with query: %v error: %v", evt.Query, err)
+					} else if len(data) == 0 {
+						log.Debug().Msgf("[ScalarClient] [Subscribe] Empty event with query: %v", evt.Query)
+					} else {
+						callback(data)
+					}
 				}
+			case <-ctx.Done():
+				log.Debug().Msgf("[ScalarClient] [Subscribe] timed out waiting for event, the transaction could have already been included or wasn't yet included")
+				network.UnSubscribeAll(context.Background(), event.Type) //nolint:errcheck // ignore
+				return
 			}
-		case <-ctx.Done():
-			log.Debug().Msgf("[ScalarClient] [Subscribe] timed out waiting for event, the transaction could have already been included or wasn't yet included")
 		}
 	}()
 	return event.Type, nil

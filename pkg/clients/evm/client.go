@@ -74,6 +74,8 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		GatewayAddress: *gatewayAddress,
 		Gateway:        gateway,
 		auth:           auth,
+		dbAdapter:      dbAdapter,
+		eventBus:       eventBus,
 	}
 
 	return evmClient, nil
@@ -221,6 +223,17 @@ func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) error {
 }
 
 func (c *EvmClient) Start(ctx context.Context) error {
+	//Subscribe to the event bus
+	if c.eventBus != nil {
+		log.Debug().Msgf("[EvmClient] [Start] subscribe to the event bus %s", c.evmConfig.GetId())
+		receiver := c.eventBus.Subscribe(c.evmConfig.GetId())
+		go func() {
+			for event := range receiver {
+				c.handleEventBusMessage(event)
+			}
+		}()
+	}
+
 	watchOpts := bind.WatchOpts{Start: &c.evmConfig.LastBlock, Context: ctx}
 	//Listen to the gateway ContractCallEvent
 	//This event is initiated by user
@@ -239,17 +252,6 @@ func (c *EvmClient) Start(ctx context.Context) error {
 	err = c.watchEVMExecuted(&watchOpts)
 	if err != nil {
 		return fmt.Errorf("failed to watch EVMExecutedEvent: %w", err)
-	}
-	//Subscribe to the event bus
-	if c.eventBus != nil {
-		receiver := c.eventBus.Subscribe(c.evmConfig.GetId())
-		go func() {
-			for event := range receiver {
-				log.Info().Msgf("EVM contract call: %v", event)
-				c.handleEventBusMessage(event)
-
-			}
-		}()
 	}
 	return nil
 }

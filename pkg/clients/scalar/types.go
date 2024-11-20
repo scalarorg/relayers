@@ -8,7 +8,7 @@ const (
 	SCALAR_COMMAND_EXECUTED       = "Scalar.CommandExecuted"
 
 	ContractCallApprovedEventTopicId = "tm.event='NewBlock' AND axelar.evm.v1beta1.ContractCallApproved.event_id EXISTS"
-	SignCommandsEventTopicId         = "tm.event='NewBlock' AND sign EXISTS"
+	SignCommandsEventTopicId         = "tm.event='NewBlock' AND sign.batchedCommandID EXISTS"
 	EVMCompletedEventTopicId         = "tm.event='NewBlock' AND axelar.evm.v1beta1.EVMEventCompleted.event_id EXISTS"
 	//For future use
 	ContractCallSubmittedEventTopicId = "tm.event='Tx' AND axelar.axelarnet.v1beta1.ContractCallSubmitted.message_id EXISTS"
@@ -16,7 +16,7 @@ const (
 	ExecuteMessageEventTopicId        = "tm.event='Tx' AND message.action='ExecuteMessage'"
 )
 
-type EventHandlerCallBack[T any] func(events []T, err error)
+type EventHandlerCallBack[T any] func(events []T)
 type ListenerEvent[T any] struct {
 	TopicId string
 	Type    string
@@ -97,10 +97,10 @@ var (
 		Type:    "axelar.evm.v1beta1.EVMEventCompleted",
 		Parser:  ParseEvmEventCompletedEvent,
 	}
-	AllEvent = ListenerEvent[IBCEvent[any]]{
+	AllNewBlockEvent = ListenerEvent[IBCEvent[any]]{
 		TopicId: "tm.event='NewBlock'",
 		Type:    "All",
-		Parser:  ParseAllEvent,
+		Parser:  ParseAllNewBlockEvent,
 	}
 	//For future use
 	ContractCallSubmittedEvent = ListenerEvent[IBCEvent[ContractCallSubmitted]]{

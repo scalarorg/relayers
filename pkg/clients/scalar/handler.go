@@ -35,7 +35,8 @@ func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBC
 		return fmt.Errorf("failed to get pending command: %w", err)
 	}
 	if len(pendingCommands) == 0 {
-		return fmt.Errorf("no pending command found")
+		log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] No pending command found")
+		return nil
 	}
 	log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] Pending commands: %+v", pendingCommands)
 	//2. Sign the commands request
@@ -44,6 +45,30 @@ func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBC
 		return fmt.Errorf("failed to sign commands request: %v, %w", signRes, err)
 	}
 	log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] Successfully broadcasted sign commands request with txHash: %s. Waiting for sign event...", signRes.TxHash)
+	//3. Wait for the sign event
+	//Todo: Check if the sign event is received
+	batchCommandId, commandIDs := c.waitForSignCommandsEvent(ctx, signRes.TxHash)
+	if batchCommandId == "" || commandIDs == "" {
+		return fmt.Errorf("BatchCommandId not found")
+	}
+	log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] Successfully received sign commands event with batch command id: %s", batchCommandId)
+	// 2. Old version, loop for get ExecuteData from batch command id
+	executeData, err := c.waitForExecuteData(ctx, event.Args.DestinationChain, batchCommandId)
+	if err != nil {
+		return fmt.Errorf("[ScalarClient] [handleContractCallApprovedEvent] failed to get execute data: %w", err)
+	}
+	eventEnvelope := events.EventEnvelope{
+		EventType:        events.EVENT_SCALAR_CONTRACT_CALL_APPROVED,
+		DestinationChain: event.Args.DestinationChain,
+		MessageID:        event.Args.MessageID,
+		Data:             executeData,
+	}
+	log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] broadcast to eventBus: EventType: %s, DestinationChain: %s, MessageID: %v",
+		eventEnvelope.EventType, eventEnvelope.DestinationChain, eventEnvelope.MessageID)
+	// 3. Broadcast the execute data to the Event bus
+	// Todo:After the executeData is broadcasted,
+	// Update status of the RelayerData to Approved
+	c.eventBus.BroadcastEvent(&eventEnvelope)
 	return nil
 }
 func (c *Client) handleSignCommandsEvents(ctx context.Context, events []IBCEvent[SignCommands]) error {
@@ -95,6 +120,25 @@ func (c *Client) findBatchCommandId(ctx context.Context, txHash string) (string,
 	}
 	return batchCommandId, nil
 }
+func (c *Client) waitForSignCommandsEvent(ctx context.Context, txHash string) (string, string) {
+	var txRes *sdk.TxResponse
+	var err error
+	for {
+		txRes, err = c.queryClient.QueryTx(ctx, txHash)
+		log.Debug().Msgf("[ScalarClient] [waitForSignCommandsEvent] txRes: %v, err: %v", txRes, err)
+		if err != nil || txRes == nil || txRes.Code != 0 || len(txRes.Logs) == 0 {
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		log.Debug().Msgf("[ScalarClient] [waitForSignCommandsEvent] TxHash: %s, Logs events: %v", txRes.TxHash, txRes.Logs[0].Events)
+		batchCommandId := findEventAttribute(txRes.Logs[0].Events, "sign", "batchedCommandID")
+		commandIDs := findEventAttribute(txRes.Logs[0].Events, "sign", "commandIDs")
+		if batchCommandId == "" {
+			log.Debug().Msgf("[ScalarClient] [waitForSignCommandsEvent] no batch command id found in the tx: %v", txRes)
+		}
+		return batchCommandId, commandIDs
+	}
+}
 func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string, batchCommandId string) (string, error) {
 	res, err := c.queryClient.QueryBatchedCommands(ctx, destinationChain, batchCommandId)
 	for {
@@ -114,7 +158,7 @@ func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string
 	return res.ExecuteData, nil
 }
 func (c *Client) preprocessContractCallApprovedEvent(event *IBCEvent[ContractCallSubmitted]) error {
-	log.Debug().Msgf("ContractCallSubmittedEvent: %v", event)
+	log.Debug().Msgf("[ScalarClient] [preprocessContractCallApprovedEvent] event: %v", event)
 	//Check if the destination chain is supported
 	// destChain := strings.ToLower(event.Args.DestinationChain)
 

@@ -173,7 +173,7 @@ func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Ms
 		return nil, err
 	}
 	if result != nil && result.Code == 0 {
-		log.Debug().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] success broadcast tx with tx hash: %s", result.TxHash)
+		//log.Debug().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] success broadcast tx with tx hash: %s", result.TxHash)
 		//Update sequence and account number
 		c.txFactory = c.txFactory.WithSequence(c.txFactory.Sequence() + 1)
 	} else {

@@ -38,7 +38,7 @@ func removeQuote(str string) string {
 }
 
 func ParseContractCallApprovedEvent(event map[string][]string) ([]IBCEvent[ContractCallApproved], error) {
-	log.Debug().Msgf("[ScalarClient] Received ContractCallApproved event")
+	log.Debug().Msgf("[ScalarClient] [ParseContractCallApprovedEvent] start parser")
 	key := "axelar.evm.v1beta1.ContractCallApproved"
 	eventIds := event[key+".event_id"]
 	senders := event[key+".sender"]
@@ -86,15 +86,16 @@ func ParseContractCallApprovedEvent(event map[string][]string) ([]IBCEvent[Contr
 			Args:        data,
 		}
 	}
-	log.Debug().Msgf("[ScalarClient] Parsed %d ContractCallApproved events: %v", len(events), events)
+	log.Debug().Msgf("[ScalarClient] [ParseContractCallApprovedEvent] parsed events: %v", events)
 	return events, nil
 }
 func ParseSignCommandsEvent(event map[string][]string) ([]IBCEvent[SignCommands], error) {
-	log.Debug().Msgf("[ScalarClient] Received SignCommands event: %d", len(event))
-	return nil, nil
+	log.Debug().Msgf("[ScalarClient] [ParseSignCommandsEvent] input event: %v", event)
+	events := make([]IBCEvent[SignCommands], 0)
+	return events, nil
 }
 func ParseEvmEventCompletedEvent(event map[string][]string) ([]IBCEvent[EVMEventCompleted], error) {
-	log.Debug().Msgf("[ScalarClient] Received EVMEventCompleted event: %d", len(event))
+	log.Debug().Msgf("[ScalarClient] [ParseEvmEventCompletedEvent] start parser")
 	eventIds := event["axelar.evm.v1beta1.EVMEventCompleted.event_id"]
 	txHashs := event["tx.hash"]
 	srcChannels := event["write_acknowledgement.packet_src_channel"]
@@ -121,11 +122,11 @@ func ParseEvmEventCompletedEvent(event map[string][]string) ([]IBCEvent[EVMEvent
 			Args:        args,
 		}
 	}
-	log.Debug().Msgf("[ScalarClient] Parsed EVMEventCompleted events: %v", events)
+	log.Debug().Msgf("[ScalarClient] [ParseEvmEventCompletedEvent] parsed events: %v", events)
 	return events, nil
 }
-func ParseAllEvent(event map[string][]string) ([]IBCEvent[any], error) {
-	log.Debug().Msgf("[ScalarClient] Received event: %v", event)
+func ParseAllNewBlockEvent(event map[string][]string) ([]IBCEvent[any], error) {
+	log.Debug().Msgf("[ScalarClient] [ParseAllNewBlockEvent] input event: %v", event)
 	return nil, nil
 }
 func ParseContractCallSubmittedEvent(event map[string][]string) ([]IBCEvent[ContractCallSubmitted], error) {

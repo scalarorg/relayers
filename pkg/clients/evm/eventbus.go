@@ -9,7 +9,7 @@ import (
 )
 
 func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
-	log.Info().Msgf("[EvmClient] [handleEventBusMessage]: %v", event)
+	log.Info().Msgf("[EvmClient] [handleEventBusMessage] event: %v", event)
 	switch event.EventType {
 	case events.EVENT_SCALAR_CONTRACT_CALL_APPROVED:
 		//Emitted from scalar.handleContractCallApprovedEvent with event.Data as executeData
@@ -20,6 +20,7 @@ func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
 }
 
 func (ec *EvmClient) handleScalarContractCallApproved(messageID string, executeData string) error {
+	log.Debug().Msgf("[EvmClient] [handleScalarContractCallApproved] messageID: %s, executeData: %s", messageID, executeData)
 	decodedExecuteData, err := DecodeExecuteData(executeData)
 	if err != nil {
 		return fmt.Errorf("failed to decode execute data: %w", err)
