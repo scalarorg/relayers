@@ -119,10 +119,11 @@ func (c *Client) Start(ctx context.Context) error {
 	if err != nil {
 		log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
 	}
-	err = subscribeSignCommandsEvent(ctx, c.network, c.handleSignCommandsEvents)
-	if err != nil {
-		log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
-	}
+	// Todo: findout if this event is emitted by the ScalarNetwork
+	// err = subscribeSignCommandsEvent(ctx, c.network, c.handleSignCommandsEvents)
+	// if err != nil {
+	// 	log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
+	// }
 	err = subscribeEVMCompletedEvent(ctx, c.network, c.handleEVMCompletedEvents)
 	if err != nil {
 		log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] error: %v", err)
@@ -131,6 +132,7 @@ func (c *Client) Start(ctx context.Context) error {
 	// if err != nil {
 	// 	log.Error().Msgf("[ScalarClient] [subscribeAllEvent] Failed: %v", err)
 	// }
+	// For debug purpose, subscribe to all tx events, findout if there is sign commands event
 	err = subscribeAllTxEvent(ctx, c.network)
 	if err != nil {
 		log.Error().Msgf("[ScalarClient] [subscribeAllTxEvent] Failed: %v", err)

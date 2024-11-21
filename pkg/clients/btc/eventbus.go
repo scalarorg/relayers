@@ -199,6 +199,8 @@ func (c *BtcClient) requestCustodialSignatures(executeParams *types.ExecuteParam
 			Base64Psbt:    base64Psbt,
 		},
 	})
+	//Todo: Perform custodial signing. Better version, we can handle this in the custodial network
+
 	return "", nil
 }
 

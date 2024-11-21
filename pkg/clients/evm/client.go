@@ -91,7 +91,6 @@ func createGateway(evmConfig *EvmNetworkConfig, client *ethclient.Client) (*cont
 	}
 	return gateway, &gatewayAddress, nil
 }
-
 func createEvmAuth(evmConfig *EvmNetworkConfig) (*bind.TransactOpts, error) {
 	if evmConfig.PrivateKey == "" {
 		return nil, fmt.Errorf("private key is not set for network %s", evmConfig.Name)
@@ -243,12 +242,18 @@ func (c *EvmClient) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to watch ContractCallEvent: %w", err)
 	}
-	//Listen to the gateway ContractCallApprovedEvent
+	// Listen to the gateway ContractCallApprovedEvent
+	// This event is emitted by the ScalarGateway contract when the executeData is broadcast to the Gateway by call method
+	// ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
+	// Received this event relayer find payload from the db and call the execute method on the protocol's smart contract
 	err = c.watchContractCallApproved(&watchOpts)
 	if err != nil {
 		return fmt.Errorf("failed to watch ContractCallApprovedEvent: %w", err)
 	}
-	//Listen to the gateway EVMExecutedEvent
+	// Listen to the gateway ExecutedEvent
+	// This event is emitted by the gateway contract when the executeData if broadcast to the Gateway by call method
+	// ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
+	// Receiverd this event, the relayer store the executed data to the db for scanner
 	err = c.watchEVMExecuted(&watchOpts)
 	if err != nil {
 		return fmt.Errorf("failed to watch EVMExecutedEvent: %w", err)

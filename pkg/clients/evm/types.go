@@ -44,6 +44,8 @@ func (c *EvmNetworkConfig) GetFamily() string {
 }
 
 type DecodedExecuteData struct {
+	//Input
+	Input []byte
 	//Data
 	ChainId    uint64
 	CommandIds [][32]byte

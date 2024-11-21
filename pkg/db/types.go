@@ -13,3 +13,8 @@ type QueryOptions struct {
 	IncludeCallContract          *bool
 	IncludeCallContractWithToken *bool
 }
+
+type RelaydataExecuteResult struct {
+	RelayDataId string
+	Status      RelayDataStatus
+}

@@ -49,6 +49,7 @@ func DecodeExecuteData(executeData string) (*DecodedExecuteData, error) {
 	if err != nil {
 		log.Debug().Msgf("[EvmClient] [DecodeExecuteData] unpack executeData error: %v", err)
 	}
+	log.Debug().Msgf("[EvmClient] [DecodeExecuteData] successfull decoded input")
 	//Decode the input
 	args, err := AbiUnpack(input[0].([]byte), "bytes", "bytes")
 	if err != nil {
@@ -90,6 +91,7 @@ func DecodeExecuteData(executeData string) (*DecodedExecuteData, error) {
 		signatures[i] = hex.EncodeToString(signature)
 	}
 	return &DecodedExecuteData{
+		Input:      input[0].([]byte),
 		ChainId:    chainId.Uint64(),
 		CommandIds: commandIds,
 		Commands:   commands,
