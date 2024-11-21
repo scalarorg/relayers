@@ -38,7 +38,7 @@ func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBC
 		log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] No pending command found")
 		return nil
 	}
-	log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] Pending commands: %+v", pendingCommands)
+	log.Debug().Any("pendingCommands", pendingCommands).Msgf("[ScalarClient] [handleContractCallApprovedEvent]")
 	//2. Sign the commands request
 	signRes, err := c.network.SignCommandsRequest(ctx, destinationChain)
 	if err != nil || signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") || signRes.TxHash == "" {
@@ -125,12 +125,15 @@ func (c *Client) waitForSignCommandsEvent(ctx context.Context, txHash string) (s
 	var err error
 	for {
 		txRes, err = c.queryClient.QueryTx(ctx, txHash)
-		log.Debug().Msgf("[ScalarClient] [waitForSignCommandsEvent] txRes: %v, err: %v", txRes, err)
 		if err != nil || txRes == nil || txRes.Code != 0 || len(txRes.Logs) == 0 {
+			log.Debug().Err(err).Msgf("[ScalarClient] [waitForSignCommandsEvent]")
 			time.Sleep(2 * time.Second)
 			continue
 		}
-		log.Debug().Msgf("[ScalarClient] [waitForSignCommandsEvent] TxHash: %s, Logs events: %v", txRes.TxHash, txRes.Logs[0].Events)
+		log.Debug().
+			Str("TxHash", txRes.TxHash).
+			Any("Log events", txRes.Logs[0].Events).
+			Msg("[ScalarClient] [waitForSignCommandsEvent]")
 		batchCommandId := findEventAttribute(txRes.Logs[0].Events, "sign", "batchedCommandID")
 		commandIDs := findEventAttribute(txRes.Logs[0].Events, "sign", "commandIDs")
 		if batchCommandId == "" {
@@ -149,7 +152,10 @@ func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string
 			time.Sleep(3 * time.Second)
 			res, err = c.queryClient.QueryBatchedCommands(ctx, destinationChain, batchCommandId)
 			if err != nil {
-				log.Error().Msgf("batched commands error: %v", err)
+				log.Error().Err(err).
+					Str("destinationChain", destinationChain).
+					Str("batchCommandId", batchCommandId).
+					Msg("[ScalarClient] [waitForExecuteData]")
 			}
 		} else {
 			break
@@ -158,7 +164,7 @@ func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string
 	return res.ExecuteData, nil
 }
 func (c *Client) preprocessContractCallApprovedEvent(event *IBCEvent[ContractCallSubmitted]) error {
-	log.Debug().Msgf("[ScalarClient] [preprocessContractCallApprovedEvent] event: %v", event)
+	log.Debug().Interface("event", event).Msg("[ScalarClient] [preprocessContractCallApprovedEvent]")
 	//Check if the destination chain is supported
 	// destChain := strings.ToLower(event.Args.DestinationChain)
 

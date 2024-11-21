@@ -49,10 +49,10 @@ func NewElectrumClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapt
 }
 func NewElectrumClient(globalConfig *config.Config, config *Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*Client, error) {
 	if config.Host == "" {
-		return nil, fmt.Errorf("Electrum rpc host is required")
+		return nil, fmt.Errorf("electrum rpc host is required")
 	}
 	if config.Port == 0 {
-		return nil, fmt.Errorf("Electrum rpc port is required")
+		return nil, fmt.Errorf("electrum rpc port is required")
 	}
 	if dbAdapter == nil {
 		return nil, fmt.Errorf("dbAdapter is required")
@@ -83,6 +83,7 @@ func (c *Client) Start(ctx context.Context) error {
 	params := []interface{}{}
 	//Set batch size from config or default value
 	params = append(params, c.electrumConfig.BatchSize)
+
 	lastCheckpoint := c.getLastCheckpoint()
 	log.Debug().Msgf("[ElectrumClient] [Start] Last checkpoint: %v", lastCheckpoint)
 	if lastCheckpoint.EventKey != "" {
@@ -123,8 +124,8 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	//2. update last checkpoint
 	lastCheckpoint := c.getLastCheckpoint()
 	for _, tx := range vaultTxs {
-		if int64(tx.Height) > lastCheckpoint.BlockNumber {
-			lastCheckpoint.BlockNumber = int64(tx.Height)
+		if uint64(tx.Height) > lastCheckpoint.BlockNumber {
+			lastCheckpoint.BlockNumber = uint64(tx.Height)
 			lastCheckpoint.EventKey = tx.Key
 		}
 	}
@@ -153,14 +154,11 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 // Get lastcheck point from db, return default value if not found
 func (c *Client) getLastCheckpoint() *models.EventCheckPoint {
 	sourceChain := c.electrumConfig.SourceChain
-	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(sourceChain)
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(sourceChain, events.EVENT_ELECTRS_VAULT_TRANSACTION)
 	if err != nil {
-		log.Warn().Msgf("[ElectrumClient] getLastCheckpoint for chain %s with error `%v`, using default value", sourceChain, err)
-		lastCheckpoint = &models.EventCheckPoint{
-			ChainName:   sourceChain,
-			BlockNumber: 0,
-			EventKey:    "",
-		}
+		log.Warn().Str("chainId", sourceChain).
+			Str("eventName", events.EVENT_ELECTRS_VAULT_TRANSACTION).
+			Msg("[ElectrumClient] [getLastCheckpoint] using default value")
 	}
 	return lastCheckpoint
 }

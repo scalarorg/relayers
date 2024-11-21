@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func (db *DatabaseAdapter) CreateSingleValue(value interface{}) error {
+func (db *DatabaseAdapter) CreateSingleValue(value any) error {
 	result := db.PostgresClient.Create(value)
 	if result.Error != nil {
 		return result.Error
@@ -17,7 +17,7 @@ func (db *DatabaseAdapter) CreateSingleValue(value interface{}) error {
 	return nil
 }
 
-func (db *DatabaseAdapter) CreateBatchValue(values interface{}, batchSize int) error {
+func (db *DatabaseAdapter) CreateBatchValue(values any, batchSize int) error {
 	result := db.PostgresClient.CreateInBatches(values, batchSize)
 	if result.Error != nil {
 		return result.Error
@@ -25,9 +25,15 @@ func (db *DatabaseAdapter) CreateBatchValue(values interface{}, batchSize int) e
 	return nil
 }
 
-func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName string) (*models.EventCheckPoint, error) {
-	var lastBlock models.EventCheckPoint
-	result := db.PostgresClient.Where("chain_name = ?", chainName).First(&lastBlock)
+func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string) (*models.EventCheckPoint, error) {
+	//Default value
+	lastBlock := models.EventCheckPoint{
+		ChainName:   chainName,
+		EventName:   eventName,
+		BlockNumber: 0,
+		EventKey:    "",
+	}
+	result := db.PostgresClient.Where("chain_name = ? AND event_name = ?", chainName, eventName).First(&lastBlock)
 	return &lastBlock, result.Error
 }
 

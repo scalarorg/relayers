@@ -37,48 +37,33 @@ func AbiUnpackIntoMap(v map[string]interface{}, data []byte, types ...byte) erro
 	}
 	return nil
 }
-
-func DecodeExecuteData(executeData string) (*DecodedExecuteData, error) {
-	executeDataBytes, err := hex.DecodeString(executeData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode execute data: %w", err)
-	}
-
-	//First 4 bytes are the function selector
-	input, err := AbiUnpack(executeDataBytes[4:], "bytes")
-	if err != nil {
-		log.Debug().Msgf("[EvmClient] [DecodeExecuteData] unpack executeData error: %v", err)
-	}
-	log.Debug().Msgf("[EvmClient] [DecodeExecuteData] successfull decoded input")
-	//Decode the input
-	args, err := AbiUnpack(input[0].([]byte), "bytes", "bytes")
+func DecodeInput(input []byte) (*DecodedExecuteData, error) {
+	args, err := AbiUnpack(input, "bytes", "bytes")
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack execute input: %w", err)
 	}
+	log.Debug().
+		Str("data", hex.EncodeToString(args[0].([]byte))).
+		Str("proof", hex.EncodeToString(args[1].([]byte))).
+		Msg("[EvmClient] [DecodeInput]")
 	//Decode the data
 	dataDecoded, err := AbiUnpack(args[0].([]byte), "uint256", "bytes32[]", "string[]", "bytes[]")
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack data: %w", err)
 	}
-	log.Debug().Msgf("[EvmClient] [DecodeExecuteData] decodedData: %v", dataDecoded)
+	log.Debug().
+		Uint64("chainId", dataDecoded[0].(*big.Int).Uint64()).
+		Strs("commands", dataDecoded[2].([]string)).
+		Msg("[EvmClient] [DecodeInput]")
 	//Decode the proof
 	proofDecoded, err := AbiUnpack(args[1].([]byte), "address[]", "uint256[]", "uint256", "bytes[]")
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack proof: %w", err)
 	}
-	log.Debug().Msgf("[EvmClient] [DecodeExecuteData] proofDecoded: %v", proofDecoded)
 	chainId := dataDecoded[0].(*big.Int)
 	commandIds := dataDecoded[1].([][32]byte)
-	// commandIds := make([]string, len(commandIdsBytes))
-	// for i, commandId := range commandIdsBytes {
-	// 	commandIds[i] = hex.EncodeToString(commandId[:])
-	// }
 	commands := dataDecoded[2].([]string)
 	params := dataDecoded[3].([][]byte)
-	// params := make([]string, len(paramsBytes))
-	// for i, param := range paramsBytes {
-	// 	params[i] = hex.EncodeToString(param)
-	// }
 	weights := proofDecoded[1].([]*big.Int)
 	weightsUint64 := make([]uint64, len(weights))
 	for i, weight := range weights {
@@ -91,7 +76,7 @@ func DecodeExecuteData(executeData string) (*DecodedExecuteData, error) {
 		signatures[i] = hex.EncodeToString(signature)
 	}
 	return &DecodedExecuteData{
-		Input:      input[0].([]byte),
+		Input:      input,
 		ChainId:    chainId.Uint64(),
 		CommandIds: commandIds,
 		Commands:   commands,
@@ -101,4 +86,17 @@ func DecodeExecuteData(executeData string) (*DecodedExecuteData, error) {
 		Threshold:  threshold.Uint64(),
 		Signatures: signatures,
 	}, nil
+}
+func DecodeExecuteData(executeData string) (*DecodedExecuteData, error) {
+	executeDataBytes, err := hex.DecodeString(executeData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode execute data: %w", err)
+	}
+
+	//First 4 bytes are the function selector
+	input, err := AbiUnpack(executeDataBytes[4:], "bytes")
+	if err != nil {
+		log.Debug().Msgf("[EvmClient] [DecodeExecuteData] unpack executeData error: %v", err)
+	}
+	return DecodeInput(input[0].([]byte))
 }

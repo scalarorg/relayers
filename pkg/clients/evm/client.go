@@ -16,6 +16,7 @@ import (
 	"github.com/scalarorg/relayers/config"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
+	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
 )
 
@@ -65,7 +66,7 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 	if err != nil {
 		//Not fatal, we can still use the gateway without auth
 		//auth is only used for sending transaction
-		log.Warn().Msgf("failed to create auth for network %s: %v", evmConfig.Name, err)
+		log.Warn().Msgf("[EvmClient] [NewEvmClient] failed to create auth for network %s: %v", evmConfig.Name, err)
 	}
 	evmClient := &EvmClient{
 		globalConfig:   globalConfig,
@@ -165,6 +166,38 @@ func preparePrivateKey(evmCfg *EvmNetworkConfig) error {
 	return nil
 }
 
+func (c *EvmClient) getLastCheckpoint() *models.EventCheckPoint {
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.evmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL)
+	if err != nil {
+		log.Warn().Str("chainId", c.evmConfig.GetId()).
+			Str("eventName", events.EVENT_EVM_CONTRACT_CALL).
+			Msg("[EvmClient] [getLastCheckpoint] using default value")
+	}
+	return lastCheckpoint
+}
+
+// Todo: [WIP] try to recover missing events from the last checkpoint block number to the current block number
+func watchForEvent(c *EvmClient, eventName string) error {
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.evmConfig.GetId(), eventName)
+	if err != nil {
+		log.Warn().Str("chainId", c.evmConfig.GetId()).
+			Str("eventName", eventName).
+			Msg("[EvmClient] [getLastCheckpoint] using default value")
+	}
+	//Get current block number
+	blockNumber, err := c.Client.BlockNumber(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get current block number: %w", err)
+	}
+	//This case should not happen
+	//It can only happen if the db is set to a future block by debugger
+	if lastCheckpoint.BlockNumber > uint64(blockNumber) {
+		return nil
+	}
+	//recover missing events from the last checkpoint block number to the current block number
+	//missingEvents := c.Client.GetEvents(lastCheckpoint.BlockNumber, uint64(blockNumber))
+	return nil
+}
 func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) error {
 	sink := make(chan *contracts.IAxelarGatewayContractCall)
 
@@ -182,7 +215,7 @@ func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) error {
 		}
 	}()
 	c.subContractCall = subContractCall
-	defer subContractCall.Unsubscribe()
+	//defer subContractCall.Unsubscribe()
 	return nil
 }
 
@@ -194,13 +227,13 @@ func (c *EvmClient) watchContractCallApproved(watchOpts *bind.WatchOpts) error {
 	}
 	go func() {
 		for event := range sink {
-			log.Info().Msgf("Contract call approved: %v", event)
-			c.handleContractCallApproved(event)
+			log.Info().Any("event", event).Msg("[EvmClient] [ContractCallApprovedHandler]")
+			c.HandleContractCallApproved(event)
 		}
 
 	}()
 	c.subContractCallApproved = subContractCallApproved
-	defer subContractCallApproved.Unsubscribe()
+	// defer subContractCallApproved.Unsubscribe()
 	return nil
 }
 
@@ -212,12 +245,12 @@ func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) error {
 	}
 	go func() {
 		for event := range sink {
-			log.Info().Msgf("EVM executed: %v", event)
-			c.handleCommandExecuted(event)
+			log.Info().Any("event", event).Msgf("EvmClient] [ExecutedHandler]")
+			c.HandleCommandExecuted(event)
 		}
 	}()
 	c.subExecuted = subExecuted
-	defer subExecuted.Unsubscribe()
+	// defer subExecuted.Unsubscribe()
 	return nil
 }
 
@@ -228,7 +261,10 @@ func (c *EvmClient) Start(ctx context.Context) error {
 		receiver := c.eventBus.Subscribe(c.evmConfig.GetId())
 		go func() {
 			for event := range receiver {
-				c.handleEventBusMessage(event)
+				err := c.handleEventBusMessage(event)
+				if err != nil {
+					log.Error().Err(err).Msgf("[EvmClient] [EventBusHandler]")
+				}
 			}
 		}()
 	}

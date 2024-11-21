@@ -14,6 +14,8 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/rs/zerolog v1.33.0
+	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241120084008-99b82de50a7b
+	github.com/scalarorg/go-electrum v0.1.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
@@ -30,10 +32,7 @@ require (
 	gorm.io/gorm v1.25.12
 )
 
-require (
-	github.com/cosmos/gogoproto v1.7.0 // indirect
-	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241119032340-74af8c39aa6d // indirect
-)
+require github.com/cosmos/gogoproto v1.7.0 // indirect
 
 require (
 	cosmossdk.io/core v0.11.1 // indirect
@@ -183,7 +182,6 @@ require (
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/scalarorg/bitcoin-vault/ffi/go-psbt v0.0.0-20241112132150-34cb94893469
-	github.com/scalarorg/go-electrum v0.1.0
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.23.12 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
@@ -236,9 +234,9 @@ require (
 )
 
 // ---- Scalar ----
-replace github.com/scalarorg/go-electrum => ../go-electrum
+//replace github.com/scalarorg/go-electrum => ../go-electrum
 
-replace github.com/scalarorg/bitcoin-vault/go-utils => ../bitcoin-vault/go-utils
+// replace github.com/scalarorg/bitcoin-vault/go-utils => ../bitcoin-vault/go-utils
 
 // Temporary replacement for rosetta support
 replace github.com/cosmos/cosmos-sdk => github.com/axelarnetwork/cosmos-sdk v0.45.17-0.20240321205000-47c0c80e20ca

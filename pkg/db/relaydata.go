@@ -102,20 +102,25 @@ func (db *DatabaseAdapter) FindPayloadByHash(payloadHash string) ([]byte, error)
 	return relayData.CallContract.Payload, nil
 }
 
+// Find Realaydata by ContractAddress, SourceAddress, PayloadHash
 func (db *DatabaseAdapter) FindRelayDataByContractCall(contractCall *models.CallContract) ([]models.RelayData, error) {
-	var relayData models.RelayData
-
+	var relayDatas []models.RelayData
 	result := db.PostgresClient.
+		Joins("CallContract").
+		Where("contract_address = ? AND source_address = ? AND payload_hash = ?",
+			strings.ToLower(contractCall.ContractAddress),
+			strings.ToLower(contractCall.SourceAddress),
+			strings.ToLower(contractCall.PayloadHash)).
+		Where("status IN ?", []int{int(PENDING), int(APPROVED)}).
 		Preload("CallContract").
-		Select("call_contract", "id").
-		Where("call_contract = ? and status IN ?",
-			contractCall, []int{int(PENDING), int(APPROVED)}).
-		First(&relayData)
+		Find(&relayDatas)
 
 	if result.Error != nil {
-		return []models.RelayData{relayData}, fmt.Errorf("failed to find relay data by contract call: %w", result.Error)
+		return relayDatas, fmt.Errorf("find relaydatas by contract call with error: %w", result.Error)
 	}
-
-	return []models.RelayData{relayData}, nil
+	if len(relayDatas) == 0 {
+		log.Warn().Str("contractAddress", contractCall.ContractAddress).Str("sourceAddress", contractCall.SourceAddress).Str("payloadHash", contractCall.PayloadHash).Msg("[DatabaseAdapter] [FindRelayDataByContractCall] no relaydata found")
+	}
+	return relayDatas, nil
 
 }

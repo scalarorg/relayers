@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -24,7 +26,19 @@ func (ec *EvmClient) handleContractCall(event *contracts.IAxelarGatewayContractC
 	if err != nil {
 		return fmt.Errorf("failed to convert ContractCallEvent to RelayData: %w", err)
 	}
-	err = ec.dbAdapter.CreateSingleValue(relayData)
+	//2. update last checkpoint
+	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.evmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL)
+	if err != nil {
+		log.Debug().Str("chainId", ec.evmConfig.GetId()).
+			Str("eventName", events.EVENT_EVM_CONTRACT_CALL).
+			Msg("[EvmClient] [handleContractCall] Get event from begining")
+	}
+	if event.Raw.BlockNumber > lastCheckpoint.BlockNumber {
+		lastCheckpoint.BlockNumber = event.Raw.BlockNumber
+		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.TxIndex)
+	}
+	//3. store relay data to the db, update last checkpoint
+	err = ec.dbAdapter.CreateRelayDatas([]models.RelayData{relayData}, lastCheckpoint)
 	if err != nil {
 		return fmt.Errorf("failed to create evm contract call: %w", err)
 	}
@@ -47,7 +61,7 @@ func (ec *EvmClient) preprocessContractCall(event *contracts.IAxelarGatewayContr
 	return nil
 }
 
-func (ec *EvmClient) handleContractCallApproved(event *contracts.IAxelarGatewayContractCallApproved) error {
+func (ec *EvmClient) HandleContractCallApproved(event *contracts.IAxelarGatewayContractCallApproved) error {
 	//0. Preprocess the event
 	ec.preprocessContractCallApproved(event)
 	//1. Convert into a RelayData instance then store to the db
@@ -55,7 +69,7 @@ func (ec *EvmClient) handleContractCallApproved(event *contracts.IAxelarGatewayC
 	if err != nil {
 		return fmt.Errorf("failed to convert ContractCallApprovedEvent to RelayData: %w", err)
 	}
-	err = ec.dbAdapter.CreateSingleValue(contractCallApproved)
+	err = ec.dbAdapter.CreateSingleValue(&contractCallApproved)
 	if err != nil {
 		return fmt.Errorf("failed to create contract call approved: %w", err)
 	}
@@ -63,22 +77,22 @@ func (ec *EvmClient) handleContractCallApproved(event *contracts.IAxelarGatewayC
 	// This contract call (initiated by the user call to the source chain) is approved by EVM network
 	// So anyone can execute it on the EVM by broadcast the corresponding payload to protocol's smart contract on the destination chain
 	contractCall := models.CallContract{
-		ContractAddress: event.ContractAddress.Hex(),
-		SourceAddress:   event.SourceAddress,
-		PayloadHash:     hex.EncodeToString(event.PayloadHash[:]),
+		ContractAddress: strings.TrimLeft(event.ContractAddress.Hex(), "0x"),
+		SourceAddress:   strings.TrimLeft(event.SourceAddress, "0x"),
+		PayloadHash:     strings.TrimLeft(hex.EncodeToString(event.PayloadHash[:]), "0x"),
 	}
 	relayDatas, err := ec.dbAdapter.FindRelayDataByContractCall(&contractCall)
 	if err != nil {
-		log.Error().Msgf("[EvmClient] [handleContractCallApproved] find relay data with error: %v", err)
+		log.Error().Err(err).Msg("[EvmClient] [handleContractCallApproved] find relay data")
 		return err
 	}
-	log.Info().Msgf("[EvmClient] [handleContractCallApproved] found relay data: %v", relayDatas)
+	log.Info().Any("relayData", relayDatas).Msg("[EvmClient] [handleContractCallApproved] query relaydata by ContractAddress, SourceAddress, PayloadHash")
 	//3. Execute payload in the found relaydatas
 	executeResults, err := ec.executeDestinationCall(event, relayDatas)
 	if err != nil {
-		return fmt.Errorf("failed to execute relay datas: %w", err)
+		return fmt.Errorf("failed to execute relaydatas: %w", err)
 	}
-	log.Info().Msgf("[EvmClient] [handleContractCallApproved] execute results: %v", executeResults)
+	log.Info().Any("executeResults", executeResults).Msg("[EvmClient] [handleContractCallApproved] execute destination call")
 	//Done; Don't need to send to the bus
 	return nil
 }
@@ -96,19 +110,20 @@ func (ec *EvmClient) executeDestinationCall(event *contracts.IAxelarGatewayContr
 				RelayDataId: relayData.ID,
 			})
 		}
-		return executeResults, fmt.Errorf("[EvmClient] [executeDestinationCall] destination contract call is already executed")
+		return executeResults, fmt.Errorf("destination contract call is already executed")
 	}
 	if len(relayDatas) > 0 {
 		for _, relayData := range relayDatas {
 			if len(relayData.CallContract.Payload) == 0 {
 				continue
 			}
-			log.Info().Msgf("[EvmClient] [executeDestinationCall] execute payload: %v", relayData.CallContract.Payload)
+			log.Info().Str("payload", hex.EncodeToString(relayData.CallContract.Payload)).
+				Msg("[EvmClient] [executeDestinationCall]")
 			receipt, err := ec.ExecuteDestinationCall(event.ContractAddress, event.CommandId, event.SourceChain, event.SourceAddress, relayData.CallContract.Payload)
 			if err != nil {
-				return nil, fmt.Errorf("[EvmClient] [executeDestinationCall] failed to execute payload: %w", err)
+				return nil, fmt.Errorf("execute destination call with error: %w", err)
 			}
-			log.Info().Msgf("[EvmClient] [executeDestinationCall] execute receipt: %v", receipt)
+			log.Info().Any("txReceipt", receipt).Msg("[EvmClient] [executeDestinationCall]")
 		}
 	}
 	return executeResults, nil
@@ -128,12 +143,12 @@ func (ec *EvmClient) isContractCallExecuted(event *contracts.IAxelarGatewayContr
 }
 
 func (ec *EvmClient) preprocessContractCallApproved(event *contracts.IAxelarGatewayContractCallApproved) error {
-	log.Info().Msgf("[EvmClient] [handleContractCallApproved] Start handle Contract call approved: %v", event)
+	log.Info().Any("event", event).Msgf("[EvmClient] [handleContractCallApproved]")
 	//Todo: validate the event
 	return nil
 }
 
-func (ec *EvmClient) handleCommandExecuted(event *contracts.IAxelarGatewayExecuted) error {
+func (ec *EvmClient) HandleCommandExecuted(event *contracts.IAxelarGatewayExecuted) error {
 	//0. Preprocess the event
 	ec.preprocessCommandExecuted(event)
 	//1. Convert into a RelayData instance then store to the db
@@ -141,7 +156,7 @@ func (ec *EvmClient) handleCommandExecuted(event *contracts.IAxelarGatewayExecut
 	if err != nil {
 		return fmt.Errorf("failed to convert EVMExecutedEvent to RelayData: %w", err)
 	}
-	err = ec.dbAdapter.CreateSingleValue(cmdExecuted)
+	err = ec.dbAdapter.CreateSingleValue(&cmdExecuted)
 	if err != nil {
 		return fmt.Errorf("failed to create evm executed: %w", err)
 	}
@@ -150,7 +165,7 @@ func (ec *EvmClient) handleCommandExecuted(event *contracts.IAxelarGatewayExecut
 }
 
 func (ec *EvmClient) preprocessCommandExecuted(event *contracts.IAxelarGatewayExecuted) error {
-	log.Info().Msgf("Start handle EVM Command executed: %v", event)
+	log.Info().Any("event", event).Msg("[EvmClient] [ExecutedHandler] Start processing evm command executed")
 	//Todo: validate the event
 	return nil
 }
@@ -164,65 +179,81 @@ func (ec *EvmClient) ExecuteDestinationCall(
 ) (*ethtypes.Transaction, error) {
 	executable, err := contracts.NewIAxelarExecutable(contractAddress, ec.Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create executable contract: %w", err)
+		log.Error().Err(err).Any("contractAddress", contractAddress).Msg("[EvmClient] [ExecuteDestinationCall] create executable contract")
+		return nil, err
+	}
+	if ec.auth == nil {
+		return nil, fmt.Errorf("auth is nil")
 	}
 	//Return signed transaction
 	signedTx, err := executable.Execute(ec.auth, commandId, sourceChain, sourceAddress, payload)
 	if err != nil {
-		log.Error().Msgf("[EvmClient] [ExecuteDestinationCall] Failed to execute destination contract: %v", err)
+		log.Error().Err(err).
+			Str("commandId", hex.EncodeToString(commandId[:])).
+			Str("sourceChain", sourceChain).
+			Str("sourceAddress", sourceAddress).
+			Str("contractAddress", contractAddress.String()).
+			Msg("[EvmClient] [ExecuteDestinationCall]")
+		//Retry
 		return nil, err
 	}
+	//Resubmit the transaction to the network
+	// receipt, err := ec.SubmitTx(signedTx, 0)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
+	// return receipt, nil
 	return signedTx, nil
 }
 
-// func (ec *EvmClient) SubmitTx(tx *ethtypes.Transaction, retryAttempt int) (*ethtypes.Receipt, error) {
-// 	if retryAttempt >= ec.evmConfig.MaxRetry {
-// 		return nil, fmt.Errorf("max retry exceeded")
-// 	}
+func (ec *EvmClient) SubmitTx(signedTx *ethtypes.Transaction, retryAttempt int) (*ethtypes.Receipt, error) {
+	if retryAttempt >= ec.evmConfig.MaxRetry {
+		return nil, fmt.Errorf("max retry exceeded")
+	}
 
-// 	// Create a new context with timeout
-// 	ctx, cancel := context.WithTimeout(context.Background(), ec.evmConfig.TxTimeout)
-// 	defer cancel()
+	// Create a new context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), ec.evmConfig.TxTimeout)
+	defer cancel()
 
-// 	// Log transaction details
-// 	log.Debug().
-// 		Interface("tx", tx).
-// 		Msg("Submitting transaction")
+	// Log transaction details
+	log.Debug().
+		Interface("tx", signedTx).
+		Msg("Submitting transaction")
 
-// 	// Send the transaction using the new context
-// 	err := ec.Client.SendTransaction(ctx, tx)
-// 	if err != nil {
-// 		log.Error().
-// 			Err(err).
-// 			Str("rpcUrl", ec.evmConfig.RPCUrl).
-// 			Str("walletAddress", ec.auth.From.String()).
-// 			Str("to", tx.To().String()).
-// 			Str("data", hex.EncodeToString(tx.Data())).
-// 			Msg("[EvmClient.SubmitTx] Failed to submit transaction")
+	// Send the transaction using the new context
+	err := ec.Client.SendTransaction(ctx, signedTx)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("rpcUrl", ec.evmConfig.RPCUrl).
+			Str("walletAddress", ec.auth.From.String()).
+			Str("to", signedTx.To().String()).
+			Str("data", hex.EncodeToString(signedTx.Data())).
+			Msg("[EvmClient.SubmitTx] Failed to submit transaction")
 
-// 		// Sleep before retry
-// 		time.Sleep(ec.evmConfig.RetryDelay)
+		// Sleep before retry
+		time.Sleep(ec.evmConfig.RetryDelay)
 
-// 		log.Debug().
-// 			Int("attempt", retryAttempt+1).
-// 			Msg("Retrying transaction")
+		log.Debug().
+			Int("attempt", retryAttempt+1).
+			Msg("Retrying transaction")
 
-// 		return ec.SubmitTx(tx, retryAttempt+1)
-// 	}
+		return ec.SubmitTx(signedTx, retryAttempt+1)
+	}
 
-// 	// Wait for transaction receipt using the new context
-// 	receipt, err := bind.WaitMined(ctx, ec.Client, tx)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to wait for transaction receipt: %w", err)
-// 	}
+	// Wait for transaction receipt using the new context
+	receipt, err := bind.WaitMined(ctx, ec.Client, signedTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait for transaction receipt: %w", err)
+	}
 
-// 	log.Debug().
-// 		Interface("receipt", receipt).
-// 		Msg("Transaction receipt received")
+	log.Debug().
+		Interface("receipt", receipt).
+		Msg("Transaction receipt received")
 
-// 	return receipt, nil
-// }
+	return receipt, nil
+}
 
 func (ec *EvmClient) WaitForTransaction(hash string) (*ethtypes.Receipt, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ec.evmConfig.TxTimeout)

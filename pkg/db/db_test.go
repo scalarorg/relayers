@@ -1,4 +1,4 @@
-package evm_test
+package db_test
 
 import (
 	"context"

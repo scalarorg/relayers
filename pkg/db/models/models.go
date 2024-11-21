@@ -10,7 +10,10 @@ import (
 type EventCheckPoint struct {
 	gorm.Model
 	ChainName   string `gorm:"unique;type:varchar(255)"`
-	BlockNumber int64  `gorm:"type:bigint"`
+	EventName   string `gorm:"unique;type:varchar(255)"`
+	BlockNumber uint64 `gorm:"type:bigint"`
+	TxHash      string `gorm:"type:varchar(255)"`
+	TxIndex     uint
 	EventKey    string `gorm:"type:varchar(255)"`
 }
 
