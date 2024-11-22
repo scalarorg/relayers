@@ -40,7 +40,7 @@ RUN make MUSLC="${WASM}" WASM="${WASM}" IBC_WASM_HOOKS="${IBC_WASM_HOOKS}" build
 # Final stage
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates bash
+RUN apk add --no-cache ca-certificates bash jq
 
 WORKDIR /app
 
