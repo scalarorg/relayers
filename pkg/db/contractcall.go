@@ -17,6 +17,14 @@ func (db *DatabaseAdapter) UpdateContractCallApproved(messageID string, executeH
 	log.Info().Msgf("[DatabaseAdapter] [UpdateContractCallApproved]: RelayData[%s]", messageID)
 	return nil
 }
+func (db *DatabaseAdapter) FindContractCallByCommnadId(commandId string) (*models.CallContract, error) {
+	var contractCall models.CallContract
+	result := db.PostgresClient.Where("command_id = ?", commandId).First(&contractCall)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &contractCall, nil
+}
 
 // func (db *DatabaseAdapter) FindCosmosToEvmCallContractApproved(event *types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]) ([]types.FindCosmosToEvmCallContractApproved, error) {
 // 	var datas []models.RelayData

@@ -18,6 +18,7 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IAxelarGatewayC
 		From: c.evmConfig.GetId(),
 		To:   event.DestinationChain,
 		CallContract: &models.CallContract{
+			ID:            id,
 			TxHash:        event.Raw.TxHash.String(),
 			BlockNumber:   event.Raw.BlockNumber,
 			LogIndex:      event.Raw.Index,

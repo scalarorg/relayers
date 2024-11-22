@@ -159,6 +159,13 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IAxelarGatewayExecut
 	if err != nil {
 		return fmt.Errorf("failed to convert EVMExecutedEvent to RelayData: %w", err)
 	}
+	//Find the ContractCall by sourceTxHash and sourceEventIndex
+	// contractCall, err := ec.dbAdapter.FindContractCallByCommnadId(cmdExecuted.CommandId)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to find contract call by sourceTxHash and sourceEventIndex: %w", err)
+	// }
+	// cmdExecuted.CallContract = contractCall
+	// cmdExecuted.ReferenceTxHash = &contractCall.TxHash
 	err = ec.dbAdapter.CreateSingleValue(&cmdExecuted)
 	if err != nil {
 		return fmt.Errorf("failed to create evm executed: %w", err)

@@ -29,6 +29,7 @@ type RelayData struct {
 }
 
 type CommandExecuted struct {
+	gorm.Model
 	ID               string `gorm:"primaryKey;type:varchar(255)"`
 	SourceChain      string `gorm:"type:varchar(255)"`
 	DestinationChain string `gorm:"type:varchar(255)"`
@@ -36,11 +37,10 @@ type CommandExecuted struct {
 	BlockNumber      uint64
 	LogIndex         uint
 	CommandId        string
-	Status           int       `gorm:"default:0"`
-	ReferenceTxHash  *string   `gorm:"type:varchar(255)"`
-	Amount           *string   `gorm:"type:varchar(255)"`
-	CreatedAt        time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
-	UpdatedAt        time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+	Status           int     `gorm:"default:0"`
+	ReferenceTxHash  *string `gorm:"type:varchar(255)"`
+	Amount           *string `gorm:"type:varchar(255)"`
+	CallContract     *CallContract
 }
 
 type CallContract struct {
@@ -54,15 +54,20 @@ type CallContract struct {
 	Amount               uint64 `gorm:"type:bigint"`
 	Symbol               string `gorm:"type:varchar(255)"`
 	Payload              []byte
-	PayloadHash          string    `gorm:"type:varchar(255);uniqueIndex"`
-	SourceAddress        string    `gorm:"type:varchar(255)"`
-	StakerPublicKey      *string   `gorm:"type:varchar(255)"`
-	SenderAddress        *string   `gorm:"type:varchar(255)"`
-	CreatedAt            time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
-	UpdatedAt            time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+	PayloadHash          string  `gorm:"type:varchar(255);uniqueIndex"`
+	SourceAddress        string  `gorm:"type:varchar(255)"`
+	StakerPublicKey      *string `gorm:"type:varchar(255)"`
+	SenderAddress        *string `gorm:"type:varchar(255)"`
 	CallContractApproved *CallContractApproved
-	RelayDataID          string     `gorm:"type:varchar(255)"`
-	RelayData            *RelayData `gorm:"foreignKey:RelayDataID"`
+	CommandExecuted      *CommandExecuted `gorm:"foreignKey:ID;references:ID"`
+	RelayDataID          string           `gorm:"type:varchar(255)"`
+	RelayData            *RelayData       `gorm:"foreignKey:RelayDataID"`
+}
+
+type CallContractWithToken struct {
+	CallContract
+	TokenContractAddress string `gorm:"type:varchar(255)"`
+	Amount               uint64 `gorm:"type:bigint"`
 }
 
 // type Approved struct {
