@@ -40,7 +40,6 @@ type CommandExecuted struct {
 	Status           int     `gorm:"default:0"`
 	ReferenceTxHash  *string `gorm:"type:varchar(255)"`
 	Amount           *string `gorm:"type:varchar(255)"`
-	CallContract     *CallContract
 }
 
 type CallContract struct {
