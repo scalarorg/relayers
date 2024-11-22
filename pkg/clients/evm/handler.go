@@ -33,8 +33,11 @@ func (ec *EvmClient) handleContractCall(event *contracts.IAxelarGatewayContractC
 			Str("eventName", events.EVENT_EVM_CONTRACT_CALL).
 			Msg("[EvmClient] [handleContractCall] Get event from begining")
 	}
-	if event.Raw.BlockNumber > lastCheckpoint.BlockNumber {
+	if event.Raw.BlockNumber > lastCheckpoint.BlockNumber ||
+		(event.Raw.BlockNumber == lastCheckpoint.BlockNumber && event.Raw.TxIndex > lastCheckpoint.TxIndex) {
 		lastCheckpoint.BlockNumber = event.Raw.BlockNumber
+		lastCheckpoint.TxHash = event.Raw.TxHash.String()
+		lastCheckpoint.TxIndex = event.Raw.TxIndex
 		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.TxIndex)
 	}
 	//3. store relay data to the db, update last checkpoint

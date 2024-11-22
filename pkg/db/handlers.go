@@ -31,6 +31,8 @@ func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string) (
 		ChainName:   chainName,
 		EventName:   eventName,
 		BlockNumber: 0,
+		TxHash:      "",
+		TxIndex:     0,
 		EventKey:    "",
 	}
 	result := db.PostgresClient.Where("chain_name = ? AND event_name = ?", chainName, eventName).First(&lastBlock)
@@ -40,9 +42,11 @@ func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string) (
 func UpdateLastEventCheckPoint(db *gorm.DB, value *models.EventCheckPoint) error {
 	result := db.Clauses(
 		clause.OnConflict{
-			Columns: []clause.Column{{Name: "chain_name"}},
+			Columns: []clause.Column{{Name: "chain_name"}, {Name: "event_name"}},
 			DoUpdates: clause.Assignments(map[string]interface{}{
 				"block_number": value.BlockNumber,
+				"tx_hash":      value.TxHash,
+				"tx_index":     value.TxIndex,
 				"event_key":    value.EventKey,
 			}),
 		},
