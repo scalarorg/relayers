@@ -9,8 +9,8 @@ import (
 // Store last received events from external network
 type EventCheckPoint struct {
 	gorm.Model
-	ChainName   string `gorm:"unique;type:varchar(255)"`
-	EventName   string `gorm:"unique;type:varchar(255)"`
+	ChainName   string `gorm:"uniqueIndex:idx_chain_event;type:varchar(255)"`
+	EventName   string `gorm:"uniqueIndex:idx_chain_event;type:varchar(255)"`
 	BlockNumber uint64 `gorm:"type:bigint"`
 	TxHash      string `gorm:"type:varchar(255)"`
 	TxIndex     uint
