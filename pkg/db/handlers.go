@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func (db *DatabaseAdapter) CreateSingleValue(value interface{}) error {
+func (db *DatabaseAdapter) CreateSingleValue(value any) error {
 	result := db.PostgresClient.Create(value)
 	if result.Error != nil {
 		return result.Error
@@ -17,7 +17,7 @@ func (db *DatabaseAdapter) CreateSingleValue(value interface{}) error {
 	return nil
 }
 
-func (db *DatabaseAdapter) CreateBatchValue(values interface{}, batchSize int) error {
+func (db *DatabaseAdapter) CreateBatchValue(values any, batchSize int) error {
 	result := db.PostgresClient.CreateInBatches(values, batchSize)
 	if result.Error != nil {
 		return result.Error
@@ -25,18 +25,28 @@ func (db *DatabaseAdapter) CreateBatchValue(values interface{}, batchSize int) e
 	return nil
 }
 
-func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName string) (*models.EventCheckPoint, error) {
-	var lastBlock models.EventCheckPoint
-	result := db.PostgresClient.Where("chain_name = ?", chainName).First(&lastBlock)
+func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string) (*models.EventCheckPoint, error) {
+	//Default value
+	lastBlock := models.EventCheckPoint{
+		ChainName:   chainName,
+		EventName:   eventName,
+		BlockNumber: 0,
+		TxHash:      "",
+		TxIndex:     0,
+		EventKey:    "",
+	}
+	result := db.PostgresClient.Where("chain_name = ? AND event_name = ?", chainName, eventName).First(&lastBlock)
 	return &lastBlock, result.Error
 }
 
 func UpdateLastEventCheckPoint(db *gorm.DB, value *models.EventCheckPoint) error {
 	result := db.Clauses(
 		clause.OnConflict{
-			Columns: []clause.Column{{Name: "chain_name"}},
+			Columns: []clause.Column{{Name: "chain_name"}, {Name: "event_name"}},
 			DoUpdates: clause.Assignments(map[string]interface{}{
 				"block_number": value.BlockNumber,
+				"tx_hash":      value.TxHash,
+				"tx_index":     value.TxIndex,
 				"event_key":    value.EventKey,
 			}),
 		},

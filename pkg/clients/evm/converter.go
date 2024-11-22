@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
+	relaydata "github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
 )
 
@@ -63,12 +64,12 @@ func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IAxelarGatewayEx
 	cmdExecuted := models.CommandExecuted{
 		ID:               id,
 		SourceChain:      c.evmConfig.GetId(),
-		DestinationChain: c.evmConfig.GetId(),
+		DestinationChain: "", //TODO: need to get the destination chain from the db by the commandId
 		TxHash:           strings.ToLower(event.Raw.TxHash.String()),
 		BlockNumber:      uint64(event.Raw.BlockNumber),
 		LogIndex:         uint(event.Raw.Index),
 		CommandId:        hex.EncodeToString(event.CommandId[:]),
-		Status:           0,
+		Status:           int(relaydata.SUCCESS),
 		ReferenceTxHash:  nil,
 	}
 	return cmdExecuted, nil

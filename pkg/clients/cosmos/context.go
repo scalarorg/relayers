@@ -1,4 +1,4 @@
-package scalar
+package cosmos
 
 import (
 	"fmt"
@@ -7,14 +7,13 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/internal/codec"
-	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 )
 
 // var _ grpc.ClientConn = &client.Context{}
 
-func CreateClientContext(config *cosmos.CosmosNetworkConfig) (*client.Context, error) {
+func CreateClientContext(config *CosmosNetworkConfig) (*client.Context, error) {
 	clientCtx := client.Context{
-		ChainID: config.ChainID,
+		ChainID: config.ID,
 	}
 	if config.RPCUrl != "" {
 		log.Info().Msgf("Create rpcClient using RPC URL: %s", config.RPCUrl)

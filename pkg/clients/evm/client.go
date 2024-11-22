@@ -16,6 +16,7 @@ import (
 	"github.com/scalarorg/relayers/config"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
+	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
 )
 
@@ -65,7 +66,7 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 	if err != nil {
 		//Not fatal, we can still use the gateway without auth
 		//auth is only used for sending transaction
-		log.Warn().Msgf("failed to create auth for network %s: %v", evmConfig.Name, err)
+		log.Warn().Msgf("[EvmClient] [NewEvmClient] failed to create auth for network %s: %v", evmConfig.Name, err)
 	}
 	evmClient := &EvmClient{
 		globalConfig:   globalConfig,
@@ -74,6 +75,8 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		GatewayAddress: *gatewayAddress,
 		Gateway:        gateway,
 		auth:           auth,
+		dbAdapter:      dbAdapter,
+		eventBus:       eventBus,
 	}
 
 	return evmClient, nil
@@ -89,7 +92,6 @@ func createGateway(evmConfig *EvmNetworkConfig, client *ethclient.Client) (*cont
 	}
 	return gateway, &gatewayAddress, nil
 }
-
 func createEvmAuth(evmConfig *EvmNetworkConfig) (*bind.TransactOpts, error) {
 	if evmConfig.PrivateKey == "" {
 		return nil, fmt.Errorf("private key is not set for network %s", evmConfig.Name)
@@ -164,6 +166,38 @@ func preparePrivateKey(evmCfg *EvmNetworkConfig) error {
 	return nil
 }
 
+func (c *EvmClient) getLastCheckpoint() *models.EventCheckPoint {
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.evmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL)
+	if err != nil {
+		log.Warn().Str("chainId", c.evmConfig.GetId()).
+			Str("eventName", events.EVENT_EVM_CONTRACT_CALL).
+			Msg("[EvmClient] [getLastCheckpoint] using default value")
+	}
+	return lastCheckpoint
+}
+
+// Todo: [WIP] try to recover missing events from the last checkpoint block number to the current block number
+func watchForEvent(c *EvmClient, eventName string) error {
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.evmConfig.GetId(), eventName)
+	if err != nil {
+		log.Warn().Str("chainId", c.evmConfig.GetId()).
+			Str("eventName", eventName).
+			Msg("[EvmClient] [getLastCheckpoint] using default value")
+	}
+	//Get current block number
+	blockNumber, err := c.Client.BlockNumber(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get current block number: %w", err)
+	}
+	//This case should not happen
+	//It can only happen if the db is set to a future block by debugger
+	if lastCheckpoint.BlockNumber > uint64(blockNumber) {
+		return nil
+	}
+	//recover missing events from the last checkpoint block number to the current block number
+	//missingEvents := c.Client.GetEvents(lastCheckpoint.BlockNumber, uint64(blockNumber))
+	return nil
+}
 func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) error {
 	sink := make(chan *contracts.IAxelarGatewayContractCall)
 
@@ -181,7 +215,7 @@ func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) error {
 		}
 	}()
 	c.subContractCall = subContractCall
-	defer subContractCall.Unsubscribe()
+	//defer subContractCall.Unsubscribe()
 	return nil
 }
 
@@ -193,13 +227,13 @@ func (c *EvmClient) watchContractCallApproved(watchOpts *bind.WatchOpts) error {
 	}
 	go func() {
 		for event := range sink {
-			log.Info().Msgf("Contract call approved: %v", event)
-			c.handleContractCallApproved(event)
+			log.Info().Any("event", event).Msg("[EvmClient] [ContractCallApprovedHandler]")
+			c.HandleContractCallApproved(event)
 		}
 
 	}()
 	c.subContractCallApproved = subContractCallApproved
-	defer subContractCallApproved.Unsubscribe()
+	// defer subContractCallApproved.Unsubscribe()
 	return nil
 }
 
@@ -211,16 +245,30 @@ func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) error {
 	}
 	go func() {
 		for event := range sink {
-			log.Info().Msgf("EVM executed: %v", event)
-			c.handleCommandExecuted(event)
+			log.Info().Any("event", event).Msgf("EvmClient] [ExecutedHandler]")
+			c.HandleCommandExecuted(event)
 		}
 	}()
 	c.subExecuted = subExecuted
-	defer subExecuted.Unsubscribe()
+	// defer subExecuted.Unsubscribe()
 	return nil
 }
 
 func (c *EvmClient) Start(ctx context.Context) error {
+	//Subscribe to the event bus
+	if c.eventBus != nil {
+		log.Debug().Msgf("[EvmClient] [Start] subscribe to the event bus %s", c.evmConfig.GetId())
+		receiver := c.eventBus.Subscribe(c.evmConfig.GetId())
+		go func() {
+			for event := range receiver {
+				err := c.handleEventBusMessage(event)
+				if err != nil {
+					log.Error().Err(err).Msgf("[EvmClient] [EventBusHandler]")
+				}
+			}
+		}()
+	}
+
 	watchOpts := bind.WatchOpts{Start: &c.evmConfig.LastBlock, Context: ctx}
 	//Listen to the gateway ContractCallEvent
 	//This event is initiated by user
@@ -230,26 +278,21 @@ func (c *EvmClient) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to watch ContractCallEvent: %w", err)
 	}
-	//Listen to the gateway ContractCallApprovedEvent
+	// Listen to the gateway ContractCallApprovedEvent
+	// This event is emitted by the ScalarGateway contract when the executeData is broadcast to the Gateway by call method
+	// ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
+	// Received this event relayer find payload from the db and call the execute method on the protocol's smart contract
 	err = c.watchContractCallApproved(&watchOpts)
 	if err != nil {
 		return fmt.Errorf("failed to watch ContractCallApprovedEvent: %w", err)
 	}
-	//Listen to the gateway EVMExecutedEvent
+	// Listen to the gateway ExecutedEvent
+	// This event is emitted by the gateway contract when the executeData if broadcast to the Gateway by call method
+	// ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
+	// Receiverd this event, the relayer store the executed data to the db for scanner
 	err = c.watchEVMExecuted(&watchOpts)
 	if err != nil {
 		return fmt.Errorf("failed to watch EVMExecutedEvent: %w", err)
-	}
-	//Subscribe to the event bus
-	if c.eventBus != nil {
-		receiver := c.eventBus.Subscribe(c.evmConfig.GetId())
-		go func() {
-			for event := range receiver {
-				log.Info().Msgf("EVM contract call: %v", event)
-				c.handleEventBusMessage(event)
-
-			}
-		}()
 	}
 	return nil
 }

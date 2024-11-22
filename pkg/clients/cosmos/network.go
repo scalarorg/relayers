@@ -1,4 +1,4 @@
-package scalar
+package cosmos
 
 import (
 	"context"
@@ -18,28 +18,32 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
-func createDefaultTxFactory(config *cosmos.CosmosNetworkConfig, txConfig client.TxConfig) (tx.Factory, error) {
+func createDefaultTxFactory(config *CosmosNetworkConfig, txConfig client.TxConfig) (tx.Factory, error) {
 	factory := tx.Factory{}
 	factory = factory.WithTxConfig(txConfig)
-	if config.ChainID == "" {
+	if config.ID == "" {
 		return factory, fmt.Errorf("chain ID is required")
 	}
-	factory = factory.WithChainID(config.ChainID)
-	factory = factory.WithGas(200000) // Adjust as needed
+	factory = factory.WithChainID(config.ID)
+	//Todo: estimate gas each time broadcast tx
+	factory = factory.WithGas(0) // Adjust in estimateGas()
+	factory = factory.WithGasAdjustment(DEFAULT_GAS_ADJUSTMENT)
+	//factory = factory.WithGasPrices(config.GasPrice)
+	// factory = factory.WithFees(sdk.NewCoin("uaxl", sdk.NewInt(20000)).String())
+
 	//Direct Sign mode with single signer
 	factory = factory.WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
 	factory = factory.WithMemo("") // Optional memo
-	factory = factory.WithFees(sdk.NewCoin("uaxl", sdk.NewInt(20000)).String())
+
 	return factory, nil
 }
 
 type NetworkClient struct {
-	config         *cosmos.CosmosNetworkConfig
+	config         *CosmosNetworkConfig
 	rpcEndpoint    string
 	rpcClient      rpcclient.Client
 	queryClient    *QueryClient
@@ -50,7 +54,7 @@ type NetworkClient struct {
 	sequenceNumber uint64
 }
 
-func NewNetworkClient(config *cosmos.CosmosNetworkConfig, queryClient *QueryClient, txConfig client.TxConfig) (*NetworkClient, error) {
+func NewNetworkClient(config *CosmosNetworkConfig, queryClient *QueryClient, txConfig client.TxConfig) (*NetworkClient, error) {
 	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create account from mnemonic: %w", err)
@@ -133,7 +137,7 @@ func (c *NetworkClient) createTxFactory(ctx context.Context) tx.Factory {
 	if err != nil {
 		log.Error().Msgf("failed to get account: %+v", err)
 	} else {
-		log.Debug().Msgf("[ScalarClient] [NetworkClient] account: %v", resp)
+		log.Debug().Msgf("[ScalarClient] [NetworkClient] account number: %v, sequence number: %v", resp.AccountNumber, resp.Sequence)
 		txf = txf.WithAccountNumber(resp.AccountNumber)
 		//If sequence number is greater than current sequence number, update the sequence number
 		//This is to avoid the situation where the transaction is not included in the next block
@@ -146,17 +150,30 @@ func (c *NetworkClient) createTxFactory(ctx context.Context) tx.Factory {
 }
 func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 	//1. Build unsigned transaction using txFactory
-	txf := c.txFactory
+	txf := c.createTxFactory(ctx)
+	//Estimate fees
+	simRes, adjusted, err := tx.CalculateGas(c.queryClient.GetClientCtx(), txf, msgs...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate gas: %w", err)
+	}
+	fees := int64(txf.GasAdjustment() * float64(simRes.GasInfo.GasUsed) * c.config.GasPrice)
+	txf = txf.WithGas(adjusted)
+	txf = txf.WithFees(sdk.NewCoin(c.config.Denom, sdk.NewInt(fees)).String())
+	log.Debug().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] estimated gas: %v, gasPrice: %v, fees: %v", adjusted, c.config.GasPrice, txf.Fees())
 	// Every required params are set in the txFactory
 	txBuilder, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
 	}
+
 	txBuilder.SetFeeGranter(c.addr)
 	//Try to sign and broadcast the transaction until success or reach max retry
 	result, err := c.trySignAndBroadcastMsgs(ctx, txBuilder)
+	if err != nil {
+		return nil, err
+	}
 	if result != nil && result.Code == 0 {
-		log.Debug().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] success broadcast tx with tx hash: %s", result.TxHash)
+		//log.Debug().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] success broadcast tx with tx hash: %s", result.TxHash)
 		//Update sequence and account number
 		c.txFactory = c.txFactory.WithSequence(c.txFactory.Sequence() + 1)
 	} else {
@@ -164,6 +181,7 @@ func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Ms
 	}
 	return result, nil
 }
+
 func (c *NetworkClient) trySignAndBroadcastMsgs(ctx context.Context, txBuilder sdkclient.TxBuilder) (*sdk.TxResponse, error) {
 	var err error
 	var result *sdk.TxResponse
@@ -295,12 +313,15 @@ func (c *NetworkClient) BroadcastTx(ctx context.Context, txBytes []byte) (*sdk.T
 
 func (c *NetworkClient) BroadcastTxSync(ctx context.Context, txBytes []byte) (*sdk.TxResponse, error) {
 	rpcClient, err := c.GetRpcClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rpc client: %w", err)
+	}
 	res, err := rpcClient.BroadcastTxSync(context.Background(), txBytes)
 	if errRes := client.CheckTendermintError(err, txBytes); errRes != nil {
 		return errRes, nil
 	}
-
-	return sdk.NewResponseFormatBroadcastTx(res), err
+	txResponse := sdk.NewResponseFormatBroadcastTx(res)
+	return txResponse, err
 }
 func (c *NetworkClient) BroadcastTxAsync(ctx context.Context, txBytes []byte) (*sdk.TxResponse, error) {
 	rpcClient, err := c.GetRpcClient()
@@ -312,8 +333,8 @@ func (c *NetworkClient) BroadcastTxAsync(ctx context.Context, txBytes []byte) (*
 	if errRes := sdkclient.CheckTendermintError(err, txBytes); errRes != nil {
 		return errRes, nil
 	}
-
-	return sdk.NewResponseFormatBroadcastTx(res), err
+	txResponse := sdk.NewResponseFormatBroadcastTx(res)
+	return txResponse, err
 }
 func (c *NetworkClient) BroadcastTxCommit(ctx context.Context, txBytes []byte) (*sdk.TxResponse, error) {
 	node, err := c.GetRpcClient()
@@ -329,7 +350,8 @@ func (c *NetworkClient) BroadcastTxCommit(ctx context.Context, txBytes []byte) (
 	if errRes := client.CheckTendermintError(err, txBytes); errRes != nil {
 		return errRes, nil
 	}
-	return sdk.NewResponseFormatBroadcastTxCommit(res), err
+	txResponse := sdk.NewResponseFormatBroadcastTxCommit(res)
+	return txResponse, err
 }
 
 func (c *NetworkClient) Subscribe(ctx context.Context, subscriber string, query string) (<-chan ctypes.ResultEvent, error) {

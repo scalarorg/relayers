@@ -1,4 +1,4 @@
-package scalar
+package cosmos
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/tx"
 	auth "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/rs/zerolog/log"
 	//gogogrpc "github.com/cosmos/gogoproto/grpc"
@@ -18,22 +19,29 @@ import (
 )
 
 type QueryClient struct {
-	clientCtx          *client.Context
-	evmQueryClient     emvtypes.QueryServiceClient
-	msgQueryClient     axltypes.MsgServiceClient
-	accountQueryClient auth.QueryClient
+	clientCtx             *client.Context
+	EvmQueryServiceClient emvtypes.QueryServiceClient
+	MsgServiceClient      axltypes.MsgServiceClient
+	TxServiceClient       tx.ServiceClient
+	AccountQueryClient    auth.QueryClient
 }
 
 func NewQueryClient(clientCtx *client.Context) *QueryClient {
-	evmQueryClient := emvtypes.NewQueryServiceClient(clientCtx)
-	msgQueryClient := axltypes.NewMsgServiceClient(clientCtx)
+	evmQueryServiceClient := emvtypes.NewQueryServiceClient(clientCtx)
+	msgServiceClient := axltypes.NewMsgServiceClient(clientCtx)
 	accountQueryClient := auth.NewQueryClient(clientCtx)
+	txServiceClient := tx.NewServiceClient(clientCtx)
 	return &QueryClient{
-		clientCtx:          clientCtx,
-		evmQueryClient:     evmQueryClient,
-		msgQueryClient:     msgQueryClient,
-		accountQueryClient: accountQueryClient,
+		clientCtx:             clientCtx,
+		EvmQueryServiceClient: evmQueryServiceClient,
+		MsgServiceClient:      msgServiceClient,
+		TxServiceClient:       txServiceClient,
+		AccountQueryClient:    accountQueryClient,
 	}
+}
+
+func (c *QueryClient) GetClientCtx() *client.Context {
+	return c.clientCtx
 }
 
 func (c *QueryClient) QueryBatchedCommands(ctx context.Context, destinationChain string, batchedCommandId string) (*emvtypes.BatchedCommandsResponse, error) {
@@ -41,7 +49,7 @@ func (c *QueryClient) QueryBatchedCommands(ctx context.Context, destinationChain
 		Chain: destinationChain,
 		Id:    batchedCommandId,
 	}
-	resp, err := c.evmQueryClient.BatchedCommands(ctx, req)
+	resp, err := c.EvmQueryServiceClient.BatchedCommands(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query batched commands: %w", err)
 	}
@@ -52,7 +60,7 @@ func (c *QueryClient) QueryPendingCommand(ctx context.Context, destinationChain 
 	req := &emvtypes.PendingCommandsRequest{
 		Chain: destinationChain,
 	}
-	resp, err := c.evmQueryClient.PendingCommands(ctx, req)
+	resp, err := c.EvmQueryServiceClient.PendingCommands(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query pending commands: %w", err)
 	}
@@ -67,7 +75,7 @@ func (c *QueryClient) QueryRouteMessageRequest(ctx context.Context, sender sdk.A
 		Payload:    []byte(payload),
 		Feegranter: feegranter,
 	}
-	resp, err := c.msgQueryClient.RouteMessage(ctx, req)
+	resp, err := c.MsgServiceClient.RouteMessage(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query route message request: %w", err)
 	}
@@ -75,7 +83,7 @@ func (c *QueryClient) QueryRouteMessageRequest(ctx context.Context, sender sdk.A
 }
 func (c *QueryClient) QueryAccount(ctx context.Context, address sdk.AccAddress) (*auth.BaseAccount, error) {
 	req := &auth.QueryAccountRequest{Address: address.String()}
-	resp, err := c.accountQueryClient.Account(ctx, req)
+	resp, err := c.AccountQueryClient.Account(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query account: %w", err)
 	}
@@ -123,21 +131,17 @@ func (c *QueryClient) UnmarshalAccount(resp *auth.QueryAccountResponse, account 
 	return nil
 }
 
-// func (c *NetworkClient) QueryTx(ctx context.Context, hash []byte) (*ctypes.ResultTx, error) {
-// 	// Query by hash
-// 	res, err := c.rpcClient.Tx(ctx, hash, false)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &ctypes.ResultTx{
-// 		Hash:     hash,
-// 		Height:   res.Height,
-// 		Index:    res.Index,
-// 		TxResult: res.TxResult,
-// 		Tx:       res.Tx,
-// 	}, nil
-// }
+func (c *QueryClient) QueryTx(ctx context.Context, txHash string) (*sdk.TxResponse, error) {
+	// Query by hash
+	req := &tx.GetTxRequest{
+		Hash: txHash,
+	}
+	res, err := c.TxServiceClient.GetTx(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tx: %w", err)
+	}
+	return res.GetTxResponse(), nil
+}
 
 // func (c *NetworkClient) QueryBalance(ctx context.Context, addr sdk.AccAddress) (*sdk.Coins, error) {
 // 	// Create gRPC connection

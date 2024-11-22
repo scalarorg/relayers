@@ -8,6 +8,7 @@ const (
 	SCALAR_COMMAND_EXECUTED       = "Scalar.CommandExecuted"
 
 	ContractCallApprovedEventTopicId = "tm.event='NewBlock' AND axelar.evm.v1beta1.ContractCallApproved.event_id EXISTS"
+	SignCommandsEventTopicId         = "tm.event='NewBlock' AND sign.batchedCommandID EXISTS"
 	EVMCompletedEventTopicId         = "tm.event='NewBlock' AND axelar.evm.v1beta1.EVMEventCompleted.event_id EXISTS"
 	//For future use
 	ContractCallSubmittedEventTopicId = "tm.event='Tx' AND axelar.axelarnet.v1beta1.ContractCallSubmitted.message_id EXISTS"
@@ -15,11 +16,11 @@ const (
 	ExecuteMessageEventTopicId        = "tm.event='Tx' AND message.action='ExecuteMessage'"
 )
 
-type EventHandlerCallBack[T any] func(event *T, err error)
+type EventHandlerCallBack[T any] func(events []T)
 type ListenerEvent[T any] struct {
 	TopicId string
 	Type    string
-	Parser  func(events map[string][]string) (*T, error)
+	Parser  func(events map[string][]string) ([]T, error)
 }
 
 type IBCEvent[T any] struct {
@@ -35,11 +36,18 @@ type ContractCallSubmitted struct {
 	SourceChain      string `json:"sourceChain"`
 	DestinationChain string `json:"destinationChain"`
 	ContractAddress  string `json:"contractAddress"`
+	CommandID        string `json:"commandId"`
 	Payload          string `json:"payload"`
 	PayloadHash      string `json:"payloadHash"`
 }
 
 type ContractCallApproved = ContractCallSubmitted
+
+type SignCommands struct {
+	DestinationChain string `json:"destinationChain"`
+	TxHash           string `json:"txHash"`
+	MessageID        string `json:"messageId"`
+}
 
 type ContractCallWithTokenSubmitted struct {
 	MessageID        string `json:"messageId"`
@@ -78,15 +86,21 @@ var (
 		Type:    "axelar.evm.v1beta1.ContractCallApproved",
 		Parser:  ParseContractCallApprovedEvent,
 	}
+	SignCommandsEvent = ListenerEvent[IBCEvent[SignCommands]]{
+		TopicId: SignCommandsEventTopicId,
+		Type:    "sign",
+		Parser:  ParseSignCommandsEvent,
+	}
+
 	EVMCompletedEvent = ListenerEvent[IBCEvent[EVMEventCompleted]]{
 		TopicId: EVMCompletedEventTopicId,
 		Type:    "axelar.evm.v1beta1.EVMEventCompleted",
 		Parser:  ParseEvmEventCompletedEvent,
 	}
-	AllEvent = ListenerEvent[IBCEvent[any]]{
+	AllNewBlockEvent = ListenerEvent[IBCEvent[any]]{
 		TopicId: "tm.event='NewBlock'",
 		Type:    "All",
-		Parser:  ParseAllEvent,
+		Parser:  ParseAllNewBlockEvent,
 	}
 	//For future use
 	ContractCallSubmittedEvent = ListenerEvent[IBCEvent[ContractCallSubmitted]]{

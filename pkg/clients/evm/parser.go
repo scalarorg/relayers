@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	eth_types "github.com/ethereum/go-ethereum/core/types"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
-	"github.com/scalarorg/relayers/pkg/types"
 )
 
 type ValidEvmEvent interface {
@@ -19,15 +18,15 @@ type ValidEvmEvent interface {
 		*contracts.IAxelarGatewayExecuted
 }
 
-func getScalarGwExecuteAbi() (*abi.ABI, error) {
-	if scalarGwExecuteAbi == nil {
+func getScalarGatewayAbi() (*abi.ABI, error) {
+	if scalarGatewayAbi == nil {
 		var err error
-		scalarGwExecuteAbi, err = contracts.IAxelarExecutableMetaData.GetAbi()
+		scalarGatewayAbi, err = contracts.IAxelarGatewayMetaData.GetAbi()
 		if err != nil {
 			return nil, err
 		}
 	}
-	return scalarGwExecuteAbi, nil
+	return scalarGatewayAbi, nil
 }
 
 // Todo: Check if this is the correct way to extract the destination chain
@@ -97,7 +96,7 @@ func parseLogIntoEventArgs(log eth_types.Log) (any, error) {
 // 	}
 // }
 
-func parseEventArgsIntoEvent[T ValidEvmEvent](eventArgs T, currentChainName string, log eth_types.Log) (*types.EvmEvent[T], error) {
+func parseEventArgsIntoEvent[T ValidEvmEvent](eventArgs T, currentChainName string, log eth_types.Log) (*EvmEvent[T], error) {
 	// Get the value of eventArgs using reflection
 	v := reflect.ValueOf(eventArgs).Elem()
 	sourceChain := currentChainName
@@ -109,7 +108,7 @@ func parseEventArgsIntoEvent[T ValidEvmEvent](eventArgs T, currentChainName stri
 		destinationChain = f.String()
 	}
 
-	return &types.EvmEvent[T]{
+	return &EvmEvent[T]{
 		Hash:             log.TxHash.Hex(),
 		BlockNumber:      log.BlockNumber,
 		LogIndex:         log.Index,
@@ -123,7 +122,7 @@ func parseEventArgsIntoEvent[T ValidEvmEvent](eventArgs T, currentChainName stri
 func parseEvmEventContractCallApproved[T *contracts.IAxelarGatewayContractCallApproved](
 	currentChainName string,
 	log eth_types.Log,
-) (*types.EvmEvent[T], error) {
+) (*EvmEvent[T], error) {
 	eventArgs, err := parseContractCallApproved(log)
 	if err != nil {
 		return nil, err
@@ -150,7 +149,7 @@ func parseContractCallApproved(
 		SourceEventIndex *big.Int
 	}{}
 
-	abi, err := getScalarGwExecuteAbi()
+	abi, err := getScalarGatewayAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
@@ -186,7 +185,7 @@ func parseContractCallApproved(
 func parseEvmEventContractCall[T *contracts.IAxelarGatewayContractCall](
 	currentChainName string,
 	log eth_types.Log,
-) (*types.EvmEvent[T], error) {
+) (*EvmEvent[T], error) {
 	eventArgs, err := parseContractCall(log)
 	if err != nil {
 		return nil, err
@@ -211,7 +210,7 @@ func parseContractCall(
 		Payload                    []byte
 	}{}
 
-	abi, err := getScalarGwExecuteAbi()
+	abi, err := getScalarGatewayAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
@@ -245,7 +244,7 @@ func parseContractCall(
 func parseEvmEventExecute[T *contracts.IAxelarGatewayExecuted](
 	currentChainName string,
 	log eth_types.Log,
-) (*types.EvmEvent[T], error) {
+) (*EvmEvent[T], error) {
 	eventArgs, err := parseExecute(log)
 	if err != nil {
 		return nil, err
@@ -265,7 +264,7 @@ func parseExecute(
 	event := struct {
 		CommandId [32]byte
 	}{}
-	abi, err := getScalarGwExecuteAbi()
+	abi, err := getScalarGatewayAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}

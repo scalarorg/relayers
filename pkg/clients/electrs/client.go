@@ -49,10 +49,10 @@ func NewElectrumClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapt
 }
 func NewElectrumClient(globalConfig *config.Config, config *Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*Client, error) {
 	if config.Host == "" {
-		return nil, fmt.Errorf("Electrum rpc host is required")
+		return nil, fmt.Errorf("electrum rpc host is required")
 	}
 	if config.Port == 0 {
-		return nil, fmt.Errorf("Electrum rpc port is required")
+		return nil, fmt.Errorf("electrum rpc port is required")
 	}
 	if dbAdapter == nil {
 		return nil, fmt.Errorf("dbAdapter is required")
@@ -83,6 +83,7 @@ func (c *Client) Start(ctx context.Context) error {
 	params := []interface{}{}
 	//Set batch size from config or default value
 	params = append(params, c.electrumConfig.BatchSize)
+
 	lastCheckpoint := c.getLastCheckpoint()
 	log.Debug().Msgf("[ElectrumClient] [Start] Last checkpoint: %v", lastCheckpoint)
 	if lastCheckpoint.EventKey != "" {
@@ -113,12 +114,21 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to convert vault transaction to relay data")
 		return fmt.Errorf("failed to convert vault transaction to relay data: %w", err)
+	} else {
+		payloadHashes := make([]string, len(relayDatas))
+		for i, relayData := range relayDatas {
+			payloadHashes[i] = relayData.CallContract.PayloadHash
+		}
+		log.Debug().Msgf("Successfully stored %d vault transactions to relay data, payload hashes: %v", len(relayDatas), payloadHashes)
 	}
 	//2. update last checkpoint
 	lastCheckpoint := c.getLastCheckpoint()
 	for _, tx := range vaultTxs {
-		if int64(tx.Height) > lastCheckpoint.BlockNumber {
-			lastCheckpoint.BlockNumber = int64(tx.Height)
+		if uint64(tx.Height) > lastCheckpoint.BlockNumber ||
+			(uint64(tx.Height) == lastCheckpoint.BlockNumber && uint(tx.TxPosition) > lastCheckpoint.TxIndex) {
+			lastCheckpoint.BlockNumber = uint64(tx.Height)
+			lastCheckpoint.TxHash = tx.TxHash
+			lastCheckpoint.TxIndex = uint(tx.TxPosition)
 			lastCheckpoint.EventKey = tx.Key
 		}
 	}
@@ -129,11 +139,17 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 		return fmt.Errorf("failed to store relay data to the db: %w", err)
 	}
 	//4. Send to the event bus with destination chain is scalar for confirmation
-	grouped := c.GroupVaultTxsByDestinationChain(relayDatas)
+	confirmTxs := events.ConfirmTxsRequest{
+		ChainName: c.electrumConfig.SourceChain,
+		TxHashs:   make([]string, len(relayDatas)),
+	}
+	for i, item := range relayDatas {
+		confirmTxs.TxHashs[i] = item.CallContract.TxHash
+	}
 	c.eventBus.BroadcastEvent(&events.EventEnvelope{
 		EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
 		DestinationChain: scalar.SCALAR_NETWORK_NAME,
-		Data:             grouped,
+		Data:             confirmTxs,
 	})
 	return nil
 }
@@ -141,14 +157,11 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 // Get lastcheck point from db, return default value if not found
 func (c *Client) getLastCheckpoint() *models.EventCheckPoint {
 	sourceChain := c.electrumConfig.SourceChain
-	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(sourceChain)
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(sourceChain, events.EVENT_ELECTRS_VAULT_TRANSACTION)
 	if err != nil {
-		log.Warn().Msgf("[ElectrumClient] getLastCheckpoint for chain %s with error `%v`, using default value", sourceChain, err)
-		lastCheckpoint = &models.EventCheckPoint{
-			ChainName:   sourceChain,
-			BlockNumber: 0,
-			EventKey:    "",
-		}
+		log.Warn().Str("chainId", sourceChain).
+			Str("eventName", events.EVENT_ELECTRS_VAULT_TRANSACTION).
+			Msg("[ElectrumClient] [getLastCheckpoint] using default value")
 	}
 	return lastCheckpoint
 }
@@ -160,13 +173,4 @@ func (c *Client) PreProcessMessages(vaultTxs []types.VaultTransaction) error {
 		log.Debug().Msgf("Received vaultTx with key=>%v; stakerAddress=>%v; stakerPubkey=>%v", vaultTx.Key, vaultTx.StakerAddress, vaultTx.StakerPubkey)
 	}
 	return nil
-}
-
-// GroupVaultTxsByDestinationChain groups vault transactions by their destination chain
-func (c *Client) GroupVaultTxsByDestinationChain(relayDatas []models.RelayData) map[string][]string {
-	grouped := make(map[string][]string)
-	for _, item := range relayDatas {
-		grouped[item.To] = append(grouped[item.To], item.CallContract.TxHash)
-	}
-	return grouped
 }

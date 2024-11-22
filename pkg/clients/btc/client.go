@@ -48,6 +48,10 @@ func NewBtcClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 				btcConfig.PrivateKey = config.GlobalConfig.BtcPrivateKey
 			}
 		}
+		// Set max fee rate to 0.10 if not set
+		if btcConfig.MaxFeeRate == 0 {
+			btcConfig.MaxFeeRate = 0.10
+		}
 		client, err := newBtcClientFromConfig(globalConfig, &btcConfig, dbAdapter, eventBus)
 		if err != nil {
 			log.Warn().Msgf("Failed to create btc client for %s: %v", btcConfig.Name, err)
@@ -89,7 +93,10 @@ func (c *BtcClient) Start(ctx context.Context) error {
 	receiver := c.eventBus.Subscribe(c.btcConfig.GetId())
 	go func() {
 		for event := range receiver {
-			c.handleEventBusMessage(event)
+			err := c.handleEventBusMessage(event)
+			if err != nil {
+				log.Error().Msgf("failed to handle event bus message: %v", err)
+			}
 		}
 	}()
 	return nil
@@ -131,8 +138,8 @@ func (c *BtcClient) BroadcastTx(tx *wire.MsgTx, maxFeeRate *float64) (*chainhash
 		return c.client.SendRawTransaction(tx, true)
 	}
 }
-func (c *BtcClient) BroadcastRawTx(signedPsbtHex string, maxFeeRate *float64) (*chainhash.Hash, error) {
-	cmd := c.creatSendRawTransactionCmd(signedPsbtHex, maxFeeRate)
+func (c *BtcClient) BroadcastRawTx(signedPsbtHex string) (*chainhash.Hash, error) {
+	cmd := c.creatSendRawTransactionCmd(signedPsbtHex, &c.btcConfig.MaxFeeRate)
 	res := c.client.SendCmd(cmd)
 	// Cast the response to FutureTestMempoolAcceptResult and call Receive
 	future := rpcclient.FutureSendRawTransactionResult(res)
