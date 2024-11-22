@@ -45,6 +45,7 @@ type CommandExecuted struct {
 
 type CallContract struct {
 	gorm.Model
+	ID                   string `gorm:"primaryKey"`
 	TxHash               string `gorm:"type:varchar(255)"`
 	TxHex                []byte
 	BlockNumber          uint64 `gorm:"default:0"`
