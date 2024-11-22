@@ -51,9 +51,10 @@ func (c *Client) handleBtcSignatureRequested(messageID string, signatureRequest 
 		return fmt.Errorf("failed to serialize final tx: %w", err)
 	}
 	c.eventBus.BroadcastEvent(&events.EventEnvelope{
-		EventType: events.EVENT_CUSTODIAL_SIGNATURES_CONFIRMED,
-		Data:      hex.EncodeToString(buf.Bytes()),
-		MessageID: messageID,
+		EventType:        events.EVENT_CUSTODIAL_SIGNATURES_CONFIRMED,
+		DestinationChain: c.networkConfig.SignerNetwork,
+		Data:             hex.EncodeToString(buf.Bytes()),
+		MessageID:        messageID,
 	})
 	return nil
 }
