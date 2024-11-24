@@ -25,11 +25,11 @@ func (c *PendingTxs) GetTxs(timeout time.Duration) ([]PendingTx, bool) {
 }
 
 // Remove processed pending tx, return true if removed, false if not found
-func (c *PendingTxs) RemoveTx(tx PendingTx) bool {
+func (c *PendingTxs) RemoveTx(txHash string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for i, item := range c.items {
-		if item.TxHash == tx.TxHash {
+		if item.TxHash == txHash {
 			c.items = append(c.items[:i], c.items[i+1:]...)
 			return true
 		}

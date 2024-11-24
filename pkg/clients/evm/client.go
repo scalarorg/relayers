@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -16,6 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
+	"github.com/scalarorg/relayers/pkg/clients/evm/parser"
 	"github.com/scalarorg/relayers/pkg/clients/evm/pending"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
@@ -174,18 +176,8 @@ func preparePrivateKey(evmCfg *EvmNetworkConfig) error {
 	return nil
 }
 
-func (c *EvmClient) getLastCheckpoint() *models.EventCheckPoint {
-	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.evmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL)
-	if err != nil {
-		log.Warn().Str("chainId", c.evmConfig.GetId()).
-			Str("eventName", events.EVENT_EVM_CONTRACT_CALL).
-			Msg("[EvmClient] [getLastCheckpoint] using default value")
-	}
-	return lastCheckpoint
-}
-
 // Todo: [WIP] try to recover missing events from the last checkpoint block number to the current block number
-func watchForEvent(c *EvmClient, eventName string) error {
+func RecoverThenWatchForEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context, eventName string) error {
 	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.evmConfig.GetId(), eventName)
 	if err != nil {
 		log.Warn().Str("chainId", c.evmConfig.GetId()).
@@ -202,8 +194,89 @@ func watchForEvent(c *EvmClient, eventName string) error {
 	if lastCheckpoint.BlockNumber > uint64(blockNumber) {
 		return nil
 	}
+
 	//recover missing events from the last checkpoint block number to the current block number
-	//missingEvents := c.Client.GetEvents(lastCheckpoint.BlockNumber, uint64(blockNumber))
+	for {
+		missingEvents, err := GetMissingEvents[T](c, eventName, lastCheckpoint)
+		if err != nil {
+			return fmt.Errorf("failed to get missing events: %w", err)
+		}
+		if len(missingEvents) > 0 {
+			log.Info().Any("missingEvents", missingEvents).Msg("[EvmClient] [watchForEvent]")
+			//Process the missing events
+			for _, event := range missingEvents {
+				log.Info().Any("event", event).Msg("[EvmClient] [watchForEvent] processing missing event")
+				c.handleEvent(&event)
+			}
+			//Then watch for new events
+			log.Info().Msg("[EvmClient] [watchForEvent] processed missing events")
+		} else {
+			//Watch for new events
+			log.Info().Msg("[EvmClient] [watchForEvent] no missing events")
+			break
+		}
+	}
+	watchOpts := bind.WatchOpts{Start: &lastCheckpoint.BlockNumber, Context: ctx}
+	//Watch for new event
+	err = watchForEvent(c, eventName, &watchOpts)
+	if err != nil {
+		return fmt.Errorf("failed to watch for event: %w", err)
+	}
+	return nil
+}
+func GetMissingEvents[T ValidEvmEvent](c *EvmClient, eventName string, lastCheckpoint *models.EventCheckPoint) ([]T, error) {
+	event, ok := scalarGatewayAbi.Events[eventName]
+	if !ok {
+		return nil, fmt.Errorf("event %s not found", eventName)
+	}
+
+	// Set up a query for logs
+	query := ethereum.FilterQuery{
+		FromBlock: big.NewInt(int64(c.evmConfig.LastBlock)),
+		Addresses: []common.Address{c.GatewayAddress},
+		Topics:    [][]common.Hash{{event.ID}}, // Filter by event signature
+	}
+	//log.Info().Any("query", query).Msg("[EvmClient] [getEvents]")
+	// // Fetch the logs
+	logs, err := c.Client.FilterLogs(context.Background(), query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch logs: %w", err)
+	}
+	result := []T{}
+	// Parse the logs
+	for _, receiptLog := range logs {
+		var eventData T
+		err := parser.ParseEventData(&receiptLog, eventName, &eventData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unpack log data: %w", err)
+		}
+		result = append(result, eventData)
+	}
+
+	// return events, nil
+	return result, nil
+}
+func (c *EvmClient) handleEvent(event any) error {
+	switch e := event.(type) {
+	case *contracts.IAxelarGatewayContractCall:
+		return c.handleContractCall(e)
+	case *contracts.IAxelarGatewayContractCallApproved:
+		return c.HandleContractCallApproved(e)
+	case *contracts.IAxelarGatewayExecuted:
+		return c.HandleCommandExecuted(e)
+	}
+	return nil
+}
+func watchForEvent(c *EvmClient, eventName string, watchOpts *bind.WatchOpts) error {
+	log.Info().Str("eventName", eventName).Msg("[EvmClient] [watchForEvent] started watching for new events")
+	switch eventName {
+	case EVENT_CONTRACT_CALL:
+		return c.watchContractCall(watchOpts)
+	case EVENT_CONTRACT_CALL_APPROVED:
+		return c.watchContractCallApproved(watchOpts)
+	case EVENT_EVM_EXECUTED:
+		return c.watchEVMExecuted(watchOpts)
+	}
 	return nil
 }
 func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) error {
@@ -279,13 +352,18 @@ func (c *EvmClient) Start(ctx context.Context) error {
 			}
 		}()
 	}
+	var err error
+	// err := RecoverThenWatchForEvent[*contracts.IAxelarGatewayContractCall](c, ctx, EVENT_CONTRACT_CALL)
+	// if err != nil {
+	// 	log.Error().Err(err).Str("eventName", EVENT_CONTRACT_CALL).Msg("failed to watch event")
+	// }
 
 	watchOpts := bind.WatchOpts{Start: &c.evmConfig.LastBlock, Context: ctx}
 	//Listen to the gateway ContractCallEvent
 	//This event is initiated by user
 	//1. User call protocol's smart contract on the evm
 	//2. Protocol sm call Scalar gateway contract for emitting ContractCallEvent
-	err := c.watchContractCall(&watchOpts)
+	err = c.watchContractCall(&watchOpts)
 	if err != nil {
 		return fmt.Errorf("failed to watch ContractCallEvent: %w", err)
 	}

@@ -7,7 +7,12 @@ import (
 	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
 )
 
-const COMPONENT_NAME = "EvmClient"
+const (
+	COMPONENT_NAME               = "EvmClient"
+	EVENT_CONTRACT_CALL          = "ContractCall"
+	EVENT_CONTRACT_CALL_APPROVED = "ContractCallApproved"
+	EVENT_EVM_EXECUTED           = "Executed"
+)
 
 type Byte32 [32]uint8
 type Bytes []byte
