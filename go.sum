@@ -1445,8 +1445,8 @@ github.com/sagikazarmark/slog-shim v0.1.0 h1:diDBnUNK9N/354PgrxMywXnAwEr1QZcOr6g
 github.com/sagikazarmark/slog-shim v0.1.0/go.mod h1:SrcSrq8aKtyuqEI1uvTDTK1arOWRIczQRv+GVI1AkeQ=
 github.com/sasha-s/go-deadlock v0.3.1 h1:sqv7fDNShgjcaxkO0JNcOAlr8B9+cV5Ey/OB71efZx0=
 github.com/sasha-s/go-deadlock v0.3.1/go.mod h1:F73l+cr82YSh10GxyRI6qZiCgK64VaZjwesgfQ1/iLM=
-github.com/scalarorg/bitcoin-vault/ffi/go-psbt v0.0.0-20241112132150-34cb94893469 h1:Ub59PztGyZP7oLwVBvK+d5/KXHaZXamSRNDUqPPUQHg=
-github.com/scalarorg/bitcoin-vault/ffi/go-psbt v0.0.0-20241112132150-34cb94893469/go.mod h1:KNnz76g/34hOZmqLMPSKztpjVCS+ggDViUu3p2mzsX8=
+github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20241124105032-c353ec3519be h1:eAsnKnt2jo72NI3qzS8wcDZHkftMjzNBTxfZ4J3lFCw=
+github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20241124105032-c353ec3519be/go.mod h1:Gi0l7q1oxP+d0JYCoJTqm4UZM52gA33jNqe7Ghmyzok=
 github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241120084008-99b82de50a7b h1:deSUSdG+Lszrc9Stff/gZIUcbvt6T0bNd3rVckWw+bw=
 github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241120084008-99b82de50a7b/go.mod h1:bziiL5A4RuXO1Y6QgIp1pFjO1XAg8XuOH01rA4hnn0s=
 github.com/scalarorg/go-electrum v0.1.1 h1:ANqnV6xQKI/Bw1pNZlbgyjdsN54vJcDee2/wPxTstRY=
