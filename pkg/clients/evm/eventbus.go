@@ -3,6 +3,7 @@ package evm
 import (
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	relaydata "github.com/scalarorg/relayers/pkg/db"
@@ -69,8 +70,10 @@ func (ec *EvmClient) handleScalarContractCallApproved(messageID string, executeD
 	// 	return fmt.Errorf("failed to send raw transaction: %w", err)
 	// }
 	log.Info().Any("signedTx", signedTx).Msg("[EvmClient] [handleScalarContractCallApproved]")
-	//2. Update status of the event
 	txHash := signedTx.Hash().String()
+	//2. Add the transaction waiting to be mined
+	ec.pendingTxs.AddTx(txHash, time.Now())
+	//3. Update status of the event
 	err = ec.dbAdapter.UpdateRelayDataStatueWithExecuteHash(messageID, relaydata.SUCCESS, &txHash)
 	if err != nil {
 		log.Error().Err(err).Str("txHash", txHash).Msg("[EvmClient] [handleScalarContractCallApproved]")

@@ -134,6 +134,15 @@ func (ec *EvmClient) executeDestinationCall(event *contracts.IAxelarGatewayContr
 
 // Check if ContractCall is already executed
 func (ec *EvmClient) isContractCallExecuted(event *contracts.IAxelarGatewayContractCallApproved) (bool, error) {
+	if ec.auth == nil {
+		log.Error().
+			Str("commandId", hex.EncodeToString(event.CommandId[:])).
+			Str("sourceChain", event.SourceChain).
+			Str("sourceAddress", event.SourceAddress).
+			Str("contractAddress", event.ContractAddress.String()).
+			Msg("[EvmClient] [isContractCallExecuted] auth is nil")
+		return false, fmt.Errorf("auth is nil")
+	}
 	callOpt := &bind.CallOpts{
 		From:    ec.auth.From,
 		Context: context.Background(),

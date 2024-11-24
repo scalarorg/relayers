@@ -1,0 +1,23 @@
+package parser
+
+import (
+	"github.com/ethereum/go-ethereum/core/types"
+	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
+)
+
+type EvmEvent[T any] struct {
+	Hash             string
+	BlockNumber      uint64
+	LogIndex         uint
+	WaitForFinality  func() (*types.Receipt, error)
+	SourceChain      string
+	DestinationChain string
+	EventName        string
+	Args             T
+}
+
+type AllEvmEvents struct {
+	ContractCallApproved *EvmEvent[*contracts.IAxelarGatewayContractCallApproved]
+	ContractCall         *EvmEvent[*contracts.IAxelarGatewayContractCall]
+	Executed             *EvmEvent[*contracts.IAxelarGatewayExecuted]
+}

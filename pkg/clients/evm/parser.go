@@ -10,7 +10,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	eth_types "github.com/ethereum/go-ethereum/core/types"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
+	"github.com/scalarorg/relayers/pkg/clients/evm/parser"
 )
+
+var scalarGatewayAbi *abi.ABI
+
+func init() {
+	scalarGatewayAbi, _ = contracts.IAxelarGatewayMetaData.GetAbi()
+}
 
 type ValidEvmEvent interface {
 	*contracts.IAxelarGatewayContractCallApproved |
@@ -96,7 +103,7 @@ func parseLogIntoEventArgs(log eth_types.Log) (any, error) {
 // 	}
 // }
 
-func parseEventArgsIntoEvent[T ValidEvmEvent](eventArgs T, currentChainName string, log eth_types.Log) (*EvmEvent[T], error) {
+func parseEventArgsIntoEvent[T ValidEvmEvent](eventArgs T, currentChainName string, log eth_types.Log) (*parser.EvmEvent[T], error) {
 	// Get the value of eventArgs using reflection
 	v := reflect.ValueOf(eventArgs).Elem()
 	sourceChain := currentChainName
@@ -108,7 +115,7 @@ func parseEventArgsIntoEvent[T ValidEvmEvent](eventArgs T, currentChainName stri
 		destinationChain = f.String()
 	}
 
-	return &EvmEvent[T]{
+	return &parser.EvmEvent[T]{
 		Hash:             log.TxHash.Hex(),
 		BlockNumber:      log.BlockNumber,
 		LogIndex:         log.Index,
@@ -122,7 +129,7 @@ func parseEventArgsIntoEvent[T ValidEvmEvent](eventArgs T, currentChainName stri
 func parseEvmEventContractCallApproved[T *contracts.IAxelarGatewayContractCallApproved](
 	currentChainName string,
 	log eth_types.Log,
-) (*EvmEvent[T], error) {
+) (*parser.EvmEvent[T], error) {
 	eventArgs, err := parseContractCallApproved(log)
 	if err != nil {
 		return nil, err
@@ -185,7 +192,7 @@ func parseContractCallApproved(
 func parseEvmEventContractCall[T *contracts.IAxelarGatewayContractCall](
 	currentChainName string,
 	log eth_types.Log,
-) (*EvmEvent[T], error) {
+) (*parser.EvmEvent[T], error) {
 	eventArgs, err := parseContractCall(log)
 	if err != nil {
 		return nil, err
@@ -244,7 +251,7 @@ func parseContractCall(
 func parseEvmEventExecute[T *contracts.IAxelarGatewayExecuted](
 	currentChainName string,
 	log eth_types.Log,
-) (*EvmEvent[T], error) {
+) (*parser.EvmEvent[T], error) {
 	eventArgs, err := parseExecute(log)
 	if err != nil {
 		return nil, err

@@ -3,31 +3,28 @@ package evm
 import (
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
 )
 
 const COMPONENT_NAME = "EvmClient"
 
-var scalarGatewayAbi *abi.ABI
-
 type Byte32 [32]uint8
 type Bytes []byte
 type EvmNetworkConfig struct {
-	ChainID    uint64 `mapstructure:"chain_id"`
-	ID         string `mapstructure:"id"`
-	Name       string `mapstructure:"name"`
-	RPCUrl     string `mapstructure:"rpc_url"`
-	Gateway    string `mapstructure:"gateway"`
-	Finality   int    `mapstructure:"finality"`
-	LastBlock  uint64 `mapstructure:"last_block"`
-	PrivateKey string `mapstructure:"private_key"`
-	GasLimit   uint64 `mapstructure:"gas_limit"`
+	ChainID    uint64        `mapstructure:"chain_id"`
+	ID         string        `mapstructure:"id"`
+	Name       string        `mapstructure:"name"`
+	RPCUrl     string        `mapstructure:"rpc_url"`
+	Gateway    string        `mapstructure:"gateway"`
+	Finality   int           `mapstructure:"finality"`
+	LastBlock  uint64        `mapstructure:"last_block"`
+	PrivateKey string        `mapstructure:"private_key"`
+	GasLimit   uint64        `mapstructure:"gas_limit"`
+	BlockTime  time.Duration `mapstructure:"blockTime"` //Timeout for pending txs (12s on the ethereum network)
 	MaxRetry   int
 	RetryDelay time.Duration
-	TxTimeout  time.Duration
+	TxTimeout  time.Duration `mapstructure:"tx_timeout"` //Timeout for send txs (~3s)
 }
 
 func (c *EvmNetworkConfig) GetChainId() uint64 {
@@ -56,14 +53,4 @@ type DecodedExecuteData struct {
 	Signatures []string
 	//Input
 	Input []byte
-}
-
-type EvmEvent[T any] struct {
-	Hash             string
-	BlockNumber      uint64
-	LogIndex         uint
-	SourceChain      string
-	DestinationChain string
-	WaitForFinality  func() (*types.Receipt, error)
-	Args             T
 }

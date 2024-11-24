@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -32,10 +33,10 @@ var (
 		Gateway:    "0xc9c5EC5975070a5CF225656e36C53e77eEa318b5",
 		PrivateKey: "",
 		Finality:   1,
+		BlockTime:  time.Second * 12,
 		LastBlock:  7121800,
 	}
-	gatewayAddress = "0x2bb588d7bb6faAA93f656C3C78fFc1bEAfd1813D"
-	evmClient      *evm.EvmClient
+	evmClient *evm.EvmClient
 )
 
 func TestMain(m *testing.M) {
@@ -151,7 +152,7 @@ func TestEvmSubscribe(t *testing.T) {
 
 	// Create the filter query
 	query := ethereum.FilterQuery{
-		Addresses: []common.Address{common.HexToAddress(gatewayAddress)},
+		Addresses: []common.Address{common.HexToAddress(evmConfig.Gateway)},
 		Topics: [][]common.Hash{{
 			crypto.Keccak256Hash(contractCallSig),
 		}},

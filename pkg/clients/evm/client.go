@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -15,6 +16,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
+	"github.com/scalarorg/relayers/pkg/clients/evm/pending"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
@@ -30,6 +32,7 @@ type EvmClient struct {
 	auth                    *bind.TransactOpts
 	dbAdapter               *db.DatabaseAdapter
 	eventBus                *events.EventBus
+	pendingTxs              pending.PendingTxs //Transactions sent to Gateway for approval, waiting for event from EVM chain.
 	subContractCall         event.Subscription
 	subContractCallApproved event.Subscription
 	subExecuted             event.Subscription
@@ -47,6 +50,36 @@ func adjustRpcUrl(rpcUrl string) string {
 	return rpcUrl
 }
 
+func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) ([]*EvmClient, error) {
+	if globalConfig == nil || globalConfig.ConfigPath == "" {
+		return nil, fmt.Errorf("config path is not set")
+	}
+	evmCfgPath := fmt.Sprintf("%s/evm.json", globalConfig.ConfigPath)
+	configs, err := config.ReadJsonArrayConfig[EvmNetworkConfig](evmCfgPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read electrum configs: %w", err)
+	}
+
+	evmClients := make([]*EvmClient, 0, len(configs))
+	for _, evmConfig := range configs {
+		//Inject evm private keys
+		preparePrivateKey(&evmConfig)
+		//Set default value for block time if is not set
+		if evmConfig.BlockTime == 0 {
+			evmConfig.BlockTime = 12 * time.Second
+		}
+		client, err := NewEvmClient(globalConfig, &evmConfig, dbAdapter, eventBus)
+		if err != nil {
+			log.Warn().Msgf("Failed to create evm client for %s: %v", evmConfig.GetName(), err)
+			continue
+		}
+		globalConfig.AddChainConfig(config.IChainConfig(&evmConfig))
+		evmClients = append(evmClients, client)
+	}
+
+	return evmClients, nil
+}
+
 func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*EvmClient, error) {
 	// Setup
 	ctx := context.Background()
@@ -58,7 +91,7 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		return nil, fmt.Errorf("failed to connect to EVM network %s: %w", evmConfig.Name, err)
 	}
 	client := ethclient.NewClient(rpc)
-	gateway, gatewayAddress, err := createGateway(evmConfig, client)
+	gateway, gatewayAddress, err := CreateGateway(evmConfig, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gateway for network %s: %w", evmConfig.Name, err)
 	}
@@ -77,11 +110,12 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		auth:           auth,
 		dbAdapter:      dbAdapter,
 		eventBus:       eventBus,
+		pendingTxs:     pending.PendingTxs{},
 	}
 
 	return evmClient, nil
 }
-func createGateway(evmConfig *EvmNetworkConfig, client *ethclient.Client) (*contracts.IAxelarGateway, *common.Address, error) {
+func CreateGateway(evmConfig *EvmNetworkConfig, client *ethclient.Client) (*contracts.IAxelarGateway, *common.Address, error) {
 	if evmConfig.Gateway == "" {
 		return nil, nil, fmt.Errorf("gateway address is not set for network %s", evmConfig.Name)
 	}
@@ -107,32 +141,6 @@ func createEvmAuth(evmConfig *EvmNetworkConfig) (*bind.TransactOpts, error) {
 	}
 	auth.GasLimit = evmConfig.GasLimit
 	return auth, nil
-}
-
-func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) ([]*EvmClient, error) {
-	if globalConfig == nil || globalConfig.ConfigPath == "" {
-		return nil, fmt.Errorf("config path is not set")
-	}
-	evmCfgPath := fmt.Sprintf("%s/evm.json", globalConfig.ConfigPath)
-	configs, err := config.ReadJsonArrayConfig[EvmNetworkConfig](evmCfgPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read electrum configs: %w", err)
-	}
-
-	evmClients := make([]*EvmClient, 0, len(configs))
-	for _, evmConfig := range configs {
-		//Inject evm private keys
-		preparePrivateKey(&evmConfig)
-		client, err := NewEvmClient(globalConfig, &evmConfig, dbAdapter, eventBus)
-		if err != nil {
-			log.Warn().Msgf("Failed to create evm client for %s: %v", evmConfig.GetName(), err)
-			continue
-		}
-		globalConfig.AddChainConfig(config.IChainConfig(&evmConfig))
-		evmClients = append(evmClients, client)
-	}
-
-	return evmClients, nil
 }
 
 func preparePrivateKey(evmCfg *EvmNetworkConfig) error {
@@ -205,6 +213,7 @@ func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) error {
 	if err != nil {
 		return err
 	}
+	log.Info().Msgf("[EvmClient] [watchContractCall] success. Listening to ContractCallEvent")
 	go func() {
 		for event := range sink {
 			log.Info().Msgf("Contract call: %v", event)
@@ -225,6 +234,7 @@ func (c *EvmClient) watchContractCallApproved(watchOpts *bind.WatchOpts) error {
 	if err != nil {
 		return err
 	}
+	log.Info().Msgf("[EvmClient] [watchContractCallApproved] success. Listening to ContractCallApprovedEvent")
 	go func() {
 		for event := range sink {
 			log.Info().Any("event", event).Msg("[EvmClient] [ContractCallApprovedHandler]")
@@ -243,6 +253,7 @@ func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) error {
 	if err != nil {
 		return err
 	}
+	log.Info().Msgf("[EvmClient] [watchEVMExecuted] success. Listening to ExecutedEvent")
 	go func() {
 		for event := range sink {
 			log.Info().Any("event", event).Msgf("EvmClient] [ExecutedHandler]")
@@ -294,6 +305,8 @@ func (c *EvmClient) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to watch EVMExecutedEvent: %w", err)
 	}
+	// Watch pending transactions, call to the evm network to check if the transaction is included in a block
+	c.WatchPendingTxs()
 	return nil
 }
 
