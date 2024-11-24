@@ -49,7 +49,7 @@ func (c *EvmClient) WatchPendingTxs() {
 						log.Error().Err(err).Msg("[EvmClient] [PendingTxs] failed to handle ContractCall event")
 					}
 				}
-				c.pendingTxs.RemoveTx(tx)
+				c.pendingTxs.RemoveTx(tx.TxHash)
 			}
 			time.Sleep(pending.PENDING_CHECK_INTERVAL)
 		}

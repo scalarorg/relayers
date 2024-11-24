@@ -48,7 +48,7 @@ func getEventIndexedArguments(eventName string) abi.Arguments {
 	return args
 }
 
-func parseEventData(receiptLog *eth_types.Log, eventName string, eventData any) error {
+func ParseEventData(receiptLog *eth_types.Log, eventName string, eventData any) error {
 	gatewayAbi := GetScalarGatewayAbi()
 	if gatewayAbi.Events[eventName].ID != receiptLog.Topics[0] {
 		return fmt.Errorf("receipt log topic 0 does not match %s event id", eventName)
@@ -122,7 +122,7 @@ func parseContractCall(
 	var eventArgs contracts.IAxelarGatewayContractCall = contracts.IAxelarGatewayContractCall{
 		Raw: *receiptLog,
 	}
-	if err := parseEventData(receiptLog, "ContractCall", &eventArgs); err != nil {
+	if err := ParseEventData(receiptLog, "ContractCall", &eventArgs); err != nil {
 		return nil, err
 	}
 
@@ -137,7 +137,7 @@ func parseContractCallApproved(
 	eventArgs := contracts.IAxelarGatewayContractCallApproved{
 		Raw: *receiptLog,
 	}
-	if err := parseEventData(receiptLog, "ContractCallApproved", &eventArgs); err != nil {
+	if err := ParseEventData(receiptLog, "ContractCallApproved", &eventArgs); err != nil {
 		return nil, err
 	}
 
@@ -151,7 +151,7 @@ func parseExecute(
 	var eventArgs contracts.IAxelarGatewayExecuted = contracts.IAxelarGatewayExecuted{
 		Raw: *receiptLog,
 	}
-	if err := parseEventData(receiptLog, "Executed", &eventArgs); err != nil {
+	if err := ParseEventData(receiptLog, "Executed", &eventArgs); err != nil {
 		return nil, err
 	}
 

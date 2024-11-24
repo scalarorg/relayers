@@ -69,6 +69,10 @@ func (s *Service) Start(ctx context.Context) error {
 	for _, client := range s.EvmClients {
 		go client.Start(ctx)
 	}
+	//Start btc clients
+	for _, client := range s.BtcClient {
+		go client.Start(ctx)
+	}
 	//Start scalar client
 	go func() {
 		err := s.ScalarClient.Start(ctx)
