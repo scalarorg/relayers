@@ -58,9 +58,8 @@ type CallContract struct {
 	StakerPublicKey      *string `gorm:"type:varchar(255)"`
 	SenderAddress        *string `gorm:"type:varchar(255)"`
 	CallContractApproved *CallContractApproved
-	CommandExecuted      *CommandExecuted `gorm:"foreignKey:ID;references:ID"`
-	RelayDataID          string           `gorm:"type:varchar(255)"`
-	RelayData            *RelayData       `gorm:"foreignKey:RelayDataID"`
+	RelayDataID          string     `gorm:"type:varchar(255)"`
+	RelayData            *RelayData `gorm:"foreignKey:RelayDataID"`
 }
 
 type CallContractWithToken struct {
