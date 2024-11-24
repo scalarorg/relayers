@@ -68,11 +68,10 @@ func ReadJsonArrayConfig[T any](filePath string) ([]T, error) {
 	}
 
 	// Unmarshal directly into slice
-	var result []T
-	if err := json.Unmarshal(content, &result); err != nil {
+	result, err := ParseJsonArrayConfig[T](content)
+	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling config from %s: %w", filePath, err)
 	}
-
 	return result, nil
 }
 
@@ -84,9 +83,27 @@ func ReadJsonConfig[T any](filePath string) (*T, error) {
 	}
 
 	// Unmarshal directly into slice
+	result, err := ParseJsonConfig[T](content)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling config from %s: %w", filePath, err)
+	}
+
+	return result, nil
+}
+
+func ParseJsonArrayConfig[T any](content []byte) ([]T, error) {
+	var result []T
+	if err := json.Unmarshal(content, &result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func ParseJsonConfig[T any](content []byte) (*T, error) {
 	var result T
 	if err := json.Unmarshal(content, &result); err != nil {
-		return nil, fmt.Errorf("error unmarshaling config from %s: %w", filePath, err)
+		return nil, err
 	}
 
 	return &result, nil
