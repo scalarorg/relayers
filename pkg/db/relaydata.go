@@ -37,6 +37,40 @@ func (db *DatabaseAdapter) updateRelayData(id string, data interface{}) (tx *gor
 	return result
 }
 
+// TODO: Find any better way to update batch relay data status
+func (db *DatabaseAdapter) UpdateBatchRelayDataStatus(data []RelaydataExecuteResult, batchSize int) error {
+	// Handle empty data case
+	if len(data) == 0 {
+		return nil
+	}
+
+	// Process updates in batches
+	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		for i := 0; i < len(data); i += batchSize {
+			end := i + batchSize
+			if end > len(data) {
+				end = len(data)
+			}
+
+			batch := data[i:end]
+			for _, item := range batch {
+				updates := models.RelayData{
+					Status: int(item.Status),
+				}
+
+				result := tx.Model(&models.RelayData{}).
+					Where("id = ?", item.RelayDataId).
+					Updates(updates)
+
+				if result.Error != nil {
+					return fmt.Errorf("failed to update relay data batch: %w", result.Error)
+				}
+			}
+		}
+		return nil
+	})
+}
+
 // --- For Setup and Run Evm and Cosmos Relayer ---
 func (db *DatabaseAdapter) UpdateRelayDataStatueWithPacketSequence(id string, status RelayDataStatus, sequence *int) error {
 	data := models.RelayData{
