@@ -77,8 +77,11 @@ func (c *BtcClient) executeBtcCommand(commandId [32]byte, command string, params
 	log.Debug().Msgf("[BtcClient] [executeBtcCommand] decodedPsbtPayload: %v", decodedPsbtPayload)
 
 	//3. request signers for signatures
-	c.broadcastForSignatures(executeParams, decodedPsbtPayload[0].(string))
-	return nil
+	err = c.broadcastForSignatures(executeParams, decodedPsbtPayload[0].(string))
+	if err != nil {
+		return fmt.Errorf("[BtcClient] [executeBtcCommand] failed to broadcast for signatures: %w", err)
+	}
+	return err
 }
 func (c *BtcClient) observeScalarContractCallApproved(decodedExecuteData *DecodedExecuteData) error {
 	log.Debug().
@@ -92,6 +95,7 @@ func (c *BtcClient) broadcastForSignatures(executeParams *types.ExecuteParams, b
 	//1. Detect which parties need to sign byte first 2 bytes of the base64Psbt
 	//Real base64Psbt is without the first 2 bytes
 	signingType, finalBase64Psbt := c.detectSigningType(executeParams, base64Psbt)
+	log.Debug().Msgf("[BtcClient] [broadcastForSignatures] signingType: %v", signingType)
 	var signedPsbtHex string
 	var err error
 	if signingType == CUSTODIAL_ONLY {
@@ -104,11 +108,11 @@ func (c *BtcClient) broadcastForSignatures(executeParams *types.ExecuteParams, b
 		}
 	} else {
 		//2. Request protocol signature
+		log.Debug().Msgf("[BtcClient] [broadcastForSignatures] request protocol signature")
 		signedPsbtHex, err = c.requestProtocolSignature(executeParams, finalBase64Psbt)
 		if err != nil {
 			return fmt.Errorf("[BtcClient] [broadcastForSignatures] failed to request protocol signature: %w", err)
 		}
-		log.Debug().Msgf("[BtcClient] [broadcastForSignatures] signedPsbtHex: %s", signedPsbtHex)
 		//3. Broadcast to the network
 		txHash, err := c.BroadcastRawTx(signedPsbtHex)
 		if err != nil {
@@ -205,6 +209,7 @@ func (c *BtcClient) requestProtocolSignature(executeParams *types.ExecuteParams,
 
 // Request custodial signatures from custodial network
 func (c *BtcClient) requestCustodialSignatures(executeParams *types.ExecuteParams, base64Psbt string) error {
+	log.Debug().Msgf("[BtcClient] [requestCustodialSignatures] request custodial signatures")
 	if c.eventBus != nil {
 		c.eventBus.BroadcastEvent(&events.EventEnvelope{
 			EventType:        events.EVENT_BTC_SIGNATURE_REQUESTED,

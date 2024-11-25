@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/btc"
+	"github.com/scalarorg/relayers/pkg/clients/custodial"
 	"github.com/scalarorg/relayers/pkg/clients/electrs"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
@@ -15,12 +16,13 @@ import (
 )
 
 type Service struct {
-	DbAdapter    *db.DatabaseAdapter
-	EventBus     *events.EventBus
-	ScalarClient *scalar.Client
-	Electrs      []*electrs.Client
-	EvmClients   []*evm.EvmClient
-	BtcClient    []*btc.BtcClient
+	DbAdapter       *db.DatabaseAdapter
+	EventBus        *events.EventBus
+	ScalarClient    *scalar.Client
+	CustodialClient *custodial.Client
+	Electrs         []*electrs.Client
+	EvmClients      []*evm.EvmClient
+	BtcClient       []*btc.BtcClient
 }
 
 func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
@@ -31,6 +33,11 @@ func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
 	scalarClient, err := scalar.NewClient(config, dbAdapter, eventBus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scalar client: %w", err)
+	}
+	// Initialize Custodial client
+	custodialClient, err := custodial.NewClient(config, dbAdapter, eventBus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create custodial client: %w", err)
 	}
 	// Initialize Electrs clients
 	electrsClients, err := electrs.NewElectrumClients(config, dbAdapter, eventBus)
@@ -50,12 +57,13 @@ func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
 	}
 
 	return &Service{
-		DbAdapter:    dbAdapter,
-		EventBus:     eventBus,
-		ScalarClient: scalarClient,
-		Electrs:      electrsClients,
-		EvmClients:   evmClients,
-		BtcClient:    btcClients,
+		DbAdapter:       dbAdapter,
+		EventBus:        eventBus,
+		ScalarClient:    scalarClient,
+		CustodialClient: custodialClient,
+		Electrs:         electrsClients,
+		EvmClients:      evmClients,
+		BtcClient:       btcClients,
 	}, nil
 }
 
@@ -74,13 +82,26 @@ func (s *Service) Start(ctx context.Context) error {
 		go client.Start(ctx)
 	}
 	//Start scalar client
-	go func() {
-		err := s.ScalarClient.Start(ctx)
-		if err != nil {
-			log.Error().Msgf("Start scalar client with error %+v", err)
-		}
-	}()
-
+	if s.ScalarClient != nil {
+		go func() {
+			err := s.ScalarClient.Start(ctx)
+			if err != nil {
+				log.Error().Msgf("Start scalar client with error %+v", err)
+			}
+		}()
+	} else {
+		log.Warn().Msg("[Relayer] [Start] scalar client is undefined")
+	}
+	if s.CustodialClient != nil {
+		go func() {
+			err := s.CustodialClient.Start(ctx)
+			if err != nil {
+				log.Error().Msgf("Start custodial client with error %+v", err)
+			}
+		}()
+	} else {
+		log.Warn().Msg("[Relayer] [Start] custodial client is undefined")
+	}
 	return nil
 }
 
