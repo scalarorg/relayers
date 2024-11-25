@@ -51,7 +51,7 @@ func NewClient(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, event
 
 func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*Client, error) {
 	txConfig := tx.NewTxConfig(codec.GetProtoCodec(), []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
-	subscriberName := fmt.Sprintf("subscriber-%s", config.ChainID)
+	subscriberName := fmt.Sprintf("subscriber-%d", config.ChainID)
 	//Set default broadcast mode is sync
 	if config.BroadcastMode == "" {
 		config.BroadcastMode = "sync"

@@ -14,6 +14,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/rs/zerolog v1.33.0
+	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20241124105032-c353ec3519be
 	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241120084008-99b82de50a7b
 	github.com/scalarorg/go-electrum v0.1.1
 	github.com/spf13/cobra v1.8.1
@@ -181,7 +182,6 @@ require (
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
-	github.com/scalarorg/bitcoin-vault/ffi/go-psbt v0.0.0-20241112132150-34cb94893469
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.23.12 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect

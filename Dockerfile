@@ -1,3 +1,11 @@
+FROM rust:1.82-alpine3.20 as libbuilder
+RUN apk add --no-cache git libc-dev
+# Build bitcoin-vault lib
+# Todo: select a specific version
+RUN git clone https://github.com/scalarorg/bitcoin-vault.git
+WORKDIR /bitcoin-vault
+RUN cargo build --release
+
 # Build stage
 FROM golang:1.23.3-alpine3.20 AS builder
 
@@ -28,6 +36,8 @@ RUN if [[ "${WASM}" == "true" ]]; then \
     wget https://github.com/CosmWasm/wasmvm/releases/download/${WASMVM_VERSION}/checksums.txt -O /tmp/checksums.txt && \
     sha256sum /lib/libwasmvm_muslc.a | grep $(cat /tmp/checksums.txt | grep libwasmvm_muslc.${ARCH}.a | cut -d ' ' -f 1); \
     fi
+
+COPY --from=libbuilder /bitcoin-vault/target/release/libbitcoin_vault_ffi.* /usr/lib/
 
 # Copy source code
 COPY . .
