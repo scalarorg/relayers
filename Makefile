@@ -17,6 +17,9 @@ MAX_WASM_SIZE := $(shell echo "$$((3 * 1024 * 1024))")
 IBC_WASM_HOOKS := false
 # Export env var to go build so Cosmos SDK can see it
 export CGO_ENABLED := 1
+# Add bitcoin-vault lib to CGO_LDFLAGS and CGO_CFLAGS
+export CGO_LDFLAGS := ${CGO_LDFLAGS} -lbitcoin_vault_ffi
+
 
 $(info $$WASM is [${WASM}])
 $(info $$IBC_WASM_HOOKS is [${IBC_WASM_HOOKS}])

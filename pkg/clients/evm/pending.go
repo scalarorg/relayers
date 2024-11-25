@@ -23,8 +23,9 @@ func (c *EvmClient) WatchPendingTxs() {
 			for _, tx := range txs {
 				log.Debug().Msgf("[EvmClient] [watchPendingTxs] processing pending tx: %s", tx.TxHash)
 				allEvents, err := c.PollTxForEvents(tx)
-				if err != nil {
+				if err != nil || allEvents == nil {
 					log.Error().Err(err).Str("txHash", tx.TxHash).Msg("[EvmClient] [watchPendingTxs] failed to get transaction receipt")
+					continue
 				}
 				if allEvents.ContractCallApproved != nil {
 					log.Debug().Msg("[EvmClient] [PendingTxs] found ContractCallApproved event")

@@ -73,7 +73,7 @@ func ParseEventData(receiptLog *eth_types.Log, eventName string, eventData any) 
 	return nil
 }
 
-func createEvmEventFromArgs[T ValidEvmEvent](eventArgs T, log *eth_types.Log) *EvmEvent[T] {
+func CreateEvmEventFromArgs[T ValidEvmEvent](eventArgs T, log *eth_types.Log) *EvmEvent[T] {
 	// Get the value of eventArgs using reflection
 	// v := reflect.ValueOf(eventArgs).Elem()
 	// sourceChain := currentChainName
@@ -88,6 +88,7 @@ func createEvmEventFromArgs[T ValidEvmEvent](eventArgs T, log *eth_types.Log) *E
 	return &EvmEvent[T]{
 		Hash:        log.TxHash.Hex(),
 		BlockNumber: log.BlockNumber,
+		TxIndex:     log.TxIndex,
 		LogIndex:    log.Index,
 		Args:        eventArgs,
 	}
@@ -98,19 +99,19 @@ func ParseLogs(receiptLogs []*eth_types.Log) AllEvmEvents {
 	for _, reciptLog := range receiptLogs {
 		// Try parsing as ContractCallApproved
 		if eventArgs, err := parseContractCallApproved(reciptLog); err == nil {
-			events.ContractCallApproved = createEvmEventFromArgs(eventArgs, reciptLog)
+			events.ContractCallApproved = CreateEvmEventFromArgs(eventArgs, reciptLog)
 			continue
 		}
 
 		// Try parsing as ContractCall
 		if eventArgs, err := parseContractCall(reciptLog); err == nil {
-			events.ContractCall = createEvmEventFromArgs(eventArgs, reciptLog)
+			events.ContractCall = CreateEvmEventFromArgs(eventArgs, reciptLog)
 			continue
 		}
 
 		// Try parsing as Execute
 		if eventArgs, err := parseExecute(reciptLog); err == nil && eventArgs != nil {
-			events.Executed = createEvmEventFromArgs(eventArgs, reciptLog)
+			events.Executed = CreateEvmEventFromArgs(eventArgs, reciptLog)
 			continue
 		}
 	}
@@ -236,7 +237,7 @@ func parseEvmEventContractCallApproved[T *contracts.IAxelarGatewayContractCallAp
 		return nil, err
 	}
 
-	event := createEvmEventFromArgs[T](eventArgs, log)
+	event := CreateEvmEventFromArgs[T](eventArgs, log)
 
 	return event, nil
 }
@@ -250,7 +251,7 @@ func parseEvmEventContractCall[T *contracts.IAxelarGatewayContractCall](
 		return nil, err
 	}
 
-	event := createEvmEventFromArgs[T](eventArgs, log)
+	event := CreateEvmEventFromArgs[T](eventArgs, log)
 
 	return event, nil
 }
@@ -263,6 +264,6 @@ func parseEvmEventExecute[T *contracts.IAxelarGatewayExecuted](
 		return nil, err
 	}
 
-	event := createEvmEventFromArgs[T](eventArgs, log)
+	event := CreateEvmEventFromArgs[T](eventArgs, log)
 	return event, nil
 }

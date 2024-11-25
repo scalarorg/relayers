@@ -3,8 +3,11 @@ package db
 import (
 	"context"
 	"fmt"
+	"os"
+	"testing"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/testcontainers/testcontainers-go"
@@ -13,6 +16,16 @@ import (
 	postgresDriver "gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
+
+func TestMain(m *testing.M) {
+	var err error
+	dbAdapter, _, err = SetupTestDB(make(chan *events.EventEnvelope, 100), 100)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to setup test db")
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+}
 
 func SetupTestDB(busEventChan chan *events.EventEnvelope, receiverChanBufSize int) (*DatabaseAdapter, func(), error) {
 	ctx := context.Background()

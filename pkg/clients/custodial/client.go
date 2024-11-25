@@ -29,24 +29,24 @@ type Client struct {
 
 func NewClient(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*Client, error) {
 	// Read Scalar config from JSON file
-	scalarCfgPath := fmt.Sprintf("%s/scalar.json", globalConfig.ConfigPath)
-	scalarConfig, err := config.ReadJsonConfig[cosmos.CosmosNetworkConfig](scalarCfgPath)
+	custodialCfgPath := fmt.Sprintf("%s/custodial.json", globalConfig.ConfigPath)
+	custodialConfig, err := config.ReadJsonConfig[cosmos.CosmosNetworkConfig](custodialCfgPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read scalar config from file: %s, %w", scalarCfgPath, err)
+		return nil, fmt.Errorf("failed to read custodial config from file: %s, %w", custodialCfgPath, err)
 	}
 	if globalConfig.ScalarMnemonic == "" {
 		return nil, fmt.Errorf("scalar mnemonic is not set")
 	}
-	scalarConfig.Mnemonic = globalConfig.ScalarMnemonic
+	custodialConfig.Mnemonic = globalConfig.ScalarMnemonic
 	//Set default max retries is 3
-	if scalarConfig.MaxRetries == 0 {
-		scalarConfig.MaxRetries = 3
+	if custodialConfig.MaxRetries == 0 {
+		custodialConfig.MaxRetries = 3
 	}
 	//Set default retry interval is 1000ms
-	if scalarConfig.RetryInterval == 0 {
-		scalarConfig.RetryInterval = 1000
+	if custodialConfig.RetryInterval == 0 {
+		custodialConfig.RetryInterval = 1000
 	}
-	return NewClientFromConfig(globalConfig, scalarConfig, dbAdapter, eventBus)
+	return NewClientFromConfig(globalConfig, custodialConfig, dbAdapter, eventBus)
 }
 
 func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*Client, error) {

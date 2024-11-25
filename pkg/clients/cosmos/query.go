@@ -143,6 +143,21 @@ func (c *QueryClient) QueryTx(ctx context.Context, txHash string) (*sdk.TxRespon
 	return res.GetTxResponse(), nil
 }
 
+func (c *QueryClient) QueryActivedChains(ctx context.Context) ([]string, error) {
+	req := &emvtypes.ChainsRequest{
+		Status: emvtypes.Activated,
+	}
+	resp, err := c.EvmQueryServiceClient.Chains(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query chains: %w", err)
+	}
+	chains := make([]string, len(resp.Chains))
+	for ind, chain := range resp.Chains {
+		chains[ind] = chain.String()
+	}
+	return chains, nil
+}
+
 // func (c *NetworkClient) QueryBalance(ctx context.Context, addr sdk.AccAddress) (*sdk.Coins, error) {
 // 	// Create gRPC connection
 // 	grpcConn, err := grpc.Dial(

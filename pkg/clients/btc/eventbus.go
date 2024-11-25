@@ -64,53 +64,62 @@ func (c *BtcClient) executeBtcCommand(commandId [32]byte, command string, params
 	payloadHash := hex.EncodeToString(executeParams.PayloadHash[:])
 	encodedPsbtPayload, err := c.dbAdapter.FindPayloadByHash(payloadHash)
 	if err != nil {
-		return fmt.Errorf("[BtcClient] [executeBtcCommand] failed to find payload by hash %s: %w", payloadHash, err)
+		log.Error().Err(err).Str("payloadHash", payloadHash).Msg("[BtcClient] [executeBtcCommand] failed to find payload by hash")
+		return err
 	}
 	//2. Extract base64 psbt from the payload
-	decodedPsbtPayload, err := evm.AbiUnpack(encodedPsbtPayload)
+	log.Debug().Msgf("[BtcClient] [executeBtcCommand] encodedPsbtPayload %s", hex.EncodeToString(encodedPsbtPayload))
+
+	decodedPsbtPayload, err := evm.AbiUnpack(encodedPsbtPayload, "string")
 	if err != nil {
 		return fmt.Errorf("[BtcClient] [executeBtcCommand] failed to abi unpack psbt: %w", err)
 	}
 	log.Debug().Msgf("[BtcClient] [executeBtcCommand] decodedPsbtPayload: %v", decodedPsbtPayload)
 
 	//3. request signers for signatures
-	c.broadcastForSignatures(executeParams, decodedPsbtPayload[0].(string))
-	return nil
+	err = c.broadcastForSignatures(executeParams, decodedPsbtPayload[0].(string))
+	if err != nil {
+		return fmt.Errorf("[BtcClient] [executeBtcCommand] failed to broadcast for signatures: %w", err)
+	}
+	return err
 }
 func (c *BtcClient) observeScalarContractCallApproved(decodedExecuteData *DecodedExecuteData) error {
-	log.Debug().Msgf("[BtcClient] [observeScalarContractCallApproved] decodedExecuteData: %v", decodedExecuteData)
+	log.Debug().
+		Uint64("chainId", decodedExecuteData.ChainId).
+		Strs("commands", decodedExecuteData.Commands).
+		Msg("[BtcClient] [observeScalarContractCallApproved]")
 	return nil
 }
 
 func (c *BtcClient) broadcastForSignatures(executeParams *types.ExecuteParams, base64Psbt string) error {
-	//1. Detect which parties need to sign
-	signingType, err := c.detectSigningType(executeParams, base64Psbt)
-	if err != nil {
-		return fmt.Errorf("[BtcClient] [broadcastForSignatures] failed to detect signing type: %w", err)
-	}
+	//1. Detect which parties need to sign byte first 2 bytes of the base64Psbt
+	//Real base64Psbt is without the first 2 bytes
+	signingType, finalBase64Psbt := c.detectSigningType(executeParams, base64Psbt)
+	log.Debug().Msgf("[BtcClient] [broadcastForSignatures] signingType: %v", signingType)
 	var signedPsbtHex string
-	switch signingType {
-	case USER_PROTOCOL:
-	case PROTOCOL_CUSTODIAL:
+	var err error
+	if signingType == CUSTODIAL_ONLY {
+		//2. Request custodial signatures
+		//Signatures will be handled by custodial network in asynchronous manner
+		err = c.requestCustodialSignatures(executeParams, finalBase64Psbt)
+		if err != nil {
+			log.Err(err).Msg("[BtcClient] [broadcastForSignatures] failed to request custodial signaturess")
+			return err
+		}
+	} else {
 		//2. Request protocol signature
-		signedPsbtHex, err = c.requestProtocolSignature(executeParams, base64Psbt)
+		log.Debug().Msgf("[BtcClient] [broadcastForSignatures] request protocol signature")
+		signedPsbtHex, err = c.requestProtocolSignature(executeParams, finalBase64Psbt)
 		if err != nil {
 			return fmt.Errorf("[BtcClient] [broadcastForSignatures] failed to request protocol signature: %w", err)
 		}
-		log.Debug().Msgf("[BtcClient] [broadcastForSignatures] signedPsbtHex: %s", signedPsbtHex)
 		//3. Broadcast to the network
 		txHash, err := c.BroadcastRawTx(signedPsbtHex)
 		if err != nil {
 			return fmt.Errorf("[BtcClient] [broadcastForSignatures] failed to broadcast tx: %w", err)
 		}
 		log.Debug().Msgf("[BtcClient] [broadcastForSignatures] broadcasted txHash: %s", txHash)
-	case CUSTODIAL_ONLY:
-		//2. Request custodial signatures
-		//Signatures will be handled by custodial network in asynchronous manner
-		signedPsbtHex, err = c.requestCustodialSignatures(executeParams, base64Psbt)
-		if err != nil {
-			return fmt.Errorf("[BtcClient] [broadcastForSignatures] failed to request custodial signaturess: %w", err)
-		}
+
 	}
 	//4. Todo:Update status in the db
 	// err = c.dbAdapter.UpdateRelayDataStatueWithExecuteHash(messageID, relaydata.SUCCESS, txHash)
@@ -120,12 +129,21 @@ func (c *BtcClient) broadcastForSignatures(executeParams *types.ExecuteParams, b
 	return nil
 }
 
-func (c *BtcClient) detectSigningType(executeParams *types.ExecuteParams, base64Psbt string) (SigningType, error) {
-	return USER_PROTOCOL, nil
+func (c *BtcClient) detectSigningType(executeParams *types.ExecuteParams, base64Psbt string) (SigningType, string) {
+	//To first 2 bytes of the base64Psbt, it can be used to detect the signing type
+	firstTwoBytes := base64Psbt[:2]
+	if firstTwoBytes == "80" {
+		return USER_PROTOCOL, base64Psbt[2:]
+	} else if firstTwoBytes == "40" {
+		return CUSTODIAL_ONLY, base64Psbt[2:]
+	} else {
+		//For old format, it is signed by custodial
+		return CUSTODIAL_ONLY, base64Psbt
+	}
 }
 func (c *BtcClient) requestProtocolSignature(executeParams *types.ExecuteParams, base64Psbt string) (string, error) {
 	//1. Find protocol info
-	protocolInfo, err := c.dbAdapter.FindProtocolInfo(executeParams.SourceChain, executeParams.ContractAddress)
+	protocolInfo, err := c.dbAdapter.FindProtocolInfo(executeParams.SourceChain, executeParams.ContractAddress.Hex())
 	if err != nil {
 		return "", fmt.Errorf("[BtcClient] [requestProtocolSignature] failed to find protocol info by chain name and contract address: %s, %s, %w",
 			executeParams.SourceChain, executeParams.ContractAddress, err)
@@ -190,18 +208,22 @@ func (c *BtcClient) requestProtocolSignature(executeParams *types.ExecuteParams,
 }
 
 // Request custodial signatures from custodial network
-func (c *BtcClient) requestCustodialSignatures(executeParams *types.ExecuteParams, base64Psbt string) (string, error) {
-	c.eventBus.BroadcastEvent(&events.EventEnvelope{
-		EventType:        events.EVENT_BTC_SIGNATURE_REQUESTED,
-		DestinationChain: events.CUSTODIAL_NETWORK_NAME,
-		Data: &events.SignatureRequest{
-			ExecuteParams: executeParams,
-			Base64Psbt:    base64Psbt,
-		},
-	})
+func (c *BtcClient) requestCustodialSignatures(executeParams *types.ExecuteParams, base64Psbt string) error {
+	log.Debug().Msgf("[BtcClient] [requestCustodialSignatures] request custodial signatures")
+	if c.eventBus != nil {
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_BTC_SIGNATURE_REQUESTED,
+			DestinationChain: events.CUSTODIAL_NETWORK_NAME,
+			Data: &events.SignatureRequest{
+				ExecuteParams: executeParams,
+				Base64Psbt:    base64Psbt,
+			},
+		})
+	} else {
+		return fmt.Errorf("[BtcClient] [requestCustodialSignatures] event bus is undefined")
+	}
 	//Todo: Perform custodial signing. Better version, we can handle this in the custodial network
-
-	return "", nil
+	return nil
 }
 
 func (c *BtcClient) handleCustodialSignaturesConfirmed(messageID string, signedPsbt string) error {

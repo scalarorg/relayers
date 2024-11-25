@@ -48,18 +48,26 @@ func (ec *EvmClient) handleContractCall(event *contracts.IAxelarGatewayContractC
 	//2. Send to the bus
 	confirmTxs := events.ConfirmTxsRequest{
 		ChainName: ec.evmConfig.GetId(),
-		TxHashs:   []string{relayData.CallContract.TxHash},
+		TxHashs:   map[string]string{relayData.CallContract.TxHash: relayData.To},
 	}
-
-	ec.eventBus.BroadcastEvent(&events.EventEnvelope{
-		EventType:        events.EVENT_EVM_CONTRACT_CALL,
-		DestinationChain: scalar.SCALAR_NETWORK_NAME,
-		Data:             confirmTxs,
-	})
+	if ec.eventBus != nil {
+		ec.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_EVM_CONTRACT_CALL,
+			DestinationChain: scalar.SCALAR_NETWORK_NAME,
+			Data:             confirmTxs,
+		})
+	} else {
+		log.Warn().Msg("[EvmClient] [handleContractCall] event bus is undefined")
+	}
 	return nil
 }
 func (ec *EvmClient) preprocessContractCall(event *contracts.IAxelarGatewayContractCall) error {
-	log.Info().Msgf("Start handle Contract call: %v", event)
+	log.Info().
+		Str("sender", event.Sender.Hex()).
+		Str("destinationChain", event.DestinationChain).
+		Str("destinationContractAddress", event.DestinationContractAddress).
+		Str("payloadHash", hex.EncodeToString(event.PayloadHash[:])).
+		Msg("[EvmClient] [preprocessContractCall] Start handle Contract call")
 	//Todo: validate the event
 	return nil
 }

@@ -118,22 +118,17 @@ func (db *DatabaseAdapter) FindRelayDataById(id string, option *QueryOptions) (*
 }
 
 func (db *DatabaseAdapter) FindPayloadByHash(payloadHash string) ([]byte, error) {
-	var relayData models.RelayData
-
+	var contractCall models.CallContract
+	log.Debug().Str("payloadHash", payloadHash).Msg("[DatabaseAdapter] [FindPayloadByHash] finding payload by hash")
 	result := db.PostgresClient.
-		Preload("CallContract").
-		Where("call_contract.payload_hash = ?", strings.ToLower(payloadHash)).
-		First(&relayData)
+		Where("payload_hash = ?", strings.ToLower(payloadHash)).
+		First(&contractCall)
 
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to find payload by hash: %w", result.Error)
 	}
 
-	if len(relayData.CallContract.Payload) == 0 {
-		return nil, fmt.Errorf("payload not found")
-	}
-
-	return relayData.CallContract.Payload, nil
+	return contractCall.Payload, nil
 }
 
 // Find Realaydata by ContractAddress, SourceAddress, PayloadHash

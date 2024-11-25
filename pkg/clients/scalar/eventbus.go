@@ -21,19 +21,45 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 }
 
 func (c *Client) handleElectrsVaultTransaction(confirmRequest events.ConfirmTxsRequest) error {
-	_, err := c.ConfirmTxs(context.Background(), confirmRequest.ChainName, confirmRequest.TxHashs)
-	if err != nil {
-		log.Error().Msgf("[ScalarClient] [handleElectrsVaultTransaction] error: %v", err)
-		return err
+	sourceChain, txHashes := c.extractValidConfirmTxs(confirmRequest)
+	if len(txHashes) > 0 {
+		_, err := c.ConfirmTxs(context.Background(), sourceChain, txHashes)
+		if err != nil {
+			log.Error().Err(err).Msg("[ScalarClient] [handleElectrsVaultTransaction] error confirming txs")
+			return err
+		}
+	} else {
+		log.Error().Msgf("[ScalarClient] [handleElectrsVaultTransaction] no valid txs to confirm")
 	}
 	return nil
 }
 
 func (c *Client) handleEvmContractCall(confirmRequest events.ConfirmTxsRequest) error {
-	_, err := c.ConfirmTxs(context.Background(), confirmRequest.ChainName, confirmRequest.TxHashs)
-	if err != nil {
-		log.Error().Msgf("[ScalarClient] [handleElectrsVaultTransaction] error: %v", err)
-		return err
+	sourceChain, txHashes := c.extractValidConfirmTxs(confirmRequest)
+	if len(txHashes) > 0 {
+		_, err := c.ConfirmTxs(context.Background(), sourceChain, txHashes)
+		if err != nil {
+			log.Error().Err(err).Msg("[ScalarClient] [handleEvmContractCall] error confirming txs")
+			return err
+		}
+	} else {
+		log.Debug().Str("sourceChain", sourceChain).Msg("[ScalarClient] [handleEvmContractCall] no valid txs to confirm")
 	}
 	return nil
+}
+
+func (c *Client) extractValidConfirmTxs(confirmRequest events.ConfirmTxsRequest) (string, []string) {
+	txHashes := make([]string, 0)
+	for txHash, destChain := range confirmRequest.TxHashs {
+		if c.globalConfig.ActiveChains[destChain] {
+			txHashes = append(txHashes, txHash)
+		} else {
+			log.Warn().
+				Str("sourceChain", confirmRequest.ChainName).
+				Str("txHash", txHash).
+				Str("destinationChain", destChain).
+				Msg("[ScalarClient] [extractValidConfirmTxs] invalid destination chain")
+		}
+	}
+	return confirmRequest.ChainName, txHashes
 }

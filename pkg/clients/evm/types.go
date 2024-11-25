@@ -8,10 +8,7 @@ import (
 )
 
 const (
-	COMPONENT_NAME               = "EvmClient"
-	EVENT_CONTRACT_CALL          = "ContractCall"
-	EVENT_CONTRACT_CALL_APPROVED = "ContractCallApproved"
-	EVENT_EVM_EXECUTED           = "Executed"
+	COMPONENT_NAME = "EvmClient"
 )
 
 type Byte32 [32]uint8
@@ -26,7 +23,7 @@ type EvmNetworkConfig struct {
 	LastBlock  uint64        `mapstructure:"last_block"`
 	PrivateKey string        `mapstructure:"private_key"`
 	GasLimit   uint64        `mapstructure:"gas_limit"`
-	BlockTime  time.Duration `mapstructure:"blockTime"` //Timeout for pending txs (12s on the ethereum network)
+	BlockTime  time.Duration `mapstructure:"blockTime"` //Timeout im ms for pending txs
 	MaxRetry   int
 	RetryDelay time.Duration
 	TxTimeout  time.Duration `mapstructure:"tx_timeout"` //Timeout for send txs (~3s)
