@@ -38,7 +38,11 @@ func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string) (
 	result := db.PostgresClient.Where("chain_name = ? AND event_name = ?", chainName, eventName).First(&lastBlock)
 	return &lastBlock, result.Error
 }
+func (db *DatabaseAdapter) UpdateLastEventCheckPoint(value *models.EventCheckPoint) error {
+	return UpdateLastEventCheckPoint(db.PostgresClient, value)
+}
 
+// For transactional update
 func UpdateLastEventCheckPoint(db *gorm.DB, value *models.EventCheckPoint) error {
 	result := db.Clauses(
 		clause.OnConflict{

@@ -100,6 +100,16 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 }
 
 func (c *Client) Start(ctx context.Context) error {
+	activedChains, err := c.queryClient.QueryActivedChains(ctx)
+	if err != nil {
+		return fmt.Errorf("[ScalarClient] [Start] failed to query actived chains: %w", err)
+	}
+	log.Debug().Msgf("[ScalarClient] [Start] actived chains: %v", activedChains)
+
+	c.globalConfig.ActiveChains = map[string]bool{}
+	for _, chain := range activedChains {
+		c.globalConfig.ActiveChains[chain] = true
+	}
 	receiver := c.eventBus.Subscribe(SCALAR_NETWORK_NAME)
 	go func() {
 		for event := range receiver {
@@ -115,7 +125,7 @@ func (c *Client) Start(ctx context.Context) error {
 	} else {
 		log.Debug().Msgf("[ScalarClient] [Start] Start rpc client success")
 	}
-	err := subscribeContractCallApprovedEvent(ctx, c.network, c.handleContractCallApprovedEvents)
+	err = subscribeContractCallApprovedEvent(ctx, c.network, c.handleContractCallApprovedEvents)
 	if err != nil {
 		log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
 	}

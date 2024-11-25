@@ -141,16 +141,20 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	//4. Send to the event bus with destination chain is scalar for confirmation
 	confirmTxs := events.ConfirmTxsRequest{
 		ChainName: c.electrumConfig.SourceChain,
-		TxHashs:   make([]string, len(relayDatas)),
+		TxHashs:   make(map[string]string),
 	}
-	for i, item := range relayDatas {
-		confirmTxs.TxHashs[i] = item.CallContract.TxHash
+	for _, item := range relayDatas {
+		confirmTxs.TxHashs[item.CallContract.TxHash] = item.To
 	}
-	c.eventBus.BroadcastEvent(&events.EventEnvelope{
-		EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
-		DestinationChain: scalar.SCALAR_NETWORK_NAME,
-		Data:             confirmTxs,
-	})
+	if c.eventBus != nil {
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
+			DestinationChain: scalar.SCALAR_NETWORK_NAME,
+			Data:             confirmTxs,
+		})
+	} else {
+		log.Warn().Msg("[ElectrumClient] [vaultTxMessageHandler] event bus is undefined")
+	}
 	return nil
 }
 

@@ -10,9 +10,9 @@ const (
 	EVENT_ELECTRS_VAULT_TRANSACTION      = "Electrs.VaultTransaction"
 	EVENT_SCALAR_CONTRACT_CALL_APPROVED  = "Scalar.ContractCallApproved"
 	EVENT_SCALAR_COMMAND_EXECUTED        = "Scalar.CommandExecuted"
-	EVENT_EVM_CONTRACT_CALL_APPROVED     = "Evm.ContractCallApproved"
-	EVENT_EVM_CONTRACT_CALL              = "Evm.ContractCall"
-	EVENT_EVM_COMMAND_EXECUTED           = "Evm.CommandExecuted"
+	EVENT_EVM_CONTRACT_CALL_APPROVED     = "ContractCallApproved"
+	EVENT_EVM_CONTRACT_CALL              = "ContractCall"
+	EVENT_EVM_COMMAND_EXECUTED           = "Executed"
 )
 
 type EventEnvelope struct {
@@ -27,5 +27,5 @@ type SignatureRequest struct {
 }
 type ConfirmTxsRequest struct {
 	ChainName string
-	TxHashs   []string
+	TxHashs   map[string]string //Map txHash to DestinationChain, user for validate destination chain
 }

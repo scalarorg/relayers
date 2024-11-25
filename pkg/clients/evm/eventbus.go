@@ -11,7 +11,10 @@ import (
 )
 
 func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
-	log.Info().Msgf("[EvmClient] [handleEventBusMessage] event: %v", event)
+	log.Debug().Str("eventType", event.EventType).
+		Str("messageID", event.MessageID).
+		Str("destinationChain", event.DestinationChain).
+		Msg("[EvmClient] [handleEventBusMessage]")
 	switch event.EventType {
 	case events.EVENT_SCALAR_CONTRACT_CALL_APPROVED:
 		//Emitted from scalar.handleContractCallApprovedEvent with event.Data as executeData
@@ -69,7 +72,11 @@ func (ec *EvmClient) handleScalarContractCallApproved(messageID string, executeD
 	// if err != nil {
 	// 	return fmt.Errorf("failed to send raw transaction: %w", err)
 	// }
-	log.Info().Any("signedTx", signedTx).Msg("[EvmClient] [handleScalarContractCallApproved]")
+	log.Info().Str("signed TxHash", signedTx.Hash().String()).
+		Uint64("nonce", signedTx.Nonce()).
+		Int64("chainId", signedTx.ChainId().Int64()).
+		Str("signer", signedTx.To().Hex()).
+		Msg("[EvmClient] [handleScalarContractCallApproved]")
 	txHash := signedTx.Hash().String()
 	//2. Add the transaction waiting to be mined
 	ec.pendingTxs.AddTx(txHash, time.Now())

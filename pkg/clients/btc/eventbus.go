@@ -64,10 +64,13 @@ func (c *BtcClient) executeBtcCommand(commandId [32]byte, command string, params
 	payloadHash := hex.EncodeToString(executeParams.PayloadHash[:])
 	encodedPsbtPayload, err := c.dbAdapter.FindPayloadByHash(payloadHash)
 	if err != nil {
-		return fmt.Errorf("[BtcClient] [executeBtcCommand] failed to find payload by hash %s: %w", payloadHash, err)
+		log.Error().Err(err).Str("payloadHash", payloadHash).Msg("[BtcClient] [executeBtcCommand] failed to find payload by hash")
+		return err
 	}
 	//2. Extract base64 psbt from the payload
-	decodedPsbtPayload, err := evm.AbiUnpack(encodedPsbtPayload)
+	log.Debug().Msgf("[BtcClient] [executeBtcCommand] encodedPsbtPayload %s", hex.EncodeToString(encodedPsbtPayload))
+
+	decodedPsbtPayload, err := evm.AbiUnpack(encodedPsbtPayload, "string")
 	if err != nil {
 		return fmt.Errorf("[BtcClient] [executeBtcCommand] failed to abi unpack psbt: %w", err)
 	}
@@ -78,7 +81,10 @@ func (c *BtcClient) executeBtcCommand(commandId [32]byte, command string, params
 	return nil
 }
 func (c *BtcClient) observeScalarContractCallApproved(decodedExecuteData *DecodedExecuteData) error {
-	log.Debug().Msgf("[BtcClient] [observeScalarContractCallApproved] decodedExecuteData: %v", decodedExecuteData)
+	log.Debug().
+		Uint64("chainId", decodedExecuteData.ChainId).
+		Strs("commands", decodedExecuteData.Commands).
+		Msg("[BtcClient] [observeScalarContractCallApproved]")
 	return nil
 }
 
@@ -125,7 +131,7 @@ func (c *BtcClient) detectSigningType(executeParams *types.ExecuteParams, base64
 }
 func (c *BtcClient) requestProtocolSignature(executeParams *types.ExecuteParams, base64Psbt string) (string, error) {
 	//1. Find protocol info
-	protocolInfo, err := c.dbAdapter.FindProtocolInfo(executeParams.SourceChain, executeParams.ContractAddress)
+	protocolInfo, err := c.dbAdapter.FindProtocolInfo(executeParams.SourceChain, executeParams.ContractAddress.Hex())
 	if err != nil {
 		return "", fmt.Errorf("[BtcClient] [requestProtocolSignature] failed to find protocol info by chain name and contract address: %s, %s, %w",
 			executeParams.SourceChain, executeParams.ContractAddress, err)
@@ -191,14 +197,18 @@ func (c *BtcClient) requestProtocolSignature(executeParams *types.ExecuteParams,
 
 // Request custodial signatures from custodial network
 func (c *BtcClient) requestCustodialSignatures(executeParams *types.ExecuteParams, base64Psbt string) (string, error) {
-	c.eventBus.BroadcastEvent(&events.EventEnvelope{
-		EventType:        events.EVENT_BTC_SIGNATURE_REQUESTED,
-		DestinationChain: events.CUSTODIAL_NETWORK_NAME,
-		Data: &events.SignatureRequest{
-			ExecuteParams: executeParams,
-			Base64Psbt:    base64Psbt,
-		},
-	})
+	if c.eventBus != nil {
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_BTC_SIGNATURE_REQUESTED,
+			DestinationChain: events.CUSTODIAL_NETWORK_NAME,
+			Data: &events.SignatureRequest{
+				ExecuteParams: executeParams,
+				Base64Psbt:    base64Psbt,
+			},
+		})
+	} else {
+		log.Warn().Msg("[BtcClient] [requestCustodialSignatures] event bus is undefined")
+	}
 	//Todo: Perform custodial signing. Better version, we can handle this in the custodial network
 
 	return "", nil

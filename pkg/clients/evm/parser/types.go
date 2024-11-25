@@ -6,8 +6,9 @@ import (
 )
 
 type EvmEvent[T any] struct {
-	Hash             string
+	Hash             string //TxHash
 	BlockNumber      uint64
+	TxIndex          uint
 	LogIndex         uint
 	WaitForFinality  func() (*types.Receipt, error)
 	SourceChain      string

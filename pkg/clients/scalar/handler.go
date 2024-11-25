@@ -102,13 +102,16 @@ func (c *Client) handleSignCommandsEvent(ctx context.Context, event *IBCEvent[Si
 	// 3. Broadcast the execute data to the Event bus
 	// Todo:After the executeData is broadcasted,
 	// Update status of the RelayerData to Approved
-	c.eventBus.BroadcastEvent(&events.EventEnvelope{
-		EventType:        events.EVENT_SCALAR_CONTRACT_CALL_APPROVED,
-		DestinationChain: event.Args.DestinationChain,
-		MessageID:        event.Args.MessageID,
-		Data:             executeData,
-	},
-	)
+	if c.eventBus != nil {
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_SCALAR_CONTRACT_CALL_APPROVED,
+			DestinationChain: event.Args.DestinationChain,
+			MessageID:        event.Args.MessageID,
+			Data:             executeData,
+		})
+	} else {
+		log.Warn().Msg("[ScalarClient] [handleSignCommandsEvent] event bus is undefined")
+	}
 	return nil
 }
 

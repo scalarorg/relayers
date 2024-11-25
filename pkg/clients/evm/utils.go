@@ -42,10 +42,10 @@ func DecodeInput(input []byte) (*DecodedExecuteData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack execute input: %w", err)
 	}
-	log.Debug().
-		Str("data", hex.EncodeToString(args[0].([]byte))).
-		Str("proof", hex.EncodeToString(args[1].([]byte))).
-		Msg("[EvmClient] [DecodeInput]")
+	// log.Debug().
+	// 	Str("data", hex.EncodeToString(args[0].([]byte))).
+	// 	Str("proof", hex.EncodeToString(args[1].([]byte))).
+	// 	Msg("[EvmClient] [DecodeInput]")
 	//Decode the data
 	dataDecoded, err := AbiUnpack(args[0].([]byte), "uint256", "bytes32[]", "string[]", "bytes[]")
 	if err != nil {

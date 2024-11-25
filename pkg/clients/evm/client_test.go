@@ -18,6 +18,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
+	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/stretchr/testify/require"
 )
 
@@ -128,7 +129,15 @@ func TestEvmClientListenEVMExecutedEvent(t *testing.T) {
 	}
 	select {}
 }
-
+func TestRecoverThenWatchForEvent(t *testing.T) {
+	fnCreateEventData := func(log types.Log) *contracts.IAxelarGatewayContractCall {
+		return &contracts.IAxelarGatewayContractCall{
+			Raw: log,
+		}
+	}
+	err := evm.RecoverThenWatchForEvent[*contracts.IAxelarGatewayContractCall](evmClient, context.Background(), events.EVENT_EVM_CONTRACT_CALL, fnCreateEventData)
+	require.NoError(t, err)
+}
 func TestEvmSubscribe(t *testing.T) {
 	fmt.Println("Test evm client")
 

@@ -50,11 +50,15 @@ func (c *Client) handleBtcSignatureRequested(messageID string, signatureRequest 
 	if err := finalTx.Serialize(finalTxBuf); err != nil {
 		return fmt.Errorf("failed to serialize final tx: %w", err)
 	}
-	c.eventBus.BroadcastEvent(&events.EventEnvelope{
-		EventType:        events.EVENT_CUSTODIAL_SIGNATURES_CONFIRMED,
-		DestinationChain: c.networkConfig.SignerNetwork,
-		Data:             hex.EncodeToString(buf.Bytes()),
-		MessageID:        messageID,
-	})
+	if c.eventBus != nil {
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_CUSTODIAL_SIGNATURES_CONFIRMED,
+			DestinationChain: c.networkConfig.SignerNetwork,
+			Data:             hex.EncodeToString(buf.Bytes()),
+			MessageID:        messageID,
+		})
+	} else {
+		log.Warn().Msg("[CustodialClient] [handleBtcSignatureRequested] event bus is undefined")
+	}
 	return nil
 }
