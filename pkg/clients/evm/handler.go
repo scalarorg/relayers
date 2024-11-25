@@ -100,15 +100,17 @@ func (ec *EvmClient) HandleContractCallApproved(event *contracts.IAxelarGatewayC
 		log.Error().Err(err).Msg("[EvmClient] [handleContractCallApproved] find relay data")
 		return err
 	}
-	log.Info().Any("relayData", relayDatas).Msg("[EvmClient] [handleContractCallApproved] query relaydata by ContractAddress, SourceAddress, PayloadHash")
+	log.Debug().Str("contractAddress", event.ContractAddress.String()).
+		Str("sourceAddress", event.SourceAddress).
+		Str("payloadHash", hex.EncodeToString(event.PayloadHash[:])).
+		Any("relayDatas", relayDatas).
+		Msg("[EvmClient] [handleContractCallApproved] query relaydata by ContractCall")
 	//3. Execute payload in the found relaydatas
 	executeResults, err := ec.executeDestinationCall(event, relayDatas)
 	if err != nil {
-		return fmt.Errorf("failed to execute relaydatas: %w", err)
+		log.Warn().Err(err).Any("executeResults", executeResults).Msg("[EvmClient] [handleContractCallApproved] execute destination call")
 	}
-	log.Info().Any("executeResults", executeResults).Msg("[EvmClient] [handleContractCallApproved] execute destination call")
 	//Done; Don't need to send to the bus
-
 	// TODO: Do we need to update relay data atomically?
 	err = ec.dbAdapter.UpdateBatchRelayDataStatus(executeResults, len(executeResults))
 	if err != nil {
@@ -194,10 +196,7 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IAxelarGatewayExecut
 	//0. Preprocess the event
 	ec.preprocessCommandExecuted(event)
 	//1. Convert into a RelayData instance then store to the db
-	cmdExecuted, err := ec.CommandExecutedEvent2Model(event)
-	if err != nil {
-		return fmt.Errorf("failed to convert EVMExecutedEvent to RelayData: %w", err)
-	}
+	cmdExecuted := ec.CommandExecutedEvent2Model(event)
 	//Find the ContractCall by sourceTxHash and sourceEventIndex
 	// contractCall, err := ec.dbAdapter.FindContractCallByCommnadId(cmdExecuted.CommandId)
 	// if err != nil {
@@ -205,7 +204,7 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IAxelarGatewayExecut
 	// }
 	// cmdExecuted.CallContract = contractCall
 	// cmdExecuted.ReferenceTxHash = &contractCall.TxHash
-	err = ec.dbAdapter.CreateSingleValue(&cmdExecuted)
+	err := ec.dbAdapter.CreateSingleValue(&cmdExecuted)
 	if err != nil {
 		return fmt.Errorf("failed to create evm executed: %w", err)
 	}

@@ -193,45 +193,40 @@ func RecoverThenWatchForEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
 	log.Info().Uint64("Current BlockNumber", blockNumber).Msg("[EvmClient] [RecoverThenWatchForEvent]")
-	//This case should not happen
-	//It can only happen if the db is set to a future block by debugger
-	if lastCheckpoint.BlockNumber > uint64(blockNumber) {
-		return nil
-	}
 
 	//recover missing events from the last checkpoint block number to the current block number
-	for {
-		missingEvents, err := GetMissingEvents[T](c, eventName, lastCheckpoint, fnCreateEventData)
+	missingEvents, err := GetMissingEvents[T](c, eventName, lastCheckpoint, fnCreateEventData)
+	if err != nil {
+		return fmt.Errorf("failed to get missing events: %w", err)
+	}
+	for len(missingEvents) > 0 {
+		//Process the missing events
+		for _, event := range missingEvents {
+			log.Debug().Str("eventName", eventName).
+				Str("txHash", event.Hash).
+				Msg("[EvmClient] [RecoverThenWatchForEvent] start handling missing event")
+			err := c.handleEvent(event.Args)
+			//Update the last checkpoint value for next iteration
+			lastCheckpoint.BlockNumber = blockNumber
+			lastCheckpoint.TxIndex = event.TxIndex
+			lastCheckpoint.TxHash = event.Hash
+			//If handleEvent success, the last checkpoint is updated within the function
+			//So we need to update the last checkpoint only if handleEvent failed
+			if err != nil {
+				log.Error().Err(err).Msg("[EvmClient] [RecoverThenWatchForEvent] failed to handle event")
+				err = c.dbAdapter.UpdateLastEventCheckPoint(lastCheckpoint)
+				if err != nil {
+					log.Error().Err(err).Msg("[EvmClient] [RecoverThenWatchForEvent] update last checkpoint failed")
+				}
+			}
+		}
+		missingEvents, err = GetMissingEvents[T](c, eventName, lastCheckpoint, fnCreateEventData)
 		if err != nil {
 			return fmt.Errorf("failed to get missing events: %w", err)
 		}
-		if len(missingEvents) > 0 {
-			//Process the missing events
-			for _, event := range missingEvents {
-				log.Debug().Str("eventName", eventName).
-					Str("txHash", event.Hash).
-					Msg("[EvmClient] [RecoverThenWatchForEvent] start handling missing event")
-				err := c.handleEvent(event.Args)
-				//Update the last checkpoint value for next iteration
-				lastCheckpoint.BlockNumber = blockNumber
-				lastCheckpoint.TxIndex = event.TxIndex
-				lastCheckpoint.TxHash = event.Hash
-				//If handleEvent success, the last checkpoint is updated within the function
-				//So we need to update the last checkpoint only if handleEvent failed
-				if err != nil {
-					log.Error().Err(err).Msg("[EvmClient] [RecoverThenWatchForEvent] failed to handle event")
-					err = c.dbAdapter.UpdateLastEventCheckPoint(lastCheckpoint)
-					if err != nil {
-						log.Error().Err(err).Msg("[EvmClient] [RecoverThenWatchForEvent] update last checkpoint failed")
-					}
-				}
-			}
-		} else {
-			//Watch for new events
-			log.Info().Msg("[EvmClient] [watchForEvent] no missing events")
-			break
-		}
 	}
+
+	//Watch for new events
 	watchOpts := bind.WatchOpts{Start: &lastCheckpoint.BlockNumber, Context: ctx}
 	//Watch for new event
 	err = watchForEvent(c, eventName, &watchOpts)
@@ -385,6 +380,8 @@ func (c *EvmClient) Start(ctx context.Context) error {
 	//Subscribe to the event bus
 	c.subscribeEventBus()
 	var err error
+	//Recover missing ContractCall events from the last checkpoint block number to the current block number
+	//Then watch for new events
 	err = RecoverThenWatchForEvent[*contracts.IAxelarGatewayContractCall](c, ctx,
 		events.EVENT_EVM_CONTRACT_CALL, func(log types.Log) *contracts.IAxelarGatewayContractCall {
 			return &contracts.IAxelarGatewayContractCall{
@@ -395,30 +392,24 @@ func (c *EvmClient) Start(ctx context.Context) error {
 		log.Error().Err(err).Str("eventName", events.EVENT_EVM_CONTRACT_CALL).Msg("failed to watch event")
 	}
 
-	watchOpts := bind.WatchOpts{Start: &c.evmConfig.LastBlock, Context: ctx}
-	//Listen to the gateway ContractCallEvent
-	//This event is initiated by user
-	//1. User call protocol's smart contract on the evm
-	//2. Protocol sm call Scalar gateway contract for emitting ContractCallEvent
-	// err = c.watchContractCall(&watchOpts)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to watch ContractCallEvent: %w", err)
-	// }
-	// Listen to the gateway ContractCallApprovedEvent
-	// This event is emitted by the ScalarGateway contract when the executeData is broadcast to the Gateway by call method
-	// ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
-	// Received this event relayer find payload from the db and call the execute method on the protocol's smart contract
-	err = c.watchContractCallApproved(&watchOpts)
+	err = RecoverThenWatchForEvent[*contracts.IAxelarGatewayContractCallApproved](c, ctx,
+		events.EVENT_EVM_CONTRACT_CALL_APPROVED, func(log types.Log) *contracts.IAxelarGatewayContractCallApproved {
+			return &contracts.IAxelarGatewayContractCallApproved{
+				Raw: log,
+			}
+		})
 	if err != nil {
-		return fmt.Errorf("failed to watch ContractCallApprovedEvent: %w", err)
+		log.Error().Err(err).Str("eventName", events.EVENT_EVM_CONTRACT_CALL_APPROVED).Msg("failed to watch event")
 	}
-	// Listen to the gateway ExecutedEvent
-	// This event is emitted by the gateway contract when the executeData if broadcast to the Gateway by call method
-	// ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
-	// Receiverd this event, the relayer store the executed data to the db for scanner
-	err = c.watchEVMExecuted(&watchOpts)
+
+	err = RecoverThenWatchForEvent[*contracts.IAxelarGatewayExecuted](c, ctx,
+		events.EVENT_EVM_COMMAND_EXECUTED, func(log types.Log) *contracts.IAxelarGatewayExecuted {
+			return &contracts.IAxelarGatewayExecuted{
+				Raw: log,
+			}
+		})
 	if err != nil {
-		return fmt.Errorf("failed to watch EVMExecutedEvent: %w", err)
+		log.Error().Err(err).Str("eventName", events.EVENT_EVM_COMMAND_EXECUTED).Msg("failed to watch event")
 	}
 	// Watch pending transactions, call to the evm network to check if the transaction is included in a block
 	c.WatchPendingTxs()

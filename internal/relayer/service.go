@@ -68,19 +68,6 @@ func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
 }
 
 func (s *Service) Start(ctx context.Context) error {
-
-	//Start electrum clients
-	for _, client := range s.Electrs {
-		go client.Start(ctx)
-	}
-	//Start evm clients
-	for _, client := range s.EvmClients {
-		go client.Start(ctx)
-	}
-	//Start btc clients
-	for _, client := range s.BtcClient {
-		go client.Start(ctx)
-	}
 	//Start scalar client
 	if s.ScalarClient != nil {
 		go func() {
@@ -101,6 +88,18 @@ func (s *Service) Start(ctx context.Context) error {
 		}()
 	} else {
 		log.Warn().Msg("[Relayer] [Start] custodial client is undefined")
+	}
+	//Start electrum clients
+	for _, client := range s.Electrs {
+		go client.Start(ctx)
+	}
+	//Start evm clients
+	for _, client := range s.EvmClients {
+		go client.Start(ctx)
+	}
+	//Start btc clients
+	for _, client := range s.BtcClient {
+		go client.Start(ctx)
 	}
 	return nil
 }

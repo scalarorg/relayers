@@ -60,7 +60,7 @@ func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IAxelarGate
 	return relayData, nil
 }
 
-func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IAxelarGatewayExecuted) (models.CommandExecuted, error) {
+func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IAxelarGatewayExecuted) models.CommandExecuted {
 	id := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
 	cmdExecuted := models.CommandExecuted{
 		ID:               id,
@@ -73,5 +73,5 @@ func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IAxelarGatewayEx
 		Status:           int(relaydata.SUCCESS),
 		ReferenceTxHash:  nil,
 	}
-	return cmdExecuted, nil
+	return cmdExecuted
 }
