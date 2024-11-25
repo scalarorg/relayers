@@ -15,47 +15,51 @@ import (
 )
 
 func (c *Client) handleContractCallApprovedEvents(ctx context.Context, events []IBCEvent[ContractCallApproved]) error {
+	updates := make([]db.RelaydataExecuteResult, 0)
 	for _, event := range events {
-		err := c.handleContractCallApprovedEvent(ctx, &event)
+		result, err := c.handleContractCallApprovedEvent(ctx, &event)
 		if err != nil {
 			return err
 		}
+		if result != nil {
+			updates = append(updates, *result)
+		}
 	}
-	return nil
+	return c.dbAdapter.UpdateBatchRelayDataStatus(updates, len(updates))
 }
-func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBCEvent[ContractCallApproved]) error {
+func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBCEvent[ContractCallApproved]) (*db.RelaydataExecuteResult, error) {
 	err := c.preprocessContractCallApprovedEvent(event)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	//1. Get pending command from Scalar network
 	destinationChain := event.Args.DestinationChain
 	pendingCommands, err := c.queryClient.QueryPendingCommand(ctx, destinationChain)
 	if err != nil {
-		return fmt.Errorf("failed to get pending command: %w", err)
+		return nil, fmt.Errorf("failed to get pending command: %w", err)
 	}
 	if len(pendingCommands) == 0 {
 		log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] No pending command found")
-		return nil
+		return nil, nil
 	}
 	log.Debug().Any("pendingCommands", pendingCommands).Msgf("[ScalarClient] [handleContractCallApprovedEvent]")
 	//2. Sign the commands request
 	signRes, err := c.network.SignCommandsRequest(ctx, destinationChain)
 	if err != nil || signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") || signRes.TxHash == "" {
-		return fmt.Errorf("failed to sign commands request: %v, %w", signRes, err)
+		return nil, fmt.Errorf("failed to sign commands request: %v, %w", signRes, err)
 	}
 	log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] Successfully broadcasted sign commands request with txHash: %s. Waiting for sign event...", signRes.TxHash)
 	//3. Wait for the sign event
 	//Todo: Check if the sign event is received
 	batchCommandId, commandIDs := c.waitForSignCommandsEvent(ctx, signRes.TxHash)
 	if batchCommandId == "" || commandIDs == "" {
-		return fmt.Errorf("BatchCommandId not found")
+		return nil, fmt.Errorf("BatchCommandId not found")
 	}
 	log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] Successfully received sign commands event with batch command id: %s", batchCommandId)
 	// 2. Old version, loop for get ExecuteData from batch command id
 	executeData, err := c.waitForExecuteData(ctx, event.Args.DestinationChain, batchCommandId)
 	if err != nil {
-		return fmt.Errorf("[ScalarClient] [handleContractCallApprovedEvent] failed to get execute data: %w", err)
+		return nil, fmt.Errorf("[ScalarClient] [handleContractCallApprovedEvent] failed to get execute data: %w", err)
 	}
 	eventEnvelope := events.EventEnvelope{
 		EventType:        events.EVENT_SCALAR_CONTRACT_CALL_APPROVED,
@@ -69,7 +73,10 @@ func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBC
 	// Todo:After the executeData is broadcasted,
 	// Update status of the RelayerData to Approved
 	c.eventBus.BroadcastEvent(&eventEnvelope)
-	return nil
+	return &db.RelaydataExecuteResult{
+		Status:      db.APPROVED,
+		RelayDataId: event.Args.MessageID,
+	}, nil
 }
 func (c *Client) handleSignCommandsEvents(ctx context.Context, events []IBCEvent[SignCommands]) error {
 	for _, event := range events {

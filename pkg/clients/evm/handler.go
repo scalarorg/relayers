@@ -66,7 +66,10 @@ func (ec *EvmClient) preprocessContractCall(event *contracts.IAxelarGatewayContr
 
 func (ec *EvmClient) HandleContractCallApproved(event *contracts.IAxelarGatewayContractCallApproved) error {
 	//0. Preprocess the event
-	ec.preprocessContractCallApproved(event)
+	err := ec.preprocessContractCallApproved(event)
+	if err != nil {
+		return fmt.Errorf("failed to preprocess contract call approved: %w", err)
+	}
 	//1. Convert into a RelayData instance then store to the db
 	contractCallApproved, err := ec.ContractCallApprovedEvent2Model(event)
 	if err != nil {
@@ -97,6 +100,12 @@ func (ec *EvmClient) HandleContractCallApproved(event *contracts.IAxelarGatewayC
 	}
 	log.Info().Any("executeResults", executeResults).Msg("[EvmClient] [handleContractCallApproved] execute destination call")
 	//Done; Don't need to send to the bus
+
+	// TODO: Do we need to update relay data atomically?
+	err = ec.dbAdapter.UpdateBatchRelayDataStatus(executeResults, len(executeResults))
+	if err != nil {
+		return fmt.Errorf("failed to update relay data status to executed: %w", err)
+	}
 	return nil
 }
 func (ec *EvmClient) executeDestinationCall(event *contracts.IAxelarGatewayContractCallApproved, relayDatas []models.RelayData) ([]db.RelaydataExecuteResult, error) {
@@ -126,7 +135,20 @@ func (ec *EvmClient) executeDestinationCall(event *contracts.IAxelarGatewayContr
 			if err != nil {
 				return nil, fmt.Errorf("execute destination call with error: %w", err)
 			}
+
 			log.Info().Any("txReceipt", receipt).Msg("[EvmClient] [executeDestinationCall]")
+
+			if receipt.Hash() != (common.Hash{}) {
+				executeResults = append(executeResults, db.RelaydataExecuteResult{
+					Status:      db.SUCCESS,
+					RelayDataId: relayData.ID,
+				})
+			} else {
+				executeResults = append(executeResults, db.RelaydataExecuteResult{
+					Status:      db.FAILED,
+					RelayDataId: relayData.ID,
+				})
+			}
 		}
 	}
 	return executeResults, nil
