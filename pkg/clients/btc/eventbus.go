@@ -237,6 +237,14 @@ func (c *BtcClient) handleCustodialSignaturesConfirmed(messageID string, signedP
 			Msg("[BtcClient] [handleCustodialSignaturesConfirmed] failed to broadcast tx")
 		return err
 	}
+	txHashStr := txHash.String()
 	log.Debug().Msgf("[BtcClient] [handleCustodialSignaturesConfirmed] broadcasted txHash: %s", txHash)
+	err = c.dbAdapter.UpdateRelayDataStatueWithExecuteHash(messageID, relaydata.SUCCESS, &txHashStr)
+	if err != nil {
+		log.Error().Err(err).
+			Str("messageID", messageID).
+			Str("signedPsbt", signedPsbt).
+			Msg("[BtcClient] [handleCustodialSignaturesConfirmed] failed to update relay data status")
+	}
 	return nil
 }
