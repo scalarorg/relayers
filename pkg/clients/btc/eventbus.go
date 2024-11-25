@@ -214,7 +214,7 @@ func (c *BtcClient) requestCustodialSignatures(executeParams *types.ExecuteParam
 		c.eventBus.BroadcastEvent(&events.EventEnvelope{
 			EventType:        events.EVENT_BTC_SIGNATURE_REQUESTED,
 			DestinationChain: events.CUSTODIAL_NETWORK_NAME,
-			Data: &events.SignatureRequest{
+			Data: events.SignatureRequest{
 				ExecuteParams: executeParams,
 				Base64Psbt:    base64Psbt,
 			},
