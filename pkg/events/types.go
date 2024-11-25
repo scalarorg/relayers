@@ -6,7 +6,7 @@ const (
 	CUSTODIAL_NETWORK_NAME               = "Custodial.Network"
 	SCALAR_NETWORK_NAME                  = "Scalar.Network"
 	EVENT_BTC_SIGNATURE_REQUESTED        = "Btc.SignatureRequested"
-	EVENT_CUSTODIAL_SIGNATURES_CONFIRMED = "Custodial.SinaturesConfirmed"
+	EVENT_CUSTODIAL_SIGNATURES_CONFIRMED = "Custodial.SignaturesConfirmed"
 	EVENT_ELECTRS_VAULT_TRANSACTION      = "Electrs.VaultTransaction"
 	EVENT_SCALAR_CONTRACT_CALL_APPROVED  = "Scalar.ContractCallApproved"
 	EVENT_SCALAR_COMMAND_EXECUTED        = "Scalar.CommandExecuted"

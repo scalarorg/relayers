@@ -113,10 +113,12 @@ func (c *Client) Start(ctx context.Context) error {
 	receiver := c.eventBus.Subscribe(SCALAR_NETWORK_NAME)
 	go func() {
 		for event := range receiver {
-			err := c.handleEventBusMessage(event)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [Start] error: %v", err)
-			}
+			go func() {
+				err := c.handleEventBusMessage(event)
+				if err != nil {
+					log.Error().Msgf("[ScalarClient] [Start] error: %v", err)
+				}
+			}()
 		}
 	}()
 	//Start rpc client

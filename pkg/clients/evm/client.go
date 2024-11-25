@@ -365,9 +365,7 @@ func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) error {
 	// defer subExecuted.Unsubscribe()
 	return nil
 }
-
-func (c *EvmClient) Start(ctx context.Context) error {
-	//Subscribe to the event bus
+func (c *EvmClient) subscribeEventBus() {
 	if c.eventBus != nil {
 		log.Debug().Msgf("[EvmClient] [Start] subscribe to the event bus %s", c.evmConfig.GetId())
 		receiver := c.eventBus.Subscribe(c.evmConfig.GetId())
@@ -379,7 +377,13 @@ func (c *EvmClient) Start(ctx context.Context) error {
 				}
 			}
 		}()
+	} else {
+		log.Warn().Msgf("[EvmClient] [subscribeEventBus] event bus is not set")
 	}
+}
+func (c *EvmClient) Start(ctx context.Context) error {
+	//Subscribe to the event bus
+	c.subscribeEventBus()
 	var err error
 	err = RecoverThenWatchForEvent[*contracts.IAxelarGatewayContractCall](c, ctx,
 		events.EVENT_EVM_CONTRACT_CALL, func(log types.Log) *contracts.IAxelarGatewayContractCall {

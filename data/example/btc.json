@@ -22,7 +22,7 @@
         "_comment": "Remove gateway address in xchains core's btc module",
         "type": "broadcast",
         "host": "testnet4.btc.scalar.org",
-        "port": 48332,
+        "port": 80,
         "ssl": false,
         "user": "user",
         "password": "password"

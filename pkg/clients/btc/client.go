@@ -91,14 +91,14 @@ func newBtcClientFromConfig(globalConfig *config.Config, btcConfig *BtcNetworkCo
 func (c *BtcClient) Start(ctx context.Context) error {
 	//Subscribe to the event bus by string identity
 	receiver := c.eventBus.Subscribe(c.btcConfig.GetId())
-	go func() {
-		for event := range receiver {
+	for event := range receiver {
+		go func() {
 			err := c.handleEventBusMessage(event)
 			if err != nil {
 				log.Error().Msgf("failed to handle event bus message: %v", err)
 			}
-		}
-	}()
+		}()
+	}
 	return nil
 }
 

@@ -2,15 +2,19 @@
 
 start() {
     source .env
-    go run ./main.go --env ${1:-""}
+    CGO_LDFLAGS="-L./lib -lbitcoin_vault_ffi" CGO_CFLAGS="-I./lib" go run ./main.go --env ${1:-""}
 }
  # example ./run.sh test clients/scalar
  # example ./run.sh test clients/scalar/client_test.go
 test() {
+    OPTIONS="-timeout 10m -v -count=1"
+
     if [ -n "$1" ]; then
-        go test -timeout 10m ./pkg/${1} -v -count=1
-    else
-        go test -timeout 10m -v -count=1
+        OPTIONS="${OPTIONS} -run ^${1}$"
+        if [ -n "$2" ]; then
+            OPTIONS="${OPTIONS} ./pkg/${2}"
+        fi
     fi
+    CGO_LDFLAGS="-L./lib -lbitcoin_vault_ffi" CGO_CFLAGS="-I./lib" go test ${OPTIONS}
 }
 $@

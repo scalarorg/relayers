@@ -231,7 +231,11 @@ func (c *BtcClient) handleCustodialSignaturesConfirmed(messageID string, signedP
 	//Broadcast to the network
 	txHash, err := c.BroadcastRawTx(signedPsbt)
 	if err != nil {
-		return fmt.Errorf("[BtcClient] [handleCustodialSignaturesConfirmed] failed to broadcast tx: %w", err)
+		log.Error().Err(err).
+			Str("messageID", messageID).
+			Str("signedPsbt", signedPsbt).
+			Msg("[BtcClient] [handleCustodialSignaturesConfirmed] failed to broadcast tx")
+		return err
 	}
 	log.Debug().Msgf("[BtcClient] [handleCustodialSignaturesConfirmed] broadcasted txHash: %s", txHash)
 	return nil

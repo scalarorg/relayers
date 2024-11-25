@@ -90,14 +90,14 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 
 func (c *Client) Start(ctx context.Context) error {
 	receiver := c.eventBus.Subscribe(events.CUSTODIAL_NETWORK_NAME)
-	go func() {
-		for event := range receiver {
+	for event := range receiver {
+		go func() {
 			err := c.handleEventBusMessage(event)
 			if err != nil {
-				log.Error().Msgf("Failed to handle event bus message: %v", err)
+				log.Error().Err(err).Str("destinationChain", c.networkConfig.SignerNetwork).Msg("[CustodialClient] [EventHandler] failed to handle event bus message")
 			}
-		}
-	}()
+		}()
+	}
 	//Start rpc client
 	return nil
 }

@@ -16,7 +16,11 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 	log.Info().Msgf("[CustodialClient] [handleEventBusMessage]: %v", event)
 	switch event.EventType {
 	case events.EVENT_BTC_SIGNATURE_REQUESTED:
-		return c.handleBtcSignatureRequested(event.MessageID, event.Data.(events.SignatureRequest))
+		err := c.handleBtcSignatureRequested(event.MessageID, event.Data.(events.SignatureRequest))
+		if err != nil {
+			log.Error().Err(err).Msg("[CustodialClient] [handleEventBusMessage] failed to handle btc signature requested event")
+			return err
+		}
 	}
 	return nil
 }
@@ -51,10 +55,11 @@ func (c *Client) handleBtcSignatureRequested(messageID string, signatureRequest 
 		return fmt.Errorf("failed to serialize final tx: %w", err)
 	}
 	if c.eventBus != nil {
+
 		c.eventBus.BroadcastEvent(&events.EventEnvelope{
 			EventType:        events.EVENT_CUSTODIAL_SIGNATURES_CONFIRMED,
 			DestinationChain: c.networkConfig.SignerNetwork,
-			Data:             hex.EncodeToString(buf.Bytes()),
+			Data:             hex.EncodeToString(finalTxBuf.Bytes()),
 			MessageID:        messageID,
 		})
 	} else {

@@ -33,28 +33,25 @@ func GetEventBus(config *config.EventBusConfig) *EventBus {
 	}
 	return eventBus
 }
-func (eb *EventBus) filterChannels(destinationChain string) Channels {
-	eb.channelsMutex.Lock()
-	defer eb.channelsMutex.Unlock()
-	return eb.channels[destinationChain]
-}
 
 func (eb *EventBus) BroadcastEvent(event *EventEnvelope) {
-	channels := eb.filterChannels(event.DestinationChain)
+	eb.channelsMutex.Lock()
+	defer eb.channelsMutex.Unlock()
+	channels := eb.channels[event.DestinationChain]
 	for _, channel := range channels {
 		channel <- event
 	}
 }
 
 func (eb *EventBus) Subscribe(destinationChain string) <-chan *EventEnvelope {
-	log.Debug().Msgf("Subscribing to %s", destinationChain)
+	log.Debug().Str("destinationChain", destinationChain).Msg("[EventBus] [Subscribe]")
 	sender := make(chan *EventEnvelope)
 	eb.channelsMutex.Lock()
+	defer eb.channelsMutex.Unlock()
 	if eb.channels[destinationChain] == nil {
 		eb.channels[destinationChain] = []chan<- *EventEnvelope{sender}
 	} else {
 		eb.channels[destinationChain] = append(eb.channels[destinationChain], sender)
 	}
-	eb.channelsMutex.Unlock()
 	return sender
 }
