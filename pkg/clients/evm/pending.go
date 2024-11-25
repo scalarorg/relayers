@@ -25,6 +25,7 @@ func (c *EvmClient) WatchPendingTxs() {
 				allEvents, err := c.PollTxForEvents(tx)
 				if err != nil || allEvents == nil {
 					log.Error().Err(err).Str("txHash", tx.TxHash).Msg("[EvmClient] [watchPendingTxs] failed to get transaction receipt")
+					continue
 				}
 				if allEvents.ContractCallApproved != nil {
 					log.Debug().Msg("[EvmClient] [PendingTxs] found ContractCallApproved event")
