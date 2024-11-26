@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
 	"github.com/scalarorg/go-electrum/electrum/types"
@@ -44,6 +45,7 @@ func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayDa
 			Symbol:          "",
 		},
 	}
+	relayData.CreatedAt = time.UnixMilli(vaultTx.Timestamp)
 	//parse chain id to chain name
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, vaultTx.DestChain)
