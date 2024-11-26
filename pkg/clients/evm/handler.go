@@ -110,7 +110,7 @@ func (ec *EvmClient) HandleContractCallApproved(event *contracts.IAxelarGatewayC
 	if err != nil {
 		log.Warn().Err(err).Any("executeResults", executeResults).Msg("[EvmClient] [handleContractCallApproved] execute destination call")
 	}
-	//Done; Don't need to send to the bus
+	// Done; Don't need to send to the bus
 	// TODO: Do we need to update relay data atomically?
 	err = ec.dbAdapter.UpdateBatchRelayDataStatus(executeResults, len(executeResults))
 	if err != nil {
@@ -122,7 +122,7 @@ func (ec *EvmClient) executeDestinationCall(event *contracts.IAxelarGatewayContr
 	executeResults := []db.RelaydataExecuteResult{}
 	executed, err := ec.isContractCallExecuted(event)
 	if err != nil {
-		return nil, fmt.Errorf("[EvmClient] [executeDestinationCall] failed to check if contract call is approved: %w", err)
+		return executeResults, fmt.Errorf("[EvmClient] [executeDestinationCall] failed to check if contract call is approved: %w", err)
 	}
 	if executed {
 		//Update the relay data status to executed
@@ -143,7 +143,7 @@ func (ec *EvmClient) executeDestinationCall(event *contracts.IAxelarGatewayContr
 				Msg("[EvmClient] [executeDestinationCall]")
 			receipt, err := ec.ExecuteDestinationCall(event.ContractAddress, event.CommandId, event.SourceChain, event.SourceAddress, relayData.CallContract.Payload)
 			if err != nil {
-				return nil, fmt.Errorf("execute destination call with error: %w", err)
+				return executeResults, fmt.Errorf("execute destination call with error: %w", err)
 			}
 
 			log.Info().Any("txReceipt", receipt).Msg("[EvmClient] [executeDestinationCall]")
