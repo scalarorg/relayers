@@ -39,7 +39,7 @@ func (c *BtcClient) handleScalarContractCallApproved(messageID string, executeDa
 		return fmt.Errorf("[BtcClient] [handleScalarContractCallApproved] commands and params length mismatch")
 	}
 	for i := 0; i < len(decodedExecuteData.Commands); i++ {
-		err := c.executeBtcCommand(decodedExecuteData.CommandIds[i], decodedExecuteData.Commands[i], decodedExecuteData.Params[i])
+		err := c.executeBtcCommand(messageID, decodedExecuteData.CommandIds[i], decodedExecuteData.Commands[i], decodedExecuteData.Params[i])
 		if err != nil {
 			log.Error().Msgf("[BtcClient] [handleScalarContractCallApproved] failed to execute btc command: %s, %v", decodedExecuteData.Commands[i], err)
 			return fmt.Errorf("failed to execute btc command: %w", err)
@@ -53,7 +53,7 @@ func (c *BtcClient) handleScalarContractCallApproved(messageID string, executeDa
 	}
 	return nil
 }
-func (c *BtcClient) executeBtcCommand(commandId [32]byte, command string, params []byte) error {
+func (c *BtcClient) executeBtcCommand(messageID string, commandId [32]byte, command string, params []byte) error {
 	executeParams, err := ParseExecuteParams(params)
 	if err != nil {
 		return fmt.Errorf("[BtcClient] [executeBtcCommand] failed to parse execute params: %w", err)
@@ -77,7 +77,7 @@ func (c *BtcClient) executeBtcCommand(commandId [32]byte, command string, params
 	log.Debug().Msgf("[BtcClient] [executeBtcCommand] decodedPsbtPayload: %v", decodedPsbtPayload)
 
 	//3. request signers for signatures
-	err = c.broadcastForSignatures(executeParams, decodedPsbtPayload[0].(string))
+	err = c.broadcastForSignatures(messageID, executeParams, decodedPsbtPayload[0].(string))
 	if err != nil {
 		return fmt.Errorf("[BtcClient] [executeBtcCommand] failed to broadcast for signatures: %w", err)
 	}
@@ -91,7 +91,7 @@ func (c *BtcClient) observeScalarContractCallApproved(decodedExecuteData *Decode
 	return nil
 }
 
-func (c *BtcClient) broadcastForSignatures(executeParams *types.ExecuteParams, base64Psbt string) error {
+func (c *BtcClient) broadcastForSignatures(messageID string, executeParams *types.ExecuteParams, base64Psbt string) error {
 	//1. Detect which parties need to sign byte first 2 bytes of the base64Psbt
 	//Real base64Psbt is without the first 2 bytes
 	signingType, finalBase64Psbt := c.detectSigningType(executeParams, base64Psbt)
@@ -101,7 +101,7 @@ func (c *BtcClient) broadcastForSignatures(executeParams *types.ExecuteParams, b
 	if signingType == CUSTODIAL_ONLY {
 		//2. Request custodial signatures
 		//Signatures will be handled by custodial network in asynchronous manner
-		err = c.requestCustodialSignatures(executeParams, finalBase64Psbt)
+		err = c.requestCustodialSignatures(messageID, executeParams, finalBase64Psbt)
 		if err != nil {
 			log.Err(err).Msg("[BtcClient] [broadcastForSignatures] failed to request custodial signaturess")
 			return err
@@ -208,12 +208,13 @@ func (c *BtcClient) requestProtocolSignature(executeParams *types.ExecuteParams,
 }
 
 // Request custodial signatures from custodial network
-func (c *BtcClient) requestCustodialSignatures(executeParams *types.ExecuteParams, base64Psbt string) error {
+func (c *BtcClient) requestCustodialSignatures(messageID string, executeParams *types.ExecuteParams, base64Psbt string) error {
 	log.Debug().Msgf("[BtcClient] [requestCustodialSignatures] request custodial signatures")
 	if c.eventBus != nil {
 		c.eventBus.BroadcastEvent(&events.EventEnvelope{
 			EventType:        events.EVENT_BTC_SIGNATURE_REQUESTED,
 			DestinationChain: events.CUSTODIAL_NETWORK_NAME,
+			MessageID:        messageID,
 			Data: events.SignatureRequest{
 				ExecuteParams: executeParams,
 				Base64Psbt:    base64Psbt,

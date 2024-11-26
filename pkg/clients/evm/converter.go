@@ -1,6 +1,7 @@
 package evm
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -11,7 +12,20 @@ import (
 )
 
 func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IAxelarGatewayContractCall) (models.RelayData, error) {
-	id := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
+	//id := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
+	//Calculate eventId by Txhash-logIndex among logs in txreceipt (AxelarEvmModule)
+	//https://github.com/axelarnetwork/axelar-core/blob/main/vald/evm/gateway_tx_confirmation.go#L73
+	receipt, err := c.Client.TransactionReceipt(context.Background(), event.Raw.TxHash)
+	if err != nil {
+		return models.RelayData{}, fmt.Errorf("failed to get transaction receipt: %w", err)
+	}
+	var id string
+	for _, log := range receipt.Logs {
+		if log.Index == event.Raw.Index {
+			id = fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), log.Index)
+			break
+		}
+	}
 	senderAddress := event.Sender.String()
 	relayData := models.RelayData{
 		ID:   id,
