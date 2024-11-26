@@ -195,9 +195,8 @@ func RecoverThenWatchForEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context
 	log.Info().Uint64("Current BlockNumber", blockNumber).Msg("[EvmClient] [RecoverThenWatchForEvent]")
 
 	//recover missing events from the last checkpoint block number to the current block number
-	//Because we can miss some event in the same block as in current checkpoint
-	//So if we get only one event in the block, we need to break the loop
-	lastBlockNumber := lastCheckpoint.BlockNumber
+	// We already filtered received event (defined by block and logIndex)
+	// So if no more missing events, then function GetMissionEvents returns an empty array
 	missingEvents, err := GetMissingEvents[T](c, eventName, lastCheckpoint, fnCreateEventData)
 	if err != nil {
 		return fmt.Errorf("failed to get missing events: %w", err)
@@ -208,36 +207,28 @@ func RecoverThenWatchForEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context
 			log.Debug().Str("eventName", eventName).
 				Str("txHash", event.Hash).
 				Msg("[EvmClient] [RecoverThenWatchForEvent] start handling missing event")
-			//We handle only new blocks, which does not appear in the db
-			if event.BlockNumber > lastCheckpoint.BlockNumber ||
-				(event.BlockNumber == lastCheckpoint.BlockNumber && event.TxIndex > lastCheckpoint.TxIndex) {
-				err := c.handleEvent(event.Args)
-				//Update the last checkpoint value for next iteration
-				lastCheckpoint.BlockNumber = event.BlockNumber
-				lastCheckpoint.TxIndex = event.TxIndex
-				lastCheckpoint.TxHash = event.Hash
-				//If handleEvent success, the last checkpoint is updated within the function
-				//So we need to update the last checkpoint only if handleEvent failed
-				if err != nil {
-					log.Error().Err(err).Msg("[EvmClient] [RecoverThenWatchForEvent] failed to handle event")
-				}
-				//Store the last checkpoint value into db,
-				//this can be performed only once when we finish recover, but some thing can break recover process, so we store state imediatele
-				err = c.dbAdapter.UpdateLastEventCheckPoint(lastCheckpoint)
-				if err != nil {
-					log.Error().Err(err).Msg("[EvmClient] [RecoverThenWatchForEvent] update last checkpoint failed")
-				}
+			err := c.handleEvent(event.Args)
+			//Update the last checkpoint value for next iteration
+			lastCheckpoint.BlockNumber = event.BlockNumber
+			lastCheckpoint.LogIndex = event.LogIndex
+			lastCheckpoint.TxHash = event.Hash
+			//If handleEvent success, the last checkpoint is updated within the function
+			//So we need to update the last checkpoint only if handleEvent failed
+			if err != nil {
+				log.Error().Err(err).Msg("[EvmClient] [RecoverThenWatchForEvent] failed to handle event")
+			}
+			//Store the last checkpoint value into db,
+			//this can be performed only once when we finish recover, but some thing can break recover process, so we store state imediatele
+			err = c.dbAdapter.UpdateLastEventCheckPoint(lastCheckpoint)
+			if err != nil {
+				log.Error().Err(err).Msg("[EvmClient] [RecoverThenWatchForEvent] update last checkpoint failed")
 			}
 
 		}
-		if lastBlockNumber < lastCheckpoint.BlockNumber {
-			//Check this condition for avoiding infinite loop
-			missingEvents, err = GetMissingEvents[T](c, eventName, lastCheckpoint, fnCreateEventData)
-			if err != nil {
-				return fmt.Errorf("failed to get missing events: %w", err)
-			}
-		} else {
-			break
+		//Check this condition for avoiding infinite loop
+		missingEvents, err = GetMissingEvents[T](c, eventName, lastCheckpoint, fnCreateEventData)
+		if err != nil {
+			return fmt.Errorf("failed to get missing events: %w", err)
 		}
 	}
 
@@ -250,6 +241,9 @@ func RecoverThenWatchForEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context
 	}
 	return nil
 }
+
+// Get missing events from the last checkpoint block number to the current block number
+// In query we filter out the event with index equal to the last checkpoint log index
 func GetMissingEvents[T ValidEvmEvent](c *EvmClient, eventName string, lastCheckpoint *models.EventCheckPoint, fnCreateEventData func(types.Log) T) ([]*parser.EvmEvent[T], error) {
 	event, ok := scalarGatewayAbi.Events[eventName]
 	if !ok {
@@ -273,7 +267,7 @@ func GetMissingEvents[T ValidEvmEvent](c *EvmClient, eventName string, lastCheck
 	// Parse the logs
 	for _, receiptLog := range logs {
 		if receiptLog.BlockNumber < lastCheckpoint.BlockNumber ||
-			(receiptLog.BlockNumber == lastCheckpoint.BlockNumber && receiptLog.TxIndex < lastCheckpoint.TxIndex) {
+			(receiptLog.BlockNumber == lastCheckpoint.BlockNumber && receiptLog.Index < lastCheckpoint.LogIndex) {
 			continue
 		}
 		var eventData = fnCreateEventData(receiptLog)

@@ -125,10 +125,10 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	lastCheckpoint := c.getLastCheckpoint()
 	for _, tx := range vaultTxs {
 		if uint64(tx.Height) > lastCheckpoint.BlockNumber ||
-			(uint64(tx.Height) == lastCheckpoint.BlockNumber && uint(tx.TxPosition) > lastCheckpoint.TxIndex) {
+			(uint64(tx.Height) == lastCheckpoint.BlockNumber && uint(tx.TxPosition) > lastCheckpoint.LogIndex) {
 			lastCheckpoint.BlockNumber = uint64(tx.Height)
 			lastCheckpoint.TxHash = tx.TxHash
-			lastCheckpoint.TxIndex = uint(tx.TxPosition)
+			lastCheckpoint.LogIndex = uint(tx.TxPosition)
 			lastCheckpoint.EventKey = tx.Key
 		}
 	}

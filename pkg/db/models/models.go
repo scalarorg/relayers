@@ -13,7 +13,7 @@ type EventCheckPoint struct {
 	EventName   string `gorm:"uniqueIndex:idx_chain_event;type:varchar(255)"`
 	BlockNumber uint64 `gorm:"type:bigint"`
 	TxHash      string `gorm:"type:varchar(255)"`
-	TxIndex     uint
+	LogIndex    uint
 	EventKey    string `gorm:"type:varchar(255)"`
 }
 

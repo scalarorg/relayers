@@ -32,7 +32,7 @@ func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string) (
 		EventName:   eventName,
 		BlockNumber: 0,
 		TxHash:      "",
-		TxIndex:     0,
+		LogIndex:    0,
 		EventKey:    "",
 	}
 	result := db.PostgresClient.Where("chain_name = ? AND event_name = ?", chainName, eventName).First(&lastBlock)
@@ -50,7 +50,7 @@ func UpdateLastEventCheckPoint(db *gorm.DB, value *models.EventCheckPoint) error
 			DoUpdates: clause.Assignments(map[string]interface{}{
 				"block_number": value.BlockNumber,
 				"tx_hash":      value.TxHash,
-				"tx_index":     value.TxIndex,
+				"log_index":    value.LogIndex,
 				"event_key":    value.EventKey,
 			}),
 		},
