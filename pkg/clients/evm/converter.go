@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	relaydata "github.com/scalarorg/relayers/pkg/db"
@@ -47,6 +48,12 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IAxelarGatewayC
 			Symbol:          "",
 		},
 	}
+	//Get transaction for timestamp
+	block, err := c.Client.BlockByHash(context.Background(), receipt.BlockHash)
+	if err != nil {
+		return models.RelayData{}, fmt.Errorf("failed to get transaction: %w", err)
+	}
+	relayData.CreatedAt = time.Unix(int64(block.Time()), 0)
 	return relayData, nil
 }
 

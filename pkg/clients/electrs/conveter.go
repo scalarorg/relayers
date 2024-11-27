@@ -45,7 +45,7 @@ func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayDa
 			Symbol:          "",
 		},
 	}
-	relayData.CreatedAt = time.UnixMilli(vaultTx.Timestamp)
+	relayData.CreatedAt = time.Unix(int64(vaultTx.Timestamp), 0)
 	//parse chain id to chain name
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, vaultTx.DestChain)
