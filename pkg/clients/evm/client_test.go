@@ -129,13 +129,13 @@ func TestEvmClientListenEVMExecutedEvent(t *testing.T) {
 	}
 	select {}
 }
-func TestRecoverThenWatchForEvent(t *testing.T) {
+func TestRecoverEvent(t *testing.T) {
 	fnCreateEventData := func(log types.Log) *contracts.IAxelarGatewayContractCall {
 		return &contracts.IAxelarGatewayContractCall{
 			Raw: log,
 		}
 	}
-	err := evm.RecoverThenWatchForEvent[*contracts.IAxelarGatewayContractCall](evmClient, context.Background(), events.EVENT_EVM_CONTRACT_CALL, fnCreateEventData)
+	err := evm.RecoverEvent[*contracts.IAxelarGatewayContractCall](evmClient, context.Background(), events.EVENT_EVM_CONTRACT_CALL, fnCreateEventData)
 	require.NoError(t, err)
 }
 func TestEvmSubscribe(t *testing.T) {
