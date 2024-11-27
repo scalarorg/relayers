@@ -428,7 +428,7 @@ func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) (event.Subscrip
 			case err := <-errorCh:
 				log.Error().Msgf("Failed to watch ContractCallEvent: %v", err)
 			case event := <-sink:
-				log.Info().Msgf("Contract call: %v", event)
+				log.Info().Msg("[EvmClient] [watchContractCall] receved contract call")
 				err := c.handleContractCall(event)
 				if err != nil {
 					log.Error().Msgf("Failed to handle ContractCallEvent: %v", err)

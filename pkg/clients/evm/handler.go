@@ -38,7 +38,7 @@ func (ec *EvmClient) handleContractCall(event *contracts.IAxelarGatewayContractC
 		lastCheckpoint.BlockNumber = event.Raw.BlockNumber
 		lastCheckpoint.TxHash = event.Raw.TxHash.String()
 		lastCheckpoint.LogIndex = event.Raw.Index
-		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.TxIndex)
+		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.Index)
 	}
 	//3. store relay data to the db, update last checkpoint
 	err = ec.dbAdapter.CreateRelayDatas([]models.RelayData{relayData}, lastCheckpoint)
@@ -67,6 +67,10 @@ func (ec *EvmClient) preprocessContractCall(event *contracts.IAxelarGatewayContr
 		Str("destinationChain", event.DestinationChain).
 		Str("destinationContractAddress", event.DestinationContractAddress).
 		Str("payloadHash", hex.EncodeToString(event.PayloadHash[:])).
+		Str("txHash", event.Raw.TxHash.String()).
+		Uint("logIndex", event.Raw.Index).
+		Uint("txIndex", event.Raw.TxIndex).
+		Str("logData", hex.EncodeToString(event.Raw.Data)).
 		Msg("[EvmClient] [preprocessContractCall] Start handle Contract call")
 	//Todo: validate the event
 	return nil

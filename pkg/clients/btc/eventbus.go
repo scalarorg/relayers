@@ -16,7 +16,12 @@ import (
 )
 
 func (c *BtcClient) handleEventBusMessage(event *events.EventEnvelope) error {
-	log.Info().Any("event", event).Msg("[BtcClient] [handleEventBusMessage]")
+	log.Info().
+		Str("eventType", event.EventType).
+		Str("messageID", event.MessageID).
+		Str("destinationChain", event.DestinationChain).
+		Any("data", event.Data).
+		Msg("[BtcClient] [handleEventBusMessage]")
 	switch event.EventType {
 	case events.EVENT_SCALAR_CONTRACT_CALL_APPROVED:
 		//Broadcast from scalar.handleContractCallApprovedEvent

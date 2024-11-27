@@ -20,9 +20,9 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IAxelarGatewayC
 		return models.RelayData{}, fmt.Errorf("failed to get transaction receipt: %w", err)
 	}
 	var id string
-	for _, log := range receipt.Logs {
+	for ind, log := range receipt.Logs {
 		if log.Index == event.Raw.Index {
-			id = fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), log.Index)
+			id = fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), ind)
 			break
 		}
 	}
