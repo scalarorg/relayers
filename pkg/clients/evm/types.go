@@ -9,6 +9,7 @@ import (
 
 const (
 	COMPONENT_NAME = "EvmClient"
+	RETRY_INTERVAL = time.Second * 12 // Initial retry interval
 )
 
 type Byte32 [32]uint8
