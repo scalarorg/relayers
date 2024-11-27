@@ -256,18 +256,19 @@ func GetMissingEvents[T ValidEvmEvent](c *EvmClient, eventName string, lastCheck
 		Addresses: []common.Address{c.GatewayAddress},
 		Topics:    [][]common.Hash{{event.ID}}, // Filter by event signature
 	}
-	log.Info().Any("query", query).Msg("[EvmClient] [GetMissingEvents]")
 	// // Fetch the logs
 	logs, err := c.Client.FilterLogs(context.Background(), query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch logs: %w", err)
 	}
-	log.Info().Int("eventCount", len(logs)).Msg("[EvmClient] [GetMissingEvents]")
 	result := []*parser.EvmEvent[T]{}
 	// Parse the logs
 	for _, receiptLog := range logs {
 		if receiptLog.BlockNumber < lastCheckpoint.BlockNumber ||
-			(receiptLog.BlockNumber == lastCheckpoint.BlockNumber && receiptLog.Index < lastCheckpoint.LogIndex) {
+			(receiptLog.BlockNumber == lastCheckpoint.BlockNumber && receiptLog.Index <= lastCheckpoint.LogIndex) {
+			log.Info().Uint64("receiptLogBlockNumber", receiptLog.BlockNumber).
+				Uint("receiptLogIndex", receiptLog.Index).
+				Msg("[EvmClient] [GetMissingEvents] skip log")
 			continue
 		}
 		var eventData = fnCreateEventData(receiptLog)
@@ -286,6 +287,12 @@ func GetMissingEvents[T ValidEvmEvent](c *EvmClient, eventName string, lastCheck
 			log.Error().Err(err).Msg("[EvmClient] [GetMissingEvents] failed to unpack log data")
 		}
 	}
+	log.Info().Int("eventCount", len(logs)).
+		Str("eventName", eventName).
+		Any("query", query).
+		Any("lastCheckpoint", lastCheckpoint).
+		Any("missingEventsCount", len(result)).
+		Msg("[EvmClient] [GetMissingEvents]")
 	return result, nil
 }
 func (c *EvmClient) handleEvent(event any) error {

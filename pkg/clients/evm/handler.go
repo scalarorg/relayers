@@ -103,7 +103,7 @@ func (ec *EvmClient) HandleContractCallApproved(event *contracts.IAxelarGatewayC
 	log.Debug().Str("contractAddress", event.ContractAddress.String()).
 		Str("sourceAddress", event.SourceAddress).
 		Str("payloadHash", hex.EncodeToString(event.PayloadHash[:])).
-		Any("relayDatas", relayDatas).
+		Any("relayDatas count", len(relayDatas)).
 		Msg("[EvmClient] [handleContractCallApproved] query relaydata by ContractCall")
 	//3. Execute payload in the found relaydatas
 	executeResults, err := ec.executeDestinationCall(event, relayDatas)
