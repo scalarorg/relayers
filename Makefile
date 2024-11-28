@@ -48,14 +48,9 @@ ifeq ($(shell uname -m), arm64)
 ARCH := aarch64
 endif
 
-DENOM := uaxl
-
-ldflags = "-X github.com/cosmos/cosmos-sdk/version.Name=axelar \
-	-X github.com/cosmos/cosmos-sdk/version.AppName=axelard \
-	-X github.com/cosmos/cosmos-sdk/version.Version=$(VERSION) \
+ldflags = "-X github.com/cosmos/cosmos-sdk/version.Version=$(VERSION) \
 	-X "github.com/cosmos/cosmos-sdk/version.BuildTags=$(BUILD_TAGS)" \
 	-X github.com/cosmos/cosmos-sdk/version.Commit=$(COMMIT) \
-	-X github.com/axelarnetwork/axelar-core/x/axelarnet/exported.NativeAsset=$(DENOM) \
 	-X github.com/axelarnetwork/axelar-core/app.WasmEnabled=$(WASM) \
 	-X github.com/axelarnetwork/axelar-core/app.IBCWasmHooksEnabled=$(IBC_WASM_HOOKS) \
 	-X github.com/axelarnetwork/axelar-core/app.WasmCapabilities=$(WASM_CAPABILITIES) \
@@ -85,13 +80,6 @@ lint:
 	@golangci-lint run
 	@go mod verify
 
-.PHONY: goimports
-goimports:
-	@echo "running goimports"
-# exclude mocks, statik and proto generated files
-	@./scripts/rm-blank-lines.sh # remove blank lines from imports
-	@goimports -l -local github.com/axelarnetwork/ . | grep -v .pb.go$ | grep -v .pb.gw.go$ | grep -v mock | grep -v statik.go$ | xargs goimports -local github.com/axelarnetwork/ -w
-
 # Build the project with release flags
 .PHONY: build
 build: go.sum
@@ -110,7 +98,7 @@ build-binaries-multiarch: go.sum
 build-binaries-in-docker:  guard-SEMVER
 	DOCKER_BUILDKIT=1 docker build \
 		--build-arg SEMVER=${SEMVER} \
-		-t axelar/core:binaries \
+		-t scalarorg/relayer:binaries \
 		-f Dockerfile.binaries .
 	./scripts/copy-binaries-from-image.sh
 

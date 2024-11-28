@@ -26,5 +26,5 @@ services:
     environment:
       - APP_NAME=relayer
     volumes:
-      - ./runtime/data:/app/data
+      - ./data/local:/app/data
     restart: unless-stopped
