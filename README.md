@@ -22,6 +22,16 @@ A cross-chain relayer service that enables seamless token transfers between **Bi
 4. The payload is submitted to the destination network (EVM or non-EVM)
 5. Transaction status and history are maintained in a PostgreSQL database
 
+## 🌟 Main flows
+
+### Staking flow
+
+![staking flow](staking.png)
+
+### Unstaking flow
+
+![unstaking flow](unstaking.png)
+
 ## 🌟 Architecture Components
 
 ### Electrum Client
