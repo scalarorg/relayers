@@ -31,7 +31,7 @@ type EvmClient struct {
 	Client                  *ethclient.Client
 	ChainName               string
 	GatewayAddress          common.Address
-	Gateway                 *contracts.IAxelarGateway
+	Gateway                 *contracts.IScalarGateway
 	auth                    *bind.TransactOpts
 	dbAdapter               *db.DatabaseAdapter
 	eventBus                *events.EventBus
@@ -122,12 +122,12 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 
 	return evmClient, nil
 }
-func CreateGateway(evmConfig *EvmNetworkConfig, client *ethclient.Client) (*contracts.IAxelarGateway, *common.Address, error) {
+func CreateGateway(evmConfig *EvmNetworkConfig, client *ethclient.Client) (*contracts.IScalarGateway, *common.Address, error) {
 	if evmConfig.Gateway == "" {
 		return nil, nil, fmt.Errorf("gateway address is not set for network %s", evmConfig.Name)
 	}
 	gatewayAddress := common.HexToAddress(evmConfig.Gateway)
-	gateway, err := contracts.NewIAxelarGateway(gatewayAddress, client)
+	gateway, err := contracts.NewIScalarGateway(gatewayAddress, client)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize gateway contract for network %s: %w", evmConfig.Name, err)
 	}
@@ -223,27 +223,27 @@ func (c *EvmClient) ConnectWithRetry(ctx context.Context) {
 }
 func (c *EvmClient) RecoverMissingEvents(ctx context.Context) error {
 	//Recover ContractCall events
-	if err := RecoverEvent[*contracts.IAxelarGatewayContractCall](c, ctx,
-		events.EVENT_EVM_CONTRACT_CALL, func(log types.Log) *contracts.IAxelarGatewayContractCall {
-			return &contracts.IAxelarGatewayContractCall{
+	if err := RecoverEvent[*contracts.IScalarGatewayContractCall](c, ctx,
+		events.EVENT_EVM_CONTRACT_CALL, func(log types.Log) *contracts.IScalarGatewayContractCall {
+			return &contracts.IScalarGatewayContractCall{
 				Raw: log,
 			}
 		}); err != nil {
 		log.Error().Err(err).Str("eventName", events.EVENT_EVM_CONTRACT_CALL_APPROVED).Msg("failed to recover missing events")
 		return err
 	}
-	if err := RecoverEvent[*contracts.IAxelarGatewayContractCallApproved](c, ctx,
-		events.EVENT_EVM_CONTRACT_CALL_APPROVED, func(log types.Log) *contracts.IAxelarGatewayContractCallApproved {
-			return &contracts.IAxelarGatewayContractCallApproved{
+	if err := RecoverEvent[*contracts.IScalarGatewayContractCallApproved](c, ctx,
+		events.EVENT_EVM_CONTRACT_CALL_APPROVED, func(log types.Log) *contracts.IScalarGatewayContractCallApproved {
+			return &contracts.IScalarGatewayContractCallApproved{
 				Raw: log,
 			}
 		}); err != nil {
 		log.Error().Err(err).Str("eventName", events.EVENT_EVM_CONTRACT_CALL_APPROVED).Msg("failed to recover missing events")
 		return err
 	}
-	if err := RecoverEvent[*contracts.IAxelarGatewayExecuted](c, ctx,
-		events.EVENT_EVM_COMMAND_EXECUTED, func(log types.Log) *contracts.IAxelarGatewayExecuted {
-			return &contracts.IAxelarGatewayExecuted{
+	if err := RecoverEvent[*contracts.IScalarGatewayExecuted](c, ctx,
+		events.EVENT_EVM_COMMAND_EXECUTED, func(log types.Log) *contracts.IScalarGatewayExecuted {
+			return &contracts.IScalarGatewayExecuted{
 				Raw: log,
 			}
 		}); err != nil {
@@ -385,11 +385,11 @@ func (c *EvmClient) ListenToEvents(ctx context.Context) error {
 
 func (c *EvmClient) handleEvent(event any) error {
 	switch e := event.(type) {
-	case *contracts.IAxelarGatewayContractCall:
+	case *contracts.IScalarGatewayContractCall:
 		return c.handleContractCall(e)
-	case *contracts.IAxelarGatewayContractCallApproved:
+	case *contracts.IScalarGatewayContractCallApproved:
 		return c.HandleContractCallApproved(e)
-	case *contracts.IAxelarGatewayExecuted:
+	case *contracts.IScalarGatewayExecuted:
 		return c.HandleCommandExecuted(e)
 	}
 	return nil
@@ -414,7 +414,7 @@ func watchForEvent(c *EvmClient, ctx context.Context, eventName string) (event.S
 	return nil, nil
 }
 func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) (event.Subscription, error) {
-	sink := make(chan *contracts.IAxelarGatewayContractCall)
+	sink := make(chan *contracts.IScalarGatewayContractCall)
 	errorCh := make(chan error)
 	subContractCall, err := c.Gateway.WatchContractCall(watchOpts, sink, nil, nil)
 	if err != nil {
@@ -446,7 +446,7 @@ func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) (event.Subscrip
 }
 
 func (c *EvmClient) watchContractCallApproved(watchOpts *bind.WatchOpts) (event.Subscription, error) {
-	sink := make(chan *contracts.IAxelarGatewayContractCallApproved)
+	sink := make(chan *contracts.IScalarGatewayContractCallApproved)
 	subContractCallApproved, err := c.Gateway.WatchContractCallApproved(watchOpts, sink, nil, nil, nil)
 	if err != nil {
 		return nil, err
@@ -463,7 +463,7 @@ func (c *EvmClient) watchContractCallApproved(watchOpts *bind.WatchOpts) (event.
 }
 
 func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) (event.Subscription, error) {
-	sink := make(chan *contracts.IAxelarGatewayExecuted)
+	sink := make(chan *contracts.IScalarGatewayExecuted)
 	subExecuted, err := c.Gateway.WatchExecuted(watchOpts, sink, nil)
 	if err != nil {
 		return nil, err

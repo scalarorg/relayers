@@ -76,7 +76,7 @@ func (db *DatabaseAdapter) UpdateEventStatus(id string, status RelayDataStatus) 
 	return nil
 }
 
-// func (db *DatabaseAdapter) CreateEvmExecutedEvent(event *types.EvmEvent[*contracts.IAxelarGatewayExecuted]) error {
+// func (db *DatabaseAdapter) CreateEvmExecutedEvent(event *types.EvmEvent[*contracts.IScalarGatewayExecuted]) error {
 // 	id := fmt.Sprintf("%s-%d", event.Hash, event.LogIndex)
 // 	log.Debug().Msgf("[DatabaseClient] Create EvmExecuted: %s", id)
 

@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	environment string
-	rootCmd     = &cobra.Command{
+	accountPrefix = "axelar"
+	environment   string
+	rootCmd       = &cobra.Command{
 		Use:   "relayer",
 		Short: "Scalar Relayer",
 		Run:   run,
@@ -99,7 +100,7 @@ func init() {
 
 func setCosmosAccountPrefix() {
 	config := types.GetConfig()
-	config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
-	config.SetBech32PrefixForConsensusNode("axelar", "axelarvalcons")
-	config.SetBech32PrefixForValidator("axelar", "axelarvaloper")
+	config.SetBech32PrefixForAccount(accountPrefix, accountPrefix+"valoper")
+	config.SetBech32PrefixForConsensusNode(accountPrefix, accountPrefix+"valcons")
+	config.SetBech32PrefixForValidator(accountPrefix, accountPrefix+"valoper")
 }

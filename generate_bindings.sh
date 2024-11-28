@@ -4,15 +4,15 @@
 mkdir -p pkg/contracts/generated
 
 # Generate Go bindings for IScalarGateway
-abigen --abi=pkg/contracts/abi/IScalarGateway.json \
+abigen --abi=pkg/clients/evm/contracts/abi/IScalarGateway.json \
        --pkg=contracts \
-       --out=pkg/contracts/generated/iscalargateway.go \
+       --out=pkg/clients/evm/contracts/generated/gateway.go \
        --type=IScalarGateway
 
 # Generate Go bindings for IScalarExecutable
-abigen --abi=pkg/contracts/abi/IScalarExecutable.json \
+abigen --abi=pkg/clients/evm/contracts/abi/IScalarExecutable.json \
        --pkg=contracts \
-       --out=pkg/contracts/generated/iscalarexecutable.go \
+       --out=pkg/clients/evm/contracts/generated/executable.go \
        --type=IScalarExecutable
 
 echo "Go contract bindings generated successfully!"

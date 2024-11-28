@@ -18,7 +18,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/events"
 )
 
-func (ec *EvmClient) handleContractCall(event *contracts.IAxelarGatewayContractCall) error {
+func (ec *EvmClient) handleContractCall(event *contracts.IScalarGatewayContractCall) error {
 	//0. Preprocess the event
 	ec.preprocessContractCall(event)
 	//1. Convert into a RelayData instance then store to the db
@@ -61,7 +61,7 @@ func (ec *EvmClient) handleContractCall(event *contracts.IAxelarGatewayContractC
 	}
 	return nil
 }
-func (ec *EvmClient) preprocessContractCall(event *contracts.IAxelarGatewayContractCall) error {
+func (ec *EvmClient) preprocessContractCall(event *contracts.IScalarGatewayContractCall) error {
 	log.Info().
 		Str("sender", event.Sender.Hex()).
 		Str("destinationChain", event.DestinationChain).
@@ -76,7 +76,7 @@ func (ec *EvmClient) preprocessContractCall(event *contracts.IAxelarGatewayContr
 	return nil
 }
 
-func (ec *EvmClient) HandleContractCallApproved(event *contracts.IAxelarGatewayContractCallApproved) error {
+func (ec *EvmClient) HandleContractCallApproved(event *contracts.IScalarGatewayContractCallApproved) error {
 	//0. Preprocess the event
 	err := ec.preprocessContractCallApproved(event)
 	if err != nil {
@@ -122,7 +122,7 @@ func (ec *EvmClient) HandleContractCallApproved(event *contracts.IAxelarGatewayC
 	}
 	return nil
 }
-func (ec *EvmClient) executeDestinationCall(event *contracts.IAxelarGatewayContractCallApproved, relayDatas []models.RelayData) ([]db.RelaydataExecuteResult, error) {
+func (ec *EvmClient) executeDestinationCall(event *contracts.IScalarGatewayContractCallApproved, relayDatas []models.RelayData) ([]db.RelaydataExecuteResult, error) {
 	executeResults := []db.RelaydataExecuteResult{}
 	executed, err := ec.isContractCallExecuted(event)
 	if err != nil {
@@ -169,7 +169,7 @@ func (ec *EvmClient) executeDestinationCall(event *contracts.IAxelarGatewayContr
 }
 
 // Check if ContractCall is already executed
-func (ec *EvmClient) isContractCallExecuted(event *contracts.IAxelarGatewayContractCallApproved) (bool, error) {
+func (ec *EvmClient) isContractCallExecuted(event *contracts.IScalarGatewayContractCallApproved) (bool, error) {
 	if ec.auth == nil {
 		log.Error().
 			Str("commandId", hex.EncodeToString(event.CommandId[:])).
@@ -190,13 +190,13 @@ func (ec *EvmClient) isContractCallExecuted(event *contracts.IAxelarGatewayContr
 	return !approved, nil
 }
 
-func (ec *EvmClient) preprocessContractCallApproved(event *contracts.IAxelarGatewayContractCallApproved) error {
+func (ec *EvmClient) preprocessContractCallApproved(event *contracts.IScalarGatewayContractCallApproved) error {
 	log.Info().Any("event", event).Msgf("[EvmClient] [handleContractCallApproved]")
 	//Todo: validate the event
 	return nil
 }
 
-func (ec *EvmClient) HandleCommandExecuted(event *contracts.IAxelarGatewayExecuted) error {
+func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecuted) error {
 	//0. Preprocess the event
 	ec.preprocessCommandExecuted(event)
 	//1. Convert into a RelayData instance then store to the db
@@ -216,7 +216,7 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IAxelarGatewayExecut
 	return nil
 }
 
-func (ec *EvmClient) preprocessCommandExecuted(event *contracts.IAxelarGatewayExecuted) error {
+func (ec *EvmClient) preprocessCommandExecuted(event *contracts.IScalarGatewayExecuted) error {
 	log.Info().Any("event", event).Msg("[EvmClient] [ExecutedHandler] Start processing evm command executed")
 	//Todo: validate the event
 	return nil
@@ -229,7 +229,7 @@ func (ec *EvmClient) ExecuteDestinationCall(
 	sourceAddress string,
 	payload []byte,
 ) (*ethtypes.Transaction, error) {
-	executable, err := contracts.NewIAxelarExecutable(contractAddress, ec.Client)
+	executable, err := contracts.NewIScalarExecutable(contractAddress, ec.Client)
 	if err != nil {
 		log.Error().Err(err).Any("contractAddress", contractAddress).Msg("[EvmClient] [ExecuteDestinationCall] create executable contract")
 		return nil, err

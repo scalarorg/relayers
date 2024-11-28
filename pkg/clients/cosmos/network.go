@@ -10,7 +10,6 @@ import (
 	axltypes "github.com/axelarnetwork/axelar-core/x/axelarnet/types"
 	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	"github.com/cosmos/cosmos-sdk/client"
-	sdkclient "github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -182,7 +181,7 @@ func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Ms
 	return result, nil
 }
 
-func (c *NetworkClient) trySignAndBroadcastMsgs(ctx context.Context, txBuilder sdkclient.TxBuilder) (*sdk.TxResponse, error) {
+func (c *NetworkClient) trySignAndBroadcastMsgs(ctx context.Context, txBuilder client.TxBuilder) (*sdk.TxResponse, error) {
 	var err error
 	var result *sdk.TxResponse
 	for i := 0; i < c.config.MaxRetries; i++ {
@@ -221,7 +220,7 @@ func (c *NetworkClient) trySignAndBroadcastMsgs(ctx context.Context, txBuilder s
 	log.Error().Msgf("[ScalarNetworkClient] [trySignAndBroadcast] failed to broadcast tx after %d retries", c.config.MaxRetries)
 	return result, err
 }
-func (c *NetworkClient) signTx(txf tx.Factory, txBuilder sdkclient.TxBuilder, overwriteSig bool) error {
+func (c *NetworkClient) signTx(txf tx.Factory, txBuilder client.TxBuilder, overwriteSig bool) error {
 	//2. Sign the transaction
 	signerData := authsigning.SignerData{
 		ChainID:       txf.ChainID(),
@@ -330,7 +329,7 @@ func (c *NetworkClient) BroadcastTxAsync(ctx context.Context, txBytes []byte) (*
 	}
 
 	res, err := rpcClient.BroadcastTxAsync(context.Background(), txBytes)
-	if errRes := sdkclient.CheckTendermintError(err, txBytes); errRes != nil {
+	if errRes := client.CheckTendermintError(err, txBytes); errRes != nil {
 		return errRes, nil
 	}
 	txResponse := sdk.NewResponseFormatBroadcastTx(res)

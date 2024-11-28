@@ -96,5 +96,5 @@ docker compose up -d
 This repository includes smart contract ABI files. Generate the contracts using abigen when there are changes in smart contracts:
 
 ```bash
-./generate_bindings.sh
+go install github.com/ethereum/go-ethereum/cmd/abigen@latest && ./generate_bindings.sh
 ```

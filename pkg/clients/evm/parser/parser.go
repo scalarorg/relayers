@@ -10,9 +10,9 @@ import (
 )
 
 type ValidEvmEvent interface {
-	*contracts.IAxelarGatewayContractCallApproved |
-		*contracts.IAxelarGatewayContractCall |
-		*contracts.IAxelarGatewayExecuted
+	*contracts.IScalarGatewayContractCallApproved |
+		*contracts.IScalarGatewayContractCall |
+		*contracts.IScalarGatewayExecuted
 }
 
 var (
@@ -21,7 +21,7 @@ var (
 
 func init() {
 	var err error
-	scalarGatewayAbi, err = contracts.IAxelarGatewayMetaData.GetAbi()
+	scalarGatewayAbi, err = contracts.IScalarGatewayMetaData.GetAbi()
 	if err != nil {
 		log.Error().Msgf("failed to get scalar gateway abi: %v", err)
 	}
@@ -119,8 +119,8 @@ func ParseLogs(receiptLogs []*eth_types.Log) AllEvmEvents {
 }
 func parseContractCall(
 	receiptLog *eth_types.Log,
-) (*contracts.IAxelarGatewayContractCall, error) {
-	var eventArgs contracts.IAxelarGatewayContractCall = contracts.IAxelarGatewayContractCall{
+) (*contracts.IScalarGatewayContractCall, error) {
+	var eventArgs contracts.IScalarGatewayContractCall = contracts.IScalarGatewayContractCall{
 		Raw: *receiptLog,
 	}
 	if err := ParseEventData(receiptLog, "ContractCall", &eventArgs); err != nil {
@@ -134,8 +134,8 @@ func parseContractCall(
 
 func parseContractCallApproved(
 	receiptLog *eth_types.Log,
-) (*contracts.IAxelarGatewayContractCallApproved, error) {
-	eventArgs := contracts.IAxelarGatewayContractCallApproved{
+) (*contracts.IScalarGatewayContractCallApproved, error) {
+	eventArgs := contracts.IScalarGatewayContractCallApproved{
 		Raw: *receiptLog,
 	}
 	if err := ParseEventData(receiptLog, "ContractCallApproved", &eventArgs); err != nil {
@@ -147,9 +147,9 @@ func parseContractCallApproved(
 
 func parseExecute(
 	receiptLog *eth_types.Log,
-) (*contracts.IAxelarGatewayExecuted, error) {
+) (*contracts.IScalarGatewayExecuted, error) {
 
-	var eventArgs contracts.IAxelarGatewayExecuted = contracts.IAxelarGatewayExecuted{
+	var eventArgs contracts.IScalarGatewayExecuted = contracts.IScalarGatewayExecuted{
 		Raw: *receiptLog,
 	}
 	if err := ParseEventData(receiptLog, "Executed", &eventArgs); err != nil {
@@ -162,7 +162,7 @@ func parseExecute(
 // Todo: Check if this is the correct way to extract the destination chain
 // Maybe add destination chain to the event.Log
 //
-//	func extractDestChainFromEvmGwContractCallApproved(event *contracts.IAxelarGatewayContractCallApproved) string {
+//	func extractDestChainFromEvmGwContractCallApproved(event *contracts.IScalarGatewayContractCallApproved) string {
 //		return event.SourceChain
 //	}
 func parseLogIntoEventArgs(log *eth_types.Log) (any, error) {
@@ -186,8 +186,8 @@ func parseLogIntoEventArgs(log *eth_types.Log) (any, error) {
 
 // func parseEventIntoEnvelope(currentChainName string, eventArgs any, log eth_types.Log) (types.EventEnvelope, error) {
 // 	switch args := eventArgs.(type) {
-// 	case *contracts.IAxelarGatewayContractCallApproved:
-// 		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayContractCallApproved](args, currentChainName, log)
+// 	case *contracts.IScalarGatewayContractCallApproved:
+// 		event, err := parseEventArgsIntoEvent[*contracts.IScalarGatewayContractCallApproved](args, currentChainName, log)
 // 		if err != nil {
 // 			return types.EventEnvelope{}, err
 // 		}
@@ -198,8 +198,8 @@ func parseLogIntoEventArgs(log *eth_types.Log) (any, error) {
 // 			Data:             event,
 // 		}, nil
 
-// 	case *contracts.IAxelarGatewayContractCall:
-// 		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayContractCall](args, currentChainName, log)
+// 	case *contracts.IScalarGatewayContractCall:
+// 		event, err := parseEventArgsIntoEvent[*contracts.IScalarGatewayContractCall](args, currentChainName, log)
 // 		if err != nil {
 // 			return types.EventEnvelope{}, err
 // 		}
@@ -210,8 +210,8 @@ func parseLogIntoEventArgs(log *eth_types.Log) (any, error) {
 // 			Data:             event,
 // 		}, nil
 
-// 	case *contracts.IAxelarGatewayExecuted:
-// 		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayExecuted](args, currentChainName, log)
+// 	case *contracts.IScalarGatewayExecuted:
+// 		event, err := parseEventArgsIntoEvent[*contracts.IScalarGatewayExecuted](args, currentChainName, log)
 // 		if err != nil {
 // 			return types.EventEnvelope{}, err
 // 		}
@@ -228,7 +228,7 @@ func parseLogIntoEventArgs(log *eth_types.Log) (any, error) {
 // }
 
 // parseAnyEvent is a generic function that parses any EVM event into a standardized EvmEvent structure
-func parseEvmEventContractCallApproved[T *contracts.IAxelarGatewayContractCallApproved](
+func parseEvmEventContractCallApproved[T *contracts.IScalarGatewayContractCallApproved](
 	currentChainName string,
 	log *eth_types.Log,
 ) (*EvmEvent[T], error) {
@@ -242,7 +242,7 @@ func parseEvmEventContractCallApproved[T *contracts.IAxelarGatewayContractCallAp
 	return event, nil
 }
 
-func parseEvmEventContractCall[T *contracts.IAxelarGatewayContractCall](
+func parseEvmEventContractCall[T *contracts.IScalarGatewayContractCall](
 	currentChainName string,
 	log *eth_types.Log,
 ) (*EvmEvent[T], error) {
@@ -256,7 +256,7 @@ func parseEvmEventContractCall[T *contracts.IAxelarGatewayContractCall](
 	return event, nil
 }
 
-func parseEvmEventExecute[T *contracts.IAxelarGatewayExecuted](
+func parseEvmEventExecute[T *contracts.IScalarGatewayExecuted](
 	log *eth_types.Log,
 ) (*EvmEvent[T], error) {
 	eventArgs, err := parseExecute(log)

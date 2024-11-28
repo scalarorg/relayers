@@ -51,10 +51,6 @@ endif
 ldflags = "-X github.com/cosmos/cosmos-sdk/version.Version=$(VERSION) \
 	-X "github.com/cosmos/cosmos-sdk/version.BuildTags=$(BUILD_TAGS)" \
 	-X github.com/cosmos/cosmos-sdk/version.Commit=$(COMMIT) \
-	-X github.com/axelarnetwork/axelar-core/app.WasmEnabled=$(WASM) \
-	-X github.com/axelarnetwork/axelar-core/app.IBCWasmHooksEnabled=$(IBC_WASM_HOOKS) \
-	-X github.com/axelarnetwork/axelar-core/app.WasmCapabilities=$(WASM_CAPABILITIES) \
-	-X github.com/axelarnetwork/axelar-core/app.MaxWasmSize=${MAX_WASM_SIZE} \
 	-w -s ${STATIC_LINK_FLAGS}"
 
 BUILD_FLAGS := -tags $(BUILD_TAGS) -ldflags $(ldflags) -trimpath

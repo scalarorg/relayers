@@ -16,19 +16,19 @@ import (
 var scalarGatewayAbi *abi.ABI
 
 func init() {
-	scalarGatewayAbi, _ = contracts.IAxelarGatewayMetaData.GetAbi()
+	scalarGatewayAbi, _ = contracts.IScalarGatewayMetaData.GetAbi()
 }
 
 type ValidEvmEvent interface {
-	*contracts.IAxelarGatewayContractCallApproved |
-		*contracts.IAxelarGatewayContractCall |
-		*contracts.IAxelarGatewayExecuted
+	*contracts.IScalarGatewayContractCallApproved |
+		*contracts.IScalarGatewayContractCall |
+		*contracts.IScalarGatewayExecuted
 }
 
 func getScalarGatewayAbi() (*abi.ABI, error) {
 	if scalarGatewayAbi == nil {
 		var err error
-		scalarGatewayAbi, err = contracts.IAxelarGatewayMetaData.GetAbi()
+		scalarGatewayAbi, err = contracts.IScalarGatewayMetaData.GetAbi()
 		if err != nil {
 			return nil, err
 		}
@@ -38,7 +38,7 @@ func getScalarGatewayAbi() (*abi.ABI, error) {
 
 // Todo: Check if this is the correct way to extract the destination chain
 // Maybe add destination chain to the event.Log
-func extractDestChainFromEvmGwContractCallApproved(event *contracts.IAxelarGatewayContractCallApproved) string {
+func extractDestChainFromEvmGwContractCallApproved(event *contracts.IScalarGatewayContractCallApproved) string {
 	return event.SourceChain
 }
 func parseLogIntoEventArgs(log eth_types.Log) (any, error) {
@@ -62,8 +62,8 @@ func parseLogIntoEventArgs(log eth_types.Log) (any, error) {
 
 // func parseEventIntoEnvelope(currentChainName string, eventArgs any, log eth_types.Log) (types.EventEnvelope, error) {
 // 	switch args := eventArgs.(type) {
-// 	case *contracts.IAxelarGatewayContractCallApproved:
-// 		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayContractCallApproved](args, currentChainName, log)
+// 	case *contracts.IScalarGatewayContractCallApproved:
+// 		event, err := parseEventArgsIntoEvent[*contracts.IScalarGatewayContractCallApproved](args, currentChainName, log)
 // 		if err != nil {
 // 			return types.EventEnvelope{}, err
 // 		}
@@ -74,8 +74,8 @@ func parseLogIntoEventArgs(log eth_types.Log) (any, error) {
 // 			Data:             event,
 // 		}, nil
 
-// 	case *contracts.IAxelarGatewayContractCall:
-// 		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayContractCall](args, currentChainName, log)
+// 	case *contracts.IScalarGatewayContractCall:
+// 		event, err := parseEventArgsIntoEvent[*contracts.IScalarGatewayContractCall](args, currentChainName, log)
 // 		if err != nil {
 // 			return types.EventEnvelope{}, err
 // 		}
@@ -86,8 +86,8 @@ func parseLogIntoEventArgs(log eth_types.Log) (any, error) {
 // 			Data:             event,
 // 		}, nil
 
-// 	case *contracts.IAxelarGatewayExecuted:
-// 		event, err := parseEventArgsIntoEvent[*contracts.IAxelarGatewayExecuted](args, currentChainName, log)
+// 	case *contracts.IScalarGatewayExecuted:
+// 		event, err := parseEventArgsIntoEvent[*contracts.IScalarGatewayExecuted](args, currentChainName, log)
 // 		if err != nil {
 // 			return types.EventEnvelope{}, err
 // 		}
@@ -126,7 +126,7 @@ func parseEventArgsIntoEvent[T ValidEvmEvent](eventArgs T, currentChainName stri
 }
 
 // parseAnyEvent is a generic function that parses any EVM event into a standardized EvmEvent structure
-func parseEvmEventContractCallApproved[T *contracts.IAxelarGatewayContractCallApproved](
+func parseEvmEventContractCallApproved[T *contracts.IScalarGatewayContractCallApproved](
 	currentChainName string,
 	log eth_types.Log,
 ) (*parser.EvmEvent[T], error) {
@@ -145,7 +145,7 @@ func parseEvmEventContractCallApproved[T *contracts.IAxelarGatewayContractCallAp
 
 func parseContractCallApproved(
 	log eth_types.Log,
-) (*contracts.IAxelarGatewayContractCallApproved, error) {
+) (*contracts.IScalarGatewayContractCallApproved, error) {
 	event := struct {
 		CommandId        [32]byte
 		SourceChain      string
@@ -173,7 +173,7 @@ func parseContractCallApproved(
 		return nil, fmt.Errorf("invalid source address value")
 	}
 
-	var eventArgs contracts.IAxelarGatewayContractCallApproved = contracts.IAxelarGatewayContractCallApproved{
+	var eventArgs contracts.IScalarGatewayContractCallApproved = contracts.IScalarGatewayContractCallApproved{
 		CommandId:        event.CommandId,
 		SourceChain:      event.SourceChain,
 		SourceAddress:    event.SourceAddress,
@@ -189,7 +189,7 @@ func parseContractCallApproved(
 	return &eventArgs, nil
 }
 
-func parseEvmEventContractCall[T *contracts.IAxelarGatewayContractCall](
+func parseEvmEventContractCall[T *contracts.IScalarGatewayContractCall](
 	currentChainName string,
 	log eth_types.Log,
 ) (*parser.EvmEvent[T], error) {
@@ -208,7 +208,7 @@ func parseEvmEventContractCall[T *contracts.IAxelarGatewayContractCall](
 
 func parseContractCall(
 	log eth_types.Log,
-) (*contracts.IAxelarGatewayContractCall, error) {
+) (*contracts.IScalarGatewayContractCall, error) {
 	event := struct {
 		Sender                     common.Address
 		DestinationChain           string
@@ -234,7 +234,7 @@ func parseContractCall(
 		return nil, fmt.Errorf("invalid destination address value")
 	}
 
-	var eventArgs contracts.IAxelarGatewayContractCall = contracts.IAxelarGatewayContractCall{
+	var eventArgs contracts.IScalarGatewayContractCall = contracts.IScalarGatewayContractCall{
 		Sender:                     event.Sender,
 		DestinationChain:           event.DestinationChain,
 		DestinationContractAddress: event.DestinationContractAddress,
@@ -248,7 +248,7 @@ func parseContractCall(
 	return &eventArgs, nil
 }
 
-func parseEvmEventExecute[T *contracts.IAxelarGatewayExecuted](
+func parseEvmEventExecute[T *contracts.IScalarGatewayExecuted](
 	currentChainName string,
 	log eth_types.Log,
 ) (*parser.EvmEvent[T], error) {
@@ -267,7 +267,7 @@ func parseEvmEventExecute[T *contracts.IAxelarGatewayExecuted](
 
 func parseExecute(
 	log eth_types.Log,
-) (*contracts.IAxelarGatewayExecuted, error) {
+) (*contracts.IScalarGatewayExecuted, error) {
 	event := struct {
 		CommandId [32]byte
 	}{}
@@ -290,7 +290,7 @@ func parseExecute(
 		return nil, fmt.Errorf("invalid command id value")
 	}
 
-	var eventArgs contracts.IAxelarGatewayExecuted = contracts.IAxelarGatewayExecuted{
+	var eventArgs contracts.IScalarGatewayExecuted = contracts.IScalarGatewayExecuted{
 		CommandId: event.CommandId,
 		Raw:       log,
 	}
