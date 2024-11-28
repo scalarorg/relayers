@@ -55,7 +55,7 @@ func TestMain(m *testing.M) {
 }
 func TestEvmClientListenContractCallEvent(t *testing.T) {
 	watchOpts := bind.WatchOpts{Start: &evmConfig.LastBlock, Context: context.Background()}
-	sink := make(chan *contracts.IAxelarGatewayContractCall)
+	sink := make(chan *contracts.IScalarGatewayContractCall)
 
 	subContractCall, err := evmClient.Gateway.WatchContractCall(&watchOpts, sink, nil, nil)
 	if err != nil {
@@ -81,7 +81,7 @@ func TestEvmClientListenContractCallEvent(t *testing.T) {
 
 func TestEvmClientListenContractCallApprovedEvent(t *testing.T) {
 	watchOpts := bind.WatchOpts{Start: &evmConfig.LastBlock, Context: context.Background()}
-	sink := make(chan *contracts.IAxelarGatewayContractCallApproved)
+	sink := make(chan *contracts.IScalarGatewayContractCallApproved)
 
 	subContractCallApproved, err := evmClient.Gateway.WatchContractCallApproved(&watchOpts, sink, nil, nil, nil)
 	if err != nil {
@@ -107,7 +107,7 @@ func TestEvmClientListenContractCallApprovedEvent(t *testing.T) {
 }
 func TestEvmClientListenEVMExecutedEvent(t *testing.T) {
 	watchOpts := bind.WatchOpts{Start: &evmConfig.LastBlock, Context: context.Background()}
-	sink := make(chan *contracts.IAxelarGatewayExecuted)
+	sink := make(chan *contracts.IScalarGatewayExecuted)
 
 	subExecuted, err := evmClient.Gateway.WatchExecuted(&watchOpts, sink, nil)
 	if err != nil {
@@ -130,12 +130,12 @@ func TestEvmClientListenEVMExecutedEvent(t *testing.T) {
 	select {}
 }
 func TestRecoverEvent(t *testing.T) {
-	fnCreateEventData := func(log types.Log) *contracts.IAxelarGatewayContractCall {
-		return &contracts.IAxelarGatewayContractCall{
+	fnCreateEventData := func(log types.Log) *contracts.IScalarGatewayContractCall {
+		return &contracts.IScalarGatewayContractCall{
 			Raw: log,
 		}
 	}
-	err := evm.RecoverEvent[*contracts.IAxelarGatewayContractCall](evmClient, context.Background(), events.EVENT_EVM_CONTRACT_CALL, fnCreateEventData)
+	err := evm.RecoverEvent[*contracts.IScalarGatewayContractCall](evmClient, context.Background(), events.EVENT_EVM_CONTRACT_CALL, fnCreateEventData)
 	require.NoError(t, err)
 }
 func TestEvmSubscribe(t *testing.T) {

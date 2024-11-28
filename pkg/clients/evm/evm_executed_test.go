@@ -25,7 +25,7 @@ func TestEvmExecutedHandler(t *testing.T) {
 		TxHash:      common.HexToHash("0x4142c36d1e81a6f98de51f685d4588a95ede1c19edd6c44444e66627ccce1e99"),
 		TxIndex:     102,
 	}
-	event := &contracts.IAxelarGatewayExecuted{
+	event := &contracts.IScalarGatewayExecuted{
 		CommandId: [32]byte{32, 242, 209, 237, 2, 88, 90, 168, 231, 249, 244, 150, 114, 201, 56, 24, 242, 205, 174, 14, 114, 68, 44, 214, 99, 164, 213, 221, 94, 200, 130, 19},
 		Raw:       raw,
 	}

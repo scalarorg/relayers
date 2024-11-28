@@ -28,11 +28,11 @@ func TestContractCallsListener(t *testing.T) {
 
 	// Initialize the contract
 	contractAddress := common.HexToAddress(TEST_CONTRACT_ADDRESS)
-	gateway, err := contracts.NewIAxelarGateway(contractAddress, client)
+	gateway, err := contracts.NewIScalarGateway(contractAddress, client)
 	require.NoError(t, err)
 
 	// Create channels for events and errors
-	eventCh := make(chan *contracts.IAxelarGatewayContractCall)
+	eventCh := make(chan *contracts.IScalarGatewayContractCall)
 	errorCh := make(chan error)
 
 	// Start listening for ContractCall events

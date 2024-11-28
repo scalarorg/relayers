@@ -11,7 +11,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/db/models"
 )
 
-func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IAxelarGatewayContractCall) (models.RelayData, error) {
+func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IScalarGatewayContractCall) (models.RelayData, error) {
 	//id := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
 	//Calculate eventId by Txhash-logIndex among logs in txreceipt (AxelarEvmModule)
 	//https://github.com/axelarnetwork/axelar-core/blob/main/vald/evm/gateway_tx_confirmation.go#L73
@@ -50,7 +50,7 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IAxelarGatewayC
 	return relayData, nil
 }
 
-func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IAxelarGatewayContractCallApproved) (models.CallContractApproved, error) {
+func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGatewayContractCallApproved) (models.CallContractApproved, error) {
 	txHash := event.Raw.TxHash.String()
 	id := strings.ToLower(fmt.Sprintf("%s-%d-%d", txHash, event.SourceEventIndex, event.Raw.Index))
 	sourceEventIndex := uint64(0)
@@ -74,7 +74,7 @@ func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IAxelarGate
 	return relayData, nil
 }
 
-func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IAxelarGatewayExecuted) models.CommandExecuted {
+func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IScalarGatewayExecuted) models.CommandExecuted {
 	id := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
 	cmdExecuted := models.CommandExecuted{
 		ID:               id,

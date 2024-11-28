@@ -26,7 +26,7 @@ func (db *DatabaseAdapter) FindContractCallByCommnadId(commandId string) (*model
 	return &contractCall, nil
 }
 
-// func (db *DatabaseAdapter) FindCosmosToEvmCallContractApproved(event *types.EvmEvent[*contracts.IAxelarGatewayContractCallApproved]) ([]types.FindCosmosToEvmCallContractApproved, error) {
+// func (db *DatabaseAdapter) FindCosmosToEvmCallContractApproved(event *types.EvmEvent[*contracts.IScalarGatewayContractCallApproved]) ([]types.FindCosmosToEvmCallContractApproved, error) {
 // 	var datas []models.RelayData
 
 // 	result := db.PostgresClient.

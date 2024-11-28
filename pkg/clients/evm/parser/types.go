@@ -18,7 +18,7 @@ type EvmEvent[T any] struct {
 }
 
 type AllEvmEvents struct {
-	ContractCallApproved *EvmEvent[*contracts.IAxelarGatewayContractCallApproved]
-	ContractCall         *EvmEvent[*contracts.IAxelarGatewayContractCall]
-	Executed             *EvmEvent[*contracts.IAxelarGatewayExecuted]
+	ContractCallApproved *EvmEvent[*contracts.IScalarGatewayContractCallApproved]
+	ContractCall         *EvmEvent[*contracts.IScalarGatewayContractCall]
+	Executed             *EvmEvent[*contracts.IScalarGatewayExecuted]
 }

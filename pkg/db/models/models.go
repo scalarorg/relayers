@@ -114,7 +114,7 @@ type ProtocolInfo struct {
 	ChainName            string `gorm:"column:chain_name;not null"`    //Evm chain name
 	BTCAddressHex        string `gorm:"column:btc_address_hex"`        //Btc address
 	PublicKeyHex         string `gorm:"column:public_key_hex"`         //Btc public key
-	SmartContractAddress string `gorm:"column:smart_contract_address"` //Evm contract address which is extended from the IAxelarExecutable
+	SmartContractAddress string `gorm:"column:smart_contract_address"` //Evm contract address which is extended from the IScalarExecutable
 	TokenContractAddress string `gorm:"column:token_contract_address"` //Evm ERC20 token contract address
 	State                bool   `gorm:"column:state"`
 	ChainEndpoint        string `gorm:"column:chain_endpoint"` //Service endpoint for handling evm tx
