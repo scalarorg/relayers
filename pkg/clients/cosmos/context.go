@@ -62,5 +62,7 @@ func CreateClientContextWithOptions(config *CosmosNetworkConfig, opts ...ClientC
 			return nil, err
 		}
 	}
+	clientCtx = clientCtx.WithCodec(codec.GetProtoCodec())
+	clientCtx = clientCtx.WithOutputFormat("json")
 	return &clientCtx, nil
 }
