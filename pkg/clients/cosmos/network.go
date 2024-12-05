@@ -43,7 +43,6 @@ func createDefaultTxFactory(config *CosmosNetworkConfig, txConfig client.TxConfi
 
 type NetworkClient struct {
 	config         *CosmosNetworkConfig
-	rpcEndpoint    string
 	rpcClient      rpcclient.Client
 	queryClient    *QueryClient
 	addr           sdk.AccAddress
@@ -85,6 +84,77 @@ func NewNetworkClient(config *CosmosNetworkConfig, queryClient *QueryClient, txC
 		txConfig:       txConfig,
 		txFactory:      txFactory,
 		sequenceNumber: account.Sequence,
+	}
+	return networkClient, nil
+}
+
+type NetworkClientOption func(*NetworkClient)
+
+func WithRpcClient(rpcClient rpcclient.Client) NetworkClientOption {
+	return func(c *NetworkClient) {
+		c.rpcClient = rpcClient
+	}
+}
+
+func WithQueryClient(queryClient *QueryClient) NetworkClientOption {
+	return func(c *NetworkClient) {
+		c.queryClient = queryClient
+	}
+}
+
+func WithAccount(privKey *secp256k1.PrivKey, addr sdk.AccAddress) NetworkClientOption {
+	return func(c *NetworkClient) {
+		c.privKey = privKey
+		c.addr = addr
+	}
+}
+
+func WithTxConfig(txConfig client.TxConfig) NetworkClientOption {
+	return func(c *NetworkClient) {
+		c.txConfig = txConfig
+	}
+}
+
+func WithTxFactory(txFactory tx.Factory) NetworkClientOption {
+	return func(c *NetworkClient) {
+		c.txFactory = txFactory
+	}
+}
+
+func (c *NetworkClient) SetTxFactory(txFactory tx.Factory) {
+	c.txFactory = txFactory
+}
+
+func NewNetworkClientWithOptions(config *CosmosNetworkConfig, queryClient *QueryClient, txConfig client.TxConfig, opts ...NetworkClientOption) (*NetworkClient, error) {
+	networkClient := &NetworkClient{
+		config: config,
+	}
+	for _, opt := range opts {
+		opt(networkClient)
+	}
+
+	log.Info().Msgf("Scalar NetworkClient created with broadcaster address: %s", networkClient.addr.String())
+	if config.RPCUrl != "" {
+		log.Info().Msgf("Create rpc client with url: %s", config.RPCUrl)
+		rpcClient, err := client.NewClientFromNode(config.RPCUrl)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create RPC client: %w", err)
+		}
+		networkClient.rpcClient = rpcClient
+	}
+
+	account, err := queryClient.QueryAccount(context.Background(), networkClient.addr)
+	if err != nil {
+		return nil, err
+	}
+	networkClient.sequenceNumber = account.Sequence
+
+	if networkClient.txFactory.AccountNumber() == 0 {
+		txFactory, err := createDefaultTxFactory(config, txConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tx factory: %w", err)
+		}
+		networkClient.txFactory = txFactory
 	}
 	return networkClient, nil
 }
