@@ -35,3 +35,32 @@ func CreateClientContext(config *CosmosNetworkConfig) (*client.Context, error) {
 	clientCtx = clientCtx.WithOutputFormat("json")
 	return &clientCtx, nil
 }
+
+type ClientContextOption func(*client.Context) error
+
+func WithRpcClientCtx(rpcUrl string) ClientContextOption {
+	return func(c *client.Context) error {
+		rpcClient, err := client.NewClientFromNode(rpcUrl)
+		if err != nil {
+			return fmt.Errorf("failed to create RPC client: %w", err)
+		}
+		clientCtx := *c
+		clientCtx = clientCtx.WithNodeURI(rpcUrl)
+		clientCtx = clientCtx.WithClient(rpcClient)
+		*c = clientCtx
+		return nil
+	}
+}
+
+func CreateClientContextWithOptions(config *CosmosNetworkConfig, opts ...ClientContextOption) (*client.Context, error) {
+	clientCtx := client.Context{
+		ChainID: config.ID,
+	}
+	for _, opt := range opts {
+		err := opt(&clientCtx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &clientCtx, nil
+}
