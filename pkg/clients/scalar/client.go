@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/axelarnetwork/axelar-core/utils"
-	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
-	nexus "github.com/axelarnetwork/axelar-core/x/nexus/exported"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/internal/codec"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	"github.com/scalarorg/scalar-core/utils"
+	emvtypes "github.com/scalarorg/scalar-core/x/evm/types"
+	nexus "github.com/scalarorg/scalar-core/x/nexus/exported"
 
 	//tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"

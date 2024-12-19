@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	axltypes "github.com/axelarnetwork/axelar-core/x/axelarnet/types"
-	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/tx"
@@ -17,6 +15,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	"github.com/rs/zerolog/log"
+	emvtypes "github.com/scalarorg/scalar-core/x/evm/types"
+	scalarnettypes "github.com/scalarorg/scalar-core/x/scalarnet/types"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
@@ -186,7 +186,7 @@ func (c *NetworkClient) SignCommandsRequest(ctx context.Context, destinationChai
 }
 func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, payload string) (*sdk.TxResponse, error) {
 	payloadBytes := []byte(payload)
-	req := axltypes.NewRouteMessage(
+	req := scalarnettypes.NewRouteMessage(
 		c.GetAddress(),
 		c.getFeegranter(),
 		id,

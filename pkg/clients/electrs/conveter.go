@@ -49,13 +49,13 @@ func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayDa
 	//parse chain id to chain name
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, vaultTx.DestChain)
-	destinationChain := chain.NewDestinationChainFromBytes(buf)
-	if destinationChain == nil {
+	chainInfo := chain.NewChainInfoFromBytes(buf)
+	if chainInfo == nil {
 		return relayData, fmt.Errorf("invalid destination chain: %d", vaultTx.DestChain)
 	}
-	destinationChainName, err := c.globalConfig.GetStringIdByChainId(destinationChain.ChainType.String(), destinationChain.ChainID)
+	destinationChainName, err := c.globalConfig.GetStringIdByChainId(chainInfo.ChainType.String(), chainInfo.ChainID)
 	if err != nil {
-		return relayData, fmt.Errorf("chain not found for input chainId: %v, %w	", destinationChain, err)
+		return relayData, fmt.Errorf("chain not found for input chainId: %v, %w	", chainInfo, err)
 	}
 	relayData.To = destinationChainName
 

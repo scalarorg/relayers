@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"strconv"
 
-	axltypes "github.com/axelarnetwork/axelar-core/x/axelarnet/types"
-	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx"
 	auth "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/rs/zerolog/log"
+	emvtypes "github.com/scalarorg/scalar-core/x/evm/types"
+	scalartypes "github.com/scalarorg/scalar-core/x/scalarnet/types"
 	//gogogrpc "github.com/cosmos/gogoproto/grpc"
 	//pbgrpc "github.com/gogo/protobuf/grpc"
 )
@@ -21,14 +21,14 @@ import (
 type QueryClient struct {
 	clientCtx             *client.Context
 	EvmQueryServiceClient emvtypes.QueryServiceClient
-	MsgServiceClient      axltypes.MsgServiceClient
+	MsgServiceClient      scalartypes.MsgServiceClient
 	TxServiceClient       tx.ServiceClient
 	AccountQueryClient    auth.QueryClient
 }
 
 func NewQueryClient(clientCtx *client.Context) *QueryClient {
 	evmQueryServiceClient := emvtypes.NewQueryServiceClient(clientCtx)
-	msgServiceClient := axltypes.NewMsgServiceClient(clientCtx)
+	msgServiceClient := scalartypes.NewMsgServiceClient(clientCtx)
 	accountQueryClient := auth.NewQueryClient(clientCtx)
 	txServiceClient := tx.NewServiceClient(clientCtx)
 	return &QueryClient{
@@ -68,8 +68,8 @@ func (c *QueryClient) QueryPendingCommand(ctx context.Context, destinationChain 
 	return resp.Commands, nil
 }
 
-func (c *QueryClient) QueryRouteMessageRequest(ctx context.Context, sender sdk.AccAddress, feegranter sdk.AccAddress, id string, payload string) (*axltypes.RouteMessageResponse, error) {
-	req := &axltypes.RouteMessageRequest{
+func (c *QueryClient) QueryRouteMessageRequest(ctx context.Context, sender sdk.AccAddress, feegranter sdk.AccAddress, id string, payload string) (*scalartypes.RouteMessageResponse, error) {
+	req := &scalartypes.RouteMessageRequest{
 		Sender:     sender,
 		ID:         id,
 		Payload:    []byte(payload),
