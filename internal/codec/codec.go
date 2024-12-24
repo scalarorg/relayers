@@ -2,7 +2,6 @@ package codec
 
 import (
 	//Importing the types package is necessary to register the codec
-	"fmt"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/types"
@@ -28,8 +27,7 @@ func init() {
 	//Register the secp256k1 pubkey type
 	interfaceRegistry.RegisterImplementations((*proto.Message)(nil), &secp256k1.PubKey{})
 	gogoCodec := GogoEnabled{Codec: encoding.GetCodec(encproto.Name)}
-	fmt.Println(gogoCodec.Name())
-	encoding.RegisterCodec(GogoEnabled{Codec: encoding.GetCodec(encproto.Name)})
+	encoding.RegisterCodec(gogoCodec)
 	protoCodec = codec.NewProtoCodec(interfaceRegistry)
 }
 

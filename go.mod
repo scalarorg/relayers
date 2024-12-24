@@ -7,15 +7,14 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/cosmos/cosmos-sdk v0.45.16
 	github.com/cosmos/go-bip39 v1.0.0
-	github.com/ethereum/go-ethereum v1.10.26
+	github.com/ethereum/go-ethereum v1.14.12
 	github.com/go-playground/validator/v10 v10.22.1
 	github.com/gogo/protobuf v1.3.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/rs/zerolog v1.33.0
 	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20241211074929-89c4badcd3e2
-	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241218084116-31524174623e
+	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241219092630-d03748ff6bdc
 	github.com/scalarorg/go-electrum v0.1.1
-	github.com/scalarorg/scalar-core v0.0.0-20241218095633-b2665d6b56fd
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
@@ -33,8 +32,20 @@ require (
 )
 
 require (
+	github.com/bits-and-blooms/bitset v1.13.0 // indirect
+	github.com/consensys/bavard v0.1.13 // indirect
+	github.com/consensys/gnark-crypto v0.12.1 // indirect
 	github.com/cosmos/gogoproto v1.7.0 // indirect
+	github.com/crate-crypto/go-ipa v0.0.0-20240223125850-b1e8a79f509c // indirect
+	github.com/crate-crypto/go-kzg-4844 v1.0.0 // indirect
+	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
+	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
+	github.com/ethereum/go-verkle v0.1.1-0.20240829091221-dffa7562dbe9 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/mmcloughlin/addchain v0.4.0 // indirect
+	github.com/scalarorg/scalar-core v0.0.2-migrate-evm // indirect
+	github.com/supranational/blst v0.3.13 // indirect
+	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
 require (
@@ -83,7 +94,6 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.0.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/dgraph-io/badger/v3 v3.2103.2 // indirect
@@ -108,7 +118,6 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/glog v1.2.2 // indirect
@@ -176,7 +185,6 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/regen-network/cosmos-proto v0.3.1 // indirect
-	github.com/rjeczalik/notify v0.9.1 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
@@ -213,20 +221,19 @@ require (
 	go.opentelemetry.io/otel/metric v1.31.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
-	golang.org/x/crypto v0.28.0 // indirect
+	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/exp v0.0.0-20240404231335-c0f41cb1a7a0 // indirect
 	golang.org/x/net v0.30.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.26.0 // indirect
-	golang.org/x/term v0.25.0 // indirect
-	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/term v0.27.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/genproto v0.0.0-20240227224415-6ceb2ff114de // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241007155032-5fefd90f89a9 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241007155032-5fefd90f89a9 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
@@ -236,6 +243,8 @@ require (
 //replace github.com/scalarorg/go-electrum => ../go-electrum
 
 // replace github.com/scalarorg/bitcoin-vault/go-utils => ../bitcoin-vault/go-utils
+
+replace github.com/scalarorg/scalar-core => ../scalar-core
 
 // Temporary replacement for rosetta support
 replace github.com/cosmos/cosmos-sdk => github.com/axelarnetwork/cosmos-sdk v0.45.17-0.20240321205000-47c0c80e20ca

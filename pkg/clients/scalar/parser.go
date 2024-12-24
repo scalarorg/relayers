@@ -36,10 +36,61 @@ func DecodeIntArrayToHexString(input string) (string, error) {
 func removeQuote(str string) string {
 	return strings.Trim(str, "\"'")
 }
-
+func ParseDestCallApprovedEvent(event map[string][]string) ([]IBCEvent[DestCallApproved], error) {
+	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] start parser")
+	key := "scalar.chains.v1beta1.DestCallApproved"
+	eventIds := event[key+".event_id"]
+	senders := event[key+".sender"]
+	sourceChains := event[key+".chain"]
+	destinationChains := event[key+".destination_chain"]
+	contractAddresses := event[key+".contract_address"]
+	commandIds := event[key+".command_id"]
+	payloadHashes := event[key+".payload_hash"]
+	srcChannels := event["write_acknowledgement.packet_src_channel"]
+	destChannels := event["write_acknowledgement.packet_dst_channel"]
+	events := make([]IBCEvent[DestCallApproved], len(eventIds))
+	for ind, eventId := range eventIds {
+		eventID := removeQuote(eventId)
+		hash := strings.Split(eventID, "-")[0]
+		payloadHash, err := DecodeIntArrayToHexString(payloadHashes[ind])
+		if err != nil {
+			log.Warn().Msgf("Failed to decode payload hash: %v, error: %v", payloadHashes[ind], err)
+		}
+		commandID, err := DecodeIntArrayToHexString(commandIds[ind])
+		if err != nil {
+			log.Warn().Msgf("Failed to decode command ID: %v, error: %v", commandIds[ind], err)
+		}
+		data := DestCallApproved{
+			MessageID:        eventID,
+			Sender:           removeQuote(senders[ind]),
+			SourceChain:      removeQuote(sourceChains[ind]),
+			DestinationChain: removeQuote(destinationChains[ind]),
+			ContractAddress:  removeQuote(contractAddresses[ind]),
+			Payload:          "", //Payload will be get from RelayData.CallContract.Payload with filter by eventID
+			PayloadHash:      "0x" + payloadHash,
+			CommandID:        commandID,
+		}
+		var srcChannel string
+		var destChannel string
+		if len(srcChannels) > ind {
+			srcChannel = srcChannels[ind]
+		}
+		if len(destChannels) > ind {
+			destChannel = destChannels[ind]
+		}
+		events[ind] = IBCEvent[DestCallApproved]{
+			Hash:        hash,
+			SrcChannel:  srcChannel,
+			DestChannel: destChannel,
+			Args:        data,
+		}
+	}
+	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] parsed events: %v", events)
+	return events, nil
+}
 func ParseContractCallApprovedEvent(event map[string][]string) ([]IBCEvent[ContractCallApproved], error) {
 	log.Debug().Msgf("[ScalarClient] [ParseContractCallApprovedEvent] start parser")
-	key := "axelar.evm.v1beta1.ContractCallApproved"
+	key := "scalar.evm.v1beta1.ContractCallApproved"
 	eventIds := event[key+".event_id"]
 	senders := event[key+".sender"]
 	sourceChains := event[key+".chain"]
@@ -96,7 +147,7 @@ func ParseSignCommandsEvent(event map[string][]string) ([]IBCEvent[SignCommands]
 }
 func ParseEvmEventCompletedEvent(event map[string][]string) ([]IBCEvent[EVMEventCompleted], error) {
 	log.Debug().Msgf("[ScalarClient] [ParseEvmEventCompletedEvent] start parser")
-	eventIds := event["axelar.evm.v1beta1.EVMEventCompleted.event_id"]
+	eventIds := event["scalar.evm.v1beta1.EVMEventCompleted.event_id"]
 	txHashs := event["tx.hash"]
 	srcChannels := event["write_acknowledgement.packet_src_channel"]
 	destChannels := event["write_acknowledgement.packet_dst_channel"]
@@ -131,7 +182,7 @@ func ParseAllNewBlockEvent(event map[string][]string) ([]IBCEvent[any], error) {
 }
 func ParseContractCallSubmittedEvent(event map[string][]string) ([]IBCEvent[ContractCallSubmitted], error) {
 	log.Debug().Msgf("[ScalarClient] Received ContractCallSubmitted event: %d", len(event))
-	key := "axelar.axelarnet.v1beta1.ContractCallSubmitted"
+	key := "scalar.scalarnet.v1beta1.ContractCallSubmitted"
 	messageIDs := event[key+".message_id"]
 	txHashes := event["tx.hash"]
 	senders := event[key+".sender"]
@@ -182,7 +233,7 @@ func ParseContractCallSubmittedEvent(event map[string][]string) ([]IBCEvent[Cont
 
 func ParseContractCallWithTokenSubmittedEvent(event map[string][]string) ([]IBCEvent[ContractCallWithTokenSubmitted], error) {
 	log.Debug().Msgf("[ScalarClient] Received ContractCallWithTokenSubmitted event: %d", len(event))
-	key := "axelar.axelarnet.v1beta1.ContractCallWithTokenSubmitted"
+	key := "scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted"
 	messageIDs := event[key+".message_id"]
 	txHashes := event["tx.hash"]
 	senders := event[key+".sender"]

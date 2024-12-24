@@ -127,10 +127,15 @@ func (c *Client) Start(ctx context.Context) error {
 	} else {
 		log.Debug().Msgf("[ScalarClient] [Start] Start rpc client success")
 	}
-	err = subscribeContractCallApprovedEvent(ctx, c.network, c.handleContractCallApprovedEvents)
+	err = subscribeDestCallApprovedEvent(ctx, c.network, c.handleDestCallApprovedEvents)
 	if err != nil {
-		log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
+		log.Error().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] error: %v", err)
 	}
+
+	// err = subscribeContractCallApprovedEvent(ctx, c.network, c.handleContractCallApprovedEvents)
+	// if err != nil {
+	// 	log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
+	// }
 	// Todo: findout if this event is emitted by the ScalarNetwork
 	// err = subscribeSignCommandsEvent(ctx, c.network, c.handleSignCommandsEvents)
 	// if err != nil {
@@ -148,6 +153,22 @@ func (c *Client) Start(ctx context.Context) error {
 	err = subscribeAllTxEvent(ctx, c.network)
 	if err != nil {
 		log.Error().Msgf("[ScalarClient] [subscribeAllTxEvent] Failed: %v", err)
+	}
+	return nil
+}
+func subscribeDestCallApprovedEvent(ctx context.Context, network *cosmos.NetworkClient,
+	callback func(ctx context.Context, events []IBCEvent[DestCallApproved]) error) error {
+	if _, err := Subscribe(ctx, network, DestCallApprovedEvent,
+		func(events []IBCEvent[DestCallApproved]) {
+			err := callback(ctx, events)
+			if err != nil {
+				log.Error().Msgf("[ScalarClient] [DestCallApprovedHandler] callback error: %v", err)
+			}
+		}); err != nil {
+		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] Failed: %v", err)
+		return err
+	} else {
+		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] success")
 	}
 	return nil
 }

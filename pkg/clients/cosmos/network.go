@@ -53,7 +53,7 @@ type NetworkClient struct {
 }
 
 func NewNetworkClient(config *CosmosNetworkConfig, queryClient *QueryClient, txConfig client.TxConfig) (*NetworkClient, error) {
-	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic)
+	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic, config.Bip44Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create account from mnemonic: %w", err)
 	}

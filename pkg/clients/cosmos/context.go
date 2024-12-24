@@ -25,7 +25,7 @@ func CreateClientContext(config *CosmosNetworkConfig) (*client.Context, error) {
 		clientCtx = clientCtx.WithClient(rpcClient)
 	}
 	if config.Mnemonic != "" {
-		_, addr, err := CreateAccountFromMnemonic(config.Mnemonic)
+		_, addr, err := CreateAccountFromMnemonic(config.Mnemonic, config.Bip44Path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create account from mnemonic: %w", err)
 		}

@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	evmutils "github.com/scalarorg/bitcoin-vault/go-utils/evm"
+	encode "github.com/scalarorg/bitcoin-vault/go-utils/encode"
 	"github.com/scalarorg/go-electrum/electrum/types"
 )
 
@@ -29,7 +29,7 @@ func CalculateStakingPayload(vaultTx *types.VaultTransaction) ([]byte, string, e
 	}
 	var txHashBytes [32]byte
 	copy(txHashBytes[:], txHash)
-	payloadBytes, payloadHash, err := evmutils.CalculateStakingPayloadHash(toAddressBytes, int64(vaultTx.Amount), txHashBytes)
+	payloadBytes, payloadHash, err := encode.CalculateStakingPayloadHash(toAddressBytes, vaultTx.Amount, txHashBytes)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to calculate payload: %w", err)
 	}

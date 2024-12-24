@@ -59,8 +59,8 @@ func TestSubscribeContractCallApprovedEvent(t *testing.T) {
 	err = networkClient.Start()
 	require.NoError(t, err)
 	//queryNewBlockHeader := "tm.event='NewBlockHeader'"
-	queryContractCallApproved := "tm.event='NewBlock' AND axelar.evm.v1beta1.ContractCallApproved.event_id EXISTS"
-	//queryEventCompleted := "tm.event='NewBlock' AND axelar.evm.v1beta1.EVMEventCompleted.event_id EXISTS"
+	queryContractCallApproved := "tm.event='NewBlock' AND scalar.evm.v1beta1.ContractCallApproved.event_id EXISTS"
+	//queryEventCompleted := "tm.event='NewBlock' AND scalar.evm.v1beta1.EVMEventCompleted.event_id EXISTS"
 	ch, err := networkClient.Subscribe(context.Background(), "test", queryContractCallApproved)
 	require.NoError(t, err)
 	require.NotNil(t, ch)

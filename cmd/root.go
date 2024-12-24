@@ -18,9 +18,15 @@ import (
 )
 
 var (
-	accountPrefix = "axelar"
-	environment   string
-	rootCmd       = &cobra.Command{
+	AccountAddressPrefix   = "scalar"
+	AccountPubKeyPrefix    = AccountAddressPrefix + types.PrefixPublic
+	ValidatorAddressPrefix = AccountAddressPrefix + types.PrefixValidator + types.PrefixOperator
+	ValidatorPubKeyPrefix  = AccountAddressPrefix + types.PrefixValidator + types.PrefixOperator + types.PrefixPublic
+	ConsNodeAddressPrefix  = AccountAddressPrefix + types.PrefixValidator + types.PrefixConsensus
+	ConsNodePubKeyPrefix   = AccountAddressPrefix + types.PrefixValidator + types.PrefixConsensus + types.PrefixPublic
+	BaseAsset              = "ascal"
+	environment            string
+	rootCmd                = &cobra.Command{
 		Use:   "relayer",
 		Short: "Scalar Relayer",
 		Run:   run,
@@ -86,13 +92,8 @@ func initObserve() {
 }
 
 func init() {
-
-	rootCmd.PersistentFlags().StringVar(
-		&environment,
-		"env",
-		"",
-		"Environment name to  to the configuration file",
-	)
+	flags := rootCmd.PersistentFlags()
+	flags.StringVar(&environment, "env", "", "Environment name to  to the configuration file")
 	viper.BindPFlag("env", rootCmd.PersistentFlags().Lookup("env"))
 	//Set account prefix for scalar
 	setCosmosAccountPrefix()
@@ -100,7 +101,7 @@ func init() {
 
 func setCosmosAccountPrefix() {
 	config := types.GetConfig()
-	config.SetBech32PrefixForAccount(accountPrefix, accountPrefix+"valoper")
-	config.SetBech32PrefixForConsensusNode(accountPrefix, accountPrefix+"valcons")
-	config.SetBech32PrefixForValidator(accountPrefix, accountPrefix+"valoper")
+	config.SetBech32PrefixForAccount(AccountAddressPrefix, AccountPubKeyPrefix)
+	config.SetBech32PrefixForValidator(ValidatorAddressPrefix, ValidatorPubKeyPrefix)
+	config.SetBech32PrefixForConsensusNode(ConsNodeAddressPrefix, ConsNodePubKeyPrefix)
 }
