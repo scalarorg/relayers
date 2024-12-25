@@ -2,13 +2,10 @@ package cosmos
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	axltypes "github.com/axelarnetwork/axelar-core/x/axelarnet/types"
-	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/tx"
@@ -17,6 +14,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	"github.com/rs/zerolog/log"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	scalarnettypes "github.com/scalarorg/scalar-core/x/scalarnet/types"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
@@ -53,37 +52,31 @@ type NetworkClient struct {
 }
 
 func NewNetworkClient(config *CosmosNetworkConfig, queryClient *QueryClient, txConfig client.TxConfig) (*NetworkClient, error) {
-	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic)
+	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic, config.Bip44Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create account from mnemonic: %w", err)
 	}
 	log.Info().Msgf("Scalar NetworkClient created with broadcaster address: %s", addr.String())
-	var rpcClient rpcclient.Client
-	if config.RPCUrl != "" {
-		log.Info().Msgf("Create rpc client with url: %s", config.RPCUrl)
-		rpcClient, err = client.NewClientFromNode(config.RPCUrl)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create RPC client: %w", err)
-		}
-	}
+	// var rpcClient rpcclient.Client
+	// if config.RPCUrl != "" {
+	// 	log.Info().Msgf("Create rpc client with url: %s", config.RPCUrl)
+	// 	rpcClient, err = client.NewClientFromNode(config.RPCUrl)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to create RPC client: %w", err)
+	// 	}
+	// }
 
-	account, err := queryClient.QueryAccount(context.Background(), addr)
-	if err != nil {
-		return nil, err
-	}
 	txFactory, err := createDefaultTxFactory(config, txConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx factory: %w", err)
 	}
 	networkClient := &NetworkClient{
-		config:         config,
-		rpcClient:      rpcClient,
-		queryClient:    queryClient,
-		addr:           addr,
-		privKey:        privKey,
-		txConfig:       txConfig,
-		txFactory:      txFactory,
-		sequenceNumber: account.Sequence,
+		config:      config,
+		queryClient: queryClient,
+		addr:        addr,
+		privKey:     privKey,
+		txConfig:    txConfig,
+		txFactory:   txFactory,
 	}
 	return networkClient, nil
 }
@@ -143,12 +136,6 @@ func NewNetworkClientWithOptions(config *CosmosNetworkConfig, queryClient *Query
 		networkClient.rpcClient = rpcClient
 	}
 
-	account, err := queryClient.QueryAccount(context.Background(), networkClient.addr)
-	if err != nil {
-		return nil, err
-	}
-	networkClient.sequenceNumber = account.Sequence
-
 	if networkClient.txFactory.AccountNumber() == 0 {
 		txFactory, err := createDefaultTxFactory(config, txConfig)
 		if err != nil {
@@ -160,33 +147,33 @@ func NewNetworkClientWithOptions(config *CosmosNetworkConfig, queryClient *Query
 }
 
 // Start connections: rpc, websocket...
-func (c *NetworkClient) Start() error {
+func (c *NetworkClient) Start() (rpcclient.Client, error) {
 	rpcClient, err := c.GetRpcClient()
 	if err != nil {
-		return fmt.Errorf("failed to get client: %w", err)
+		return nil, fmt.Errorf("failed to get client: %w", err)
 	}
-	return rpcClient.Start()
+	return rpcClient, rpcClient.Start()
 }
 
 // https://github.com/cosmos/cosmos-sdk/blob/main/client/tx/tx.go#L31
-func (c *NetworkClient) ConfirmEvmTx(ctx context.Context, msg *emvtypes.ConfirmGatewayTxsRequest) (*sdk.TxResponse, error) {
+func (c *NetworkClient) ConfirmEvmTx(ctx context.Context, msg *chainstypes.ConfirmSourceTxsRequest) (*sdk.TxResponse, error) {
 	return c.SignAndBroadcastMsgs(ctx, msg)
 }
 
 func (c *NetworkClient) SignCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
-	req := emvtypes.NewSignCommandsRequest(
+	req := chainstypes.NewSignCommandsRequest(
 		c.GetAddress(),
 		destinationChain)
 
 	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign commands request: %w", err)
+		return nil, fmt.Errorf("[NetworkClient] [SignCommandsRequest] %w", err)
 	}
 	return txRes, nil
 }
 func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, payload string) (*sdk.TxResponse, error) {
 	payloadBytes := []byte(payload)
-	req := axltypes.NewRouteMessage(
+	req := scalarnettypes.NewRouteMessage(
 		c.GetAddress(),
 		c.getFeegranter(),
 		id,
@@ -194,7 +181,7 @@ func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, 
 	)
 	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign commands request: %w", err)
+		return nil, fmt.Errorf("[NetworkClient] [SendRouteMessageRequest] %w", err)
 	}
 	return txRes, nil
 }
@@ -221,7 +208,11 @@ func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Ms
 	//1. Build unsigned transaction using txFactory
 	txf := c.createTxFactory(ctx)
 	//Estimate fees
-	simRes, adjusted, err := tx.CalculateGas(c.queryClient.GetClientCtx(), txf, msgs...)
+	cliContext, err := c.queryClient.GetClientCtx()
+	if err != nil {
+		log.Debug().Err(err).Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] cannot create client context")
+	}
+	simRes, adjusted, err := tx.CalculateGas(cliContext, txf, msgs...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate gas: %w", err)
 	}
@@ -461,9 +452,19 @@ func (c *NetworkClient) getFeegranter() sdk.AccAddress {
 	return c.addr
 }
 func (c *NetworkClient) GetRpcClient() (rpcclient.Client, error) {
-	if c.rpcClient == nil {
-		return nil, errors.New("no RPC client is defined in offline mode")
+	if c.rpcClient == nil && c.config.RPCUrl != "" {
+		rpcClient, err := client.NewClientFromNode(c.config.RPCUrl)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create RPC client with url %s : %w", c.config.RPCUrl, err)
+		}
+		c.rpcClient = rpcClient
 	}
 
 	return c.rpcClient, nil
+}
+
+// This function is call when the connection with current rpc client is lost
+func (c *NetworkClient) RemoveRpcClient() {
+	//Todo: Figure out how to clean up resource
+	c.rpcClient = nil
 }

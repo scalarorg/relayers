@@ -15,6 +15,7 @@ type CosmosNetworkConfig struct {
 	WSUrl         string   `mapstructure:"ws_url"`
 	Denom         string   `mapstructure:"denom"`
 	Mnemonic      string   `mapstructure:"mnemonic"`
+	Bip44Path     string   `mapstructure:"bip44path"`
 	GasPrice      float64  `mapstructure:"gas_price"`
 	BroadcastMode string   `mapstructure:"broadcast_mode"`
 	MaxRetries    int      `mapstructure:"max_retries"`

@@ -36,10 +36,9 @@ func DecodeIntArrayToHexString(input string) (string, error) {
 func removeQuote(str string) string {
 	return strings.Trim(str, "\"'")
 }
-
-func ParseContractCallApprovedEvent(event map[string][]string) ([]IBCEvent[ContractCallApproved], error) {
-	log.Debug().Msgf("[ScalarClient] [ParseContractCallApprovedEvent] start parser")
-	key := "axelar.evm.v1beta1.ContractCallApproved"
+func ParseDestCallApprovedEvent(event map[string][]string) ([]IBCEvent[DestCallApproved], error) {
+	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] start parser")
+	key := EventTypeDestCallApproved
 	eventIds := event[key+".event_id"]
 	senders := event[key+".sender"]
 	sourceChains := event[key+".chain"]
@@ -49,7 +48,7 @@ func ParseContractCallApprovedEvent(event map[string][]string) ([]IBCEvent[Contr
 	payloadHashes := event[key+".payload_hash"]
 	srcChannels := event["write_acknowledgement.packet_src_channel"]
 	destChannels := event["write_acknowledgement.packet_dst_channel"]
-	events := make([]IBCEvent[ContractCallApproved], len(eventIds))
+	events := make([]IBCEvent[DestCallApproved], len(eventIds))
 	for ind, eventId := range eventIds {
 		eventID := removeQuote(eventId)
 		hash := strings.Split(eventID, "-")[0]
@@ -61,7 +60,7 @@ func ParseContractCallApprovedEvent(event map[string][]string) ([]IBCEvent[Contr
 		if err != nil {
 			log.Warn().Msgf("Failed to decode command ID: %v, error: %v", commandIds[ind], err)
 		}
-		data := ContractCallApproved{
+		data := DestCallApproved{
 			MessageID:        eventID,
 			Sender:           removeQuote(senders[ind]),
 			SourceChain:      removeQuote(sourceChains[ind]),
@@ -79,16 +78,17 @@ func ParseContractCallApprovedEvent(event map[string][]string) ([]IBCEvent[Contr
 		if len(destChannels) > ind {
 			destChannel = destChannels[ind]
 		}
-		events[ind] = IBCEvent[ContractCallApproved]{
+		events[ind] = IBCEvent[DestCallApproved]{
 			Hash:        hash,
 			SrcChannel:  srcChannel,
 			DestChannel: destChannel,
 			Args:        data,
 		}
 	}
-	log.Debug().Msgf("[ScalarClient] [ParseContractCallApprovedEvent] parsed events: %v", events)
+	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] parsed events: %v", events)
 	return events, nil
 }
+
 func ParseSignCommandsEvent(event map[string][]string) ([]IBCEvent[SignCommands], error) {
 	log.Debug().Msgf("[ScalarClient] [ParseSignCommandsEvent] input event: %v", event)
 	events := make([]IBCEvent[SignCommands], 0)
@@ -96,7 +96,7 @@ func ParseSignCommandsEvent(event map[string][]string) ([]IBCEvent[SignCommands]
 }
 func ParseEvmEventCompletedEvent(event map[string][]string) ([]IBCEvent[EVMEventCompleted], error) {
 	log.Debug().Msgf("[ScalarClient] [ParseEvmEventCompletedEvent] start parser")
-	eventIds := event["axelar.evm.v1beta1.EVMEventCompleted.event_id"]
+	eventIds := event[EventTypeEVMEventCompleted+".event_id"]
 	txHashs := event["tx.hash"]
 	srcChannels := event["write_acknowledgement.packet_src_channel"]
 	destChannels := event["write_acknowledgement.packet_dst_channel"]
@@ -131,7 +131,7 @@ func ParseAllNewBlockEvent(event map[string][]string) ([]IBCEvent[any], error) {
 }
 func ParseContractCallSubmittedEvent(event map[string][]string) ([]IBCEvent[ContractCallSubmitted], error) {
 	log.Debug().Msgf("[ScalarClient] Received ContractCallSubmitted event: %d", len(event))
-	key := "axelar.axelarnet.v1beta1.ContractCallSubmitted"
+	key := "scalar.scalarnet.v1beta1.ContractCallSubmitted"
 	messageIDs := event[key+".message_id"]
 	txHashes := event["tx.hash"]
 	senders := event[key+".sender"]
@@ -182,7 +182,7 @@ func ParseContractCallSubmittedEvent(event map[string][]string) ([]IBCEvent[Cont
 
 func ParseContractCallWithTokenSubmittedEvent(event map[string][]string) ([]IBCEvent[ContractCallWithTokenSubmitted], error) {
 	log.Debug().Msgf("[ScalarClient] Received ContractCallWithTokenSubmitted event: %d", len(event))
-	key := "axelar.axelarnet.v1beta1.ContractCallWithTokenSubmitted"
+	key := "scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted"
 	messageIDs := event[key+".message_id"]
 	txHashes := event["tx.hash"]
 	senders := event[key+".sender"]

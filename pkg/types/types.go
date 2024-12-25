@@ -43,8 +43,8 @@ type IBCPacketEvent struct {
 // ------ Payloads ------
 // TODO: USING COSMOS SDK TO DEFINE THESE TYPES LATER
 const (
-	EvmProtobufPackage    = "axelar.evm.v1beta1"
-	AxelarProtobufPackage = "axelar.axelarnet.v1beta1"
+	ChainsProtobufPackage = "scalar.chains.v1beta1"
+	AxelarProtobufPackage = "scalar.scalarnet.v1beta1"
 )
 
 // Fee represents a fee structure with amount and recipient

@@ -7,60 +7,95 @@ import (
 	"fmt"
 	"strconv"
 
-	axltypes "github.com/axelarnetwork/axelar-core/x/axelarnet/types"
-	emvtypes "github.com/axelarnetwork/axelar-core/x/evm/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx"
 	auth "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/rs/zerolog/log"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	scalartypes "github.com/scalarorg/scalar-core/x/scalarnet/types"
 	//gogogrpc "github.com/cosmos/gogoproto/grpc"
 	//pbgrpc "github.com/gogo/protobuf/grpc"
 )
 
 type QueryClient struct {
-	clientCtx             *client.Context
-	EvmQueryServiceClient emvtypes.QueryServiceClient
-	MsgServiceClient      axltypes.MsgServiceClient
-	TxServiceClient       tx.ServiceClient
-	AccountQueryClient    auth.QueryClient
+	clientCtx *client.Context
 }
 
 func NewQueryClient(clientCtx *client.Context) *QueryClient {
-	evmQueryServiceClient := emvtypes.NewQueryServiceClient(clientCtx)
-	msgServiceClient := axltypes.NewMsgServiceClient(clientCtx)
-	accountQueryClient := auth.NewQueryClient(clientCtx)
-	txServiceClient := tx.NewServiceClient(clientCtx)
 	return &QueryClient{
-		clientCtx:             clientCtx,
-		EvmQueryServiceClient: evmQueryServiceClient,
-		MsgServiceClient:      msgServiceClient,
-		TxServiceClient:       txServiceClient,
-		AccountQueryClient:    accountQueryClient,
+		clientCtx: clientCtx,
 	}
 }
 
-func (c *QueryClient) GetClientCtx() *client.Context {
-	return c.clientCtx
+func (c *QueryClient) GetClientCtx() (*client.Context, error) {
+	if c.clientCtx.NodeURI != "" && c.clientCtx.Client == nil {
+		rpcClient, err := client.NewClientFromNode(c.clientCtx.NodeURI)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create RPC client: %w", err)
+		}
+		ctx := c.clientCtx.WithClient(rpcClient)
+		c.clientCtx = &ctx
+	}
+	return c.clientCtx, nil
+}
+func (c *QueryClient) GetAuthQueryClient() (auth.QueryClient, error) {
+	clientCtx, err := c.GetClientCtx()
+	if err != nil {
+		return nil, err
+	}
+	return auth.NewQueryClient(clientCtx), nil
 }
 
-func (c *QueryClient) QueryBatchedCommands(ctx context.Context, destinationChain string, batchedCommandId string) (*emvtypes.BatchedCommandsResponse, error) {
-	req := &emvtypes.BatchedCommandsRequest{
+func (c *QueryClient) GetChainQueryServiceClient() (chainstypes.QueryServiceClient, error) {
+	clientCtx, err := c.GetClientCtx()
+	if err != nil {
+		return nil, err
+	}
+	return chainstypes.NewQueryServiceClient(clientCtx), nil
+}
+
+func (c *QueryClient) GetMsgServiceClient() (scalartypes.MsgServiceClient, error) {
+	clientCtx, err := c.GetClientCtx()
+	if err != nil {
+		return nil, err
+	}
+	return scalartypes.NewMsgServiceClient(clientCtx), nil
+}
+
+func (c *QueryClient) GetTxServiceClient() (tx.ServiceClient, error) {
+	clientCtx, err := c.GetClientCtx()
+	if err != nil {
+		return nil, err
+	}
+	return tx.NewServiceClient(clientCtx), nil
+}
+
+func (c *QueryClient) QueryBatchedCommands(ctx context.Context, destinationChain string, batchedCommandId string) (*chainstypes.BatchedCommandsResponse, error) {
+	req := &chainstypes.BatchedCommandsRequest{
 		Chain: destinationChain,
 		Id:    batchedCommandId,
 	}
-	resp, err := c.EvmQueryServiceClient.BatchedCommands(ctx, req)
+	client, err := c.GetChainQueryServiceClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service client: %w", err)
+	}
+	resp, err := client.BatchedCommands(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query batched commands: %w", err)
 	}
 	return resp, nil
 }
 
-func (c *QueryClient) QueryPendingCommand(ctx context.Context, destinationChain string) ([]emvtypes.QueryCommandResponse, error) {
-	req := &emvtypes.PendingCommandsRequest{
+func (c *QueryClient) QueryPendingCommand(ctx context.Context, destinationChain string) ([]chainstypes.QueryCommandResponse, error) {
+	req := &chainstypes.PendingCommandsRequest{
 		Chain: destinationChain,
 	}
-	resp, err := c.EvmQueryServiceClient.PendingCommands(ctx, req)
+	client, err := c.GetChainQueryServiceClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service client: %w", err)
+	}
+	resp, err := client.PendingCommands(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query pending commands: %w", err)
 	}
@@ -68,14 +103,18 @@ func (c *QueryClient) QueryPendingCommand(ctx context.Context, destinationChain 
 	return resp.Commands, nil
 }
 
-func (c *QueryClient) QueryRouteMessageRequest(ctx context.Context, sender sdk.AccAddress, feegranter sdk.AccAddress, id string, payload string) (*axltypes.RouteMessageResponse, error) {
-	req := &axltypes.RouteMessageRequest{
+func (c *QueryClient) QueryRouteMessageRequest(ctx context.Context, sender sdk.AccAddress, feegranter sdk.AccAddress, id string, payload string) (*scalartypes.RouteMessageResponse, error) {
+	req := &scalartypes.RouteMessageRequest{
 		Sender:     sender,
 		ID:         id,
 		Payload:    []byte(payload),
 		Feegranter: feegranter,
 	}
-	resp, err := c.MsgServiceClient.RouteMessage(ctx, req)
+	client, err := c.GetMsgServiceClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service client: %w", err)
+	}
+	resp, err := client.RouteMessage(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query route message request: %w", err)
 	}
@@ -83,7 +122,11 @@ func (c *QueryClient) QueryRouteMessageRequest(ctx context.Context, sender sdk.A
 }
 func (c *QueryClient) QueryAccount(ctx context.Context, address sdk.AccAddress) (*auth.BaseAccount, error) {
 	req := &auth.QueryAccountRequest{Address: address.String()}
-	resp, err := c.AccountQueryClient.Account(ctx, req)
+	client, err := c.GetAuthQueryClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service client: %w", err)
+	}
+	resp, err := client.Account(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query account: %w", err)
 	}
@@ -136,7 +179,11 @@ func (c *QueryClient) QueryTx(ctx context.Context, txHash string) (*sdk.TxRespon
 	req := &tx.GetTxRequest{
 		Hash: txHash,
 	}
-	res, err := c.TxServiceClient.GetTx(ctx, req)
+	client, err := c.GetTxServiceClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service client: %w", err)
+	}
+	res, err := client.GetTx(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tx: %w", err)
 	}
@@ -144,10 +191,14 @@ func (c *QueryClient) QueryTx(ctx context.Context, txHash string) (*sdk.TxRespon
 }
 
 func (c *QueryClient) QueryActivedChains(ctx context.Context) ([]string, error) {
-	req := &emvtypes.ChainsRequest{
-		Status: emvtypes.Activated,
+	req := &chainstypes.ChainsRequest{
+		Status: chainstypes.Activated,
 	}
-	resp, err := c.EvmQueryServiceClient.Chains(ctx, req)
+	client, err := c.GetChainQueryServiceClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service client: %w", err)
+	}
+	resp, err := client.Chains(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query chains: %w", err)
 	}

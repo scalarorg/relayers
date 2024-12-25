@@ -50,16 +50,17 @@ func (c *Client) handleEvmContractCall(confirmRequest events.ConfirmTxsRequest) 
 
 func (c *Client) extractValidConfirmTxs(confirmRequest events.ConfirmTxsRequest) (string, []string) {
 	txHashes := make([]string, 0)
-	for txHash, destChain := range confirmRequest.TxHashs {
-		if c.globalConfig.ActiveChains[destChain] {
-			txHashes = append(txHashes, txHash)
-		} else {
-			log.Warn().
-				Str("sourceChain", confirmRequest.ChainName).
-				Str("txHash", txHash).
-				Str("destinationChain", destChain).
-				Msg("[ScalarClient] [extractValidConfirmTxs] invalid destination chain")
-		}
+	for txHash, _ := range confirmRequest.TxHashs {
+		txHashes = append(txHashes, txHash)
+		// if c.globalConfig.ActiveChains[destChain] {
+		// 	txHashes = append(txHashes, txHash)
+		// } else {
+		// 	log.Warn().
+		// 		Str("sourceChain", confirmRequest.ChainName).
+		// 		Str("txHash", txHash).
+		// 		Str("destinationChain", destChain).
+		// 		Msg("[ScalarClient] [extractValidConfirmTxs] invalid destination chain")
+		// }
 	}
 	return confirmRequest.ChainName, txHashes
 }

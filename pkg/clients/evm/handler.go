@@ -12,7 +12,6 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
-	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
@@ -53,7 +52,7 @@ func (ec *EvmClient) handleContractCall(event *contracts.IScalarGatewayContractC
 	if ec.eventBus != nil {
 		ec.eventBus.BroadcastEvent(&events.EventEnvelope{
 			EventType:        events.EVENT_EVM_CONTRACT_CALL,
-			DestinationChain: scalar.SCALAR_NETWORK_NAME,
+			DestinationChain: events.SCALAR_NETWORK_NAME,
 			Data:             confirmTxs,
 		})
 	} else {

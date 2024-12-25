@@ -14,7 +14,7 @@ import (
 func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IScalarGatewayContractCall) (models.RelayData, error) {
 	//id := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
 	//Calculate eventId by Txhash-logIndex among logs in txreceipt (AxelarEvmModule)
-	//https://github.com/axelarnetwork/axelar-core/blob/main/vald/evm/gateway_tx_confirmation.go#L73
+	//https://github.com/scalarorg/scalar-core/blob/main/vald/evm/gateway_tx_confirmation.go#L73
 	receipt, err := c.Client.TransactionReceipt(context.Background(), event.Raw.TxHash)
 	if err != nil {
 		return models.RelayData{}, fmt.Errorf("failed to get transaction receipt: %w", err)

@@ -26,7 +26,7 @@ type Config struct {
 	EvmPrivateKey     string                 `mapstructure:"evm_private_key"`
 	BtcPrivateKey     string                 `mapstructure:"btc_private_key"`
 	ChainConfigs      map[string]ChainFamily `mapstructure:"chain_configs"` //Store all valid chain configs
-	ActiveChains      map[string]bool        `mapstructure:"active_chains"` //Store all active chains in the scalar network
+	//ActiveChains      map[string]bool        `mapstructure:"active_chains"` //Store all active chains in the scalar network
 }
 
 var GlobalConfig Config
