@@ -15,8 +15,9 @@ import (
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/internal/codec"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
+	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/scalar-core/utils"
-	emvtypes "github.com/scalarorg/scalar-core/x/evm/types"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	nexus "github.com/scalarorg/scalar-core/x/nexus/exported"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/encoding"
@@ -48,7 +49,7 @@ var (
 	accAddress sdk.AccAddress
 )
 
-func TestSubscribeContractCallApprovedEvent(t *testing.T) {
+func TestSubscribeDestCallApprovedEvent(t *testing.T) {
 	txConfig := tx.NewTxConfig(codec.GetProtoCodec(), []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
 	clientCtx, err := cosmos.CreateClientContext(&CosmosNetworkConfig)
 	require.NoError(t, err)
@@ -56,12 +57,12 @@ func TestSubscribeContractCallApprovedEvent(t *testing.T) {
 	networkClient, err := cosmos.NewNetworkClient(&CosmosNetworkConfig, queryClient, txConfig)
 	require.NoError(t, err)
 	require.NotNil(t, networkClient)
-	err = networkClient.Start()
+	_, err = networkClient.Start()
 	require.NoError(t, err)
 	//queryNewBlockHeader := "tm.event='NewBlockHeader'"
-	queryContractCallApproved := "tm.event='NewBlock' AND scalar.evm.v1beta1.ContractCallApproved.event_id EXISTS"
-	//queryEventCompleted := "tm.event='NewBlock' AND scalar.evm.v1beta1.EVMEventCompleted.event_id EXISTS"
-	ch, err := networkClient.Subscribe(context.Background(), "test", queryContractCallApproved)
+	queryDestCallApproved := scalar.DestCallApprovedEventTopicId
+	//queryEventCompleted := "tm.event='NewBlock' AND scalar.chains.v1beta1.EVMEventCompleted.event_id EXISTS"
+	ch, err := networkClient.Subscribe(context.Background(), "test", queryDestCallApproved)
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	go func() {
@@ -73,9 +74,9 @@ func TestSubscribeContractCallApprovedEvent(t *testing.T) {
 	nexusChain := nexus.ChainName(utils.NormalizeString(chainNameBtcTestnet4))
 	txIds := []string{"f0510bcacb2e428bd89e39e9708555265ed413b5320c5f920bf4becac9c53f56"}
 	log.Debug().Msgf("[ScalarClient] [ConfirmTxs] Broadcast for confirmation txs from chain %s: %v", nexusChain, txIds)
-	txHashs := make([]emvtypes.Hash, len(txIds))
+	txHashs := make([]chainstypes.Hash, len(txIds))
 	for i, txId := range txIds {
-		txHashs[i] = emvtypes.Hash(common.HexToHash(txId))
+		txHashs[i] = chainstypes.Hash(common.HexToHash(txId))
 	}
 	//msg := emvtypes.NewConfirmGatewayTxsRequest(networkClient.GetAddress(), nexusChain, txHashs)
 	//2. Sign and broadcast the payload using the network client, which has the private key

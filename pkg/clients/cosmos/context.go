@@ -18,11 +18,6 @@ func CreateClientContext(config *CosmosNetworkConfig) (*client.Context, error) {
 	if config.RPCUrl != "" {
 		log.Info().Msgf("Create rpcClient using RPC URL: %s", config.RPCUrl)
 		clientCtx = clientCtx.WithNodeURI(config.RPCUrl)
-		rpcClient, err := client.NewClientFromNode(config.RPCUrl)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create RPC client: %w", err)
-		}
-		clientCtx = clientCtx.WithClient(rpcClient)
 	}
 	if config.Mnemonic != "" {
 		_, addr, err := CreateAccountFromMnemonic(config.Mnemonic, config.Bip44Path)

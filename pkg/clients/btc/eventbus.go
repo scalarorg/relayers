@@ -23,30 +23,29 @@ func (c *BtcClient) handleEventBusMessage(event *events.EventEnvelope) error {
 		Any("data", event.Data).
 		Msg("[BtcClient] [handleEventBusMessage]")
 	switch event.EventType {
-	case events.EVENT_SCALAR_CONTRACT_CALL_APPROVED:
-		//Broadcast from scalar.handleContractCallApprovedEvent
-		return c.handleScalarContractCallApproved(event.MessageID, event.Data.(string))
+	case events.EVENT_SCALAR_DEST_CALL_APPROVED:
+		//Broadcast from scalar.handleDestCallApprovedEvent
+		return c.handleScalarDestCallApproved(event.MessageID, event.Data.(string))
 	case events.EVENT_CUSTODIAL_SIGNATURES_CONFIRMED:
-		//Broadcast from scalar.handleContractCallApprovedEvent
 		return c.handleCustodialSignaturesConfirmed(event.MessageID, event.Data.(string))
 	}
 
 	return nil
 }
 
-func (c *BtcClient) handleScalarContractCallApproved(messageID string, executeData string) error {
+func (c *BtcClient) handleScalarDestCallApproved(messageID string, executeData string) error {
 	decodedExecuteData, err := DecodeExecuteData(executeData)
 	if err != nil {
 		return fmt.Errorf("failed to decode execute data: %w", err)
 	}
-	c.observeScalarContractCallApproved(decodedExecuteData)
+	c.observeScalarDestCallApproved(decodedExecuteData)
 	if len(decodedExecuteData.Commands) != len(decodedExecuteData.Params) {
-		return fmt.Errorf("[BtcClient] [handleScalarContractCallApproved] commands and params length mismatch")
+		return fmt.Errorf("[BtcClient] [handleScalarDestCallApproved] commands and params length mismatch")
 	}
 	for i := 0; i < len(decodedExecuteData.Commands); i++ {
 		err := c.executeBtcCommand(messageID, decodedExecuteData.CommandIds[i], decodedExecuteData.Commands[i], decodedExecuteData.Params[i])
 		if err != nil {
-			log.Error().Msgf("[BtcClient] [handleScalarContractCallApproved] failed to execute btc command: %s, %v", decodedExecuteData.Commands[i], err)
+			log.Error().Msgf("[BtcClient] [handleScalarDestCallApproved] failed to execute btc command: %s, %v", decodedExecuteData.Commands[i], err)
 			return fmt.Errorf("failed to execute btc command: %w", err)
 		}
 	}
@@ -88,11 +87,11 @@ func (c *BtcClient) executeBtcCommand(messageID string, commandId [32]byte, comm
 	}
 	return err
 }
-func (c *BtcClient) observeScalarContractCallApproved(decodedExecuteData *DecodedExecuteData) error {
+func (c *BtcClient) observeScalarDestCallApproved(decodedExecuteData *DecodedExecuteData) error {
 	log.Debug().
 		Uint64("chainId", decodedExecuteData.ChainId).
 		Strs("commands", decodedExecuteData.Commands).
-		Msg("[BtcClient] [observeScalarContractCallApproved]")
+		Msg("[BtcClient] [observeScalarDestCallApproved]")
 	return nil
 }
 

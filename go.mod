@@ -15,6 +15,7 @@ require (
 	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20241211074929-89c4badcd3e2
 	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241219092630-d03748ff6bdc
 	github.com/scalarorg/go-electrum v0.1.1
+	github.com/scalarorg/scalar-core v0.0.2-migrate-evm
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
@@ -43,7 +44,6 @@ require (
 	github.com/ethereum/go-verkle v0.1.1-0.20240829091221-dffa7562dbe9 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
-	github.com/scalarorg/scalar-core v0.0.2-migrate-evm // indirect
 	github.com/supranational/blst v0.3.13 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
@@ -240,11 +240,11 @@ require (
 )
 
 // ---- Scalar ----
-//replace github.com/scalarorg/go-electrum => ../go-electrum
+// replace github.com/scalarorg/go-electrum => ../go-electrum
 
 // replace github.com/scalarorg/bitcoin-vault/go-utils => ../bitcoin-vault/go-utils
 
-replace github.com/scalarorg/scalar-core => ../scalar-core
+// replace github.com/scalarorg/scalar-core => ../scalar-core
 
 // Temporary replacement for rosetta support
 replace github.com/cosmos/cosmos-sdk => github.com/axelarnetwork/cosmos-sdk v0.45.17-0.20240321205000-47c0c80e20ca

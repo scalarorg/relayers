@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
@@ -12,7 +13,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/scalar-core/utils"
-	emvtypes "github.com/scalarorg/scalar-core/x/evm/types"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	nexus "github.com/scalarorg/scalar-core/x/nexus/exported"
 
 	//tmtypes "github.com/cometbft/cometbft/types"
@@ -100,17 +101,7 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 }
 
 func (c *Client) Start(ctx context.Context) error {
-	activedChains, err := c.queryClient.QueryActivedChains(ctx)
-	if err != nil {
-		return fmt.Errorf("[ScalarClient] [Start] failed to query actived chains: %w", err)
-	}
-	log.Debug().Msgf("[ScalarClient] [Start] actived chains: %v", activedChains)
-
-	c.globalConfig.ActiveChains = map[string]bool{}
-	for _, chain := range activedChains {
-		c.globalConfig.ActiveChains[chain] = true
-	}
-	receiver := c.eventBus.Subscribe(SCALAR_NETWORK_NAME)
+	receiver := c.eventBus.Subscribe(events.SCALAR_NETWORK_NAME)
 	go func() {
 		for event := range receiver {
 			go func() {
@@ -121,41 +112,62 @@ func (c *Client) Start(ctx context.Context) error {
 			}()
 		}
 	}()
-	//Start rpc client
-	if err := c.network.Start(); err != nil {
-		return fmt.Errorf("[ScalarClient] [Start] failed to start rpc client: %w", err)
-	} else {
-		log.Debug().Msgf("[ScalarClient] [Start] Start rpc client success")
-	}
-	err = subscribeDestCallApprovedEvent(ctx, c.network, c.handleDestCallApprovedEvents)
-	if err != nil {
-		log.Error().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] error: %v", err)
-	}
-
-	// err = subscribeContractCallApprovedEvent(ctx, c.network, c.handleContractCallApprovedEvents)
-	// if err != nil {
-	// 	log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
-	// }
-	// Todo: findout if this event is emitted by the ScalarNetwork
-	// err = subscribeSignCommandsEvent(ctx, c.network, c.handleSignCommandsEvents)
-	// if err != nil {
-	// 	log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
-	// }
-	err = subscribeEVMCompletedEvent(ctx, c.network, c.handleEVMCompletedEvents)
-	if err != nil {
-		log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] error: %v", err)
-	}
-	// err = subscribeAllNewBlockEvent(ctx, c.network, c.handleAnyEvents)
-	// if err != nil {
-	// 	log.Error().Msgf("[ScalarClient] [subscribeAllEvent] Failed: %v", err)
-	// }
-	// For debug purpose, subscribe to all tx events, findout if there is sign commands event
-	err = subscribeAllTxEvent(ctx, c.network)
-	if err != nil {
-		log.Error().Msgf("[ScalarClient] [subscribeAllTxEvent] Failed: %v", err)
-	}
+	c.subscribeWithHeatBeat(ctx)
 	return nil
 }
+func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
+	retryInterval := time.Millisecond * time.Duration(c.networkConfig.RetryInterval)
+	for {
+		cancelCtx, cancelFunc := context.WithCancel(ctx)
+		//Start rpc client
+		log.Debug().Msg("[ScalarClient] [Start] Try to start scalar connection")
+		tmclient, err := c.network.Start()
+		if err != nil {
+			log.Debug().Msgf("[ScalarClient] [Start] Connect to the scalar network failed, sleep for %ds then retry", int64(retryInterval.Seconds()))
+			time.Sleep(retryInterval)
+			continue
+		}
+		log.Info().Msgf("[ScalarClient] [Start] Start rpc client success. Subscribing for events...")
+
+		err = subscribeDestCallApprovedEvent(cancelCtx, c.network, c.handleDestCallApprovedEvents)
+		if err != nil {
+			log.Error().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] error: %v", err)
+		}
+		// Todo: findout if this event is emitted by the ScalarNetwork
+		// err = subscribeSignCommandsEvent(cancelCtx, c.network, c.handleSignCommandsEvents)
+		// if err != nil {
+		// 	log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
+		// }
+		err = subscribeEVMCompletedEvent(cancelCtx, c.network, c.handleEVMCompletedEvents)
+		if err != nil {
+			log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] error: %v", err)
+		}
+		// err = subscribeAllNewBlockEvent(cancelCtx, c.network, c.handleAnyEvents)
+		// if err != nil {
+		// 	log.Error().Msgf("[ScalarClient] [subscribeAllEvent] Failed: %v", err)
+		// }
+		// For debug purpose, subscribe to all tx events, findout if there is sign commands event
+		err = subscribeAllTxEvent(cancelCtx, c.network)
+		if err != nil {
+			log.Error().Msgf("[ScalarClient] [subscribeAllTxEvent] Failed: %v", err)
+		}
+		//HeatBeat
+		for {
+			_, err := tmclient.Health(ctx)
+			if err != nil {
+				// clean all subscriber then retry
+				log.Info().Msgf("[ScalarClient] ScalarNode is dead. Perform reconnecting")
+				c.network.RemoveRpcClient()
+				break
+			} else {
+				log.Debug().Msgf("[ScalarClient] ScalarNode is alive")
+			}
+			time.Sleep(retryInterval)
+		}
+		cancelFunc()
+	}
+}
+
 func subscribeDestCallApprovedEvent(ctx context.Context, network *cosmos.NetworkClient,
 	callback func(ctx context.Context, events []IBCEvent[DestCallApproved]) error) error {
 	if _, err := Subscribe(ctx, network, DestCallApprovedEvent,
@@ -173,22 +185,6 @@ func subscribeDestCallApprovedEvent(ctx context.Context, network *cosmos.Network
 	return nil
 }
 
-func subscribeContractCallApprovedEvent(ctx context.Context, network *cosmos.NetworkClient,
-	callback func(ctx context.Context, events []IBCEvent[ContractCallApproved]) error) error {
-	if _, err := Subscribe(ctx, network, ContractCallApprovedEvent,
-		func(events []IBCEvent[ContractCallApproved]) {
-			err := callback(ctx, events)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [ContractCallApprovedHandler] callback error: %v", err)
-			}
-		}); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] Failed: %v", err)
-		return err
-	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] success")
-	}
-	return nil
-}
 func subscribeSignCommandsEvent(ctx context.Context, network *cosmos.NetworkClient,
 	callback func(ctx context.Context, events []IBCEvent[SignCommands]) error) error {
 	if _, err := Subscribe(ctx, network, SignCommandsEvent,
@@ -306,11 +302,11 @@ func (c *Client) ConfirmTxs(ctx context.Context, chainName string, txIds []strin
 	//1. Create Confirm message request
 	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
 	log.Debug().Msgf("[ScalarClient] [ConfirmTxs] Broadcast for confirmation txs from chain %s: %v", nexusChain, txIds)
-	txHashs := make([]emvtypes.Hash, len(txIds))
+	txHashs := make([]chainstypes.Hash, len(txIds))
 	for i, txId := range txIds {
-		txHashs[i] = emvtypes.Hash(common.HexToHash(txId))
+		txHashs[i] = chainstypes.Hash(common.HexToHash(txId))
 	}
-	msg := emvtypes.NewConfirmGatewayTxsRequest(c.network.GetAddress(), nexusChain, txHashs)
+	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, txHashs)
 	//2. Sign and broadcast the payload using the network client, which has the private key
 	confirmTx, err := c.network.SignAndBroadcastMsgs(ctx, msg)
 	if err != nil {
@@ -334,8 +330,8 @@ func (c *Client) ConfirmBtcTx(ctx context.Context, chainName string, txId string
 func (c *Client) ConfirmEvmTx(ctx context.Context, chainName string, txId string) (*sdk.TxResponse, error) {
 	//1. Create Confirm message request
 	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
-	txHash := emvtypes.Hash(common.HexToHash(txId))
-	msg := emvtypes.NewConfirmGatewayTxsRequest(c.network.GetAddress(), nexusChain, []emvtypes.Hash{txHash})
+	txHash := chainstypes.Hash(common.HexToHash(txId))
+	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, []chainstypes.Hash{txHash})
 
 	//2. Sign and broadcast the payload using the network client, which has the private key
 	confirmTx, err := c.network.ConfirmEvmTx(ctx, msg)

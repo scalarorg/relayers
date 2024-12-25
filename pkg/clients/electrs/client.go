@@ -10,7 +10,6 @@ import (
 	"github.com/scalarorg/go-electrum/electrum"
 	"github.com/scalarorg/go-electrum/electrum/types"
 	"github.com/scalarorg/relayers/config"
-	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
@@ -149,7 +148,7 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	if c.eventBus != nil {
 		c.eventBus.BroadcastEvent(&events.EventEnvelope{
 			EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
-			DestinationChain: scalar.SCALAR_NETWORK_NAME,
+			DestinationChain: events.SCALAR_NETWORK_NAME,
 			Data:             confirmTxs,
 		})
 	} else {

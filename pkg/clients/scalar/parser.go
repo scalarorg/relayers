@@ -38,7 +38,7 @@ func removeQuote(str string) string {
 }
 func ParseDestCallApprovedEvent(event map[string][]string) ([]IBCEvent[DestCallApproved], error) {
 	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] start parser")
-	key := "scalar.chains.v1beta1.DestCallApproved"
+	key := EventTypeDestCallApproved
 	eventIds := event[key+".event_id"]
 	senders := event[key+".sender"]
 	sourceChains := event[key+".chain"]
@@ -88,58 +88,7 @@ func ParseDestCallApprovedEvent(event map[string][]string) ([]IBCEvent[DestCallA
 	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] parsed events: %v", events)
 	return events, nil
 }
-func ParseContractCallApprovedEvent(event map[string][]string) ([]IBCEvent[ContractCallApproved], error) {
-	log.Debug().Msgf("[ScalarClient] [ParseContractCallApprovedEvent] start parser")
-	key := "scalar.evm.v1beta1.ContractCallApproved"
-	eventIds := event[key+".event_id"]
-	senders := event[key+".sender"]
-	sourceChains := event[key+".chain"]
-	destinationChains := event[key+".destination_chain"]
-	contractAddresses := event[key+".contract_address"]
-	commandIds := event[key+".command_id"]
-	payloadHashes := event[key+".payload_hash"]
-	srcChannels := event["write_acknowledgement.packet_src_channel"]
-	destChannels := event["write_acknowledgement.packet_dst_channel"]
-	events := make([]IBCEvent[ContractCallApproved], len(eventIds))
-	for ind, eventId := range eventIds {
-		eventID := removeQuote(eventId)
-		hash := strings.Split(eventID, "-")[0]
-		payloadHash, err := DecodeIntArrayToHexString(payloadHashes[ind])
-		if err != nil {
-			log.Warn().Msgf("Failed to decode payload hash: %v, error: %v", payloadHashes[ind], err)
-		}
-		commandID, err := DecodeIntArrayToHexString(commandIds[ind])
-		if err != nil {
-			log.Warn().Msgf("Failed to decode command ID: %v, error: %v", commandIds[ind], err)
-		}
-		data := ContractCallApproved{
-			MessageID:        eventID,
-			Sender:           removeQuote(senders[ind]),
-			SourceChain:      removeQuote(sourceChains[ind]),
-			DestinationChain: removeQuote(destinationChains[ind]),
-			ContractAddress:  removeQuote(contractAddresses[ind]),
-			Payload:          "", //Payload will be get from RelayData.CallContract.Payload with filter by eventID
-			PayloadHash:      "0x" + payloadHash,
-			CommandID:        commandID,
-		}
-		var srcChannel string
-		var destChannel string
-		if len(srcChannels) > ind {
-			srcChannel = srcChannels[ind]
-		}
-		if len(destChannels) > ind {
-			destChannel = destChannels[ind]
-		}
-		events[ind] = IBCEvent[ContractCallApproved]{
-			Hash:        hash,
-			SrcChannel:  srcChannel,
-			DestChannel: destChannel,
-			Args:        data,
-		}
-	}
-	log.Debug().Msgf("[ScalarClient] [ParseContractCallApprovedEvent] parsed events: %v", events)
-	return events, nil
-}
+
 func ParseSignCommandsEvent(event map[string][]string) ([]IBCEvent[SignCommands], error) {
 	log.Debug().Msgf("[ScalarClient] [ParseSignCommandsEvent] input event: %v", event)
 	events := make([]IBCEvent[SignCommands], 0)
@@ -147,7 +96,7 @@ func ParseSignCommandsEvent(event map[string][]string) ([]IBCEvent[SignCommands]
 }
 func ParseEvmEventCompletedEvent(event map[string][]string) ([]IBCEvent[EVMEventCompleted], error) {
 	log.Debug().Msgf("[ScalarClient] [ParseEvmEventCompletedEvent] start parser")
-	eventIds := event["scalar.evm.v1beta1.EVMEventCompleted.event_id"]
+	eventIds := event[EventTypeEVMEventCompleted+".event_id"]
 	txHashs := event["tx.hash"]
 	srcChannels := event["write_acknowledgement.packet_src_channel"]
 	destChannels := event["write_acknowledgement.packet_dst_channel"]

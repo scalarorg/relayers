@@ -43,7 +43,7 @@ type IBCPacketEvent struct {
 // ------ Payloads ------
 // TODO: USING COSMOS SDK TO DEFINE THESE TYPES LATER
 const (
-	EvmProtobufPackage    = "scalar.evm.v1beta1"
+	ChainsProtobufPackage = "scalar.chains.v1beta1"
 	AxelarProtobufPackage = "scalar.scalarnet.v1beta1"
 )
 

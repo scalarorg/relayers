@@ -3,13 +3,13 @@ package scalar
 // Add this new type definition
 
 const (
-	SCALAR_NETWORK_NAME           = "Scalar.Network"
-	SCALAR_CONTRACT_CALL_APPROVED = "Scalar.ContractCallApproved"
-	SCALAR_COMMAND_EXECUTED       = "Scalar.CommandExecuted"
-
-	ContractCallApprovedEventTopicId = "tm.event='NewBlock' AND scalar.evm.v1beta1.ContractCallApproved.event_id EXISTS"
-	SignCommandsEventTopicId         = "tm.event='NewBlock' AND sign.batchedCommandID EXISTS"
-	EVMCompletedEventTopicId         = "tm.event='NewBlock' AND scalar.evm.v1beta1.EVMEventCompleted.event_id EXISTS"
+	EventTypeDestCallApproved               = "scalar.chains.v1beta1.DestCallApproved"
+	EventTypeEVMEventCompleted              = "scalar.chains.v1beta1.EVMEventCompleted"
+	EventTypeContractCallSubmitted          = "scalar.scalarnet.v1beta1.ContractCallSubmitted"
+	EventTypeContractCallWithTokenSubmitted = "scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted"
+	DestCallApprovedEventTopicId            = "tm.event='NewBlock' AND scalar.chains.v1beta1.DestCallApproved.event_id EXISTS"
+	SignCommandsEventTopicId                = "tm.event='NewBlock' AND sign.batchedCommandID EXISTS"
+	EVMCompletedEventTopicId                = "tm.event='NewBlock' AND scalar.chains.v1beta1.EVMEventCompleted.event_id EXISTS"
 	//For future use
 	ContractCallSubmittedEventTopicId = "tm.event='Tx' AND scalar.scalarnet.v1beta1.ContractCallSubmitted.message_id EXISTS"
 	ContractCallWithTokenEventTopicId = "tm.event='Tx' AND scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted.message_id EXISTS"
@@ -92,14 +92,9 @@ type IBCPacketEvent struct {
 
 var (
 	DestCallApprovedEvent = ListenerEvent[IBCEvent[DestCallApproved]]{
-		TopicId: ContractCallApprovedEventTopicId,
-		Type:    "scalar.evm.v1beta1.ContractCallApproved",
+		TopicId: DestCallApprovedEventTopicId,
+		Type:    EventTypeDestCallApproved,
 		Parser:  ParseDestCallApprovedEvent,
-	}
-	ContractCallApprovedEvent = ListenerEvent[IBCEvent[ContractCallApproved]]{
-		TopicId: ContractCallApprovedEventTopicId,
-		Type:    "scalar.evm.v1beta1.ContractCallApproved",
-		Parser:  ParseContractCallApprovedEvent,
 	}
 	SignCommandsEvent = ListenerEvent[IBCEvent[SignCommands]]{
 		TopicId: SignCommandsEventTopicId,
@@ -109,7 +104,7 @@ var (
 
 	EVMCompletedEvent = ListenerEvent[IBCEvent[EVMEventCompleted]]{
 		TopicId: EVMCompletedEventTopicId,
-		Type:    "scalar.evm.v1beta1.EVMEventCompleted",
+		Type:    EventTypeEVMEventCompleted,
 		Parser:  ParseEvmEventCompletedEvent,
 	}
 	AllNewBlockEvent = ListenerEvent[IBCEvent[any]]{
@@ -120,12 +115,12 @@ var (
 	//For future use
 	ContractCallSubmittedEvent = ListenerEvent[IBCEvent[ContractCallSubmitted]]{
 		TopicId: ContractCallSubmittedEventTopicId,
-		Type:    "scalar.scalarnet.v1beta1.ContractCallSubmitted",
+		Type:    EventTypeContractCallSubmitted,
 		Parser:  ParseContractCallSubmittedEvent,
 	}
 	ContractCallWithTokenSubmittedEvent = ListenerEvent[IBCEvent[ContractCallWithTokenSubmitted]]{
 		TopicId: ContractCallWithTokenEventTopicId,
-		Type:    "scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted",
+		Type:    EventTypeContractCallWithTokenSubmitted,
 		Parser:  ParseContractCallWithTokenSubmittedEvent,
 	}
 	ExecuteMessageEvent = ListenerEvent[IBCPacketEvent]{
