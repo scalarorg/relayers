@@ -116,13 +116,17 @@ func (c *Client) Start(ctx context.Context) error {
 }
 func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 	retryInterval := time.Millisecond * time.Duration(c.networkConfig.RetryInterval)
+	deadCount := 0
 	for {
 		cancelCtx, cancelFunc := context.WithCancel(ctx)
 		//Start rpc client
 		log.Debug().Msg("[ScalarClient] [Start] Try to start scalar connection")
 		tmclient, err := c.network.Start()
 		if err != nil {
-			log.Debug().Msgf("[ScalarClient] [Start] Connect to the scalar network failed, sleep for %ds then retry", int64(retryInterval.Seconds()))
+			deadCount += 1
+			if deadCount >= 10 {
+				log.Debug().Msgf("[ScalarClient] [Start] Connect to the scalar network failed, sleep for %ds then retry", int64(retryInterval.Seconds()))
+			}
 			c.network.RemoveRpcClient()
 			time.Sleep(retryInterval)
 			continue
@@ -152,6 +156,7 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 			log.Error().Msgf("[ScalarClient] [subscribeAllTxEvent] Failed: %v", err)
 		}
 		//HeatBeat
+		aliveCount := 0
 		for {
 			_, err := tmclient.Health(ctx)
 			if err != nil {
@@ -160,7 +165,11 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 				c.network.RemoveRpcClient()
 				break
 			} else {
-				log.Debug().Msgf("[ScalarClient] ScalarNode is alive")
+				aliveCount += 1
+				if aliveCount >= 100 {
+					log.Debug().Msgf("[ScalarClient] ScalarNode is alive")
+					aliveCount = 0
+				}
 			}
 			time.Sleep(retryInterval)
 		}
