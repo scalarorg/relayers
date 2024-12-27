@@ -143,10 +143,13 @@ func (c *Client) findBatchCommandId(ctx context.Context, txHash string) (string,
 func (c *Client) waitForSignCommandsEvent(ctx context.Context, txHash string) (string, string) {
 	var txRes *sdk.TxResponse
 	var err error
+	//First time wait for 5 seconds
+	time.Sleep(5 * time.Second)
 	for {
 		txRes, err = c.queryClient.QueryTx(ctx, txHash)
 		if err != nil || txRes == nil || txRes.Code != 0 || len(txRes.Logs) == 0 {
 			log.Debug().Err(err).Msgf("[ScalarClient] [waitForSignCommandsEvent]")
+			//Wait for 2 seconds before retry
 			time.Sleep(2 * time.Second)
 			continue
 		}

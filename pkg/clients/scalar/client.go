@@ -19,7 +19,6 @@ import (
 	//tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -59,7 +58,7 @@ func NewClient(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, event
 }
 
 func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*Client, error) {
-	txConfig := tx.NewTxConfig(codec.GetProtoCodec(), []signing.SignMode{signing.SignMode_SIGN_MODE_DIRECT})
+	txConfig := tx.NewTxConfig(codec.GetProtoCodec(), tx.DefaultSignModes)
 	subscriberName := fmt.Sprintf("subscriber-%s", config.ID)
 	//Set default broadcast mode is sync
 	if config.BroadcastMode == "" {
@@ -124,6 +123,7 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 		tmclient, err := c.network.Start()
 		if err != nil {
 			log.Debug().Msgf("[ScalarClient] [Start] Connect to the scalar network failed, sleep for %ds then retry", int64(retryInterval.Seconds()))
+			c.network.RemoveRpcClient()
 			time.Sleep(retryInterval)
 			continue
 		}

@@ -10,6 +10,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
@@ -187,7 +188,7 @@ func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, 
 }
 
 // Inject account number and sequence number into txFactory for signing
-func (c *NetworkClient) createTxFactory(ctx context.Context) tx.Factory {
+func (c *NetworkClient) CreateTxFactory(ctx context.Context) tx.Factory {
 	txf := c.txFactory
 	resp, err := c.queryClient.QueryAccount(ctx, c.GetAddress())
 	if err != nil {
@@ -195,6 +196,7 @@ func (c *NetworkClient) createTxFactory(ctx context.Context) tx.Factory {
 	} else {
 		log.Debug().Msgf("[ScalarClient] [NetworkClient] account number: %v, sequence number: %v", resp.AccountNumber, resp.Sequence)
 		txf = txf.WithAccountNumber(resp.AccountNumber)
+
 		//If sequence number is greater than current sequence number, update the sequence number
 		//This is to avoid the situation where the transaction is not included in the next block
 		//Then account sequence number is not updated on the server side
@@ -204,9 +206,9 @@ func (c *NetworkClient) createTxFactory(ctx context.Context) tx.Factory {
 	}
 	return txf
 }
-func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Msg) (*sdk.TxResponse, error) {
+func (c *NetworkClient) CreateTxBuilder(ctx context.Context, msgs ...sdk.Msg) (client.TxBuilder, error) {
 	//1. Build unsigned transaction using txFactory
-	txf := c.createTxFactory(ctx)
+	txf := c.CreateTxFactory(ctx)
 	//Estimate fees
 	cliContext, err := c.queryClient.GetClientCtx()
 	if err != nil {
@@ -227,6 +229,13 @@ func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Ms
 	}
 
 	txBuilder.SetFeeGranter(c.addr)
+	return txBuilder, nil
+}
+func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Msg) (*sdk.TxResponse, error) {
+	txBuilder, err := c.CreateTxBuilder(ctx, msgs...)
+	if err != nil {
+		return nil, err
+	}
 	//Try to sign and broadcast the transaction until success or reach max retry
 	result, err := c.trySignAndBroadcastMsgs(ctx, txBuilder)
 	if err != nil {
@@ -246,10 +255,10 @@ func (c *NetworkClient) trySignAndBroadcastMsgs(ctx context.Context, txBuilder c
 	var err error
 	var result *sdk.TxResponse
 	for i := 0; i < c.config.MaxRetries; i++ {
-		txf := c.createTxFactory(ctx)
+		txf := c.CreateTxFactory(ctx)
 		log.Debug().Msgf("[ScalarNetworkClient] [trySignAndBroadcastMsgs] account sequence: %d", txf.Sequence())
 		c.txFactory = txf
-		err = c.signTx(txf, txBuilder, true)
+		err = c.SignTx(txf, txBuilder, true)
 
 		if err != nil {
 			return nil, err
@@ -281,7 +290,7 @@ func (c *NetworkClient) trySignAndBroadcastMsgs(ctx context.Context, txBuilder c
 	log.Error().Msgf("[ScalarNetworkClient] [trySignAndBroadcast] failed to broadcast tx after %d retries", c.config.MaxRetries)
 	return result, err
 }
-func (c *NetworkClient) signTx(txf tx.Factory, txBuilder client.TxBuilder, overwriteSig bool) error {
+func (c *NetworkClient) SignTx(txf tx.Factory, txBuilder client.TxBuilder, overwriteSig bool) error {
 	//2. Sign the transaction
 	signerData := authsigning.SignerData{
 		ChainID:       txf.ChainID(),
@@ -327,7 +336,6 @@ func (c *NetworkClient) signTx(txf tx.Factory, txBuilder client.TxBuilder, overw
 	if err != nil {
 		return err
 	}
-
 	// Construct the SignatureV2 struct
 	sigData = signing.SingleSignatureData{
 		SignMode:  txf.SignMode(),
@@ -338,6 +346,7 @@ func (c *NetworkClient) signTx(txf tx.Factory, txBuilder client.TxBuilder, overw
 		Data:     &sigData,
 		Sequence: txf.Sequence(),
 	}
+
 	if overwriteSig {
 		return txBuilder.SetSignatures(sigV2)
 	}
@@ -442,6 +451,10 @@ func (c *NetworkClient) UnSubscribeAll(ctx context.Context, subscriber string) e
 		return err
 	}
 	return client.UnsubscribeAll(ctx, subscriber)
+}
+
+func (c *NetworkClient) GetPubkey() cryptotypes.PubKey {
+	return c.privKey.PubKey()
 }
 
 // Get Broadcast Address from config (privatekey or mnemonic)
