@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/rs/zerolog/log"
 	encode "github.com/scalarorg/bitcoin-vault/go-utils/encode"
 	"github.com/scalarorg/go-electrum/electrum/types"
 )
@@ -19,17 +20,19 @@ func CalculateStakingPayload(vaultTx *types.VaultTransaction) ([]byte, string, e
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to decode toAddress: %w", err)
 	}
-	var toAddressBytes [20]byte
-	copy(toAddressBytes[:], toAddress)
+	// var toAddressBytes [20]byte
+	// copy(toAddressBytes[:], toAddress)
 
+	txHash := strings.TrimPrefix(vaultTx.TxHash, "0x")
 	// Convert hex string to [32]byte
-	txHash, err := hex.DecodeString(strings.TrimPrefix(vaultTx.TxHash, "0x"))
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to decode txHash: %w", err)
-	}
-	var txHashBytes [32]byte
-	copy(txHashBytes[:], txHash)
-	payloadBytes, payloadHash, err := encode.CalculateStakingPayloadHash(toAddressBytes, vaultTx.Amount, txHashBytes)
+	// txHash, err := hex.DecodeString(strings.TrimPrefix(vaultTx.TxHash, "0x"))
+	// if err != nil {
+	// 	return nil, "", fmt.Errorf("failed to decode txHash: %w", err)
+	// }
+	// var txHashBytes [32]byte
+	// copy(txHashBytes[:], txHash)
+	log.Debug().Str("TxHash", txHash).Uint64("Amount", vaultTx.Amount).Bytes("RecipientAddress", toAddress).Msg("CalculateDestPayload")
+	payloadBytes, payloadHash, err := encode.SafeCalculateDestPayload(vaultTx.Amount, txHash, toAddress)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to calculate payload: %w", err)
 	}
