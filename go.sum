@@ -1458,6 +1458,10 @@ github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20241211074929-89c4badcd3
 github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20241211074929-89c4badcd3e2/go.mod h1:Gi0l7q1oxP+d0JYCoJTqm4UZM52gA33jNqe7Ghmyzok=
 github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241219092630-d03748ff6bdc h1:QLXN7T+dcVFloTQAIijgU6rfclA1iijI6pP9lsVCfCI=
 github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241219092630-d03748ff6bdc/go.mod h1:q+FgVSWNEDSjJ15s4LUT53tIGtNARAR0mrPGgJN8Y1w=
+github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241228144138-0942ba6b9c9a h1:JMawd6VthXVPq0DxUZCahdi8Ao5a46vBiz/ZEx+Z88k=
+github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241228144138-0942ba6b9c9a/go.mod h1:LG6gpTio0/hxYdoi4WSeQm1ywfXx5uhMD5Bi9cMWih0=
+github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241228164455-79a63389d412 h1:63hkRLX3Dj9SSx+oMeH/pha+I909gB/rI+lT4+AxOvw=
+github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241228164455-79a63389d412/go.mod h1:LG6gpTio0/hxYdoi4WSeQm1ywfXx5uhMD5Bi9cMWih0=
 github.com/scalarorg/go-electrum v0.1.1 h1:ANqnV6xQKI/Bw1pNZlbgyjdsN54vJcDee2/wPxTstRY=
 github.com/scalarorg/go-electrum v0.1.1/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
 github.com/scalarorg/scalar-core v0.0.2-migrate-evm h1:b9CFjXy0MFS0cfqKLryy77imG24zfEqAZDSd+K/IaBE=

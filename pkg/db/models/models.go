@@ -56,7 +56,6 @@ type CallContract struct {
 	PayloadHash          string  `gorm:"type:varchar(255);uniqueIndex"`
 	SourceAddress        string  `gorm:"type:varchar(255)"`
 	StakerPublicKey      *string `gorm:"type:varchar(255)"`
-	SenderAddress        *string `gorm:"type:varchar(255)"`
 	CallContractApproved *CallContractApproved
 	RelayDataID          string     `gorm:"type:varchar(255)"`
 	RelayData            *RelayData `gorm:"foreignKey:RelayDataID"`

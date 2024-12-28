@@ -37,9 +37,7 @@ func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayDa
 			BlockNumber:     uint64(vaultTx.Height),
 			LogIndex:        uint(vaultTx.TxPosition),
 			ContractAddress: strings.ToLower(vaultTx.DestContractAddress),
-			//Do not confuse this with Btc Sender address
-			SourceAddress:   strings.ToLower(vaultTx.DestRecipientAddress),
-			SenderAddress:   &vaultTx.StakerAddress,
+			SourceAddress:   strings.ToLower(vaultTx.StakerAddress),
 			StakerPublicKey: &vaultTx.StakerPubkey,
 			Amount:          vaultTx.Amount,
 			Symbol:          "",
