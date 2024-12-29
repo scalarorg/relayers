@@ -27,7 +27,10 @@ func (c *Client) CreateRelayDatas(vaultTxs []types.VaultTransaction) ([]models.R
 
 func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayData, error) {
 	//For btc vault tx, the log index is tx position in the block
-	id := fmt.Sprintf("%s-%d", strings.ToLower(vaultTx.TxHash), vaultTx.TxPosition)
+	//index := vaultTx.TxPosition
+	//In scalar-core, cannot get tx positions by transactionHashes, so we set default index here is zero
+	index := 0
+	id := fmt.Sprintf("%s-%d", strings.ToLower(vaultTx.TxHash), index)
 	relayData := models.RelayData{
 		ID:   id,
 		From: c.electrumConfig.SourceChain,
