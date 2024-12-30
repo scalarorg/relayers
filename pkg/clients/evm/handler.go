@@ -240,6 +240,8 @@ func (ec *EvmClient) ExecuteDestinationCall(
 	signedTx, err := executable.Execute(ec.auth, commandId, sourceChain, sourceAddress, payload)
 	if err != nil {
 		log.Error().Err(err).
+			Str("Sender", ec.auth.From.String()).
+			Uint64("GasLimit", ec.auth.GasLimit).
 			Str("commandId", hex.EncodeToString(commandId[:])).
 			Str("sourceChain", sourceChain).
 			Str("sourceAddress", sourceAddress).

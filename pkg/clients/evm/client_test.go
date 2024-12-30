@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
@@ -28,7 +29,7 @@ var (
 	}
 	evmConfig *evm.EvmNetworkConfig = &evm.EvmNetworkConfig{
 		ChainID:    11155111,
-		ID:         "ethereum-sepolia",
+		ID:         "evm|11155111",
 		Name:       "Ethereum sepolia",
 		RPCUrl:     "wss://eth-sepolia.g.alchemy.com/v2/nNbspp-yjKP9GtAcdKi8xcLnBTptR2Zx",
 		Gateway:    "0xc9c5EC5975070a5CF225656e36C53e77eEa318b5",
@@ -36,12 +37,18 @@ var (
 		Finality:   1,
 		BlockTime:  time.Second * 12,
 		LastBlock:  7121800,
+		GasLimit:   300000,
 	}
 	evmClient *evm.EvmClient
 )
 
 func TestMain(m *testing.M) {
-	var err error
+	// Load .env file
+	err := godotenv.Load(".env.test")
+	if err != nil {
+		log.Error().Err(err).Msg("Error loading .env.test file: %v")
+	}
+	evmConfig.PrivateKey = os.Getenv("EVM_PRIVATE_KEY")
 	log.Info().Msgf("Creating evm client with config: %v", evmConfig)
 	dbAdapter, err := db.NewDatabaseAdapter(&globalConfig)
 	if err != nil {
