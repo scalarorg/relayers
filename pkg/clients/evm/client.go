@@ -74,6 +74,10 @@ func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 		} else {
 			evmConfig.BlockTime = evmConfig.BlockTime * time.Millisecond
 		}
+		//Set default gaslimit to 100000
+		if evmConfig.GasLimit == 0 {
+			evmConfig.GasLimit = 100000
+		}
 		client, err := NewEvmClient(globalConfig, &evmConfig, dbAdapter, eventBus)
 		if err != nil {
 			log.Warn().Msgf("Failed to create evm client for %s: %v", evmConfig.GetName(), err)
@@ -101,7 +105,7 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gateway for network %s: %w", evmConfig.Name, err)
 	}
-	auth, err := createEvmAuth(evmConfig)
+	auth, err := CreateEvmAuth(evmConfig)
 	if err != nil {
 		//Not fatal, we can still use the gateway without auth
 		//auth is only used for sending transaction
@@ -133,7 +137,7 @@ func CreateGateway(evmConfig *EvmNetworkConfig, client *ethclient.Client) (*cont
 	}
 	return gateway, &gatewayAddress, nil
 }
-func createEvmAuth(evmConfig *EvmNetworkConfig) (*bind.TransactOpts, error) {
+func CreateEvmAuth(evmConfig *EvmNetworkConfig) (*bind.TransactOpts, error) {
 	if evmConfig.PrivateKey == "" {
 		return nil, fmt.Errorf("private key is not set for network %s", evmConfig.Name)
 	}
@@ -180,7 +184,9 @@ func preparePrivateKey(evmCfg *EvmNetworkConfig) error {
 	}
 	return nil
 }
-
+func (c *EvmClient) SetAuth(auth *bind.TransactOpts) {
+	c.auth = auth
+}
 func (c *EvmClient) Start(ctx context.Context) error {
 	//Subscribe to the event bus
 	c.subscribeEventBus()
