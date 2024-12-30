@@ -3,6 +3,7 @@ package evm_test
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
@@ -20,18 +22,42 @@ import (
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	CHAIN_ID_SEPOLIA = "evm|11155111"
+	CHAIN_ID_BNB     = "evm|97"
+	TOKEN_SYMBOL     = "pBtc"
 )
 
 var (
 	globalConfig config.Config = config.Config{
 		ConnnectionString: "postgres://postgres:postgres@localhost:5432/relayer?sslmode=disable",
 	}
-	evmConfig *evm.EvmNetworkConfig = &evm.EvmNetworkConfig{
+	sepoliaClient  *ethclient.Client
+	bnbClient      *ethclient.Client
+	evmPrivateKey  string
+	evmUserPrivKey string
+	evmUserAddress string
+	sepoliaConfig  *evm.EvmNetworkConfig = &evm.EvmNetworkConfig{
 		ChainID:    11155111,
-		ID:         "evm|11155111",
+		ID:         CHAIN_ID_SEPOLIA,
 		Name:       "Ethereum sepolia",
 		RPCUrl:     "wss://eth-sepolia.g.alchemy.com/v2/nNbspp-yjKP9GtAcdKi8xcLnBTptR2Zx",
+		Gateway:    "0x842C080EE1399addb76830CFe21D41e47aaaf57e",
+		PrivateKey: "",
+		Finality:   1,
+		BlockTime:  time.Second * 12,
+		LastBlock:  7121800,
+		GasLimit:   300000,
+	}
+	bnbConfig *evm.EvmNetworkConfig = &evm.EvmNetworkConfig{
+		ChainID:    97,
+		ID:         CHAIN_ID_BNB,
+		Name:       "Ethereum bnb",
+		RPCUrl:     "https://data-seed-prebsc-1-s1.binance.org:8545",
 		Gateway:    "0xc9c5EC5975070a5CF225656e36C53e77eEa318b5",
 		PrivateKey: "",
 		Finality:   1,
@@ -44,24 +70,40 @@ var (
 
 func TestMain(m *testing.M) {
 	// Load .env file
-	err := godotenv.Load(".env.test")
+	err := godotenv.Load("../../../.env.test")
 	if err != nil {
 		log.Error().Err(err).Msg("Error loading .env.test file: %v")
 	}
-	evmConfig.PrivateKey = os.Getenv("EVM_PRIVATE_KEY")
-	log.Info().Msgf("Creating evm client with config: %v", evmConfig)
+	evmPrivateKey = os.Getenv("EVM_PRIVATE_KEY")
+	evmUserPrivKey = os.Getenv("EVM_USER_PRIVATE_KEY")
+	evmUserAddress = os.Getenv("EVM_USER_ADDRESS")
+	sepoliaConfig.PrivateKey = evmPrivateKey
+	bnbConfig.PrivateKey = evmPrivateKey
+	sepoliaClient, _ = createEVMClient("RPC_SEPOLIA")
+	bnbClient, _ = createEVMClient("RPC_BNB")
+
+	log.Info().Msgf("Creating evm client with config: %v", sepoliaConfig)
 	dbAdapter, err := db.NewDatabaseAdapter(&globalConfig)
 	if err != nil {
 		log.Error().Msgf("failed to create db adapter: %v", err)
 	}
-	evmClient, err = evm.NewEvmClient(&globalConfig, evmConfig, dbAdapter, nil)
+	evmClient, err = evm.NewEvmClient(&globalConfig, sepoliaConfig, dbAdapter, nil)
 	if err != nil {
 		log.Error().Msgf("failed to create evm client: %v", err)
 	}
 	os.Exit(m.Run())
 }
+func createEVMClient(key string) (*ethclient.Client, error) {
+	rpcEndpoint := os.Getenv(key)
+	rpcSepolia, err := rpc.DialContext(context.Background(), rpcEndpoint)
+	if err != nil {
+		fmt.Printf("failed to connect to sepolia with rpc %s: %v", rpcEndpoint, err)
+		return nil, err
+	}
+	return ethclient.NewClient(rpcSepolia), nil
+}
 func TestEvmClientListenContractCallEvent(t *testing.T) {
-	watchOpts := bind.WatchOpts{Start: &evmConfig.LastBlock, Context: context.Background()}
+	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayContractCall)
 
 	subContractCall, err := evmClient.Gateway.WatchContractCall(&watchOpts, sink, nil, nil)
@@ -87,7 +129,7 @@ func TestEvmClientListenContractCallEvent(t *testing.T) {
 }
 
 func TestEvmClientListenContractCallApprovedEvent(t *testing.T) {
-	watchOpts := bind.WatchOpts{Start: &evmConfig.LastBlock, Context: context.Background()}
+	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayContractCallApproved)
 
 	subContractCallApproved, err := evmClient.Gateway.WatchContractCallApproved(&watchOpts, sink, nil, nil, nil)
@@ -113,7 +155,7 @@ func TestEvmClientListenContractCallApprovedEvent(t *testing.T) {
 	select {}
 }
 func TestEvmClientListenEVMExecutedEvent(t *testing.T) {
-	watchOpts := bind.WatchOpts{Start: &evmConfig.LastBlock, Context: context.Background()}
+	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayExecuted)
 
 	subExecuted, err := evmClient.Gateway.WatchExecuted(&watchOpts, sink, nil)
@@ -149,7 +191,7 @@ func TestEvmSubscribe(t *testing.T) {
 	fmt.Println("Test evm client")
 
 	// Connect to Ethereum client
-	client, err := ethclient.Dial(evmConfig.RPCUrl)
+	client, err := ethclient.Dial(sepoliaConfig.RPCUrl)
 	require.NoError(t, err)
 	if err != nil {
 		fmt.Printf("failed to connect to the Ethereum client: %v", err)
@@ -168,7 +210,7 @@ func TestEvmSubscribe(t *testing.T) {
 
 	// Create the filter query
 	query := ethereum.FilterQuery{
-		Addresses: []common.Address{common.HexToAddress(evmConfig.Gateway)},
+		Addresses: []common.Address{common.HexToAddress(sepoliaConfig.Gateway)},
 		Topics: [][]common.Hash{{
 			crypto.Keccak256Hash(contractCallSig),
 		}},
@@ -196,4 +238,19 @@ func TestEvmSubscribe(t *testing.T) {
 
 	// Keep the program running
 	select {}
+}
+
+func TestSendTokenFromSepoliaToBnb(t *testing.T) {
+	fmt.Println("Test SendToken From Sepolia to Bnd")
+	sepoliaGwAddr := "0x842C080EE1399addb76830CFe21D41e47aaaf57e"
+
+	sepoliaGateway, _, err := evm.CreateGateway("Sepolia", sepoliaGwAddr, sepoliaClient)
+	assert.NoError(t, err)
+	sepoliaConfig.PrivateKey = evmUserPrivKey
+	fmt.Printf("SepoliaConfig %v", sepoliaConfig)
+	transOpts, err := evm.CreateEvmAuth(sepoliaConfig)
+	assert.NoError(t, err)
+	tx, err := sepoliaGateway.SendToken(transOpts, CHAIN_ID_BNB, evmUserAddress, TOKEN_SYMBOL, big.NewInt(10000))
+	assert.NoError(t, err)
+	fmt.Printf("SendToken tx %v", tx)
 }

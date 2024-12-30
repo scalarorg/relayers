@@ -1,7 +1,6 @@
 package evm
 
 import (
-	"context"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -15,17 +14,19 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IScalarGatewayC
 	//id := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
 	//Calculate eventId by Txhash-logIndex among logs in txreceipt (AxelarEvmModule)
 	//https://github.com/scalarorg/scalar-core/blob/main/vald/evm/gateway_tx_confirmation.go#L73
-	receipt, err := c.Client.TransactionReceipt(context.Background(), event.Raw.TxHash)
-	if err != nil {
-		return models.RelayData{}, fmt.Errorf("failed to get transaction receipt: %w", err)
-	}
-	var id string
-	for ind, log := range receipt.Logs {
-		if log.Index == event.Raw.Index {
-			id = fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), ind)
-			break
-		}
-	}
+	//Dec 30, use logIndex directly to avoid redundant request. This must aggrees with the scalar-core vald module
+	// receipt, err := c.Client.TransactionReceipt(context.Background(), event.Raw.TxHash)
+	// if err != nil {
+	// 	return models.RelayData{}, fmt.Errorf("failed to get transaction receipt: %w", err)
+	// }
+	// var id string
+	// for ind, log := range receipt.Logs {
+	// 	if log.Index == event.Raw.Index {
+	// 		id = fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), ind)
+	// 		break
+	// 	}
+	// }
+	id := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
 	senderAddress := event.Sender.String()
 	relayData := models.RelayData{
 		ID:   id,
@@ -44,6 +45,43 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IScalarGatewayC
 			//Use for bitcoin vault tx only
 			StakerPublicKey: nil,
 			Symbol:          "",
+		},
+	}
+	return relayData, nil
+}
+
+func (c *EvmClient) TokenSentEvent2RelayData(event *contracts.IScalarGatewayTokenSent) (models.RelayData, error) {
+	//id := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
+	//Calculate eventId by Txhash-logIndex among logs in txreceipt (AxelarEvmModule)
+	//https://github.com/scalarorg/scalar-core/blob/main/vald/evm/gateway_tx_confirmation.go#L73
+	//Dec 30, use logIndex directly to avoid redundant request. This must aggrees with the scalar-core vald module
+	// receipt, err := c.Client.TransactionReceipt(context.Background(), event.Raw.TxHash)
+	// if err != nil {
+	// 	return models.RelayData{}, fmt.Errorf("failed to get transaction receipt: %w", err)
+	// }
+	// var id string
+	// for ind, log := range receipt.Logs {
+	// 	if log.Index == event.Raw.Index {
+	// 		id = fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), ind)
+	// 		break
+	// 	}
+	// }
+	id := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
+	senderAddress := event.Sender.String()
+	relayData := models.RelayData{
+		ID:   id,
+		From: c.evmConfig.GetId(),
+		To:   event.DestinationChain,
+		TokenSent: &models.TokenSent{
+			ID:          id,
+			TxHash:      event.Raw.TxHash.String(),
+			BlockNumber: event.Raw.BlockNumber,
+			LogIndex:    event.Raw.Index,
+			//3 follows field are used for query to get back payload, so need to convert to lower case
+			SourceAddress:      strings.ToLower(senderAddress),
+			DestinationAddress: strings.ToLower(event.DestinationAddress),
+			Symbol:             event.Symbol,
+			Amount:             event.Amount.Uint64(),
 		},
 	}
 	return relayData, nil

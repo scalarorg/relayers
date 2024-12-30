@@ -12,6 +12,7 @@ const (
 	EVENT_SCALAR_COMMAND_EXECUTED        = "Scalar.CommandExecuted"
 	EVENT_EVM_CONTRACT_CALL_APPROVED     = "ContractCallApproved"
 	EVENT_EVM_CONTRACT_CALL              = "ContractCall"
+	EVENT_EVM_TOKEN_SENT                 = "TokenSent"
 	EVENT_EVM_COMMAND_EXECUTED           = "Executed"
 )
 
