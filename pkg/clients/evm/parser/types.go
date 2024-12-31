@@ -21,4 +21,5 @@ type AllEvmEvents struct {
 	ContractCallApproved *EvmEvent[*contracts.IScalarGatewayContractCallApproved]
 	ContractCall         *EvmEvent[*contracts.IScalarGatewayContractCall]
 	Executed             *EvmEvent[*contracts.IScalarGatewayExecuted]
+	TokenSent            *EvmEvent[*contracts.IScalarGatewayTokenSent]
 }

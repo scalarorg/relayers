@@ -172,6 +172,17 @@ func (c *NetworkClient) SignCommandsRequest(ctx context.Context, destinationChai
 	}
 	return txRes, nil
 }
+func (c *NetworkClient) SignCommandsRequests(ctx context.Context, destinationChains []string) (*sdk.TxResponse, error) {
+	requests := []sdk.Msg{}
+	for _, chain := range destinationChains {
+		requests = append(requests, chainstypes.NewSignCommandsRequest(c.GetAddress(), chain))
+	}
+	txRes, err := c.SignAndBroadcastMsgs(ctx, requests...)
+	if err != nil {
+		return nil, fmt.Errorf("[NetworkClient] [SignCommandsRequest] %w", err)
+	}
+	return txRes, nil
+}
 func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, payload string) (*sdk.TxResponse, error) {
 	payloadBytes := []byte(payload)
 	req := scalarnettypes.NewRouteMessage(

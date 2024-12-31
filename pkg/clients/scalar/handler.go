@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	"github.com/scalarorg/scalar-core/x/chains/types"
 )
 
 func (c *Client) handleDestCallApprovedEvents(ctx context.Context, events []IBCEvent[DestCallApproved]) error {
@@ -165,11 +166,11 @@ func (c *Client) waitForSignCommandsEvent(ctx context.Context, txHash string) (s
 		return batchCommandId, commandIDs
 	}
 }
-func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string, batchCommandId string) (string, error) {
+func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string, batchCommandId string) (*types.BatchedCommandsResponse, error) {
 	res, err := c.queryClient.QueryBatchedCommands(ctx, destinationChain, batchCommandId)
 	for {
 		if err != nil {
-			return "", fmt.Errorf("failed to get batched commands: %w", err)
+			return nil, fmt.Errorf("failed to get batched commands: %w", err)
 		}
 		if res.Status != 3 {
 			time.Sleep(3 * time.Second)
@@ -184,7 +185,7 @@ func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string
 			break
 		}
 	}
-	return res.ExecuteData, nil
+	return res, nil
 }
 func (c *Client) preprocessContractCallApprovedEvent(event *IBCEvent[ContractCallSubmitted]) error {
 	log.Debug().Interface("event", event).Msg("[ScalarClient] [preprocessContractCallApprovedEvent]")

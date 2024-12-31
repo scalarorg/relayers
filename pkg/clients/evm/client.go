@@ -40,6 +40,7 @@ type EvmClient struct {
 	subContractCall         event.Subscription
 	subContractCallApproved event.Subscription
 	subExecuted             event.Subscription
+	subTokenSent            event.Subscription
 }
 
 // This function is used to adjust the rpc url to the ws prefix
@@ -101,7 +102,7 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		return nil, fmt.Errorf("failed to connect to EVM network %s: %w", evmConfig.Name, err)
 	}
 	client := ethclient.NewClient(rpc)
-	gateway, gatewayAddress, err := CreateGateway(evmConfig, client)
+	gateway, gatewayAddress, err := CreateGateway(evmConfig.Name, evmConfig.Gateway, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gateway for network %s: %w", evmConfig.Name, err)
 	}
@@ -126,14 +127,14 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 
 	return evmClient, nil
 }
-func CreateGateway(evmConfig *EvmNetworkConfig, client *ethclient.Client) (*contracts.IScalarGateway, *common.Address, error) {
-	if evmConfig.Gateway == "" {
-		return nil, nil, fmt.Errorf("gateway address is not set for network %s", evmConfig.Name)
+func CreateGateway(networName string, gwAddr string, client *ethclient.Client) (*contracts.IScalarGateway, *common.Address, error) {
+	if gwAddr == "" {
+		return nil, nil, fmt.Errorf("gateway address is not set for network %s", networName)
 	}
-	gatewayAddress := common.HexToAddress(evmConfig.Gateway)
+	gatewayAddress := common.HexToAddress(gwAddr)
 	gateway, err := contracts.NewIScalarGateway(gatewayAddress, client)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize gateway contract for network %s: %w", evmConfig.Name, err)
+		return nil, nil, fmt.Errorf("failed to initialize gateway contract for network %s: %w", networName, err)
 	}
 	return gateway, &gatewayAddress, nil
 }
@@ -198,8 +199,9 @@ func (c *EvmClient) ConnectWithRetry(ctx context.Context) {
 	var retryInterval = time.Second * 12 // Initial retry interval
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	var err error
 	for {
-		err := c.RecoverMissingEvents(ctx)
+		err = c.RecoverMissingEvents(ctx)
 		if err != nil {
 			log.Printf("Error recovering missing events: %v", err)
 		}
@@ -227,6 +229,9 @@ func (c *EvmClient) ConnectWithRetry(ctx context.Context) {
 		<-ctx.Done()
 	}
 }
+func (c *EvmClient) VerifyDeployTokens(ctx context.Context) error {
+	return nil
+}
 func (c *EvmClient) RecoverMissingEvents(ctx context.Context) error {
 	//Recover ContractCall events
 	if err := RecoverEvent[*contracts.IScalarGatewayContractCall](c, ctx,
@@ -245,6 +250,15 @@ func (c *EvmClient) RecoverMissingEvents(ctx context.Context) error {
 			}
 		}); err != nil {
 		log.Error().Err(err).Str("eventName", events.EVENT_EVM_CONTRACT_CALL_APPROVED).Msg("failed to recover missing events")
+		return err
+	}
+	if err := RecoverEvent[*contracts.IScalarGatewayTokenSent](c, ctx,
+		events.EVENT_EVM_TOKEN_SENT, func(log types.Log) *contracts.IScalarGatewayTokenSent {
+			return &contracts.IScalarGatewayTokenSent{
+				Raw: log,
+			}
+		}); err != nil {
+		log.Error().Err(err).Str("eventName", events.EVENT_EVM_TOKEN_SENT).Msg("failed to recover missing events")
 		return err
 	}
 	if err := RecoverEvent[*contracts.IScalarGatewayExecuted](c, ctx,
@@ -383,6 +397,10 @@ func (c *EvmClient) ListenToEvents(ctx context.Context) error {
 	if c.subExecuted, err = watchForEvent(c, ctx, events.EVENT_EVM_COMMAND_EXECUTED); err != nil {
 		return fmt.Errorf("failed to watch for event: %w", err)
 	}
+	//Watch for new TokenSent events in one go routine
+	if c.subTokenSent, err = watchForEvent(c, ctx, events.EVENT_EVM_TOKEN_SENT); err != nil {
+		return fmt.Errorf("failed to watch for event: %w", err)
+	}
 	c.retryInterval = RETRY_INTERVAL
 	//Wait for context cancel
 	<-ctx.Done()
@@ -397,6 +415,8 @@ func (c *EvmClient) handleEvent(event any) error {
 		return c.HandleContractCallApproved(e)
 	case *contracts.IScalarGatewayExecuted:
 		return c.HandleCommandExecuted(e)
+	case *contracts.IScalarGatewayTokenSent:
+		return c.HandleTokenSent(e)
 	}
 	return nil
 }
@@ -416,6 +436,8 @@ func watchForEvent(c *EvmClient, ctx context.Context, eventName string) (event.S
 		return c.watchContractCallApproved(&watchOpts)
 	case events.EVENT_EVM_COMMAND_EXECUTED:
 		return c.watchEVMExecuted(&watchOpts)
+	case events.EVENT_EVM_TOKEN_SENT:
+		return c.watchEVMTokenSent(&watchOpts)
 	}
 	return nil, nil
 }
@@ -482,6 +504,25 @@ func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) (event.Subscript
 		}
 	}()
 	return subExecuted, nil
+}
+func (c *EvmClient) watchEVMTokenSent(watchOpts *bind.WatchOpts) (event.Subscription, error) {
+	sink := make(chan *contracts.IScalarGatewayTokenSent)
+	subTokenSent, err := c.Gateway.WatchTokenSent(watchOpts, sink, nil)
+	if err != nil {
+		return nil, err
+	}
+	log.Info().Msgf("[EvmClient] [watchEVMTokenSent] success. Listening to TokenSent")
+	go func() {
+		for event := range sink {
+			err := c.HandleTokenSent(event)
+			if err != nil {
+				log.Debug().Err(err).Msgf("[EvmClient] [watchEVMTokenSent] with error.")
+			} else {
+				log.Info().Any("event", event).Msgf("EvmClient] [watchEVMTokenSent]")
+			}
+		}
+	}()
+	return subTokenSent, nil
 }
 func (c *EvmClient) subscribeEventBus() {
 	if c.eventBus != nil {
