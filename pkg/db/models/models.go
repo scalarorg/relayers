@@ -139,7 +139,7 @@ type TokenSentApproved struct {
 	PayloadHash      string `gorm:"type:varchar(255)"`
 	CommandId        string
 	TokenSentID      *string    `gorm:"type:varchar(255);unique"`
-	TokenSent        *TokenSent `gorm:"foreignKey:CallContractID"`
+	TokenSent        *TokenSent `gorm:"foreignKey:TokenSentID"`
 	CreatedAt        time.Time  `gorm:"type:timestamp(6);default:current_timestamp(6)"`
 	UpdatedAt        time.Time  `gorm:"type:timestamp(6);default:current_timestamp(6)"`
 }

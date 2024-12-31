@@ -100,12 +100,12 @@ func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) e
 	//3. store relay data to the db, update last checkpoint
 	err = ec.dbAdapter.CreateRelayDatas([]models.RelayData{relayData}, lastCheckpoint)
 	if err != nil {
-		return fmt.Errorf("failed to create evm contract call: %w", err)
+		return fmt.Errorf("failed to create evm token send: %w", err)
 	}
 	//2. Send to the bus
 	confirmTxs := events.ConfirmTxsRequest{
 		ChainName: ec.evmConfig.GetId(),
-		TxHashs:   map[string]string{relayData.CallContract.TxHash: relayData.To},
+		TxHashs:   map[string]string{relayData.TokenSent.TxHash: relayData.To},
 	}
 	if ec.eventBus != nil {
 		ec.eventBus.BroadcastEvent(&events.EventEnvelope{
@@ -126,11 +126,11 @@ func (ec *EvmClient) preprocessTokenSent(event *contracts.IScalarGatewayTokenSen
 		Str("destinationAddress", event.DestinationAddress).
 		Str("txHash", event.Raw.TxHash.String()).
 		Str("symbol", event.Symbol).
-		Uint64("Amount", event.Amount.Uint64()).
+		Uint64("amount", event.Amount.Uint64()).
 		Uint("logIndex", event.Raw.Index).
 		Uint("txIndex", event.Raw.TxIndex).
 		Str("logData", hex.EncodeToString(event.Raw.Data)).
-		Msg("[EvmClient] [preprocessContractCall] Start handle Contract call")
+		Msg("[EvmClient] [preprocessTokenSent] Start handle TokenSent")
 	//Todo: validate the event
 	return nil
 }

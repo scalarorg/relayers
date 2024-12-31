@@ -111,7 +111,14 @@ func (c *Client) Start(ctx context.Context) error {
 			}()
 		}
 	}()
-	c.subscribeWithHeatBeat(ctx)
+	go func() {
+		log.Info().Msg("[ScalarClient] Start ProcessSignCommands process")
+		c.ProcessSignCommands(ctx)
+	}()
+	go func() {
+		c.subscribeWithHeatBeat(ctx)
+	}()
+	log.Info().Msg("Scalar client started")
 	return nil
 }
 func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
@@ -349,4 +356,8 @@ func (c *Client) ConfirmEvmTx(ctx context.Context, chainName string, txId string
 	}
 
 	return confirmTx, nil
+}
+
+func (c *Client) GetQueryClient() *cosmos.QueryClient {
+	return c.queryClient
 }

@@ -40,6 +40,7 @@ type EvmClient struct {
 	subContractCall         event.Subscription
 	subContractCallApproved event.Subscription
 	subExecuted             event.Subscription
+	subTokenSent            event.Subscription
 }
 
 // This function is used to adjust the rpc url to the ws prefix
@@ -198,8 +199,9 @@ func (c *EvmClient) ConnectWithRetry(ctx context.Context) {
 	var retryInterval = time.Second * 12 // Initial retry interval
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	var err error
 	for {
-		err := c.RecoverMissingEvents(ctx)
+		err = c.RecoverMissingEvents(ctx)
 		if err != nil {
 			log.Printf("Error recovering missing events: %v", err)
 		}
@@ -226,6 +228,9 @@ func (c *EvmClient) ConnectWithRetry(ctx context.Context) {
 		//Wait for context cancel
 		<-ctx.Done()
 	}
+}
+func (c *EvmClient) VerifyDeployTokens(ctx context.Context) error {
+	return nil
 }
 func (c *EvmClient) RecoverMissingEvents(ctx context.Context) error {
 	//Recover ContractCall events
@@ -393,7 +398,7 @@ func (c *EvmClient) ListenToEvents(ctx context.Context) error {
 		return fmt.Errorf("failed to watch for event: %w", err)
 	}
 	//Watch for new TokenSent events in one go routine
-	if c.subExecuted, err = watchForEvent(c, ctx, events.EVENT_EVM_TOKEN_SENT); err != nil {
+	if c.subTokenSent, err = watchForEvent(c, ctx, events.EVENT_EVM_TOKEN_SENT); err != nil {
 		return fmt.Errorf("failed to watch for event: %w", err)
 	}
 	c.retryInterval = RETRY_INTERVAL
@@ -410,6 +415,8 @@ func (c *EvmClient) handleEvent(event any) error {
 		return c.HandleContractCallApproved(e)
 	case *contracts.IScalarGatewayExecuted:
 		return c.HandleCommandExecuted(e)
+	case *contracts.IScalarGatewayTokenSent:
+		return c.HandleTokenSent(e)
 	}
 	return nil
 }
@@ -500,18 +507,22 @@ func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) (event.Subscript
 }
 func (c *EvmClient) watchEVMTokenSent(watchOpts *bind.WatchOpts) (event.Subscription, error) {
 	sink := make(chan *contracts.IScalarGatewayTokenSent)
-	subExecuted, err := c.Gateway.WatchTokenSent(watchOpts, sink, nil)
+	subTokenSent, err := c.Gateway.WatchTokenSent(watchOpts, sink, nil)
 	if err != nil {
 		return nil, err
 	}
 	log.Info().Msgf("[EvmClient] [watchEVMTokenSent] success. Listening to TokenSent")
 	go func() {
 		for event := range sink {
-			log.Info().Any("event", event).Msgf("EvmClient] [ExecutedHandler]")
-			c.HandleTokenSent(event)
+			err := c.HandleTokenSent(event)
+			if err != nil {
+				log.Debug().Err(err).Msgf("[EvmClient] [watchEVMTokenSent] with error.")
+			} else {
+				log.Info().Any("event", event).Msgf("EvmClient] [watchEVMTokenSent]")
+			}
 		}
 	}()
-	return subExecuted, nil
+	return subTokenSent, nil
 }
 func (c *EvmClient) subscribeEventBus() {
 	if c.eventBus != nil {

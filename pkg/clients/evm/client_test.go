@@ -241,16 +241,35 @@ func TestEvmSubscribe(t *testing.T) {
 }
 
 func TestSendTokenFromSepoliaToBnb(t *testing.T) {
-	fmt.Println("Test SendToken From Sepolia to Bnd")
+	fmt.Println("Test SendToken From Sepolia to BnB")
+	fmt.Printf("DestChain %s, TokenSymbol %s, UserAddress %s", CHAIN_ID_BNB, TOKEN_SYMBOL, evmUserAddress)
 	sepoliaGwAddr := "0x842C080EE1399addb76830CFe21D41e47aaaf57e"
+	amount := big.NewInt(10000)
 
 	sepoliaGateway, _, err := evm.CreateGateway("Sepolia", sepoliaGwAddr, sepoliaClient)
 	assert.NoError(t, err)
 	sepoliaConfig.PrivateKey = evmUserPrivKey
-	fmt.Printf("SepoliaConfig %v", sepoliaConfig)
+	fmt.Printf("SepoliaConfig %v\n", sepoliaConfig)
 	transOpts, err := evm.CreateEvmAuth(sepoliaConfig)
 	assert.NoError(t, err)
-	tx, err := sepoliaGateway.SendToken(transOpts, CHAIN_ID_BNB, evmUserAddress, TOKEN_SYMBOL, big.NewInt(10000))
+	//Need to incrate allowance if need
+	// tokenAddress := "0x6e3B806C5F6413e0a0670666301ccB6b10628A52"
+	// proxy, err := createErc20ProxyContract(tokenAddress, sepoliaClient)
+	// assert.NoError(t, err)
+	// allowance, err := proxy.Allowance(callOpts, common.HexToAddress(evmUserAddress), common.HexToAddress(sepoliaGwAddr))
+	// assert.NoError(t, err)
+	// if allowance.Int64() < amount.Int64() {
+	// 	proxy.IncreaseAllowance(transOpts, common.HexToAddress(sepoliaGwAddr), amount)
+	// }
+	time.Sleep(15 * time.Second)
+	tx, err := sepoliaGateway.SendToken(transOpts, CHAIN_ID_BNB, evmUserAddress, TOKEN_SYMBOL, amount)
 	assert.NoError(t, err)
-	fmt.Printf("SendToken tx %v", tx)
+	fmt.Printf("SendToken tx %v\n", tx)
+}
+func createErc20ProxyContract(proxyAddress string, client *ethclient.Client) (*contracts.IScalarERC20CrossChain, error) {
+	proxy, err := contracts.NewIScalarERC20CrossChain(common.HexToAddress(proxyAddress), client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize proxy contract from address: %s", proxyAddress)
+	}
+	return proxy, nil
 }
