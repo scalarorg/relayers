@@ -4,10 +4,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
+	_ "github.com/gogo/protobuf/gogoproto"
+	proto "github.com/gogo/protobuf/proto"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/scalar-core/x/chains/types"
+	"github.com/scalarorg/scalar-core/x/nexus/exported"
+	//gogoproto "google.golang.org/protobuf/proto"
 )
 
 func DecodeIntArrayToBytes(input string) ([]byte, error) {
@@ -36,7 +43,233 @@ func DecodeIntArrayToHexString(input string) (string, error) {
 func removeQuote(str string) string {
 	return strings.Trim(str, "\"'")
 }
-func ParseDestCallApprovedEvent(event map[string][]string) ([]IBCEvent[DestCallApproved], error) {
+
+func ParseEvent[T proto.Message](rawData map[string][]string, messages T) ([]T, error) {
+	msgName, values, err := parseTarget(rawData, messages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse type: %T", reflect.TypeOf(messages))
+	}
+	log.Info().Str("MessageType", msgName).Msg("Successful parsed event")
+	// // Handle both struct and pointer cases
+	// if targetVal.Kind() != reflect.Struct && targetVal.Kind() != reflect.Ptr && targetVal.Elem().Kind() != reflect.Struct {
+	// 	return fmt.Errorf("target must be a struct or pointer to struct, got: %T", target)
+	// }
+	return values, nil
+}
+func ParseIBCEvent[T proto.Message](rawData map[string][]string) ([]IBCEvent[T], error) {
+	jsonDatas := []map[string]string{}
+	var args T
+	msgType := reflect.TypeOf(args).Elem()
+	msg := reflect.New(msgType).Interface().(T)
+	msgName := proto.MessageName(msg)
+	nameLen := len(msgName) + 1
+	for key, values := range rawData {
+		if strings.HasPrefix(key, msgName) {
+			fieldName := key[nameLen:]
+			for i, value := range values {
+				if len(jsonDatas) <= i {
+					jsonDatas = append(jsonDatas, map[string]string{})
+				}
+				jsonData := jsonDatas[i]
+				jsonData[fieldName] = value
+				jsonDatas[i] = jsonData
+			}
+		}
+	}
+	result := []IBCEvent[T]{}
+	for _, data := range jsonDatas {
+		instance := copyProtoMessage(msg)
+		err := bindValue(data, instance)
+
+		if err != nil {
+			log.Error().Err(err).Any("JsonData", data).Msg("Cannot unmarshal message")
+		}
+		// log.Info().Any("JsonData", data).Any("Instance", instance).Msg("BindValues")
+		args := instance.(T)
+		result = append(result, IBCEvent[T]{
+			Args: args,
+		})
+	}
+	return result, nil
+}
+func parseTarget[T proto.Message](rawData map[string][]string, msg T) (string, []T, error) {
+	jsonDatas := []map[string]string{}
+	msgName := proto.MessageName(msg)
+	fmt.Printf("MsgName %s", msgName)
+	nameLen := len(msgName) + 1
+	//msgType := reflect.TypeOf(msg)
+	for key, values := range rawData {
+		if strings.HasPrefix(key, msgName) {
+			fieldName := key[nameLen:]
+			for i, value := range values {
+				if len(jsonDatas) <= i {
+					jsonDatas = append(jsonDatas, map[string]string{})
+				}
+				jsonData := jsonDatas[i]
+				jsonData[fieldName] = value
+				jsonDatas[i] = jsonData
+			}
+		}
+	}
+	result := []T{}
+	for _, data := range jsonDatas {
+		// Convert map back to JSON
+		// jsonData, err := json.Marshal(data)
+		// if err != nil {
+		// 	log.Error().Err(err).Any("JsonData", data).Msg("Parse error")
+		// }
+		// Unmarshal JSON into the target struct
+		// err = proto.Unmarshal(jsonData, instance)
+		//err = gogoproto.Unmarshal(jsonData, instance)
+		//err = json.Unmarshal(jsonData, instance)
+		instance := copyProtoMessage(msg)
+		err := bindValue(data, instance)
+
+		if err != nil {
+			log.Error().Err(err).Any("JsonData", data).Msg("Cannot unmarshal message")
+		}
+		// log.Info().Any("JsonData", data).Any("Instance", instance).Msg("BindValues")
+		result = append(result, instance.(T))
+	}
+	return msgName, result, nil
+
+}
+func copyProtoMessage(inst proto.Message) proto.Message {
+	typ := reflect.TypeOf(inst)
+	val := reflect.ValueOf(inst)
+
+	if val.Kind() == reflect.Pointer {
+		vp := reflect.New(typ.Elem())
+		return vp.Interface().(proto.Message)
+	} else {
+		v := reflect.Zero(typ)
+		return v.Interface().(proto.Message)
+	}
+}
+func bindValue(data map[string]string, target interface{}) error {
+	targetVal := reflect.ValueOf(target).Elem()
+	targetType := targetVal.Type()
+	for i := 0; i < targetType.NumField(); i++ {
+		field := targetType.Field(i)
+		fieldValue := targetVal.Field(i)
+
+		tag := getJSONTag(field)
+		if value, exists := data[tag]; exists {
+			if err := setFieldValue(fieldValue, value, tag); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// getJSONTag extracts the JSON tag name or defaults to the field name.
+func getJSONTag(field reflect.StructField) string {
+	tag := field.Tag.Get("json")
+	if tag == "" || tag == "-" {
+		return field.Name
+	}
+	return strings.Split(tag, ",")[0]
+}
+
+// setFieldValue sets the appropriate value for a struct field.
+func setFieldValue(fieldValue reflect.Value, value string, tag string) error {
+	switch fieldValue.Kind() {
+	case reflect.String:
+		if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") {
+			value = strings.Trim(value, "\"")
+		}
+		if strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'") {
+			value = strings.Trim(value, "'")
+		}
+		fieldValue.SetString(value)
+	case reflect.Slice:
+		if fieldValue.Type().Elem().Kind() == reflect.Uint8 {
+			return setByteArrayValue(fieldValue, value, tag)
+		}
+		return fmt.Errorf("unsupported slice type for field '%s'", tag)
+	case reflect.Array:
+		if fieldValue.Type().Elem().Kind() == reflect.Uint8 {
+			return setArrayValue(fieldValue, value, tag)
+		}
+		return fmt.Errorf("unsupported array type for field '%s'", tag)
+	default:
+		return fmt.Errorf("unsupported field type %s for field '%s'", fieldValue.Kind(), tag)
+	}
+	return nil
+}
+
+// setByteArrayValue handles slices and decodes from either JSON array notation or hex string.
+func setByteArrayValue(fieldValue reflect.Value, value string, tag string) error {
+	var byteArray []byte
+	var err error
+
+	if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
+		byteArray, err = parseByteArray(value)
+	} else {
+		byteArray, err = hex.DecodeString(value)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to parse byte array for field '%s': %w", tag, err)
+	}
+
+	fieldValue.SetBytes(byteArray)
+	return nil
+}
+
+// setArrayValue handles fixed-size arrays and decodes from JSON array notation or hex string.
+func setArrayValue(fieldValue reflect.Value, value string, tag string) error {
+	var byteArray []byte
+	var err error
+
+	if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
+		byteArray, err = parseByteArray(value)
+	} else {
+		byteArray, err = hex.DecodeString(value)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to parse array for field '%s': %w", tag, err)
+	}
+
+	reflect.Copy(fieldValue, reflect.ValueOf(byteArray))
+	return nil
+}
+
+// parseByteArray converts a JSON array-like string into a byte slice.
+func parseByteArray(value string) ([]byte, error) {
+	value = strings.Trim(value, "[]")
+	parts := strings.Split(value, ",")
+	byteArray := make([]byte, len(parts))
+
+	for i, part := range parts {
+		num, err := parseByte(strings.TrimSpace(part))
+		if err != nil {
+			return nil, err
+		}
+		byteArray[i] = num
+	}
+	return byteArray, nil
+}
+
+// parseByte parses a single byte value from a string.
+func parseByte(value string) (byte, error) {
+	var num int
+	_, err := fmt.Sscanf(value, "%d", &num)
+	if err != nil {
+		return 0, err
+	}
+	if num < 0 || num > 255 {
+		return 0, fmt.Errorf("value out of range: %d", num)
+	}
+	return byte(num), nil
+}
+
+func ParseTokenSentEvent(event map[string][]string) ([]IBCEvent[*types.EventTokenSent], error) {
+	return nil, nil
+}
+func ParseDestCallApprovedEvent(event map[string][]string) ([]IBCEvent[*types.DestCallApproved], error) {
 	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] start parser")
 	key := EventTypeDestCallApproved
 	eventIds := event[key+".event_id"]
@@ -48,7 +281,7 @@ func ParseDestCallApprovedEvent(event map[string][]string) ([]IBCEvent[DestCallA
 	payloadHashes := event[key+".payload_hash"]
 	srcChannels := event["write_acknowledgement.packet_src_channel"]
 	destChannels := event["write_acknowledgement.packet_dst_channel"]
-	events := make([]IBCEvent[DestCallApproved], len(eventIds))
+	events := make([]IBCEvent[*types.DestCallApproved], len(eventIds))
 	for ind, eventId := range eventIds {
 		eventID := removeQuote(eventId)
 		hash := strings.Split(eventID, "-")[0]
@@ -56,19 +289,20 @@ func ParseDestCallApprovedEvent(event map[string][]string) ([]IBCEvent[DestCallA
 		if err != nil {
 			log.Warn().Msgf("Failed to decode payload hash: %v, error: %v", payloadHashes[ind], err)
 		}
-		commandID, err := DecodeIntArrayToHexString(commandIds[ind])
+		commandIDHex, err := DecodeIntArrayToHexString(commandIds[ind])
 		if err != nil {
 			log.Warn().Msgf("Failed to decode command ID: %v, error: %v", commandIds[ind], err)
 		}
-		data := DestCallApproved{
-			MessageID:        eventID,
+		commandID, err := types.HexToCommandID(commandIDHex)
+		data := &types.DestCallApproved{
+			EventID:          types.EventID(eventID),
 			Sender:           removeQuote(senders[ind]),
-			SourceChain:      removeQuote(sourceChains[ind]),
-			DestinationChain: removeQuote(destinationChains[ind]),
+			Chain:            exported.ChainName(removeQuote(sourceChains[ind])),
+			DestinationChain: exported.ChainName(removeQuote(destinationChains[ind])),
 			ContractAddress:  removeQuote(contractAddresses[ind]),
-			Payload:          "", //Payload will be get from RelayData.CallContract.Payload with filter by eventID
-			PayloadHash:      "0x" + payloadHash,
-			CommandID:        commandID,
+			//Payload:          "", //Payload will be get from RelayData.CallContract.Payload with filter by eventID
+			PayloadHash: types.Hash(common.HexToHash("0x" + payloadHash)),
+			CommandID:   commandID,
 		}
 		var srcChannel string
 		var destChannel string
@@ -78,7 +312,7 @@ func ParseDestCallApprovedEvent(event map[string][]string) ([]IBCEvent[DestCallA
 		if len(destChannels) > ind {
 			destChannel = destChannels[ind]
 		}
-		events[ind] = IBCEvent[DestCallApproved]{
+		events[ind] = IBCEvent[*types.DestCallApproved]{
 			Hash:        hash,
 			SrcChannel:  srcChannel,
 			DestChannel: destChannel,

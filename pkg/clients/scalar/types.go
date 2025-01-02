@@ -1,12 +1,19 @@
 package scalar
 
+import (
+	"github.com/gogo/protobuf/proto"
+	"github.com/scalarorg/scalar-core/x/chains/types"
+)
+
 // Add this new type definition
 
 const (
 	EventTypeDestCallApproved               = "scalar.chains.v1beta1.DestCallApproved"
 	EventTypeEVMEventCompleted              = "scalar.chains.v1beta1.EVMEventCompleted"
+	EventTypeTokenSent                      = "scalar.scalarnet.v1beta1.TokenSent"
 	EventTypeContractCallSubmitted          = "scalar.scalarnet.v1beta1.ContractCallSubmitted"
 	EventTypeContractCallWithTokenSubmitted = "scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted"
+	TokenSentEventTopicId                   = "tm.event='NewBlock' AND scalar.scalarnet.v1beta1.TokenSent.event_id EXISTS"
 	DestCallApprovedEventTopicId            = "tm.event='NewBlock' AND scalar.chains.v1beta1.DestCallApproved.event_id EXISTS"
 	SignCommandsEventTopicId                = "tm.event='NewBlock' AND sign.batchedCommandID EXISTS"
 	EVMCompletedEventTopicId                = "tm.event='NewBlock' AND scalar.chains.v1beta1.EVMEventCompleted.event_id EXISTS"
@@ -16,11 +23,11 @@ const (
 	ExecuteMessageEventTopicId        = "tm.event='Tx' AND message.action='ExecuteMessage'"
 )
 
-type EventHandlerCallBack[T any] func(events []T)
+type EventHandlerCallBack[T any] func(events []IBCEvent[T])
 type ListenerEvent[T any] struct {
 	TopicId string
 	Type    string
-	Parser  func(events map[string][]string) ([]T, error)
+	Parser  func(events map[string][]string) ([]IBCEvent[T], error)
 }
 
 type IBCEvent[T any] struct {
@@ -28,6 +35,8 @@ type IBCEvent[T any] struct {
 	SrcChannel  string `json:"srcChannel,omitempty"`
 	DestChannel string `json:"destChannel,omitempty"`
 	Args        T      `json:"args"`
+}
+type TokenSent struct {
 }
 type DestCallApproved struct {
 	MessageID        string `json:"messageId"`
@@ -91,43 +100,52 @@ type IBCPacketEvent struct {
 }
 
 var (
-	DestCallApprovedEvent = ListenerEvent[IBCEvent[DestCallApproved]]{
+	TokenSentEvent = ListenerEvent[*types.EventTokenSent]{
+		TopicId: TokenSentEventTopicId,
+		Type:    EventTypeTokenSent,
+		Parser:  ParseIBCEvent[*types.EventTokenSent],
+		//Parser:  ParseTokenSentEvent,
+	}
+	DestCallApprovedEvent = ListenerEvent[*types.DestCallApproved]{
 		TopicId: DestCallApprovedEventTopicId,
 		Type:    EventTypeDestCallApproved,
 		Parser:  ParseDestCallApprovedEvent,
 	}
-	SignCommandsEvent = ListenerEvent[IBCEvent[SignCommands]]{
+	SignCommandsEvent = ListenerEvent[SignCommands]{
 		TopicId: SignCommandsEventTopicId,
 		Type:    "sign",
 		Parser:  ParseSignCommandsEvent,
 	}
 
-	EVMCompletedEvent = ListenerEvent[IBCEvent[EVMEventCompleted]]{
+	EVMCompletedEvent = ListenerEvent[*types.ChainEventCompleted]{
 		TopicId: EVMCompletedEventTopicId,
 		Type:    EventTypeEVMEventCompleted,
-		Parser:  ParseEvmEventCompletedEvent,
+		Parser:  ParseIBCEvent[*types.ChainEventCompleted],
+		// Parser:  ParseEvmEventCompletedEvent,
 	}
-	AllNewBlockEvent = ListenerEvent[IBCEvent[any]]{
+	AllNewBlockEvent = ListenerEvent[proto.Message]{
 		TopicId: "tm.event='NewBlock'",
 		Type:    "All",
-		Parser:  ParseAllNewBlockEvent,
+		Parser:  ParseIBCEvent[proto.Message],
+		//Parser: ParseAllNewBlockEvent,
 	}
 	//For future use
-	ContractCallSubmittedEvent = ListenerEvent[IBCEvent[ContractCallSubmitted]]{
-		TopicId: ContractCallSubmittedEventTopicId,
-		Type:    EventTypeContractCallSubmitted,
-		Parser:  ParseContractCallSubmittedEvent,
-	}
-	ContractCallWithTokenSubmittedEvent = ListenerEvent[IBCEvent[ContractCallWithTokenSubmitted]]{
-		TopicId: ContractCallWithTokenEventTopicId,
-		Type:    EventTypeContractCallWithTokenSubmitted,
-		Parser:  ParseContractCallWithTokenSubmittedEvent,
-	}
-	ExecuteMessageEvent = ListenerEvent[IBCPacketEvent]{
-		TopicId: ExecuteMessageEventTopicId,
-		Type:    "ExecuteMessage",
-		Parser:  ParseExecuteMessageEvent,
-	}
+	// ContractCallSubmittedEvent = ListenerEvent[IBCEvent[ContractCallSubmitted]]{
+	// 	TopicId: ContractCallSubmittedEventTopicId,
+	// 	Type:    EventTypeContractCallSubmitted,
+	// 	Parser:  ParseIBCEvent[types.ContractCallSubmitted],
+	// 	// Parser:  ParseContractCallSubmittedEvent,
+	// }
+	// ContractCallWithTokenSubmittedEvent = ListenerEvent[IBCEvent[ContractCallWithTokenSubmitted]]{
+	// 	TopicId: ContractCallWithTokenEventTopicId,
+	// 	Type:    EventTypeContractCallWithTokenSubmitted,
+	// 	Parser:  ParseContractCallWithTokenSubmittedEvent,
+	// }
+	// ExecuteMessageEvent = ListenerEvent[IBCPacketEvent]{
+	// 	TopicId: ExecuteMessageEventTopicId,
+	// 	Type:    "ExecuteMessage",
+	// 	Parser:  ParseExecuteMessageEvent,
+	// }
 )
 
 //For example

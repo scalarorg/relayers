@@ -13,7 +13,10 @@ import (
 // Periodically call to the scalar network to check if there is any pending SignCommand
 // Then request signCommand request
 func (c *Client) ProcessSignCommands(ctx context.Context) {
-	interval := time.Duration(c.networkConfig.SignCommandInterval) * time.Millisecond
+	interval := time.Second
+	if c.networkConfig.SignCommandInterval > 0 {
+		interval = time.Millisecond * time.Duration(c.networkConfig.SignCommandInterval)
+	}
 	counter := 0
 	for {
 		counter += 1
@@ -64,11 +67,11 @@ func (c *Client) processSignCommandsForChain(ctx context.Context, destChain stri
 	if batchCommandId == "" || commandIDs == "" {
 		return fmt.Errorf("BatchCommandId not found")
 	}
-	log.Debug().Msgf("[ScalarClient] [handleDestCallApprovedEvent] Successfully received sign commands event with batch command id: %s", batchCommandId)
+	log.Debug().Msgf("[ScalarClient] [processSignCommandsForChain] Successfully received sign commands event with batch command id: %s", batchCommandId)
 	// 2. Old version, loop for get ExecuteData from batch command id
 	res, err := c.waitForExecuteData(ctx, destChain, batchCommandId)
 	if err != nil {
-		return fmt.Errorf("[ScalarClient] [handleDestCallApprovedEvent] failed to get execute data: %w", err)
+		return fmt.Errorf("[ScalarClient] [processSignCommandsForChain] failed to get execute data: %w", err)
 	}
 	log.Debug().Str("Chain", destChain).Any("BatchCommandResponse", res).Msg("[ScalarClient] [processSignCommandsForChain] BatchCommand response")
 
