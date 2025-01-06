@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -48,13 +47,6 @@ type EvmClient struct {
 // format: wss:// -> https://
 // Todo: Improve this implementation
 
-func adjustRpcUrl(rpcUrl string) string {
-	if strings.HasPrefix(rpcUrl, "http") {
-		return strings.Replace(rpcUrl, "http", "ws", 1)
-	}
-	return rpcUrl
-}
-
 func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) ([]*EvmClient, error) {
 	if globalConfig == nil || globalConfig.ConfigPath == "" {
 		return nil, fmt.Errorf("config path is not set")
@@ -96,8 +88,7 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 	ctx := context.Background()
 
 	// Connect to a test network
-	rpcUrl := adjustRpcUrl(evmConfig.RPCUrl)
-	rpc, err := rpc.DialContext(ctx, rpcUrl)
+	rpc, err := rpc.DialContext(ctx, evmConfig.RPCUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to EVM network %s: %w", evmConfig.Name, err)
 	}
@@ -444,7 +435,7 @@ func watchForEvent(c *EvmClient, ctx context.Context, eventName string) (event.S
 func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) (event.Subscription, error) {
 	sink := make(chan *contracts.IScalarGatewayContractCall)
 	errorCh := make(chan error)
-	subContractCall, err := c.Gateway.WatchContractCall(watchOpts, sink, nil, nil)
+	subscription, err := c.Gateway.WatchContractCall(watchOpts, sink, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -470,12 +461,12 @@ func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) (event.Subscrip
 			}
 		}
 	}()
-	return subContractCall, nil
+	return subscription, nil
 }
 
 func (c *EvmClient) watchContractCallApproved(watchOpts *bind.WatchOpts) (event.Subscription, error) {
 	sink := make(chan *contracts.IScalarGatewayContractCallApproved)
-	subContractCallApproved, err := c.Gateway.WatchContractCallApproved(watchOpts, sink, nil, nil, nil)
+	subscription, err := c.Gateway.WatchContractCallApproved(watchOpts, sink, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -487,12 +478,12 @@ func (c *EvmClient) watchContractCallApproved(watchOpts *bind.WatchOpts) (event.
 		}
 
 	}()
-	return subContractCallApproved, nil
+	return subscription, nil
 }
 
 func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) (event.Subscription, error) {
 	sink := make(chan *contracts.IScalarGatewayExecuted)
-	subExecuted, err := c.Gateway.WatchExecuted(watchOpts, sink, nil)
+	subscription, err := c.Gateway.WatchExecuted(watchOpts, sink, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -503,11 +494,11 @@ func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) (event.Subscript
 			c.HandleCommandExecuted(event)
 		}
 	}()
-	return subExecuted, nil
+	return subscription, nil
 }
 func (c *EvmClient) watchEVMTokenSent(watchOpts *bind.WatchOpts) (event.Subscription, error) {
 	sink := make(chan *contracts.IScalarGatewayTokenSent)
-	subTokenSent, err := c.Gateway.WatchTokenSent(watchOpts, sink, nil)
+	subscription, err := c.Gateway.WatchTokenSent(watchOpts, sink, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -522,7 +513,7 @@ func (c *EvmClient) watchEVMTokenSent(watchOpts *bind.WatchOpts) (event.Subscrip
 			}
 		}
 	}()
-	return subTokenSent, nil
+	return subscription, nil
 }
 func (c *EvmClient) subscribeEventBus() {
 	if c.eventBus != nil {
@@ -550,6 +541,9 @@ func (c *EvmClient) Stop() {
 	}
 	if c.subExecuted != nil {
 		c.subExecuted.Unsubscribe()
+	}
+	if c.subTokenSent != nil {
+		c.subTokenSent.Unsubscribe()
 	}
 	c.Client.Close()
 }

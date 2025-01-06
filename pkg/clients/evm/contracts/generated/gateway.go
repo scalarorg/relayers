@@ -31,7 +31,7 @@ var (
 
 // IScalarGatewayMetaData contains all meta data concerning the IScalarGateway contract.
 var IScalarGatewayMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"}],\"name\":\"BurnFailed\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"}],\"name\":\"ExceedMintLimit\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidAmount\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidAuthModule\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidChainId\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidCodeHash\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidCommands\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidSetMintLimitsParams\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidTokenDeployer\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"}],\"name\":\"MintFailed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotProxy\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotSelf\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"SetupFailed\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"}],\"name\":\"TokenAlreadyExists\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"TokenContractDoesNotExist\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"}],\"name\":\"TokenDeployFailed\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"}],\"name\":\"TokenDoesNotExist\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"destinationChain\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"destinationContractAddress\",\"type\":\"string\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"payloadHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"payload\",\"type\":\"bytes\"}],\"name\":\"ContractCall\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"commandId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"sourceChain\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"sourceAddress\",\"type\":\"string\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"payloadHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"sourceTxHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"sourceEventIndex\",\"type\":\"uint256\"}],\"name\":\"ContractCallApproved\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"commandId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"sourceChain\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"sourceAddress\",\"type\":\"string\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"payloadHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"sourceTxHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"sourceEventIndex\",\"type\":\"uint256\"}],\"name\":\"ContractCallApprovedWithMint\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"destinationChain\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"destinationContractAddress\",\"type\":\"string\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"payloadHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"payload\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"ContractCallWithToken\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"commandId\",\"type\":\"bytes32\"}],\"name\":\"Executed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"newOperatorsData\",\"type\":\"bytes\"}],\"name\":\"OperatorshipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"tokenAddresses\",\"type\":\"address\"}],\"name\":\"TokenDeployed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"limit\",\"type\":\"uint256\"}],\"name\":\"TokenMintLimitUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"destinationChain\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"destinationAddress\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"TokenSent\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"implementation\",\"type\":\"address\"}],\"name\":\"Upgraded\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"adminEpoch\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"epoch\",\"type\":\"uint256\"}],\"name\":\"adminThreshold\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"epoch\",\"type\":\"uint256\"}],\"name\":\"admins\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"allTokensFrozen\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"authModule\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"destinationChain\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"contractAddress\",\"type\":\"string\"},{\"internalType\":\"bytes\",\"name\":\"payload\",\"type\":\"bytes\"}],\"name\":\"callContract\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"destinationChain\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"contractAddress\",\"type\":\"string\"},{\"internalType\":\"bytes\",\"name\":\"payload\",\"type\":\"bytes\"},{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"callContractWithToken\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"input\",\"type\":\"bytes\"}],\"name\":\"execute\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"implementation\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"commandId\",\"type\":\"bytes32\"}],\"name\":\"isCommandExecuted\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"commandId\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"sourceChain\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"sourceAddress\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"payloadHash\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"isContractCallAndMintApproved\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"commandId\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"sourceChain\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"sourceAddress\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"payloadHash\",\"type\":\"bytes32\"}],\"name\":\"isContractCallApproved\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"destinationChain\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"destinationAddress\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"sendToken\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string[]\",\"name\":\"symbols\",\"type\":\"string[]\"},{\"internalType\":\"uint256[]\",\"name\":\"limits\",\"type\":\"uint256[]\"}],\"name\":\"setTokenMintLimits\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"params\",\"type\":\"bytes\"}],\"name\":\"setup\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"}],\"name\":\"tokenAddresses\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"tokenDeployer\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"}],\"name\":\"tokenFrozen\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"}],\"name\":\"tokenMintAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"}],\"name\":\"tokenMintLimit\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newImplementation\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"newImplementationCodeHash\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"setupParams\",\"type\":\"bytes\"}],\"name\":\"upgrade\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"commandId\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"sourceChain\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"sourceAddress\",\"type\":\"string\"},{\"internalType\":\"bytes32\",\"name\":\"payloadHash\",\"type\":\"bytes32\"}],\"name\":\"validateContractCall\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"commandId\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"sourceChain\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"sourceAddress\",\"type\":\"string\"},{\"internalType\":\"bytes32\",\"name\":\"payloadHash\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"validateContractCallAndMint\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"authModule_\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"tokenDeployer_\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"allTokensFrozen\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"approveContractCall\",\"inputs\":[{\"name\":\"params\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"commandId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"approveContractCallWithMint\",\"inputs\":[{\"name\":\"params\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"commandId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"authModule\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"burnToken\",\"inputs\":[{\"name\":\"params\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"callContract\",\"inputs\":[{\"name\":\"destinationChain\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"destinationContractAddress\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"payload\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"callContractWithToken\",\"inputs\":[{\"name\":\"destinationChain\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"destinationContractAddress\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"payload\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"contractId\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"deployToken\",\"inputs\":[{\"name\":\"params\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"execute\",\"inputs\":[{\"name\":\"input\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getBool\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getBytes\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getInt\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"int256\",\"internalType\":\"int256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getString\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getUint\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"governance\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"implementation\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isCommandExecuted\",\"inputs\":[{\"name\":\"commandId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isContractCallAndMintApproved\",\"inputs\":[{\"name\":\"commandId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChain\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"sourceAddress\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"contractAddress\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"payloadHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isContractCallApproved\",\"inputs\":[{\"name\":\"commandId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChain\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"sourceAddress\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"contractAddress\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"payloadHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"mintLimiter\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"mintToken\",\"inputs\":[{\"name\":\"params\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"sendToken\",\"inputs\":[{\"name\":\"destinationChain\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"destinationAddress\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setTokenMintLimits\",\"inputs\":[{\"name\":\"symbols\",\"type\":\"string[]\",\"internalType\":\"string[]\"},{\"name\":\"limits\",\"type\":\"uint256[]\",\"internalType\":\"uint256[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setup\",\"inputs\":[{\"name\":\"params\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"tokenAddresses\",\"inputs\":[{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"tokenDeployer\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"tokenFrozen\",\"inputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"tokenMintAmount\",\"inputs\":[{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"tokenMintLimit\",\"inputs\":[{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"transferGovernance\",\"inputs\":[{\"name\":\"newGovernance\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferMintLimiter\",\"inputs\":[{\"name\":\"newMintLimiter\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOperatorship\",\"inputs\":[{\"name\":\"newOperatorsData\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"upgrade\",\"inputs\":[{\"name\":\"newImplementation\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"newImplementationCodeHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"setupParams\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"validateContractCall\",\"inputs\":[{\"name\":\"commandId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChain\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"sourceAddress\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"payloadHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"valid\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"validateContractCallAndMint\",\"inputs\":[{\"name\":\"commandId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChain\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"sourceAddress\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"payloadHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"valid\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"ContractCall\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"destinationChain\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"destinationContractAddress\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"payloadHash\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"payload\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ContractCallApproved\",\"inputs\":[{\"name\":\"commandId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"sourceChain\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"sourceAddress\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"contractAddress\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"payloadHash\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"sourceTxHash\",\"type\":\"bytes32\",\"indexed\":false,\"internalType\":\"bytes32\"},{\"name\":\"sourceEventIndex\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ContractCallApprovedWithMint\",\"inputs\":[{\"name\":\"commandId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"sourceChain\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"sourceAddress\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"contractAddress\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"payloadHash\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"symbol\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"sourceTxHash\",\"type\":\"bytes32\",\"indexed\":false,\"internalType\":\"bytes32\"},{\"name\":\"sourceEventIndex\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ContractCallExecuted\",\"inputs\":[{\"name\":\"commandId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ContractCallWithToken\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"destinationChain\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"destinationContractAddress\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"payloadHash\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"payload\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"},{\"name\":\"symbol\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Executed\",\"inputs\":[{\"name\":\"commandId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"GovernanceTransferred\",\"inputs\":[{\"name\":\"previousGovernance\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newGovernance\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"MintLimiterTransferred\",\"inputs\":[{\"name\":\"previousGovernance\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newGovernance\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OperatorshipTransferred\",\"inputs\":[{\"name\":\"newOperatorsData\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"TokenDeployed\",\"inputs\":[{\"name\":\"symbol\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"tokenAddresses\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"TokenMintLimitUpdated\",\"inputs\":[{\"name\":\"symbol\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"limit\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"TokenSent\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"destinationChain\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"destinationAddress\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"symbol\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Upgraded\",\"inputs\":[{\"name\":\"implementation\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"BurnFailed\",\"inputs\":[{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"ExceedMintLimit\",\"inputs\":[{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"InvalidAmount\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidAuthModule\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidChainId\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidCodeHash\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidCommands\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidGovernance\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidImplementation\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidMintLimiter\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidSetMintLimitsParams\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidTokenDeployer\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MintFailed\",\"inputs\":[{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"NotGovernance\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NotMintLimiter\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NotProxy\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NotSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"SetupFailed\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"TokenAlreadyExists\",\"inputs\":[{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"TokenContractDoesNotExist\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TokenDeployFailed\",\"inputs\":[{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"TokenDoesNotExist\",\"inputs\":[{\"name\":\"symbol\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"TokenTransferFailed\",\"inputs\":[]}]",
 }
 
 // IScalarGatewayABI is the input ABI used to generate the binding from.
@@ -180,102 +180,9 @@ func (_IScalarGateway *IScalarGatewayTransactorRaw) Transact(opts *bind.Transact
 	return _IScalarGateway.Contract.contract.Transact(opts, method, params...)
 }
 
-// AdminEpoch is a free data retrieval call binding the contract method 0x364940d8.
-//
-// Solidity: function adminEpoch() view returns(uint256)
-func (_IScalarGateway *IScalarGatewayCaller) AdminEpoch(opts *bind.CallOpts) (*big.Int, error) {
-	var out []interface{}
-	err := _IScalarGateway.contract.Call(opts, &out, "adminEpoch")
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
-}
-
-// AdminEpoch is a free data retrieval call binding the contract method 0x364940d8.
-//
-// Solidity: function adminEpoch() view returns(uint256)
-func (_IScalarGateway *IScalarGatewaySession) AdminEpoch() (*big.Int, error) {
-	return _IScalarGateway.Contract.AdminEpoch(&_IScalarGateway.CallOpts)
-}
-
-// AdminEpoch is a free data retrieval call binding the contract method 0x364940d8.
-//
-// Solidity: function adminEpoch() view returns(uint256)
-func (_IScalarGateway *IScalarGatewayCallerSession) AdminEpoch() (*big.Int, error) {
-	return _IScalarGateway.Contract.AdminEpoch(&_IScalarGateway.CallOpts)
-}
-
-// AdminThreshold is a free data retrieval call binding the contract method 0x88b30587.
-//
-// Solidity: function adminThreshold(uint256 epoch) view returns(uint256)
-func (_IScalarGateway *IScalarGatewayCaller) AdminThreshold(opts *bind.CallOpts, epoch *big.Int) (*big.Int, error) {
-	var out []interface{}
-	err := _IScalarGateway.contract.Call(opts, &out, "adminThreshold", epoch)
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
-}
-
-// AdminThreshold is a free data retrieval call binding the contract method 0x88b30587.
-//
-// Solidity: function adminThreshold(uint256 epoch) view returns(uint256)
-func (_IScalarGateway *IScalarGatewaySession) AdminThreshold(epoch *big.Int) (*big.Int, error) {
-	return _IScalarGateway.Contract.AdminThreshold(&_IScalarGateway.CallOpts, epoch)
-}
-
-// AdminThreshold is a free data retrieval call binding the contract method 0x88b30587.
-//
-// Solidity: function adminThreshold(uint256 epoch) view returns(uint256)
-func (_IScalarGateway *IScalarGatewayCallerSession) AdminThreshold(epoch *big.Int) (*big.Int, error) {
-	return _IScalarGateway.Contract.AdminThreshold(&_IScalarGateway.CallOpts, epoch)
-}
-
-// Admins is a free data retrieval call binding the contract method 0x14bfd6d0.
-//
-// Solidity: function admins(uint256 epoch) view returns(address[])
-func (_IScalarGateway *IScalarGatewayCaller) Admins(opts *bind.CallOpts, epoch *big.Int) ([]common.Address, error) {
-	var out []interface{}
-	err := _IScalarGateway.contract.Call(opts, &out, "admins", epoch)
-
-	if err != nil {
-		return *new([]common.Address), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
-
-	return out0, err
-
-}
-
-// Admins is a free data retrieval call binding the contract method 0x14bfd6d0.
-//
-// Solidity: function admins(uint256 epoch) view returns(address[])
-func (_IScalarGateway *IScalarGatewaySession) Admins(epoch *big.Int) ([]common.Address, error) {
-	return _IScalarGateway.Contract.Admins(&_IScalarGateway.CallOpts, epoch)
-}
-
-// Admins is a free data retrieval call binding the contract method 0x14bfd6d0.
-//
-// Solidity: function admins(uint256 epoch) view returns(address[])
-func (_IScalarGateway *IScalarGatewayCallerSession) Admins(epoch *big.Int) ([]common.Address, error) {
-	return _IScalarGateway.Contract.Admins(&_IScalarGateway.CallOpts, epoch)
-}
-
 // AllTokensFrozen is a free data retrieval call binding the contract method 0xaa1e1f0a.
 //
-// Solidity: function allTokensFrozen() view returns(bool)
+// Solidity: function allTokensFrozen() pure returns(bool)
 func (_IScalarGateway *IScalarGatewayCaller) AllTokensFrozen(opts *bind.CallOpts) (bool, error) {
 	var out []interface{}
 	err := _IScalarGateway.contract.Call(opts, &out, "allTokensFrozen")
@@ -292,14 +199,14 @@ func (_IScalarGateway *IScalarGatewayCaller) AllTokensFrozen(opts *bind.CallOpts
 
 // AllTokensFrozen is a free data retrieval call binding the contract method 0xaa1e1f0a.
 //
-// Solidity: function allTokensFrozen() view returns(bool)
+// Solidity: function allTokensFrozen() pure returns(bool)
 func (_IScalarGateway *IScalarGatewaySession) AllTokensFrozen() (bool, error) {
 	return _IScalarGateway.Contract.AllTokensFrozen(&_IScalarGateway.CallOpts)
 }
 
 // AllTokensFrozen is a free data retrieval call binding the contract method 0xaa1e1f0a.
 //
-// Solidity: function allTokensFrozen() view returns(bool)
+// Solidity: function allTokensFrozen() pure returns(bool)
 func (_IScalarGateway *IScalarGatewayCallerSession) AllTokensFrozen() (bool, error) {
 	return _IScalarGateway.Contract.AllTokensFrozen(&_IScalarGateway.CallOpts)
 }
@@ -333,6 +240,254 @@ func (_IScalarGateway *IScalarGatewaySession) AuthModule() (common.Address, erro
 // Solidity: function authModule() view returns(address)
 func (_IScalarGateway *IScalarGatewayCallerSession) AuthModule() (common.Address, error) {
 	return _IScalarGateway.Contract.AuthModule(&_IScalarGateway.CallOpts)
+}
+
+// ContractId is a free data retrieval call binding the contract method 0x8291286c.
+//
+// Solidity: function contractId() pure returns(bytes32)
+func (_IScalarGateway *IScalarGatewayCaller) ContractId(opts *bind.CallOpts) ([32]byte, error) {
+	var out []interface{}
+	err := _IScalarGateway.contract.Call(opts, &out, "contractId")
+
+	if err != nil {
+		return *new([32]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
+
+	return out0, err
+
+}
+
+// ContractId is a free data retrieval call binding the contract method 0x8291286c.
+//
+// Solidity: function contractId() pure returns(bytes32)
+func (_IScalarGateway *IScalarGatewaySession) ContractId() ([32]byte, error) {
+	return _IScalarGateway.Contract.ContractId(&_IScalarGateway.CallOpts)
+}
+
+// ContractId is a free data retrieval call binding the contract method 0x8291286c.
+//
+// Solidity: function contractId() pure returns(bytes32)
+func (_IScalarGateway *IScalarGatewayCallerSession) ContractId() ([32]byte, error) {
+	return _IScalarGateway.Contract.ContractId(&_IScalarGateway.CallOpts)
+}
+
+// GetAddress is a free data retrieval call binding the contract method 0x21f8a721.
+//
+// Solidity: function getAddress(bytes32 key) view returns(address)
+func (_IScalarGateway *IScalarGatewayCaller) GetAddress(opts *bind.CallOpts, key [32]byte) (common.Address, error) {
+	var out []interface{}
+	err := _IScalarGateway.contract.Call(opts, &out, "getAddress", key)
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// GetAddress is a free data retrieval call binding the contract method 0x21f8a721.
+//
+// Solidity: function getAddress(bytes32 key) view returns(address)
+func (_IScalarGateway *IScalarGatewaySession) GetAddress(key [32]byte) (common.Address, error) {
+	return _IScalarGateway.Contract.GetAddress(&_IScalarGateway.CallOpts, key)
+}
+
+// GetAddress is a free data retrieval call binding the contract method 0x21f8a721.
+//
+// Solidity: function getAddress(bytes32 key) view returns(address)
+func (_IScalarGateway *IScalarGatewayCallerSession) GetAddress(key [32]byte) (common.Address, error) {
+	return _IScalarGateway.Contract.GetAddress(&_IScalarGateway.CallOpts, key)
+}
+
+// GetBool is a free data retrieval call binding the contract method 0x7ae1cfca.
+//
+// Solidity: function getBool(bytes32 key) view returns(bool)
+func (_IScalarGateway *IScalarGatewayCaller) GetBool(opts *bind.CallOpts, key [32]byte) (bool, error) {
+	var out []interface{}
+	err := _IScalarGateway.contract.Call(opts, &out, "getBool", key)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+// GetBool is a free data retrieval call binding the contract method 0x7ae1cfca.
+//
+// Solidity: function getBool(bytes32 key) view returns(bool)
+func (_IScalarGateway *IScalarGatewaySession) GetBool(key [32]byte) (bool, error) {
+	return _IScalarGateway.Contract.GetBool(&_IScalarGateway.CallOpts, key)
+}
+
+// GetBool is a free data retrieval call binding the contract method 0x7ae1cfca.
+//
+// Solidity: function getBool(bytes32 key) view returns(bool)
+func (_IScalarGateway *IScalarGatewayCallerSession) GetBool(key [32]byte) (bool, error) {
+	return _IScalarGateway.Contract.GetBool(&_IScalarGateway.CallOpts, key)
+}
+
+// GetBytes is a free data retrieval call binding the contract method 0xc031a180.
+//
+// Solidity: function getBytes(bytes32 key) view returns(bytes)
+func (_IScalarGateway *IScalarGatewayCaller) GetBytes(opts *bind.CallOpts, key [32]byte) ([]byte, error) {
+	var out []interface{}
+	err := _IScalarGateway.contract.Call(opts, &out, "getBytes", key)
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
+}
+
+// GetBytes is a free data retrieval call binding the contract method 0xc031a180.
+//
+// Solidity: function getBytes(bytes32 key) view returns(bytes)
+func (_IScalarGateway *IScalarGatewaySession) GetBytes(key [32]byte) ([]byte, error) {
+	return _IScalarGateway.Contract.GetBytes(&_IScalarGateway.CallOpts, key)
+}
+
+// GetBytes is a free data retrieval call binding the contract method 0xc031a180.
+//
+// Solidity: function getBytes(bytes32 key) view returns(bytes)
+func (_IScalarGateway *IScalarGatewayCallerSession) GetBytes(key [32]byte) ([]byte, error) {
+	return _IScalarGateway.Contract.GetBytes(&_IScalarGateway.CallOpts, key)
+}
+
+// GetInt is a free data retrieval call binding the contract method 0xdc97d962.
+//
+// Solidity: function getInt(bytes32 key) view returns(int256)
+func (_IScalarGateway *IScalarGatewayCaller) GetInt(opts *bind.CallOpts, key [32]byte) (*big.Int, error) {
+	var out []interface{}
+	err := _IScalarGateway.contract.Call(opts, &out, "getInt", key)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// GetInt is a free data retrieval call binding the contract method 0xdc97d962.
+//
+// Solidity: function getInt(bytes32 key) view returns(int256)
+func (_IScalarGateway *IScalarGatewaySession) GetInt(key [32]byte) (*big.Int, error) {
+	return _IScalarGateway.Contract.GetInt(&_IScalarGateway.CallOpts, key)
+}
+
+// GetInt is a free data retrieval call binding the contract method 0xdc97d962.
+//
+// Solidity: function getInt(bytes32 key) view returns(int256)
+func (_IScalarGateway *IScalarGatewayCallerSession) GetInt(key [32]byte) (*big.Int, error) {
+	return _IScalarGateway.Contract.GetInt(&_IScalarGateway.CallOpts, key)
+}
+
+// GetString is a free data retrieval call binding the contract method 0x986e791a.
+//
+// Solidity: function getString(bytes32 key) view returns(string)
+func (_IScalarGateway *IScalarGatewayCaller) GetString(opts *bind.CallOpts, key [32]byte) (string, error) {
+	var out []interface{}
+	err := _IScalarGateway.contract.Call(opts, &out, "getString", key)
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+// GetString is a free data retrieval call binding the contract method 0x986e791a.
+//
+// Solidity: function getString(bytes32 key) view returns(string)
+func (_IScalarGateway *IScalarGatewaySession) GetString(key [32]byte) (string, error) {
+	return _IScalarGateway.Contract.GetString(&_IScalarGateway.CallOpts, key)
+}
+
+// GetString is a free data retrieval call binding the contract method 0x986e791a.
+//
+// Solidity: function getString(bytes32 key) view returns(string)
+func (_IScalarGateway *IScalarGatewayCallerSession) GetString(key [32]byte) (string, error) {
+	return _IScalarGateway.Contract.GetString(&_IScalarGateway.CallOpts, key)
+}
+
+// GetUint is a free data retrieval call binding the contract method 0xbd02d0f5.
+//
+// Solidity: function getUint(bytes32 key) view returns(uint256)
+func (_IScalarGateway *IScalarGatewayCaller) GetUint(opts *bind.CallOpts, key [32]byte) (*big.Int, error) {
+	var out []interface{}
+	err := _IScalarGateway.contract.Call(opts, &out, "getUint", key)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// GetUint is a free data retrieval call binding the contract method 0xbd02d0f5.
+//
+// Solidity: function getUint(bytes32 key) view returns(uint256)
+func (_IScalarGateway *IScalarGatewaySession) GetUint(key [32]byte) (*big.Int, error) {
+	return _IScalarGateway.Contract.GetUint(&_IScalarGateway.CallOpts, key)
+}
+
+// GetUint is a free data retrieval call binding the contract method 0xbd02d0f5.
+//
+// Solidity: function getUint(bytes32 key) view returns(uint256)
+func (_IScalarGateway *IScalarGatewayCallerSession) GetUint(key [32]byte) (*big.Int, error) {
+	return _IScalarGateway.Contract.GetUint(&_IScalarGateway.CallOpts, key)
+}
+
+// Governance is a free data retrieval call binding the contract method 0x5aa6e675.
+//
+// Solidity: function governance() view returns(address)
+func (_IScalarGateway *IScalarGatewayCaller) Governance(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _IScalarGateway.contract.Call(opts, &out, "governance")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// Governance is a free data retrieval call binding the contract method 0x5aa6e675.
+//
+// Solidity: function governance() view returns(address)
+func (_IScalarGateway *IScalarGatewaySession) Governance() (common.Address, error) {
+	return _IScalarGateway.Contract.Governance(&_IScalarGateway.CallOpts)
+}
+
+// Governance is a free data retrieval call binding the contract method 0x5aa6e675.
+//
+// Solidity: function governance() view returns(address)
+func (_IScalarGateway *IScalarGatewayCallerSession) Governance() (common.Address, error) {
+	return _IScalarGateway.Contract.Governance(&_IScalarGateway.CallOpts)
 }
 
 // Implementation is a free data retrieval call binding the contract method 0x5c60da1b.
@@ -459,6 +614,37 @@ func (_IScalarGateway *IScalarGatewayCallerSession) IsContractCallApproved(comma
 	return _IScalarGateway.Contract.IsContractCallApproved(&_IScalarGateway.CallOpts, commandId, sourceChain, sourceAddress, contractAddress, payloadHash)
 }
 
+// MintLimiter is a free data retrieval call binding the contract method 0xc82fe87a.
+//
+// Solidity: function mintLimiter() view returns(address)
+func (_IScalarGateway *IScalarGatewayCaller) MintLimiter(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _IScalarGateway.contract.Call(opts, &out, "mintLimiter")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// MintLimiter is a free data retrieval call binding the contract method 0xc82fe87a.
+//
+// Solidity: function mintLimiter() view returns(address)
+func (_IScalarGateway *IScalarGatewaySession) MintLimiter() (common.Address, error) {
+	return _IScalarGateway.Contract.MintLimiter(&_IScalarGateway.CallOpts)
+}
+
+// MintLimiter is a free data retrieval call binding the contract method 0xc82fe87a.
+//
+// Solidity: function mintLimiter() view returns(address)
+func (_IScalarGateway *IScalarGatewayCallerSession) MintLimiter() (common.Address, error) {
+	return _IScalarGateway.Contract.MintLimiter(&_IScalarGateway.CallOpts)
+}
+
 // TokenAddresses is a free data retrieval call binding the contract method 0x935b13f6.
 //
 // Solidity: function tokenAddresses(string symbol) view returns(address)
@@ -523,10 +709,10 @@ func (_IScalarGateway *IScalarGatewayCallerSession) TokenDeployer() (common.Addr
 
 // TokenFrozen is a free data retrieval call binding the contract method 0x7b1b769e.
 //
-// Solidity: function tokenFrozen(string symbol) view returns(bool)
-func (_IScalarGateway *IScalarGatewayCaller) TokenFrozen(opts *bind.CallOpts, symbol string) (bool, error) {
+// Solidity: function tokenFrozen(string ) pure returns(bool)
+func (_IScalarGateway *IScalarGatewayCaller) TokenFrozen(opts *bind.CallOpts, arg0 string) (bool, error) {
 	var out []interface{}
-	err := _IScalarGateway.contract.Call(opts, &out, "tokenFrozen", symbol)
+	err := _IScalarGateway.contract.Call(opts, &out, "tokenFrozen", arg0)
 
 	if err != nil {
 		return *new(bool), err
@@ -540,16 +726,16 @@ func (_IScalarGateway *IScalarGatewayCaller) TokenFrozen(opts *bind.CallOpts, sy
 
 // TokenFrozen is a free data retrieval call binding the contract method 0x7b1b769e.
 //
-// Solidity: function tokenFrozen(string symbol) view returns(bool)
-func (_IScalarGateway *IScalarGatewaySession) TokenFrozen(symbol string) (bool, error) {
-	return _IScalarGateway.Contract.TokenFrozen(&_IScalarGateway.CallOpts, symbol)
+// Solidity: function tokenFrozen(string ) pure returns(bool)
+func (_IScalarGateway *IScalarGatewaySession) TokenFrozen(arg0 string) (bool, error) {
+	return _IScalarGateway.Contract.TokenFrozen(&_IScalarGateway.CallOpts, arg0)
 }
 
 // TokenFrozen is a free data retrieval call binding the contract method 0x7b1b769e.
 //
-// Solidity: function tokenFrozen(string symbol) view returns(bool)
-func (_IScalarGateway *IScalarGatewayCallerSession) TokenFrozen(symbol string) (bool, error) {
-	return _IScalarGateway.Contract.TokenFrozen(&_IScalarGateway.CallOpts, symbol)
+// Solidity: function tokenFrozen(string ) pure returns(bool)
+func (_IScalarGateway *IScalarGatewayCallerSession) TokenFrozen(arg0 string) (bool, error) {
+	return _IScalarGateway.Contract.TokenFrozen(&_IScalarGateway.CallOpts, arg0)
 }
 
 // TokenMintAmount is a free data retrieval call binding the contract method 0xcec7b359.
@@ -614,46 +800,130 @@ func (_IScalarGateway *IScalarGatewayCallerSession) TokenMintLimit(symbol string
 	return _IScalarGateway.Contract.TokenMintLimit(&_IScalarGateway.CallOpts, symbol)
 }
 
-// CallContract is a paid mutator transaction binding the contract method 0x1c92115f.
+// ApproveContractCall is a paid mutator transaction binding the contract method 0xfbe0a31b.
 //
-// Solidity: function callContract(string destinationChain, string contractAddress, bytes payload) returns()
-func (_IScalarGateway *IScalarGatewayTransactor) CallContract(opts *bind.TransactOpts, destinationChain string, contractAddress string, payload []byte) (*types.Transaction, error) {
-	return _IScalarGateway.contract.Transact(opts, "callContract", destinationChain, contractAddress, payload)
+// Solidity: function approveContractCall(bytes params, bytes32 commandId) returns()
+func (_IScalarGateway *IScalarGatewayTransactor) ApproveContractCall(opts *bind.TransactOpts, params []byte, commandId [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.contract.Transact(opts, "approveContractCall", params, commandId)
+}
+
+// ApproveContractCall is a paid mutator transaction binding the contract method 0xfbe0a31b.
+//
+// Solidity: function approveContractCall(bytes params, bytes32 commandId) returns()
+func (_IScalarGateway *IScalarGatewaySession) ApproveContractCall(params []byte, commandId [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.ApproveContractCall(&_IScalarGateway.TransactOpts, params, commandId)
+}
+
+// ApproveContractCall is a paid mutator transaction binding the contract method 0xfbe0a31b.
+//
+// Solidity: function approveContractCall(bytes params, bytes32 commandId) returns()
+func (_IScalarGateway *IScalarGatewayTransactorSession) ApproveContractCall(params []byte, commandId [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.ApproveContractCall(&_IScalarGateway.TransactOpts, params, commandId)
+}
+
+// ApproveContractCallWithMint is a paid mutator transaction binding the contract method 0x585a9fd4.
+//
+// Solidity: function approveContractCallWithMint(bytes params, bytes32 commandId) returns()
+func (_IScalarGateway *IScalarGatewayTransactor) ApproveContractCallWithMint(opts *bind.TransactOpts, params []byte, commandId [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.contract.Transact(opts, "approveContractCallWithMint", params, commandId)
+}
+
+// ApproveContractCallWithMint is a paid mutator transaction binding the contract method 0x585a9fd4.
+//
+// Solidity: function approveContractCallWithMint(bytes params, bytes32 commandId) returns()
+func (_IScalarGateway *IScalarGatewaySession) ApproveContractCallWithMint(params []byte, commandId [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.ApproveContractCallWithMint(&_IScalarGateway.TransactOpts, params, commandId)
+}
+
+// ApproveContractCallWithMint is a paid mutator transaction binding the contract method 0x585a9fd4.
+//
+// Solidity: function approveContractCallWithMint(bytes params, bytes32 commandId) returns()
+func (_IScalarGateway *IScalarGatewayTransactorSession) ApproveContractCallWithMint(params []byte, commandId [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.ApproveContractCallWithMint(&_IScalarGateway.TransactOpts, params, commandId)
+}
+
+// BurnToken is a paid mutator transaction binding the contract method 0x4656ae2e.
+//
+// Solidity: function burnToken(bytes params, bytes32 ) returns()
+func (_IScalarGateway *IScalarGatewayTransactor) BurnToken(opts *bind.TransactOpts, params []byte, arg1 [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.contract.Transact(opts, "burnToken", params, arg1)
+}
+
+// BurnToken is a paid mutator transaction binding the contract method 0x4656ae2e.
+//
+// Solidity: function burnToken(bytes params, bytes32 ) returns()
+func (_IScalarGateway *IScalarGatewaySession) BurnToken(params []byte, arg1 [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.BurnToken(&_IScalarGateway.TransactOpts, params, arg1)
+}
+
+// BurnToken is a paid mutator transaction binding the contract method 0x4656ae2e.
+//
+// Solidity: function burnToken(bytes params, bytes32 ) returns()
+func (_IScalarGateway *IScalarGatewayTransactorSession) BurnToken(params []byte, arg1 [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.BurnToken(&_IScalarGateway.TransactOpts, params, arg1)
 }
 
 // CallContract is a paid mutator transaction binding the contract method 0x1c92115f.
 //
-// Solidity: function callContract(string destinationChain, string contractAddress, bytes payload) returns()
-func (_IScalarGateway *IScalarGatewaySession) CallContract(destinationChain string, contractAddress string, payload []byte) (*types.Transaction, error) {
-	return _IScalarGateway.Contract.CallContract(&_IScalarGateway.TransactOpts, destinationChain, contractAddress, payload)
+// Solidity: function callContract(string destinationChain, string destinationContractAddress, bytes payload) returns()
+func (_IScalarGateway *IScalarGatewayTransactor) CallContract(opts *bind.TransactOpts, destinationChain string, destinationContractAddress string, payload []byte) (*types.Transaction, error) {
+	return _IScalarGateway.contract.Transact(opts, "callContract", destinationChain, destinationContractAddress, payload)
 }
 
 // CallContract is a paid mutator transaction binding the contract method 0x1c92115f.
 //
-// Solidity: function callContract(string destinationChain, string contractAddress, bytes payload) returns()
-func (_IScalarGateway *IScalarGatewayTransactorSession) CallContract(destinationChain string, contractAddress string, payload []byte) (*types.Transaction, error) {
-	return _IScalarGateway.Contract.CallContract(&_IScalarGateway.TransactOpts, destinationChain, contractAddress, payload)
+// Solidity: function callContract(string destinationChain, string destinationContractAddress, bytes payload) returns()
+func (_IScalarGateway *IScalarGatewaySession) CallContract(destinationChain string, destinationContractAddress string, payload []byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.CallContract(&_IScalarGateway.TransactOpts, destinationChain, destinationContractAddress, payload)
+}
+
+// CallContract is a paid mutator transaction binding the contract method 0x1c92115f.
+//
+// Solidity: function callContract(string destinationChain, string destinationContractAddress, bytes payload) returns()
+func (_IScalarGateway *IScalarGatewayTransactorSession) CallContract(destinationChain string, destinationContractAddress string, payload []byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.CallContract(&_IScalarGateway.TransactOpts, destinationChain, destinationContractAddress, payload)
 }
 
 // CallContractWithToken is a paid mutator transaction binding the contract method 0xb5417084.
 //
-// Solidity: function callContractWithToken(string destinationChain, string contractAddress, bytes payload, string symbol, uint256 amount) returns()
-func (_IScalarGateway *IScalarGatewayTransactor) CallContractWithToken(opts *bind.TransactOpts, destinationChain string, contractAddress string, payload []byte, symbol string, amount *big.Int) (*types.Transaction, error) {
-	return _IScalarGateway.contract.Transact(opts, "callContractWithToken", destinationChain, contractAddress, payload, symbol, amount)
+// Solidity: function callContractWithToken(string destinationChain, string destinationContractAddress, bytes payload, string symbol, uint256 amount) returns()
+func (_IScalarGateway *IScalarGatewayTransactor) CallContractWithToken(opts *bind.TransactOpts, destinationChain string, destinationContractAddress string, payload []byte, symbol string, amount *big.Int) (*types.Transaction, error) {
+	return _IScalarGateway.contract.Transact(opts, "callContractWithToken", destinationChain, destinationContractAddress, payload, symbol, amount)
 }
 
 // CallContractWithToken is a paid mutator transaction binding the contract method 0xb5417084.
 //
-// Solidity: function callContractWithToken(string destinationChain, string contractAddress, bytes payload, string symbol, uint256 amount) returns()
-func (_IScalarGateway *IScalarGatewaySession) CallContractWithToken(destinationChain string, contractAddress string, payload []byte, symbol string, amount *big.Int) (*types.Transaction, error) {
-	return _IScalarGateway.Contract.CallContractWithToken(&_IScalarGateway.TransactOpts, destinationChain, contractAddress, payload, symbol, amount)
+// Solidity: function callContractWithToken(string destinationChain, string destinationContractAddress, bytes payload, string symbol, uint256 amount) returns()
+func (_IScalarGateway *IScalarGatewaySession) CallContractWithToken(destinationChain string, destinationContractAddress string, payload []byte, symbol string, amount *big.Int) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.CallContractWithToken(&_IScalarGateway.TransactOpts, destinationChain, destinationContractAddress, payload, symbol, amount)
 }
 
 // CallContractWithToken is a paid mutator transaction binding the contract method 0xb5417084.
 //
-// Solidity: function callContractWithToken(string destinationChain, string contractAddress, bytes payload, string symbol, uint256 amount) returns()
-func (_IScalarGateway *IScalarGatewayTransactorSession) CallContractWithToken(destinationChain string, contractAddress string, payload []byte, symbol string, amount *big.Int) (*types.Transaction, error) {
-	return _IScalarGateway.Contract.CallContractWithToken(&_IScalarGateway.TransactOpts, destinationChain, contractAddress, payload, symbol, amount)
+// Solidity: function callContractWithToken(string destinationChain, string destinationContractAddress, bytes payload, string symbol, uint256 amount) returns()
+func (_IScalarGateway *IScalarGatewayTransactorSession) CallContractWithToken(destinationChain string, destinationContractAddress string, payload []byte, symbol string, amount *big.Int) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.CallContractWithToken(&_IScalarGateway.TransactOpts, destinationChain, destinationContractAddress, payload, symbol, amount)
+}
+
+// DeployToken is a paid mutator transaction binding the contract method 0x886a625d.
+//
+// Solidity: function deployToken(bytes params, bytes32 ) returns()
+func (_IScalarGateway *IScalarGatewayTransactor) DeployToken(opts *bind.TransactOpts, params []byte, arg1 [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.contract.Transact(opts, "deployToken", params, arg1)
+}
+
+// DeployToken is a paid mutator transaction binding the contract method 0x886a625d.
+//
+// Solidity: function deployToken(bytes params, bytes32 ) returns()
+func (_IScalarGateway *IScalarGatewaySession) DeployToken(params []byte, arg1 [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.DeployToken(&_IScalarGateway.TransactOpts, params, arg1)
+}
+
+// DeployToken is a paid mutator transaction binding the contract method 0x886a625d.
+//
+// Solidity: function deployToken(bytes params, bytes32 ) returns()
+func (_IScalarGateway *IScalarGatewayTransactorSession) DeployToken(params []byte, arg1 [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.DeployToken(&_IScalarGateway.TransactOpts, params, arg1)
 }
 
 // Execute is a paid mutator transaction binding the contract method 0x09c5eabe.
@@ -675,6 +945,27 @@ func (_IScalarGateway *IScalarGatewaySession) Execute(input []byte) (*types.Tran
 // Solidity: function execute(bytes input) returns()
 func (_IScalarGateway *IScalarGatewayTransactorSession) Execute(input []byte) (*types.Transaction, error) {
 	return _IScalarGateway.Contract.Execute(&_IScalarGateway.TransactOpts, input)
+}
+
+// MintToken is a paid mutator transaction binding the contract method 0x146e2d78.
+//
+// Solidity: function mintToken(bytes params, bytes32 ) returns()
+func (_IScalarGateway *IScalarGatewayTransactor) MintToken(opts *bind.TransactOpts, params []byte, arg1 [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.contract.Transact(opts, "mintToken", params, arg1)
+}
+
+// MintToken is a paid mutator transaction binding the contract method 0x146e2d78.
+//
+// Solidity: function mintToken(bytes params, bytes32 ) returns()
+func (_IScalarGateway *IScalarGatewaySession) MintToken(params []byte, arg1 [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.MintToken(&_IScalarGateway.TransactOpts, params, arg1)
+}
+
+// MintToken is a paid mutator transaction binding the contract method 0x146e2d78.
+//
+// Solidity: function mintToken(bytes params, bytes32 ) returns()
+func (_IScalarGateway *IScalarGatewayTransactorSession) MintToken(params []byte, arg1 [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.MintToken(&_IScalarGateway.TransactOpts, params, arg1)
 }
 
 // SendToken is a paid mutator transaction binding the contract method 0x26ef699d.
@@ -740,6 +1031,69 @@ func (_IScalarGateway *IScalarGatewayTransactorSession) Setup(params []byte) (*t
 	return _IScalarGateway.Contract.Setup(&_IScalarGateway.TransactOpts, params)
 }
 
+// TransferGovernance is a paid mutator transaction binding the contract method 0xd38bfff4.
+//
+// Solidity: function transferGovernance(address newGovernance) returns()
+func (_IScalarGateway *IScalarGatewayTransactor) TransferGovernance(opts *bind.TransactOpts, newGovernance common.Address) (*types.Transaction, error) {
+	return _IScalarGateway.contract.Transact(opts, "transferGovernance", newGovernance)
+}
+
+// TransferGovernance is a paid mutator transaction binding the contract method 0xd38bfff4.
+//
+// Solidity: function transferGovernance(address newGovernance) returns()
+func (_IScalarGateway *IScalarGatewaySession) TransferGovernance(newGovernance common.Address) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.TransferGovernance(&_IScalarGateway.TransactOpts, newGovernance)
+}
+
+// TransferGovernance is a paid mutator transaction binding the contract method 0xd38bfff4.
+//
+// Solidity: function transferGovernance(address newGovernance) returns()
+func (_IScalarGateway *IScalarGatewayTransactorSession) TransferGovernance(newGovernance common.Address) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.TransferGovernance(&_IScalarGateway.TransactOpts, newGovernance)
+}
+
+// TransferMintLimiter is a paid mutator transaction binding the contract method 0x41d8f26b.
+//
+// Solidity: function transferMintLimiter(address newMintLimiter) returns()
+func (_IScalarGateway *IScalarGatewayTransactor) TransferMintLimiter(opts *bind.TransactOpts, newMintLimiter common.Address) (*types.Transaction, error) {
+	return _IScalarGateway.contract.Transact(opts, "transferMintLimiter", newMintLimiter)
+}
+
+// TransferMintLimiter is a paid mutator transaction binding the contract method 0x41d8f26b.
+//
+// Solidity: function transferMintLimiter(address newMintLimiter) returns()
+func (_IScalarGateway *IScalarGatewaySession) TransferMintLimiter(newMintLimiter common.Address) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.TransferMintLimiter(&_IScalarGateway.TransactOpts, newMintLimiter)
+}
+
+// TransferMintLimiter is a paid mutator transaction binding the contract method 0x41d8f26b.
+//
+// Solidity: function transferMintLimiter(address newMintLimiter) returns()
+func (_IScalarGateway *IScalarGatewayTransactorSession) TransferMintLimiter(newMintLimiter common.Address) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.TransferMintLimiter(&_IScalarGateway.TransactOpts, newMintLimiter)
+}
+
+// TransferOperatorship is a paid mutator transaction binding the contract method 0x97b87ba6.
+//
+// Solidity: function transferOperatorship(bytes newOperatorsData, bytes32 ) returns()
+func (_IScalarGateway *IScalarGatewayTransactor) TransferOperatorship(opts *bind.TransactOpts, newOperatorsData []byte, arg1 [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.contract.Transact(opts, "transferOperatorship", newOperatorsData, arg1)
+}
+
+// TransferOperatorship is a paid mutator transaction binding the contract method 0x97b87ba6.
+//
+// Solidity: function transferOperatorship(bytes newOperatorsData, bytes32 ) returns()
+func (_IScalarGateway *IScalarGatewaySession) TransferOperatorship(newOperatorsData []byte, arg1 [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.TransferOperatorship(&_IScalarGateway.TransactOpts, newOperatorsData, arg1)
+}
+
+// TransferOperatorship is a paid mutator transaction binding the contract method 0x97b87ba6.
+//
+// Solidity: function transferOperatorship(bytes newOperatorsData, bytes32 ) returns()
+func (_IScalarGateway *IScalarGatewayTransactorSession) TransferOperatorship(newOperatorsData []byte, arg1 [32]byte) (*types.Transaction, error) {
+	return _IScalarGateway.Contract.TransferOperatorship(&_IScalarGateway.TransactOpts, newOperatorsData, arg1)
+}
+
 // Upgrade is a paid mutator transaction binding the contract method 0xa3499c73.
 //
 // Solidity: function upgrade(address newImplementation, bytes32 newImplementationCodeHash, bytes setupParams) returns()
@@ -763,42 +1117,42 @@ func (_IScalarGateway *IScalarGatewayTransactorSession) Upgrade(newImplementatio
 
 // ValidateContractCall is a paid mutator transaction binding the contract method 0x5f6970c3.
 //
-// Solidity: function validateContractCall(bytes32 commandId, string sourceChain, string sourceAddress, bytes32 payloadHash) returns(bool)
+// Solidity: function validateContractCall(bytes32 commandId, string sourceChain, string sourceAddress, bytes32 payloadHash) returns(bool valid)
 func (_IScalarGateway *IScalarGatewayTransactor) ValidateContractCall(opts *bind.TransactOpts, commandId [32]byte, sourceChain string, sourceAddress string, payloadHash [32]byte) (*types.Transaction, error) {
 	return _IScalarGateway.contract.Transact(opts, "validateContractCall", commandId, sourceChain, sourceAddress, payloadHash)
 }
 
 // ValidateContractCall is a paid mutator transaction binding the contract method 0x5f6970c3.
 //
-// Solidity: function validateContractCall(bytes32 commandId, string sourceChain, string sourceAddress, bytes32 payloadHash) returns(bool)
+// Solidity: function validateContractCall(bytes32 commandId, string sourceChain, string sourceAddress, bytes32 payloadHash) returns(bool valid)
 func (_IScalarGateway *IScalarGatewaySession) ValidateContractCall(commandId [32]byte, sourceChain string, sourceAddress string, payloadHash [32]byte) (*types.Transaction, error) {
 	return _IScalarGateway.Contract.ValidateContractCall(&_IScalarGateway.TransactOpts, commandId, sourceChain, sourceAddress, payloadHash)
 }
 
 // ValidateContractCall is a paid mutator transaction binding the contract method 0x5f6970c3.
 //
-// Solidity: function validateContractCall(bytes32 commandId, string sourceChain, string sourceAddress, bytes32 payloadHash) returns(bool)
+// Solidity: function validateContractCall(bytes32 commandId, string sourceChain, string sourceAddress, bytes32 payloadHash) returns(bool valid)
 func (_IScalarGateway *IScalarGatewayTransactorSession) ValidateContractCall(commandId [32]byte, sourceChain string, sourceAddress string, payloadHash [32]byte) (*types.Transaction, error) {
 	return _IScalarGateway.Contract.ValidateContractCall(&_IScalarGateway.TransactOpts, commandId, sourceChain, sourceAddress, payloadHash)
 }
 
 // ValidateContractCallAndMint is a paid mutator transaction binding the contract method 0x1876eed9.
 //
-// Solidity: function validateContractCallAndMint(bytes32 commandId, string sourceChain, string sourceAddress, bytes32 payloadHash, string symbol, uint256 amount) returns(bool)
+// Solidity: function validateContractCallAndMint(bytes32 commandId, string sourceChain, string sourceAddress, bytes32 payloadHash, string symbol, uint256 amount) returns(bool valid)
 func (_IScalarGateway *IScalarGatewayTransactor) ValidateContractCallAndMint(opts *bind.TransactOpts, commandId [32]byte, sourceChain string, sourceAddress string, payloadHash [32]byte, symbol string, amount *big.Int) (*types.Transaction, error) {
 	return _IScalarGateway.contract.Transact(opts, "validateContractCallAndMint", commandId, sourceChain, sourceAddress, payloadHash, symbol, amount)
 }
 
 // ValidateContractCallAndMint is a paid mutator transaction binding the contract method 0x1876eed9.
 //
-// Solidity: function validateContractCallAndMint(bytes32 commandId, string sourceChain, string sourceAddress, bytes32 payloadHash, string symbol, uint256 amount) returns(bool)
+// Solidity: function validateContractCallAndMint(bytes32 commandId, string sourceChain, string sourceAddress, bytes32 payloadHash, string symbol, uint256 amount) returns(bool valid)
 func (_IScalarGateway *IScalarGatewaySession) ValidateContractCallAndMint(commandId [32]byte, sourceChain string, sourceAddress string, payloadHash [32]byte, symbol string, amount *big.Int) (*types.Transaction, error) {
 	return _IScalarGateway.Contract.ValidateContractCallAndMint(&_IScalarGateway.TransactOpts, commandId, sourceChain, sourceAddress, payloadHash, symbol, amount)
 }
 
 // ValidateContractCallAndMint is a paid mutator transaction binding the contract method 0x1876eed9.
 //
-// Solidity: function validateContractCallAndMint(bytes32 commandId, string sourceChain, string sourceAddress, bytes32 payloadHash, string symbol, uint256 amount) returns(bool)
+// Solidity: function validateContractCallAndMint(bytes32 commandId, string sourceChain, string sourceAddress, bytes32 payloadHash, string symbol, uint256 amount) returns(bool valid)
 func (_IScalarGateway *IScalarGatewayTransactorSession) ValidateContractCallAndMint(commandId [32]byte, sourceChain string, sourceAddress string, payloadHash [32]byte, symbol string, amount *big.Int) (*types.Transaction, error) {
 	return _IScalarGateway.Contract.ValidateContractCallAndMint(&_IScalarGateway.TransactOpts, commandId, sourceChain, sourceAddress, payloadHash, symbol, amount)
 }
@@ -1299,6 +1653,150 @@ func (_IScalarGateway *IScalarGatewayFilterer) ParseContractCallApprovedWithMint
 	return event, nil
 }
 
+// IScalarGatewayContractCallExecutedIterator is returned from FilterContractCallExecuted and is used to iterate over the raw logs and unpacked data for ContractCallExecuted events raised by the IScalarGateway contract.
+type IScalarGatewayContractCallExecutedIterator struct {
+	Event *IScalarGatewayContractCallExecuted // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *IScalarGatewayContractCallExecutedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(IScalarGatewayContractCallExecuted)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(IScalarGatewayContractCallExecuted)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *IScalarGatewayContractCallExecutedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *IScalarGatewayContractCallExecutedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// IScalarGatewayContractCallExecuted represents a ContractCallExecuted event raised by the IScalarGateway contract.
+type IScalarGatewayContractCallExecuted struct {
+	CommandId [32]byte
+	Raw       types.Log // Blockchain specific contextual infos
+}
+
+// FilterContractCallExecuted is a free log retrieval operation binding the contract event 0x91057b069763121972ce22b18b2f319b1520dd4c72f1f94a6395e81ceaf63f41.
+//
+// Solidity: event ContractCallExecuted(bytes32 indexed commandId)
+func (_IScalarGateway *IScalarGatewayFilterer) FilterContractCallExecuted(opts *bind.FilterOpts, commandId [][32]byte) (*IScalarGatewayContractCallExecutedIterator, error) {
+
+	var commandIdRule []interface{}
+	for _, commandIdItem := range commandId {
+		commandIdRule = append(commandIdRule, commandIdItem)
+	}
+
+	logs, sub, err := _IScalarGateway.contract.FilterLogs(opts, "ContractCallExecuted", commandIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return &IScalarGatewayContractCallExecutedIterator{contract: _IScalarGateway.contract, event: "ContractCallExecuted", logs: logs, sub: sub}, nil
+}
+
+// WatchContractCallExecuted is a free log subscription operation binding the contract event 0x91057b069763121972ce22b18b2f319b1520dd4c72f1f94a6395e81ceaf63f41.
+//
+// Solidity: event ContractCallExecuted(bytes32 indexed commandId)
+func (_IScalarGateway *IScalarGatewayFilterer) WatchContractCallExecuted(opts *bind.WatchOpts, sink chan<- *IScalarGatewayContractCallExecuted, commandId [][32]byte) (event.Subscription, error) {
+
+	var commandIdRule []interface{}
+	for _, commandIdItem := range commandId {
+		commandIdRule = append(commandIdRule, commandIdItem)
+	}
+
+	logs, sub, err := _IScalarGateway.contract.WatchLogs(opts, "ContractCallExecuted", commandIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(IScalarGatewayContractCallExecuted)
+				if err := _IScalarGateway.contract.UnpackLog(event, "ContractCallExecuted", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseContractCallExecuted is a log parse operation binding the contract event 0x91057b069763121972ce22b18b2f319b1520dd4c72f1f94a6395e81ceaf63f41.
+//
+// Solidity: event ContractCallExecuted(bytes32 indexed commandId)
+func (_IScalarGateway *IScalarGatewayFilterer) ParseContractCallExecuted(log types.Log) (*IScalarGatewayContractCallExecuted, error) {
+	event := new(IScalarGatewayContractCallExecuted)
+	if err := _IScalarGateway.contract.UnpackLog(event, "ContractCallExecuted", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
 // IScalarGatewayContractCallWithTokenIterator is returned from FilterContractCallWithToken and is used to iterate over the raw logs and unpacked data for ContractCallWithToken events raised by the IScalarGateway contract.
 type IScalarGatewayContractCallWithTokenIterator struct {
 	Event *IScalarGatewayContractCallWithToken // Event containing the contract specifics and raw log
@@ -1597,6 +2095,312 @@ func (_IScalarGateway *IScalarGatewayFilterer) WatchExecuted(opts *bind.WatchOpt
 func (_IScalarGateway *IScalarGatewayFilterer) ParseExecuted(log types.Log) (*IScalarGatewayExecuted, error) {
 	event := new(IScalarGatewayExecuted)
 	if err := _IScalarGateway.contract.UnpackLog(event, "Executed", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// IScalarGatewayGovernanceTransferredIterator is returned from FilterGovernanceTransferred and is used to iterate over the raw logs and unpacked data for GovernanceTransferred events raised by the IScalarGateway contract.
+type IScalarGatewayGovernanceTransferredIterator struct {
+	Event *IScalarGatewayGovernanceTransferred // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *IScalarGatewayGovernanceTransferredIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(IScalarGatewayGovernanceTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(IScalarGatewayGovernanceTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *IScalarGatewayGovernanceTransferredIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *IScalarGatewayGovernanceTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// IScalarGatewayGovernanceTransferred represents a GovernanceTransferred event raised by the IScalarGateway contract.
+type IScalarGatewayGovernanceTransferred struct {
+	PreviousGovernance common.Address
+	NewGovernance      common.Address
+	Raw                types.Log // Blockchain specific contextual infos
+}
+
+// FilterGovernanceTransferred is a free log retrieval operation binding the contract event 0x5f56bee8cffbe9a78652a74a60705edede02af10b0bbb888ca44b79a0d42ce80.
+//
+// Solidity: event GovernanceTransferred(address indexed previousGovernance, address indexed newGovernance)
+func (_IScalarGateway *IScalarGatewayFilterer) FilterGovernanceTransferred(opts *bind.FilterOpts, previousGovernance []common.Address, newGovernance []common.Address) (*IScalarGatewayGovernanceTransferredIterator, error) {
+
+	var previousGovernanceRule []interface{}
+	for _, previousGovernanceItem := range previousGovernance {
+		previousGovernanceRule = append(previousGovernanceRule, previousGovernanceItem)
+	}
+	var newGovernanceRule []interface{}
+	for _, newGovernanceItem := range newGovernance {
+		newGovernanceRule = append(newGovernanceRule, newGovernanceItem)
+	}
+
+	logs, sub, err := _IScalarGateway.contract.FilterLogs(opts, "GovernanceTransferred", previousGovernanceRule, newGovernanceRule)
+	if err != nil {
+		return nil, err
+	}
+	return &IScalarGatewayGovernanceTransferredIterator{contract: _IScalarGateway.contract, event: "GovernanceTransferred", logs: logs, sub: sub}, nil
+}
+
+// WatchGovernanceTransferred is a free log subscription operation binding the contract event 0x5f56bee8cffbe9a78652a74a60705edede02af10b0bbb888ca44b79a0d42ce80.
+//
+// Solidity: event GovernanceTransferred(address indexed previousGovernance, address indexed newGovernance)
+func (_IScalarGateway *IScalarGatewayFilterer) WatchGovernanceTransferred(opts *bind.WatchOpts, sink chan<- *IScalarGatewayGovernanceTransferred, previousGovernance []common.Address, newGovernance []common.Address) (event.Subscription, error) {
+
+	var previousGovernanceRule []interface{}
+	for _, previousGovernanceItem := range previousGovernance {
+		previousGovernanceRule = append(previousGovernanceRule, previousGovernanceItem)
+	}
+	var newGovernanceRule []interface{}
+	for _, newGovernanceItem := range newGovernance {
+		newGovernanceRule = append(newGovernanceRule, newGovernanceItem)
+	}
+
+	logs, sub, err := _IScalarGateway.contract.WatchLogs(opts, "GovernanceTransferred", previousGovernanceRule, newGovernanceRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(IScalarGatewayGovernanceTransferred)
+				if err := _IScalarGateway.contract.UnpackLog(event, "GovernanceTransferred", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseGovernanceTransferred is a log parse operation binding the contract event 0x5f56bee8cffbe9a78652a74a60705edede02af10b0bbb888ca44b79a0d42ce80.
+//
+// Solidity: event GovernanceTransferred(address indexed previousGovernance, address indexed newGovernance)
+func (_IScalarGateway *IScalarGatewayFilterer) ParseGovernanceTransferred(log types.Log) (*IScalarGatewayGovernanceTransferred, error) {
+	event := new(IScalarGatewayGovernanceTransferred)
+	if err := _IScalarGateway.contract.UnpackLog(event, "GovernanceTransferred", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// IScalarGatewayMintLimiterTransferredIterator is returned from FilterMintLimiterTransferred and is used to iterate over the raw logs and unpacked data for MintLimiterTransferred events raised by the IScalarGateway contract.
+type IScalarGatewayMintLimiterTransferredIterator struct {
+	Event *IScalarGatewayMintLimiterTransferred // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *IScalarGatewayMintLimiterTransferredIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(IScalarGatewayMintLimiterTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(IScalarGatewayMintLimiterTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *IScalarGatewayMintLimiterTransferredIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *IScalarGatewayMintLimiterTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// IScalarGatewayMintLimiterTransferred represents a MintLimiterTransferred event raised by the IScalarGateway contract.
+type IScalarGatewayMintLimiterTransferred struct {
+	PreviousGovernance common.Address
+	NewGovernance      common.Address
+	Raw                types.Log // Blockchain specific contextual infos
+}
+
+// FilterMintLimiterTransferred is a free log retrieval operation binding the contract event 0xa9303c860c5de3c0c866c354d281785c89778ac5ca2dffdf12841c45cd4e1e6e.
+//
+// Solidity: event MintLimiterTransferred(address indexed previousGovernance, address indexed newGovernance)
+func (_IScalarGateway *IScalarGatewayFilterer) FilterMintLimiterTransferred(opts *bind.FilterOpts, previousGovernance []common.Address, newGovernance []common.Address) (*IScalarGatewayMintLimiterTransferredIterator, error) {
+
+	var previousGovernanceRule []interface{}
+	for _, previousGovernanceItem := range previousGovernance {
+		previousGovernanceRule = append(previousGovernanceRule, previousGovernanceItem)
+	}
+	var newGovernanceRule []interface{}
+	for _, newGovernanceItem := range newGovernance {
+		newGovernanceRule = append(newGovernanceRule, newGovernanceItem)
+	}
+
+	logs, sub, err := _IScalarGateway.contract.FilterLogs(opts, "MintLimiterTransferred", previousGovernanceRule, newGovernanceRule)
+	if err != nil {
+		return nil, err
+	}
+	return &IScalarGatewayMintLimiterTransferredIterator{contract: _IScalarGateway.contract, event: "MintLimiterTransferred", logs: logs, sub: sub}, nil
+}
+
+// WatchMintLimiterTransferred is a free log subscription operation binding the contract event 0xa9303c860c5de3c0c866c354d281785c89778ac5ca2dffdf12841c45cd4e1e6e.
+//
+// Solidity: event MintLimiterTransferred(address indexed previousGovernance, address indexed newGovernance)
+func (_IScalarGateway *IScalarGatewayFilterer) WatchMintLimiterTransferred(opts *bind.WatchOpts, sink chan<- *IScalarGatewayMintLimiterTransferred, previousGovernance []common.Address, newGovernance []common.Address) (event.Subscription, error) {
+
+	var previousGovernanceRule []interface{}
+	for _, previousGovernanceItem := range previousGovernance {
+		previousGovernanceRule = append(previousGovernanceRule, previousGovernanceItem)
+	}
+	var newGovernanceRule []interface{}
+	for _, newGovernanceItem := range newGovernance {
+		newGovernanceRule = append(newGovernanceRule, newGovernanceItem)
+	}
+
+	logs, sub, err := _IScalarGateway.contract.WatchLogs(opts, "MintLimiterTransferred", previousGovernanceRule, newGovernanceRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(IScalarGatewayMintLimiterTransferred)
+				if err := _IScalarGateway.contract.UnpackLog(event, "MintLimiterTransferred", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseMintLimiterTransferred is a log parse operation binding the contract event 0xa9303c860c5de3c0c866c354d281785c89778ac5ca2dffdf12841c45cd4e1e6e.
+//
+// Solidity: event MintLimiterTransferred(address indexed previousGovernance, address indexed newGovernance)
+func (_IScalarGateway *IScalarGatewayFilterer) ParseMintLimiterTransferred(log types.Log) (*IScalarGatewayMintLimiterTransferred, error) {
+	event := new(IScalarGatewayMintLimiterTransferred)
+	if err := _IScalarGateway.contract.UnpackLog(event, "MintLimiterTransferred", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log

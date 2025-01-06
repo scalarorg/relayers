@@ -57,3 +57,30 @@ type DecodedExecuteData struct {
 	//Input
 	Input []byte
 }
+
+type ExecuteData[T any] struct {
+	//Data
+	Data T
+	//Proof
+	Operators  []common.Address
+	Weights    []uint64
+	Threshold  uint64
+	Signatures []string
+	//Input
+	Input []byte
+}
+type ApproveContractCall struct {
+	ChainId    uint64
+	CommandIds [][32]byte
+	Commands   []string
+	Params     [][]byte
+}
+type DeployToken struct {
+	//Data
+	Name         string
+	Symbol       string
+	Decimals     uint8
+	Cap          uint64
+	TokenAddress common.Address
+	MintLimit    uint64
+}

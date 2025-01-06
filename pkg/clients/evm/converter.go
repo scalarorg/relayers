@@ -51,21 +51,6 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IScalarGatewayC
 }
 
 func (c *EvmClient) TokenSentEvent2RelayData(event *contracts.IScalarGatewayTokenSent) (models.RelayData, error) {
-	//id := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
-	//Calculate eventId by Txhash-logIndex among logs in txreceipt (AxelarEvmModule)
-	//https://github.com/scalarorg/scalar-core/blob/main/vald/evm/gateway_tx_confirmation.go#L73
-	//Dec 30, use logIndex directly to avoid redundant request. This must aggrees with the scalar-core vald module
-	// receipt, err := c.Client.TransactionReceipt(context.Background(), event.Raw.TxHash)
-	// if err != nil {
-	// 	return models.RelayData{}, fmt.Errorf("failed to get transaction receipt: %w", err)
-	// }
-	// var id string
-	// for ind, log := range receipt.Logs {
-	// 	if log.Index == event.Raw.Index {
-	// 		id = fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), ind)
-	// 		break
-	// 	}
-	// }
 	id := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
 	senderAddress := event.Sender.String()
 	relayData := models.RelayData{
@@ -94,7 +79,7 @@ func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGate
 	if event.SourceEventIndex != nil && event.SourceEventIndex.IsUint64() {
 		sourceEventIndex = event.SourceEventIndex.Uint64()
 	}
-	relayData := models.CallContractApproved{
+	record := models.CallContractApproved{
 		ID:               id,
 		SourceChain:      event.SourceChain,
 		DestinationChain: c.evmConfig.GetId(),
@@ -108,7 +93,7 @@ func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGate
 		SourceTxHash:     strings.ToLower(hex.EncodeToString(event.SourceTxHash[:])),
 		SourceEventIndex: sourceEventIndex,
 	}
-	return relayData, nil
+	return record, nil
 }
 
 func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IScalarGatewayExecuted) models.CommandExecuted {

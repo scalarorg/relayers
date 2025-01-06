@@ -31,7 +31,7 @@ func CalculateStakingPayload(vaultTx *types.VaultTransaction) ([]byte, string, e
 	// }
 	// var txHashBytes [32]byte
 	// copy(txHashBytes[:], txHash)
-	log.Debug().Str("TxHash", txHash).Uint64("Amount", vaultTx.Amount).Bytes("RecipientAddress", toAddress).Msg("CalculateDestPayload")
+	log.Debug().Str("TxHash", txHash).Uint64("Amount", vaultTx.Amount).Str("RecipientAddress", hex.EncodeToString(toAddress)).Msg("CalculateDestPayload")
 	payloadBytes, payloadHash, err := encode.SafeCalculateDestPayload(vaultTx.Amount, txHash, toAddress)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to calculate payload: %w", err)

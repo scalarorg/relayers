@@ -16,6 +16,7 @@ import (
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	"github.com/rs/zerolog/log"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	"github.com/scalarorg/scalar-core/x/nexus/exported"
 	scalarnettypes "github.com/scalarorg/scalar-core/x/scalarnet/types"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -183,6 +184,19 @@ func (c *NetworkClient) SignCommandsRequests(ctx context.Context, destinationCha
 	}
 	return txRes, nil
 }
+
+func (c *NetworkClient) CreatePendingTransfersRequest(ctx context.Context, chain string) (*sdk.TxResponse, error) {
+	req := chainstypes.CreatePendingTransfersRequest{
+		Sender: c.GetAddress(),
+		Chain:  exported.ChainName(chain),
+	}
+	txRes, err := c.SignAndBroadcastMsgs(ctx, &req)
+	if err != nil {
+		return nil, fmt.Errorf("[NetworkClient] [CreatePendingTransderRequest] %w", err)
+	}
+	return txRes, nil
+}
+
 func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, payload string) (*sdk.TxResponse, error) {
 	payloadBytes := []byte(payload)
 	req := scalarnettypes.NewRouteMessage(

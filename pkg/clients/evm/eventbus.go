@@ -26,6 +26,16 @@ func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
 				Msg("[EvmClient] [handleEventBusMessage]")
 			return err
 		}
+	case events.EVENT_SCALAR_TOKEN_SENT:
+		//Emitted from scalar.handleDestCallApprovedEvent with event.Data as executeData
+		err := ec.handleScalarTokenSent(event.Data.(string))
+		if err != nil {
+			log.Error().
+				Err(err).
+				Any("eventData", event.Data).
+				Msg("[EvmClient] [handleEventBusMessage]")
+			return err
+		}
 	case events.EVENT_SCALAR_DEST_CALL_APPROVED:
 		//Emitted from scalar.handleDestCallApprovedEvent with event.Data as executeData
 		err := ec.handleScalarDestCallApproved(event.MessageID, event.Data.(string))
@@ -41,6 +51,55 @@ func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
 	return nil
 }
 
+func (ec *EvmClient) handleScalarTokenSent(executeData string) error {
+	log.Debug().
+		Str("executeData", executeData).
+		Msg("[EvmClient] [handleScalarTokenSent]")
+	decodedExecuteData, err := DecodeExecuteData(executeData)
+	if err != nil {
+		return fmt.Errorf("failed to decode execute data: %w", err)
+	}
+	ec.observeScalarExecuteData(decodedExecuteData)
+	//1. Call ScalarGateway's execute method
+	//Todo add retry
+	if ec.auth == nil {
+		log.Error().
+			Str("chainId", ec.evmConfig.GetId()).
+			Msg("[EvmClient] [handleScalarTokenSent] auth is nil")
+		return fmt.Errorf("[EvmClient] [handleScalarTokenSent] auth is nil")
+	}
+	signedTx, err := ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
+	if err != nil {
+		log.Error().Err(err).
+			Str("input", hex.EncodeToString(decodedExecuteData.Input)).
+			Str("contractAddress", ec.evmConfig.Gateway).
+			Str("signer", ec.auth.From.String()).
+			Msg("[EvmClient] [handleScalarTokenSent]")
+		return err
+	}
+	//Or send raw transaction to the network directly
+	// txRaw := types.NewTx()
+	// tx, err := ec.Client.SendTransaction(context.Background(), txRaw)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to send raw transaction: %w", err)
+	// }
+	log.Info().Str("signed TxHash", signedTx.Hash().String()).
+		Uint64("nonce", signedTx.Nonce()).
+		Int64("chainId", signedTx.ChainId().Int64()).
+		Str("signer", signedTx.To().Hex()).
+		Msg("[EvmClient] [handleScalarTokenSent]")
+	txHash := signedTx.Hash().String()
+	//2. Add the transaction waiting to be mined
+	ec.pendingTxs.AddTx(txHash, time.Now())
+	//3. Update status of the event
+	// err = ec.dbAdapter.UpdateRelayDataStatueWithExecuteHash(messageID, relaydata.SUCCESS, &txHash)
+	// if err != nil {
+	// 	log.Error().Err(err).Str("txHash", txHash).Msg("[EvmClient] [handleScalarDestCallApproved]")
+	// 	return err
+	// }
+	return nil
+}
+
 func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, executeData string) error {
 	log.Debug().
 		Str("ChainId", chainId).
@@ -50,7 +109,7 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, executeData 
 	if err != nil {
 		return fmt.Errorf("failed to decode execute data: %w", err)
 	}
-	ec.observeScalarDestCallApproved(decodedExecuteData)
+	ec.observeScalarExecuteData(decodedExecuteData)
 	//1. Call ScalarGateway's execute method
 	//Todo add retry
 	if ec.auth == nil {
@@ -59,6 +118,7 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, executeData 
 			Msg("[EvmClient] [handleScalarBatchCommandSigned] auth is nil")
 		return fmt.Errorf("[EvmClient] [handleScalarBatchCommandSigned] auth is nil")
 	}
+	//Todo: check if token is not yet deployed on the chain
 	signedTx, err := ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
 	if err != nil {
 		log.Error().Err(err).
@@ -103,7 +163,7 @@ func (ec *EvmClient) handleScalarDestCallApproved(messageID string, executeData 
 	if err != nil {
 		return fmt.Errorf("failed to decode execute data: %w", err)
 	}
-	ec.observeScalarDestCallApproved(decodedExecuteData)
+	ec.observeScalarExecuteData(decodedExecuteData)
 	//1. Call ScalarGateway's execute method
 	//Todo add retry
 	if ec.auth == nil {
@@ -144,7 +204,7 @@ func (ec *EvmClient) handleScalarDestCallApproved(messageID string, executeData 
 	return nil
 }
 
-func (ec *EvmClient) observeScalarDestCallApproved(decodedExecuteData *DecodedExecuteData) error {
+func (ec *EvmClient) observeScalarExecuteData(decodedExecuteData *DecodedExecuteData) error {
 	commandIds := make([]string, len(decodedExecuteData.CommandIds))
 	for i, commandId := range decodedExecuteData.CommandIds {
 		commandIds[i] = hex.EncodeToString(commandId[:])
