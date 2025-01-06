@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	proto "github.com/gogo/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/internal/codec"
@@ -147,6 +147,11 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 			log.Error().Msgf("[ScalarClient] [subscribeTokenSentEvent] error: %v", err)
 		}
 
+		err = subscribeMintCommand(cancelCtx, c.network, c.handleMintCommandEvents)
+		if err != nil {
+			log.Error().Msgf("[ScalarClient] [subscribeMintCommand] error: %v", err)
+		}
+
 		err = subscribeDestCallApprovedEvent(cancelCtx, c.network, c.handleDestCallApprovedEvents)
 		if err != nil {
 			log.Error().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] error: %v", err)
@@ -207,7 +212,22 @@ func subscribeTokenSentEvent(ctx context.Context, network *cosmos.NetworkClient,
 	}
 	return nil
 }
-
+func subscribeMintCommand(ctx context.Context, network *cosmos.NetworkClient,
+	callback func(ctx context.Context, events []IBCEvent[*types.MintCommand]) error) error {
+	if _, err := Subscribe(ctx, network, MintCommandEvent,
+		func(events []IBCEvent[*types.MintCommand]) {
+			err := callback(ctx, events)
+			if err != nil {
+				log.Error().Msgf("[ScalarClient] [DestCallApprovedHandler] callback error: %v", err)
+			}
+		}); err != nil {
+		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] Failed: %v", err)
+		return err
+	} else {
+		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] success")
+	}
+	return nil
+}
 func subscribeDestCallApprovedEvent(ctx context.Context, network *cosmos.NetworkClient,
 	callback func(ctx context.Context, events []IBCEvent[*types.DestCallApproved]) error) error {
 	if _, err := Subscribe(ctx, network, DestCallApprovedEvent,
@@ -260,10 +280,10 @@ func subscribeEVMCompletedEvent(ctx context.Context, network *cosmos.NetworkClie
 	return nil
 }
 func subscribeAllNewBlockEvent(ctx context.Context, network *cosmos.NetworkClient,
-	callback func(ctx context.Context, events []IBCEvent[proto.Message]) error) error {
+	callback func(ctx context.Context, events []IBCEvent[ScalarMessage]) error) error {
 	//Subscribe to all events for debug purpose
 	if _, err := Subscribe(ctx, network, AllNewBlockEvent,
-		func(events []IBCEvent[proto.Message]) {
+		func(events []IBCEvent[ScalarMessage]) {
 			err := callback(ctx, events)
 			if err != nil {
 				log.Error().Msgf("[ScalarClient] [AllNewBlockHandler] callback error: %v", err)
@@ -280,16 +300,16 @@ func subscribeAllNewBlockEvent(ctx context.Context, network *cosmos.NetworkClien
 
 func subscribeAllTxEvent(ctx context.Context, network *cosmos.NetworkClient) error {
 	//Subscribe to all events for debug purpose
-	TxEvent := ListenerEvent[proto.Message]{
+	TxEvent := ListenerEvent[ScalarMessage]{
 		Type: "Tx",
 		//TopicId: "tm.event='Tx'",
 		TopicId: "tm.event='*'",
-		Parser: func(events map[string][]string) ([]IBCEvent[proto.Message], error) {
+		Parser: func(events map[string][]string) ([]IBCEvent[ScalarMessage], error) {
 			log.Debug().Msgf("[ScalarClient] [AllTxHandler] events: %v", events)
 			return nil, nil
 		},
 	}
-	callback := func(events []IBCEvent[proto.Message]) {
+	callback := func(events []IBCEvent[ScalarMessage]) {
 		log.Debug().Msgf("[ScalarClient] [subscribeAllTxEvent] events: %v", events)
 	}
 	if _, err := Subscribe(ctx, network, TxEvent, callback); err != nil {
@@ -319,7 +339,7 @@ func Subscribe[T proto.Message](ctx context.Context,
 					log.Debug().Msgf("[ScalarClient] [Subscribe] Event query is not match query: %v, topicId: %s", evt.Query, event.TopicId)
 				} else {
 					//Extract the data from the event
-					log.Debug().Str("Topic", evt.Query).Msg("Received new event")
+					log.Debug().Str("Topic", evt.Query).Any("Events", evt.Events).Msg("Received new event")
 					// var args T
 					// msgType := reflect.TypeOf(args).Elem()
 					// msg := reflect.New(msgType).Interface().(T)

@@ -14,8 +14,8 @@ import (
 // Then request signCommand request
 func (c *Client) ProcessSignCommands(ctx context.Context) {
 	interval := time.Second
-	if c.networkConfig.SignCommandInterval > 0 {
-		interval = time.Millisecond * time.Duration(c.networkConfig.SignCommandInterval)
+	if c.networkConfig.CommandInterval > 0 {
+		interval = time.Millisecond * time.Duration(c.networkConfig.CommandInterval)
 	}
 	counter := 0
 	for {
@@ -38,17 +38,18 @@ func (c *Client) ProcessSignCommands(ctx context.Context) {
 		if len(chainsWithPendingCmds) > 0 {
 			log.Info().Msgf("Found chains with pending command %v", chainsWithPendingCmds)
 			for _, chain := range chainsWithPendingCmds {
-				err := c.processSignCommandsForChain(ctx, chain)
-				if err != nil {
-					log.Error().Err(err).Msg("[ScalarClient] processSignCommandsForChain with error")
-				}
+				go func() {
+					err := c.processSignCommandsForChain(ctx, chain)
+					if err != nil {
+						log.Error().Err(err).Msg("[ScalarClient] processSignCommandsForChain with error")
+					}
+				}()
 			}
-		} else {
-			time.Sleep(interval)
-			if counter >= 100 {
-				log.Info().Msgf("No pending commands found. Sleep for %ds then retry.(This message is printed one of 100)", int64(interval.Seconds()))
-				counter = 0
-			}
+		}
+		time.Sleep(interval)
+		if counter >= 100 {
+			log.Info().Msgf("No pending commands found. Sleep for %ds then retry.(This message is printed one of 100)", int64(interval.Seconds()))
+			counter = 0
 		}
 	}
 }

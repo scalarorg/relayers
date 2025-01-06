@@ -118,6 +118,7 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, executeData 
 			Msg("[EvmClient] [handleScalarBatchCommandSigned] auth is nil")
 		return fmt.Errorf("[EvmClient] [handleScalarBatchCommandSigned] auth is nil")
 	}
+	//Todo: check if token is not yet deployed on the chain
 	signedTx, err := ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
 	if err != nil {
 		log.Error().Err(err).

@@ -37,6 +37,21 @@ func AbiUnpackIntoMap(v map[string]interface{}, data []byte, types ...byte) erro
 	}
 	return nil
 }
+
+func DecodeExecuteData(executeData string) (*DecodedExecuteData, error) {
+	executeDataBytes, err := hex.DecodeString(executeData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode execute data: %w", err)
+	}
+
+	//First 4 bytes are the function selector
+	input, err := AbiUnpack(executeDataBytes[4:], "bytes")
+	if err != nil {
+		log.Debug().Msgf("[EvmClient] [DecodeExecuteData] unpack executeData error: %v", err)
+	}
+	return DecodeInput(input[0].([]byte))
+}
+
 func DecodeInput(input []byte) (*DecodedExecuteData, error) {
 	args, err := AbiUnpack(input, "bytes", "bytes")
 	if err != nil {
@@ -87,16 +102,42 @@ func DecodeInput(input []byte) (*DecodedExecuteData, error) {
 		Signatures: signatures,
 	}, nil
 }
-func DecodeExecuteData(executeData string) (*DecodedExecuteData, error) {
-	executeDataBytes, err := hex.DecodeString(executeData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode execute data: %w", err)
-	}
 
-	//First 4 bytes are the function selector
-	input, err := AbiUnpack(executeDataBytes[4:], "bytes")
+func DecodeApproveContractCall(input []byte) (*ApproveContractCall, error) {
+	dataDecoded, err := AbiUnpack(input, "uint256", "bytes32[]", "string[]", "bytes[]")
 	if err != nil {
-		log.Debug().Msgf("[EvmClient] [DecodeExecuteData] unpack executeData error: %v", err)
+		return nil, fmt.Errorf("failed to unpack data: %w", err)
 	}
-	return DecodeInput(input[0].([]byte))
+	chainId := dataDecoded[0].(*big.Int)
+	commandIds := dataDecoded[1].([][32]byte)
+	commands := dataDecoded[2].([]string)
+	params := dataDecoded[3].([][]byte)
+
+	return &ApproveContractCall{
+		ChainId:    chainId.Uint64(),
+		CommandIds: commandIds,
+		Commands:   commands,
+		Params:     params,
+	}, nil
+}
+func DecodeDeployToken(input []byte) (*DeployToken, error) {
+	dataDecoded, err := AbiUnpack(input, "string", "string", "uint8", "uint256", "address", "uint256")
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack data: %w", err)
+	}
+	decimals := dataDecoded[2].(uint8)
+	cap := dataDecoded[3].(*big.Int)
+	mintLimit := dataDecoded[5].(*big.Int)
+	deployToken := DeployToken{
+		Name:         dataDecoded[0].(string),
+		Symbol:       dataDecoded[1].(string),
+		Decimals:     decimals,
+		Cap:          cap.Uint64(),
+		TokenAddress: dataDecoded[4].(common.Address),
+		MintLimit:    mintLimit.Uint64(),
+	}
+	log.Debug().
+		Any("DeployToken", deployToken).
+		Msg("[EvmClient] [DecodeDeployToken]")
+	return &deployToken, nil
 }

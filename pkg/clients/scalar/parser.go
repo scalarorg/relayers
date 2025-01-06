@@ -8,12 +8,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
 	_ "github.com/gogo/protobuf/gogoproto"
 	proto "github.com/gogo/protobuf/proto"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/scalar-core/x/chains/types"
-	"github.com/scalarorg/scalar-core/x/nexus/exported"
 	//gogoproto "google.golang.org/protobuf/proto"
 )
 
@@ -41,31 +39,31 @@ func DecodeIntArrayToHexString(input string) (string, error) {
 }
 
 func removeQuote(str string) string {
-	return strings.Trim(str, "\"'")
+	return strings.Trim(str, "\"")
 }
 
-func ParseEvent[T proto.Message](rawData map[string][]string, messages T) ([]T, error) {
-	msgName, values, err := parseTarget(rawData, messages)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse type: %T", reflect.TypeOf(messages))
-	}
-	log.Info().Str("MessageType", msgName).Msg("Successful parsed event")
-	// // Handle both struct and pointer cases
-	// if targetVal.Kind() != reflect.Struct && targetVal.Kind() != reflect.Ptr && targetVal.Elem().Kind() != reflect.Struct {
-	// 	return fmt.Errorf("target must be a struct or pointer to struct, got: %T", target)
-	// }
-	return values, nil
-}
+//	func ParseEvent[T proto.Message](rawData map[string][]string, messages T) ([]T, error) {
+//		msgName, values, err := parseTarget(rawData, messages)
+//		if err != nil {
+//			return nil, fmt.Errorf("failed to parse type: %T", reflect.TypeOf(messages))
+//		}
+//		log.Info().Str("MessageType", msgName).Msg("Successful parsed event")
+//		// // Handle both struct and pointer cases
+//		// if targetVal.Kind() != reflect.Struct && targetVal.Kind() != reflect.Ptr && targetVal.Elem().Kind() != reflect.Struct {
+//		// 	return fmt.Errorf("target must be a struct or pointer to struct, got: %T", target)
+//		// }
+//		return values, nil
+//	}
 func ParseIBCEvent[T proto.Message](rawData map[string][]string) ([]IBCEvent[T], error) {
 	jsonDatas := []map[string]string{}
 	var args T
 	msgType := reflect.TypeOf(args).Elem()
 	msg := reflect.New(msgType).Interface().(T)
 	msgName := proto.MessageName(msg)
-	nameLen := len(msgName) + 1
+	nameLen := len(msgName)
 	for key, values := range rawData {
-		if strings.HasPrefix(key, msgName) {
-			fieldName := key[nameLen:]
+		if strings.HasPrefix(key, msgName) && key[nameLen] == '.' {
+			fieldName := key[nameLen+1:]
 			for i, value := range values {
 				if len(jsonDatas) <= i {
 					jsonDatas = append(jsonDatas, map[string]string{})
@@ -78,13 +76,14 @@ func ParseIBCEvent[T proto.Message](rawData map[string][]string) ([]IBCEvent[T],
 	}
 	result := []IBCEvent[T]{}
 	for _, data := range jsonDatas {
-		instance := copyProtoMessage(msg)
-		err := bindValue(data, instance)
-
+		instance := copyMessage(msg)
+		log.Debug().Any("JsonData", data).Msgf("Try to parser to type %T", msg)
+		err := UnmarshalJson(data, instance)
 		if err != nil {
 			log.Error().Err(err).Any("JsonData", data).Msg("Cannot unmarshal message")
+		} else {
+			log.Debug().Any("Instance", instance).Msg("UnmarshalJson success")
 		}
-		// log.Info().Any("JsonData", data).Any("Instance", instance).Msg("BindValues")
 		args := instance.(T)
 		result = append(result, IBCEvent[T]{
 			Args: args,
@@ -92,6 +91,7 @@ func ParseIBCEvent[T proto.Message](rawData map[string][]string) ([]IBCEvent[T],
 	}
 	return result, nil
 }
+
 func parseTarget[T proto.Message](rawData map[string][]string, msg T) (string, []T, error) {
 	jsonDatas := []map[string]string{}
 	msgName := proto.MessageName(msg)
@@ -122,7 +122,7 @@ func parseTarget[T proto.Message](rawData map[string][]string, msg T) (string, [
 		// err = proto.Unmarshal(jsonData, instance)
 		//err = gogoproto.Unmarshal(jsonData, instance)
 		//err = json.Unmarshal(jsonData, instance)
-		instance := copyProtoMessage(msg)
+		instance := copyMessage(msg)
 		err := bindValue(data, instance)
 
 		if err != nil {
@@ -134,7 +134,7 @@ func parseTarget[T proto.Message](rawData map[string][]string, msg T) (string, [
 	return msgName, result, nil
 
 }
-func copyProtoMessage(inst proto.Message) proto.Message {
+func copyMessage(inst proto.Message) proto.Message {
 	typ := reflect.TypeOf(inst)
 	val := reflect.ValueOf(inst)
 
@@ -269,150 +269,159 @@ func parseByte(value string) (byte, error) {
 func ParseTokenSentEvent(event map[string][]string) ([]IBCEvent[*types.EventTokenSent], error) {
 	return nil, nil
 }
-func ParseDestCallApprovedEvent(event map[string][]string) ([]IBCEvent[*types.DestCallApproved], error) {
-	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] start parser")
-	key := EventTypeDestCallApproved
-	eventIds := event[key+".event_id"]
-	senders := event[key+".sender"]
-	sourceChains := event[key+".chain"]
-	destinationChains := event[key+".destination_chain"]
-	contractAddresses := event[key+".contract_address"]
-	commandIds := event[key+".command_id"]
-	payloadHashes := event[key+".payload_hash"]
-	srcChannels := event["write_acknowledgement.packet_src_channel"]
-	destChannels := event["write_acknowledgement.packet_dst_channel"]
-	events := make([]IBCEvent[*types.DestCallApproved], len(eventIds))
-	for ind, eventId := range eventIds {
-		eventID := removeQuote(eventId)
-		hash := strings.Split(eventID, "-")[0]
-		payloadHash, err := DecodeIntArrayToHexString(payloadHashes[ind])
-		if err != nil {
-			log.Warn().Msgf("Failed to decode payload hash: %v, error: %v", payloadHashes[ind], err)
-		}
-		commandIDHex, err := DecodeIntArrayToHexString(commandIds[ind])
-		if err != nil {
-			log.Warn().Msgf("Failed to decode command ID: %v, error: %v", commandIds[ind], err)
-		}
-		commandID, err := types.HexToCommandID(commandIDHex)
-		data := &types.DestCallApproved{
-			EventID:          types.EventID(eventID),
-			Sender:           removeQuote(senders[ind]),
-			Chain:            exported.ChainName(removeQuote(sourceChains[ind])),
-			DestinationChain: exported.ChainName(removeQuote(destinationChains[ind])),
-			ContractAddress:  removeQuote(contractAddresses[ind]),
-			//Payload:          "", //Payload will be get from RelayData.CallContract.Payload with filter by eventID
-			PayloadHash: types.Hash(common.HexToHash("0x" + payloadHash)),
-			CommandID:   commandID,
-		}
-		var srcChannel string
-		var destChannel string
-		if len(srcChannels) > ind {
-			srcChannel = srcChannels[ind]
-		}
-		if len(destChannels) > ind {
-			destChannel = destChannels[ind]
-		}
-		events[ind] = IBCEvent[*types.DestCallApproved]{
-			Hash:        hash,
-			SrcChannel:  srcChannel,
-			DestChannel: destChannel,
-			Args:        data,
-		}
-	}
-	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] parsed events: %v", events)
-	return events, nil
-}
+
+// func ParseDestCallApprovedEvent(event map[string][]string) ([]IBCEvent[*DestCallApproved], error) {
+// 	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] start parser")
+// 	key := EventTypeDestCallApproved
+// 	eventIds := event[key+".event_id"]
+// 	senders := event[key+".sender"]
+// 	sourceChains := event[key+".chain"]
+// 	destinationChains := event[key+".destination_chain"]
+// 	contractAddresses := event[key+".contract_address"]
+// 	commandIds := event[key+".command_id"]
+// 	payloadHashes := event[key+".payload_hash"]
+// 	srcChannels := event["write_acknowledgement.packet_src_channel"]
+// 	destChannels := event["write_acknowledgement.packet_dst_channel"]
+// 	events := make([]IBCEvent[*types.DestCallApproved], len(eventIds))
+// 	for ind, eventId := range eventIds {
+// 		eventID := removeQuote(eventId)
+// 		hash := strings.Split(eventID, "-")[0]
+// 		payloadHash, err := DecodeIntArrayToHexString(payloadHashes[ind])
+// 		if err != nil {
+// 			log.Warn().Msgf("Failed to decode payload hash: %v, error: %v", payloadHashes[ind], err)
+// 		}
+// 		commandIDHex, err := DecodeIntArrayToHexString(commandIds[ind])
+// 		if err != nil {
+// 			log.Warn().Msgf("Failed to decode command ID: %v, error: %v", commandIds[ind], err)
+// 		}
+// 		commandID, err := types.HexToCommandID(commandIDHex)
+// 		data := &types.DestCallApproved{
+// 			EventID:          types.EventID(eventID),
+// 			Sender:           removeQuote(senders[ind]),
+// 			Chain:            exported.ChainName(removeQuote(sourceChains[ind])),
+// 			DestinationChain: exported.ChainName(removeQuote(destinationChains[ind])),
+// 			ContractAddress:  removeQuote(contractAddresses[ind]),
+// 			//Payload:          "", //Payload will be get from RelayData.CallContract.Payload with filter by eventID
+// 			PayloadHash: types.Hash(common.HexToHash("0x" + payloadHash)),
+// 			CommandID:   commandID,
+// 		}
+// 		var srcChannel string
+// 		var destChannel string
+// 		if len(srcChannels) > ind {
+// 			srcChannel = srcChannels[ind]
+// 		}
+// 		if len(destChannels) > ind {
+// 			destChannel = destChannels[ind]
+// 		}
+// 		events[ind] = IBCEvent[*types.DestCallApproved]{
+// 			Hash:        hash,
+// 			SrcChannel:  srcChannel,
+// 			DestChannel: destChannel,
+// 			Args:        data,
+// 		}
+// 	}
+// 	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] parsed events: %v", events)
+// 	return events, nil
+// }
 
 func ParseSignCommandsEvent(event map[string][]string) ([]IBCEvent[SignCommands], error) {
 	log.Debug().Msgf("[ScalarClient] [ParseSignCommandsEvent] input event: %v", event)
 	events := make([]IBCEvent[SignCommands], 0)
 	return events, nil
 }
-func ParseEvmEventCompletedEvent(event map[string][]string) ([]IBCEvent[EVMEventCompleted], error) {
-	log.Debug().Msgf("[ScalarClient] [ParseEvmEventCompletedEvent] start parser")
-	eventIds := event[EventTypeEVMEventCompleted+".event_id"]
-	txHashs := event["tx.hash"]
-	srcChannels := event["write_acknowledgement.packet_src_channel"]
-	destChannels := event["write_acknowledgement.packet_dst_channel"]
-	events := make([]IBCEvent[EVMEventCompleted], len(eventIds))
-	for ind, eventId := range eventIds {
-		eventID := removeQuote(eventId)
-		args := EVMEventCompleted{
-			ID:      eventID,
-			Payload: "",
-		}
-		var srcChannel string
-		var destChannel string
-		if len(srcChannels) > ind {
-			srcChannel = srcChannels[ind]
-		}
-		if len(destChannels) > ind {
-			destChannel = destChannels[ind]
-		}
-		events[ind] = IBCEvent[EVMEventCompleted]{
-			Hash:        txHashs[ind],
-			SrcChannel:  srcChannel,
-			DestChannel: destChannel,
-			Args:        args,
-		}
-	}
-	log.Debug().Msgf("[ScalarClient] [ParseEvmEventCompletedEvent] parsed events: %v", events)
-	return events, nil
-}
+
+//	func ParseEvmEventCompletedEvent(event map[string][]string) ([]IBCEvent[EVMEventCompleted], error) {
+//		log.Debug().Msgf("[ScalarClient] [ParseEvmEventCompletedEvent] start parser")
+//		eventIds := event[EventTypeEVMEventCompleted+".event_id"]
+//		txHashs := event["tx.hash"]
+//		srcChannels := event["write_acknowledgement.packet_src_channel"]
+//		destChannels := event["write_acknowledgement.packet_dst_channel"]
+//		events := make([]IBCEvent[EVMEventCompleted], len(eventIds))
+//		for ind, eventId := range eventIds {
+//			eventID := removeQuote(eventId)
+//			chainEventCompleted := ChainEventCompleted {
+//				Chain: "",
+//				EventId: "",
+//				Type: ""
+//			}
+//			args := EVMEventCompleted{
+//				ChainEventCompleted: ,
+//				ID:      eventID,
+//				Payload: "",
+//			}
+//			var srcChannel string
+//			var destChannel string
+//			if len(srcChannels) > ind {
+//				srcChannel = srcChannels[ind]
+//			}
+//			if len(destChannels) > ind {
+//				destChannel = destChannels[ind]
+//			}
+//			events[ind] = IBCEvent[EVMEventCompleted]{
+//				Hash:        txHashs[ind],
+//				SrcChannel:  srcChannel,
+//				DestChannel: destChannel,
+//				Args:        args,
+//			}
+//		}
+//		log.Debug().Msgf("[ScalarClient] [ParseEvmEventCompletedEvent] parsed events: %v", events)
+//		return events, nil
+//	}
 func ParseAllNewBlockEvent(event map[string][]string) ([]IBCEvent[any], error) {
 	log.Debug().Msgf("[ScalarClient] [ParseAllNewBlockEvent] input event: %v", event)
 	return nil, nil
 }
-func ParseContractCallSubmittedEvent(event map[string][]string) ([]IBCEvent[ContractCallSubmitted], error) {
-	log.Debug().Msgf("[ScalarClient] Received ContractCallSubmitted event: %d", len(event))
-	key := "scalar.scalarnet.v1beta1.ContractCallSubmitted"
-	messageIDs := event[key+".message_id"]
-	txHashes := event["tx.hash"]
-	senders := event[key+".sender"]
-	sourceChains := event[key+".source_chain"]
-	destinationChains := event[key+".destination_chain"]
-	contractAddresses := event[key+".contract_address"]
-	payloads := event[key+".payload"]
-	payloadHashes := event[key+".payload_hash"]
-	srcChannels := event["write_acknowledgement.packet_src_channel"]
-	destChannels := event["write_acknowledgement.packet_dst_channel"]
-	events := make([]IBCEvent[ContractCallSubmitted], len(messageIDs))
-	for ind := range messageIDs {
-		payloadHash, err := DecodeIntArrayToHexString(payloadHashes[ind])
-		if err != nil {
-			log.Warn().Msgf("Failed to decode payload hash: %v, error: %v", payloadHashes[ind], err)
-		}
-		payload, err := DecodeIntArrayToBytes(payloads[ind])
-		if err != nil {
-			log.Warn().Msgf("Failed to decode payload: %v, error: %v", payloads[ind], err)
-		}
-		data := ContractCallSubmitted{
-			MessageID:        removeQuote(messageIDs[ind]),
-			Sender:           removeQuote(senders[ind]),
-			SourceChain:      removeQuote(sourceChains[ind]),
-			DestinationChain: removeQuote(destinationChains[ind]),
-			ContractAddress:  removeQuote(contractAddresses[ind]),
-			Payload:          hex.EncodeToString(payload),
-			PayloadHash:      "0x" + payloadHash,
-		}
-		var srcChannel string
-		var destChannel string
-		if len(srcChannels) > ind {
-			srcChannel = srcChannels[ind]
-		}
-		if len(destChannels) > ind {
-			destChannel = destChannels[ind]
-		}
-		events[ind] = IBCEvent[ContractCallSubmitted]{
-			Hash:        txHashes[ind],
-			SrcChannel:  srcChannel,
-			DestChannel: destChannel,
-			Args:        data,
-		}
-	}
-	log.Debug().Msgf("[ScalarClient] Parsed ContractCallSubmitted events: %v", events)
-	return events, nil
-}
+
+// func ParseContractCallSubmittedEvent(event map[string][]string) ([]IBCEvent[ContractCallSubmitted], error) {
+// 	log.Debug().Msgf("[ScalarClient] Received ContractCallSubmitted event: %d", len(event))
+// 	key := "scalar.scalarnet.v1beta1.ContractCallSubmitted"
+// 	messageIDs := event[key+".message_id"]
+// 	txHashes := event["tx.hash"]
+// 	senders := event[key+".sender"]
+// 	sourceChains := event[key+".source_chain"]
+// 	destinationChains := event[key+".destination_chain"]
+// 	contractAddresses := event[key+".contract_address"]
+// 	payloads := event[key+".payload"]
+// 	payloadHashes := event[key+".payload_hash"]
+// 	srcChannels := event["write_acknowledgement.packet_src_channel"]
+// 	destChannels := event["write_acknowledgement.packet_dst_channel"]
+// 	events := make([]IBCEvent[ContractCallSubmitted], len(messageIDs))
+// 	for ind := range messageIDs {
+// 		payloadHash, err := DecodeIntArrayToHexString(payloadHashes[ind])
+// 		if err != nil {
+// 			log.Warn().Msgf("Failed to decode payload hash: %v, error: %v", payloadHashes[ind], err)
+// 		}
+// 		payload, err := DecodeIntArrayToBytes(payloads[ind])
+// 		if err != nil {
+// 			log.Warn().Msgf("Failed to decode payload: %v, error: %v", payloads[ind], err)
+// 		}
+// 		data := ContractCallSubmitted{
+// 			MessageID:        removeQuote(messageIDs[ind]),
+// 			Sender:           removeQuote(senders[ind]),
+// 			SourceChain:      removeQuote(sourceChains[ind]),
+// 			DestinationChain: removeQuote(destinationChains[ind]),
+// 			ContractAddress:  removeQuote(contractAddresses[ind]),
+// 			Payload:          hex.EncodeToString(payload),
+// 			PayloadHash:      "0x" + payloadHash,
+// 		}
+// 		var srcChannel string
+// 		var destChannel string
+// 		if len(srcChannels) > ind {
+// 			srcChannel = srcChannels[ind]
+// 		}
+// 		if len(destChannels) > ind {
+// 			destChannel = destChannels[ind]
+// 		}
+// 		events[ind] = IBCEvent[ContractCallSubmitted]{
+// 			Hash:        txHashes[ind],
+// 			SrcChannel:  srcChannel,
+// 			DestChannel: destChannel,
+// 			Args:        data,
+// 		}
+// 	}
+// 	log.Debug().Msgf("[ScalarClient] Parsed ContractCallSubmitted events: %v", events)
+// 	return events, nil
+// }
 
 func ParseContractCallWithTokenSubmittedEvent(event map[string][]string) ([]IBCEvent[ContractCallWithTokenSubmitted], error) {
 	log.Debug().Msgf("[ScalarClient] Received ContractCallWithTokenSubmitted event: %d", len(event))
