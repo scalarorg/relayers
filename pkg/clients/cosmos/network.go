@@ -16,6 +16,7 @@ import (
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	"github.com/rs/zerolog/log"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	"github.com/scalarorg/scalar-core/x/nexus/exported"
 	scalarnettypes "github.com/scalarorg/scalar-core/x/scalarnet/types"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
@@ -162,6 +163,21 @@ func (c *NetworkClient) ConfirmEvmTx(ctx context.Context, msg *chainstypes.Confi
 	return c.SignAndBroadcastMsgs(ctx, msg)
 }
 
+func (c *NetworkClient) SignBtcCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
+	//Todo: Form psbt
+	var psbt covtypes.Psbt
+	req := chainstypes.NewSignBTCCommandsRequest(
+		c.GetAddress(),
+		destinationChain,
+		psbt)
+
+	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("[NetworkClient] [SignCommandsRequest] %w", err)
+	}
+	return txRes, nil
+}
+
 func (c *NetworkClient) SignCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
 	req := chainstypes.NewSignCommandsRequest(
 		c.GetAddress(),
@@ -176,7 +192,14 @@ func (c *NetworkClient) SignCommandsRequest(ctx context.Context, destinationChai
 func (c *NetworkClient) SignCommandsRequests(ctx context.Context, destinationChains []string) (*sdk.TxResponse, error) {
 	requests := []sdk.Msg{}
 	for _, chain := range destinationChains {
-		requests = append(requests, chainstypes.NewSignCommandsRequest(c.GetAddress(), chain))
+		chainName := exported.ChainName(chain)
+		if chainstypes.IsEvmChain(chainName) {
+			requests = append(requests, chainstypes.NewSignCommandsRequest(c.GetAddress(), chain))
+		} else if chainstypes.IsBitcoinChain(chainName) {
+			//Todo: Form psbt
+			var psbt covtypes.Psbt
+			requests = append(requests, chainstypes.NewSignBTCCommandsRequest(c.GetAddress(), chain, psbt))
+		}
 	}
 	txRes, err := c.SignAndBroadcastMsgs(ctx, requests...)
 	if err != nil {

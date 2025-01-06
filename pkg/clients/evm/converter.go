@@ -50,6 +50,35 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IScalarGatewayC
 	return relayData, nil
 }
 
+func (c *EvmClient) ContractCallWithToken2RelayData(event *contracts.IScalarGatewayContractCallWithToken) (models.RelayData, error) {
+	id := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
+	senderAddress := event.Sender.String()
+	callContract := models.CallContract{
+		ID:          id,
+		TxHash:      event.Raw.TxHash.String(),
+		BlockNumber: event.Raw.BlockNumber,
+		LogIndex:    event.Raw.Index,
+		//3 follows field are used for query to get back payload, so need to convert to lower case
+		ContractAddress: strings.ToLower(event.DestinationContractAddress),
+		SourceAddress:   strings.ToLower(senderAddress),
+		PayloadHash:     strings.ToLower(hex.EncodeToString(event.PayloadHash[:])),
+		Payload:         event.Payload,
+		//Use for bitcoin vault tx only
+		StakerPublicKey: nil,
+		Symbol:          event.Symbol,
+	}
+	relayData := models.RelayData{
+		ID:   id,
+		From: c.evmConfig.GetId(),
+		To:   event.DestinationChain,
+		CallContractWithToken: &models.CallContractWithToken{
+			CallContract: callContract,
+			Amount:       event.Amount.Uint64(),
+		},
+	}
+	return relayData, nil
+}
+
 func (c *EvmClient) TokenSentEvent2RelayData(event *contracts.IScalarGatewayTokenSent) (models.RelayData, error) {
 	id := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
 	senderAddress := event.Sender.String()
