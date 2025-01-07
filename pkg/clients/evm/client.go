@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
@@ -25,22 +24,17 @@ import (
 )
 
 type EvmClient struct {
-	globalConfig             *config.Config
-	evmConfig                *EvmNetworkConfig
-	Client                   *ethclient.Client
-	ChainName                string
-	GatewayAddress           common.Address
-	Gateway                  *contracts.IScalarGateway
-	auth                     *bind.TransactOpts
-	dbAdapter                *db.DatabaseAdapter
-	eventBus                 *events.EventBus
-	pendingTxs               pending.PendingTxs //Transactions sent to Gateway for approval, waiting for event from EVM chain.
-	retryInterval            time.Duration
-	subContractCall          event.Subscription
-	subContractCallWithToken event.Subscription
-	subContractCallApproved  event.Subscription
-	subExecuted              event.Subscription
-	subTokenSent             event.Subscription
+	globalConfig   *config.Config
+	evmConfig      *EvmNetworkConfig
+	Client         *ethclient.Client
+	ChainName      string
+	GatewayAddress common.Address
+	Gateway        *contracts.IScalarGateway
+	auth           *bind.TransactOpts
+	dbAdapter      *db.DatabaseAdapter
+	eventBus       *events.EventBus
+	pendingTxs     pending.PendingTxs //Transactions sent to Gateway for approval, waiting for event from EVM chain.
+	retryInterval  time.Duration
 }
 
 // This function is used to adjust the rpc url to the ws prefix
@@ -377,28 +371,22 @@ func GetMissingEvents[T ValidEvmEvent](c *EvmClient, eventName string, lastCheck
 
 func (c *EvmClient) ListenToEvents(ctx context.Context) error {
 	var err error
-	//Watch for new TokenSent events in one go routine
-	if c.subTokenSent, err = watchForEvent(c, ctx, events.EVENT_EVM_TOKEN_SENT); err != nil {
-		return fmt.Errorf("failed to watch for event: %w", err)
-	}
-	//Watch for new ContractCallWithToken events in one go routine
-	if c.subContractCallWithToken, err = watchForEvent(c, ctx, events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN); err != nil {
-		return fmt.Errorf("failed to watch for event: %w", err)
-	}
-	//Watch for new ContractCall events in one go routine
-	if c.subContractCall, err = watchForEvent(c, ctx, events.EVENT_EVM_CONTRACT_CALL); err != nil {
-		return fmt.Errorf("failed to watch for event: %w", err)
-	}
-	//Watch for new ContractCallApproved events in one go routine
-	if c.subContractCallApproved, err = watchForEvent(c, ctx, events.EVENT_EVM_CONTRACT_CALL_APPROVED); err != nil {
-		return fmt.Errorf("failed to watch for event: %w", err)
-	}
-	//Watch for new Executed events in one go routine
-	if c.subExecuted, err = watchForEvent(c, ctx, events.EVENT_EVM_COMMAND_EXECUTED); err != nil {
-		return fmt.Errorf("failed to watch for event: %w", err)
-	}
-
 	c.retryInterval = RETRY_INTERVAL
+	//Watch for new TokenSent events in one go routine
+	events := []string{
+		events.EVENT_EVM_TOKEN_SENT,
+		events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN,
+		events.EVENT_EVM_CONTRACT_CALL,
+		events.EVENT_EVM_CONTRACT_CALL_APPROVED,
+		events.EVENT_EVM_COMMAND_EXECUTED,
+	}
+	for _, eventName := range events {
+		go func() {
+			if err = watchForEvent(c, ctx, eventName); err != nil {
+				log.Error().Err(err).Msgf("[EvmClient] [ListenToEvents] failed to watch for event: %s", eventName)
+			}
+		}()
+	}
 	//Wait for context cancel
 	<-ctx.Done()
 	return nil
@@ -417,7 +405,7 @@ func (c *EvmClient) handleEvent(event any) error {
 	}
 	return nil
 }
-func watchForEvent(c *EvmClient, ctx context.Context, eventName string) (event.Subscription, error) {
+func watchForEvent(c *EvmClient, ctx context.Context, eventName string) error {
 	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.evmConfig.GetId(), eventName)
 	if err != nil {
 		log.Warn().Str("chainId", c.evmConfig.GetId()).
@@ -438,120 +426,116 @@ func watchForEvent(c *EvmClient, ctx context.Context, eventName string) (event.S
 	case events.EVENT_EVM_TOKEN_SENT:
 		return c.watchEVMTokenSent(&watchOpts)
 	}
-	return nil, nil
+	return nil
 }
-func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) (event.Subscription, error) {
+func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) error {
 	sink := make(chan *contracts.IScalarGatewayContractCall)
 	errorCh := make(chan error)
 	subscription, err := c.Gateway.WatchContractCall(watchOpts, sink, nil, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	defer subscription.Unsubscribe()
 	log.Info().Msgf("[EvmClient] [watchContractCall] success. Listening to ContractCallEvent")
-	go func() {
-		// timeout := time.After(30 * time.Minute)
-		for {
-			select {
-			case err := <-errorCh:
-				log.Error().Msgf("Failed to watch ContractCallEvent: %v", err)
-			case event := <-sink:
-				log.Info().Msg("[EvmClient] [watchContractCall] receved contract call")
-				err := c.handleContractCall(event)
-				if err != nil {
-					log.Error().Msgf("Failed to handle ContractCallEvent: %v", err)
-				}
-			// case <-timeout:
-			// 	log.Error().Msgf("[EvmClient] [watchContractCall] timeout")
-			// 	return
-			case <-watchOpts.Context.Done():
-				log.Info().Msgf("[EvmClient] [watchContractCall] context done")
-				return
+	// timeout := time.After(30 * time.Minute)
+	done := false
+	for !done {
+		select {
+		case err := <-errorCh:
+			log.Error().Msgf("Failed to watch ContractCallEvent: %v", err)
+		case event := <-sink:
+			log.Info().Msg("[EvmClient] [watchContractCall] received event")
+			err := c.handleContractCall(event)
+			if err != nil {
+				log.Error().Msgf("Failed to handle ContractCallEvent: %v", err)
 			}
+		// case <-timeout:
+		// 	log.Error().Msgf("[EvmClient] [watchContractCall] timeout")
+		// 	return
+		case <-watchOpts.Context.Done():
+			log.Info().Msgf("[EvmClient] [watchContractCall] context done")
+			done = true
 		}
-	}()
-	return subscription, nil
+	}
+	return nil
 }
-func (c *EvmClient) watchContractCallWithToken(watchOpts *bind.WatchOpts) (event.Subscription, error) {
+func (c *EvmClient) watchContractCallWithToken(watchOpts *bind.WatchOpts) error {
 	sink := make(chan *contracts.IScalarGatewayContractCallWithToken)
 	errorCh := make(chan error)
 	subscription, err := c.Gateway.WatchContractCallWithToken(watchOpts, sink, nil, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	log.Info().Msgf("[EvmClient] [watchContractCall] success. Listening to ContractCallEvent")
-	go func() {
-		// timeout := time.After(30 * time.Minute)
-		for {
-			select {
-			case err := <-errorCh:
-				log.Error().Msgf("Failed to watch ContractCallEvent: %v", err)
-			case event := <-sink:
-				log.Info().Msg("[EvmClient] [watchContractCall] receved contract call")
-				err := c.handleContractCallWithToken(event)
-				if err != nil {
-					log.Error().Msgf("Failed to handle ContractCallEvent: %v", err)
-				}
-			// case <-timeout:
-			// 	log.Error().Msgf("[EvmClient] [watchContractCall] timeout")
-			// 	return
-			case <-watchOpts.Context.Done():
-				log.Info().Msgf("[EvmClient] [watchContractCall] context done")
-				return
+	defer subscription.Unsubscribe()
+	log.Info().Msgf("[EvmClient] [watchContractCallWithToken] success. Listening to ContractCallWithTokenEvent")
+	// timeout := time.After(30 * time.Minute)
+	done := false
+	for !done {
+		select {
+		case err := <-errorCh:
+			log.Error().Msgf("Failed to watch ContractCallWithTokenEvent: %v", err)
+		case event := <-sink:
+			log.Info().Msg("[EvmClient] [watchContractCallWithToken] received event")
+			err := c.handleContractCallWithToken(event)
+			if err != nil {
+				log.Error().Msgf("Failed to handle ContractCallWithTokenEvent: %v", err)
 			}
+		// case <-timeout:
+		// 	log.Error().Msgf("[EvmClient] [watchContractCall] timeout")
+		// 	return
+		case <-watchOpts.Context.Done():
+			log.Info().Msgf("[EvmClient] [watchContractCallWithToken] context done")
+			done = true
 		}
-	}()
-	return subscription, nil
+	}
+	return nil
 }
-func (c *EvmClient) watchContractCallApproved(watchOpts *bind.WatchOpts) (event.Subscription, error) {
+func (c *EvmClient) watchContractCallApproved(watchOpts *bind.WatchOpts) error {
 	sink := make(chan *contracts.IScalarGatewayContractCallApproved)
 	subscription, err := c.Gateway.WatchContractCallApproved(watchOpts, sink, nil, nil, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	defer subscription.Unsubscribe()
 	log.Info().Msgf("[EvmClient] [watchContractCallApproved] success. Listening to ContractCallApprovedEvent")
-	go func() {
-		for event := range sink {
-			log.Info().Any("event", event).Msg("[EvmClient] [ContractCallApprovedHandler]")
-			c.HandleContractCallApproved(event)
-		}
-
-	}()
-	return subscription, nil
+	for event := range sink {
+		log.Info().Any("event", event).Msg("[EvmClient] [ContractCallApprovedHandler]")
+		c.HandleContractCallApproved(event)
+	}
+	return nil
 }
 
-func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) (event.Subscription, error) {
+func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) error {
 	sink := make(chan *contracts.IScalarGatewayExecuted)
 	subscription, err := c.Gateway.WatchExecuted(watchOpts, sink, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	defer subscription.Unsubscribe()
 	log.Info().Msgf("[EvmClient] [watchEVMExecuted] success. Listening to ExecutedEvent")
-	go func() {
-		for event := range sink {
-			log.Info().Any("event", event).Msgf("EvmClient] [ExecutedHandler]")
-			c.HandleCommandExecuted(event)
-		}
-	}()
-	return subscription, nil
+	for event := range sink {
+		log.Info().Any("event", event).Msgf("EvmClient] [ExecutedHandler]")
+		c.HandleCommandExecuted(event)
+	}
+	return nil
 }
-func (c *EvmClient) watchEVMTokenSent(watchOpts *bind.WatchOpts) (event.Subscription, error) {
+func (c *EvmClient) watchEVMTokenSent(watchOpts *bind.WatchOpts) error {
 	sink := make(chan *contracts.IScalarGatewayTokenSent)
 	subscription, err := c.Gateway.WatchTokenSent(watchOpts, sink, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	defer subscription.Unsubscribe()
 	log.Info().Msgf("[EvmClient] [watchEVMTokenSent] success. Listening to TokenSent")
-	go func() {
-		for event := range sink {
-			err := c.HandleTokenSent(event)
-			if err != nil {
-				log.Debug().Err(err).Msgf("[EvmClient] [watchEVMTokenSent] with error.")
-			} else {
-				log.Info().Any("event", event).Msgf("EvmClient] [watchEVMTokenSent]")
-			}
+	for event := range sink {
+		err := c.HandleTokenSent(event)
+		if err != nil {
+			log.Debug().Err(err).Msgf("[EvmClient] [watchEVMTokenSent] with error.")
+		} else {
+			log.Info().Any("event", event).Msgf("EvmClient] [watchEVMTokenSent]")
 		}
-	}()
-	return subscription, nil
+	}
+	return nil
 }
 func (c *EvmClient) subscribeEventBus() {
 	if c.eventBus != nil {
@@ -568,23 +552,4 @@ func (c *EvmClient) subscribeEventBus() {
 	} else {
 		log.Warn().Msgf("[EvmClient] [subscribeEventBus] event bus is not set")
 	}
-}
-
-func (c *EvmClient) Stop() {
-	if c.subContractCall != nil {
-		c.subContractCall.Unsubscribe()
-	}
-	if c.subContractCallWithToken != nil {
-		c.subContractCallWithToken.Unsubscribe()
-	}
-	if c.subContractCallApproved != nil {
-		c.subContractCallApproved.Unsubscribe()
-	}
-	if c.subExecuted != nil {
-		c.subExecuted.Unsubscribe()
-	}
-	if c.subTokenSent != nil {
-		c.subTokenSent.Unsubscribe()
-	}
-	c.Client.Close()
 }

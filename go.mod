@@ -12,8 +12,8 @@ require (
 	github.com/gogo/protobuf v1.3.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/rs/zerolog v1.33.0
-	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20241211074929-89c4badcd3e2
-	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241228164455-79a63389d412
+	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250107104524-6c675765e3b0
+	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250107104524-6c675765e3b0
 	github.com/scalarorg/go-electrum v0.1.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
