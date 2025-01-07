@@ -32,13 +32,13 @@ var (
 	"proposer_reward.validator":["scalarvaloper105wsknjutftqksqtugr83avrlsxdz0tvc96yhk"],
 	"rewards.amount":["9281250135956132777.300000000000000000ascal","92070001348684837093.272249157071976780ascal","51789375758635220897.334000000000000000ascal","23017500337171209230.160249157071976780ascal","5754375084292802264.382249157071976780ascal"],
 	"rewards.validator":["scalarvaloper105wsknjutftqksqtugr83avrlsxdz0tvc96yhk","scalarvaloper105wsknjutftqksqtugr83avrlsxdz0tvc96yhk","scalarvaloper1tc9q2ngj29kllv4kfrqjh6gj4hrsp6p35zpyep","scalarvaloper1qyhnraq6dwpl69heem9qd4phrd946lct6xdgqg","scalarvaloper1u8ennvwsshneu4nvec38e3jvcxmppf7lfq3pf5"],
-	"scalar.chains.v1beta1.DestCallApproved.chain":["\"evm|11155111\""],
-	"scalar.chains.v1beta1.DestCallApproved.command_id":["[216,24,192,178,234,134,203,174,53,152,189,26,210,97,212,0,37,25,215,39,92,169,55,110,150,157,109,194,170,153,170,16]"],
-	"scalar.chains.v1beta1.DestCallApproved.contract_address":["\"0x0000000000000000000000000000000000000000\""],
-	"scalar.chains.v1beta1.DestCallApproved.destination_chain":["\"bitcoin|4\""],
-	"scalar.chains.v1beta1.DestCallApproved.event_id":["\"0xcabc3140a564038f9f76e9d692309ea8d5be7d5a8a2133b97bf0579a73cfbb37-288\""],
-	"scalar.chains.v1beta1.DestCallApproved.payload_hash":["[163,161,152,24,44,45,10,135,85,128,20,128,254,13,202,225,73,27,188,103,173,247,208,12,183,71,67,208,196,81,7,170]"],
-	"scalar.chains.v1beta1.DestCallApproved.sender":["\"0x982321eb5693cdbAadFfe97056BEce07D09Ba49f\""],
+	"scalar.chains.v1beta1.ContractCallApproved.chain":["\"evm|11155111\""],
+	"scalar.chains.v1beta1.ContractCallApproved.command_id":["[216,24,192,178,234,134,203,174,53,152,189,26,210,97,212,0,37,25,215,39,92,169,55,110,150,157,109,194,170,153,170,16]"],
+	"scalar.chains.v1beta1.ContractCallApproved.contract_address":["\"0x0000000000000000000000000000000000000000\""],
+	"scalar.chains.v1beta1.ContractCallApproved.destination_chain":["\"bitcoin|4\""],
+	"scalar.chains.v1beta1.ContractCallApproved.event_id":["\"0xcabc3140a564038f9f76e9d692309ea8d5be7d5a8a2133b97bf0579a73cfbb37-288\""],
+	"scalar.chains.v1beta1.ContractCallApproved.payload_hash":["[163,161,152,24,44,45,10,135,85,128,20,128,254,13,202,225,73,27,188,103,173,247,208,12,183,71,67,208,196,81,7,170]"],
+	"scalar.chains.v1beta1.ContractCallApproved.sender":["\"0x982321eb5693cdbAadFfe97056BEce07D09Ba49f\""],
 	"scalar.nexus.v1beta1.MessageExecuted.destination_chain":["\"bitcoin|4\""],
 	"scalar.nexus.v1beta1.MessageExecuted.id":["\"0xcabc3140a564038f9f76e9d692309ea8d5be7d5a8a2133b97bf0579a73cfbb37-288\""],
 	"scalar.nexus.v1beta1.MessageExecuted.source_chain":["\"evm|11155111\""],
@@ -115,17 +115,17 @@ func TestParseTokenSent(t *testing.T) {
 	t.Logf("Parsed event %v\n", tokenSent)
 }
 
-func TestParseDestCallApprovedEvent(t *testing.T) {
+func TestParseContractCallApprovedEvent(t *testing.T) {
 	// Map to hold the raw JSON
 	var rawMap map[string][]string
 	if err := json.Unmarshal([]byte(jsonData), &rawMap); err != nil {
 		log.Fatalf("Error unmarshalling to map: %v", err)
 	}
-	event := types.DestCallApproved{}
+	event := types.ContractCallApproved{}
 	msgName := proto.MessageName(&event)
-	assert.Equal(t, "scalar.chains.v1beta1.DestCallApproved", msgName)
+	assert.Equal(t, "scalar.chains.v1beta1.ContractCallApproved", msgName)
 	// targets := map[string]reflect.Type{"": }
-	events, err := scalar.ParseIBCEvent[*types.DestCallApproved](rawMap)
+	events, err := scalar.ParseIBCEvent[*types.ContractCallApproved](rawMap)
 	assert.NoError(t, err)
 	fmt.Printf("Events %v\n", events)
 	//fmt.Printf("Raw Map %v:", rawMap)
@@ -138,7 +138,7 @@ func TestParseIBCEvent(t *testing.T) {
 		log.Fatalf("Error unmarshalling to map: %v", err)
 	}
 	fmt.Printf("Raw Map %v:", rawMap)
-	// event := types.DestCallApproved
+	// event := types.ContractCallApproved
 	// msgName := proto.MessageName(&event)
 	// fmt.Printf("%s", msgName)
 	// targets := map[string]reflect.Type{"": }

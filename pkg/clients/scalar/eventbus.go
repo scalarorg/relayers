@@ -12,22 +12,18 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 	switch event.EventType {
 	case events.EVENT_ELECTRS_VAULT_TRANSACTION:
 		//Broadcast from electrs.handleVaultTransaction
-		return c.handleElectrsVaultTransaction(event.Data.(events.ConfirmTxsRequest))
-	case events.EVENT_EVM_CONTRACT_CALL:
-		//Broadcast from evm.handleContractCall
-		return c.requestConfirmTxs(event.Data.(events.ConfirmTxsRequest))
-	case events.EVENT_EVM_TOKEN_SENT:
-		//Broadcast from evm.handleTokenSent
-		return c.requestConfirmTxs(event.Data.(events.ConfirmTxsRequest))
+		return c.requestConfirmBtcTxs(event.Data.(events.ConfirmTxsRequest))
+	case events.EVENT_EVM_TOKEN_SENT, events.EVENT_EVM_CONTRACT_CALL, events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN:
+		return c.requestConfirmEvmTxs(event.Data.(events.ConfirmTxsRequest))
 	}
 
 	return nil
 }
 
-func (c *Client) handleElectrsVaultTransaction(confirmRequest events.ConfirmTxsRequest) error {
+func (c *Client) requestConfirmBtcTxs(confirmRequest events.ConfirmTxsRequest) error {
 	sourceChain, txHashes := c.extractValidConfirmTxs(confirmRequest)
 	if len(txHashes) > 0 {
-		_, err := c.ConfirmTxs(context.Background(), sourceChain, txHashes)
+		_, err := c.ConfirmBtcTxs(context.Background(), sourceChain, txHashes)
 		if err != nil {
 			log.Error().Err(err).Msg("[ScalarClient] [handleElectrsVaultTransaction] error confirming txs")
 			return err
@@ -38,10 +34,10 @@ func (c *Client) handleElectrsVaultTransaction(confirmRequest events.ConfirmTxsR
 	return nil
 }
 
-func (c *Client) requestConfirmTxs(confirmRequest events.ConfirmTxsRequest) error {
+func (c *Client) requestConfirmEvmTxs(confirmRequest events.ConfirmTxsRequest) error {
 	sourceChain, txHashes := c.extractValidConfirmTxs(confirmRequest)
 	if len(txHashes) > 0 {
-		_, err := c.ConfirmTxs(context.Background(), sourceChain, txHashes)
+		_, err := c.ConfirmEvmTxs(context.Background(), sourceChain, txHashes)
 		if err != nil {
 			log.Error().Err(err).Msg("[ScalarClient] [handleEvmContractCall] error confirming txs")
 			return err

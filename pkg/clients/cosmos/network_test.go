@@ -70,15 +70,15 @@ func TestMain(m *testing.M) {
 	networkClient, err = cosmos.NewNetworkClient(&DefaultNetworkConfig, queryClient, txConfig)
 	os.Exit(m.Run())
 }
-func TestSubscribeDestCallApprovedEvent(t *testing.T) {
+func TestSubscribeContractCallApprovedEvent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, networkClient)
 	_, err = networkClient.Start()
 	require.NoError(t, err)
 	//queryNewBlockHeader := "tm.event='NewBlockHeader'"
-	queryDestCallApproved := scalar.DestCallApprovedEventTopicId
+	queryContractCallApproved := scalar.ContractCallApprovedEventTopicId
 	//queryEventCompleted := "tm.event='NewBlock' AND scalar.chains.v1beta1.EVMEventCompleted.event_id EXISTS"
-	ch, err := networkClient.Subscribe(context.Background(), "test", queryDestCallApproved)
+	ch, err := networkClient.Subscribe(context.Background(), "test", queryContractCallApproved)
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	go func() {

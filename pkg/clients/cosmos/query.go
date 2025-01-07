@@ -29,6 +29,7 @@ func NewQueryClient(clientCtx *client.Context) *QueryClient {
 }
 
 func (c *QueryClient) GetClientCtx() (*client.Context, error) {
+	//Lazily create clientCtx based on Client pointer
 	if c.clientCtx.NodeURI != "" && c.clientCtx.Client == nil {
 		rpcClient, err := client.NewClientFromNode(c.clientCtx.NodeURI)
 		if err != nil {

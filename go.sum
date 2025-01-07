@@ -1458,8 +1458,12 @@ github.com/sasha-s/go-deadlock v0.3.5 h1:tNCOEEDG6tBqrNDOX35j/7hL5FcFViG6awUGROb
 github.com/sasha-s/go-deadlock v0.3.5/go.mod h1:bugP6EGbdGYObIlx7pUZtWqlvo8k9H6vCBBsiChJQ5U=
 github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20241211074929-89c4badcd3e2 h1:GfrTYpb9IOGCibd/pAkk67968iEZBIbPfM9h7+LNSn4=
 github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20241211074929-89c4badcd3e2/go.mod h1:Gi0l7q1oxP+d0JYCoJTqm4UZM52gA33jNqe7Ghmyzok=
+github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250107104524-6c675765e3b0 h1:aaqvRpbYbOu2PpUzKp4SlwIkpa1fkU8MHBvWZPqnpeQ=
+github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250107104524-6c675765e3b0/go.mod h1:Gi0l7q1oxP+d0JYCoJTqm4UZM52gA33jNqe7Ghmyzok=
 github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241228164455-79a63389d412 h1:63hkRLX3Dj9SSx+oMeH/pha+I909gB/rI+lT4+AxOvw=
 github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20241228164455-79a63389d412/go.mod h1:LG6gpTio0/hxYdoi4WSeQm1ywfXx5uhMD5Bi9cMWih0=
+github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250107104524-6c675765e3b0 h1:HlTctsTc+i2D41lk73/fFtewMO9ldVPAPvjAuWjQj5Y=
+github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250107104524-6c675765e3b0/go.mod h1:LG6gpTio0/hxYdoi4WSeQm1ywfXx5uhMD5Bi9cMWih0=
 github.com/scalarorg/go-electrum v0.1.1 h1:ANqnV6xQKI/Bw1pNZlbgyjdsN54vJcDee2/wPxTstRY=
 github.com/scalarorg/go-electrum v0.1.1/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20241231235718-ec1a2eb4cbb2 h1:T05zpLJuoPnbpJnMWCtDgqXX+jtJziZvpu0NjqvBrm0=
@@ -1468,6 +1472,8 @@ github.com/scalarorg/scalar-core v0.0.1-staking.0.20250105095623-e2a09e74c43c h1
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250105095623-e2a09e74c43c/go.mod h1:1QJEQ7d6aOdiAm4dauUwHKTTuzRQCqqJRpdhNpVD3/E=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250106020336-b25ac241e483 h1:Bh5FHOvL2P2/EswTCaptcqp0E0BjdSpR+s6pRujJ6oU=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250106020336-b25ac241e483/go.mod h1:1QJEQ7d6aOdiAm4dauUwHKTTuzRQCqqJRpdhNpVD3/E=
+github.com/scalarorg/scalar-core v0.0.1-staking.0.20250107012525-dcf1036a148d h1:+brfYOFU2XwZ5NCv0eXG0ceoOXwwzIVBiovnrbxrQtQ=
+github.com/scalarorg/scalar-core v0.0.1-staking.0.20250107012525-dcf1036a148d/go.mod h1:1QJEQ7d6aOdiAm4dauUwHKTTuzRQCqqJRpdhNpVD3/E=
 github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible h1:Bn1aCHHRnjv4Bl16T8rcaFjYSrGrIZvpiGO6P3Q4GpU=
 github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible/go.mod h1:5b4v6he4MtMOwMlS0TUMTu2PcXUg8+E1lC7eC3UO/RA=
 github.com/shirou/gopsutil/v3 v3.23.12 h1:z90NtUkp3bMtmICZKpC4+WaknU1eXtp5vtbQ11DgpE4=

@@ -14,7 +14,6 @@ import (
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/scalar-core/utils"
-	"github.com/scalarorg/scalar-core/x/chains/types"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	nexus "github.com/scalarorg/scalar-core/x/nexus/exported"
 
@@ -114,8 +113,8 @@ func (c *Client) Start(ctx context.Context) error {
 		}
 	}()
 	go func() {
-		log.Info().Msg("[ScalarClient] Start ProcessSignCommands process")
-		c.ProcessSignCommands(ctx)
+		log.Info().Msg("[ScalarClient] Start ProcessPendingCommands process")
+		c.ProcessPendingCommands(ctx)
 	}()
 	go func() {
 		c.subscribeWithHeatBeat(ctx)
@@ -152,15 +151,19 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 			log.Error().Msgf("[ScalarClient] [subscribeMintCommand] error: %v", err)
 		}
 
-		err = subscribeDestCallApprovedEvent(cancelCtx, c.network, c.handleDestCallApprovedEvents)
+		err = subscribeContractCallWithTokenApprovedEvent(cancelCtx, c.network, c.handleContractCallWithTokenApprovedEvents)
 		if err != nil {
-			log.Error().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] error: %v", err)
+			log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
 		}
-		// Todo: findout if this event is emitted by the ScalarNetwork
-		// err = subscribeSignCommandsEvent(cancelCtx, c.network, c.handleSignCommandsEvents)
-		// if err != nil {
-		// 	log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
-		// }
+
+		err = subscribeContractCallApprovedEvent(cancelCtx, c.network, c.handleContractCallApprovedEvents)
+		if err != nil {
+			log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
+		}
+		err = subscribeCommandBatchSignedEvent(cancelCtx, c.network, c.handleCommandBatchSignedEvent)
+		if err != nil {
+			log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
+		}
 		err = subscribeEVMCompletedEvent(cancelCtx, c.network, c.handleEVMCompletedEvents)
 		if err != nil {
 			log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] error: %v", err)
@@ -194,131 +197,6 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 		}
 		cancelFunc()
 	}
-}
-
-func subscribeTokenSentEvent(ctx context.Context, network *cosmos.NetworkClient,
-	callback func(ctx context.Context, events []IBCEvent[*types.EventTokenSent]) error) error {
-	if _, err := Subscribe(ctx, network, TokenSentEvent,
-		func(events []IBCEvent[*types.EventTokenSent]) {
-			err := callback(ctx, events)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [DestCallApprovedHandler] callback error: %v", err)
-			}
-		}); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] Failed: %v", err)
-		return err
-	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] success")
-	}
-	return nil
-}
-func subscribeMintCommand(ctx context.Context, network *cosmos.NetworkClient,
-	callback func(ctx context.Context, events []IBCEvent[*types.MintCommand]) error) error {
-	if _, err := Subscribe(ctx, network, MintCommandEvent,
-		func(events []IBCEvent[*types.MintCommand]) {
-			err := callback(ctx, events)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [DestCallApprovedHandler] callback error: %v", err)
-			}
-		}); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] Failed: %v", err)
-		return err
-	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] success")
-	}
-	return nil
-}
-func subscribeDestCallApprovedEvent(ctx context.Context, network *cosmos.NetworkClient,
-	callback func(ctx context.Context, events []IBCEvent[*types.DestCallApproved]) error) error {
-	if _, err := Subscribe(ctx, network, DestCallApprovedEvent,
-		func(events []IBCEvent[*types.DestCallApproved]) {
-			err := callback(ctx, events)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [DestCallApprovedHandler] callback error: %v", err)
-			}
-		}); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] Failed: %v", err)
-		return err
-	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] success")
-	}
-	return nil
-}
-
-// func subscribeSignCommandsEvent(ctx context.Context, network *cosmos.NetworkClient,
-// 	callback func(ctx context.Context, events []IBCEvent[SignCommands]) error) error {
-// 	if _, err := Subscribe(ctx, network, SignCommandsEvent,
-// 		func(events []IBCEvent[SignCommands]) {
-// 			err := callback(ctx, events)
-// 			if err != nil {
-// 				log.Error().Msgf("[ScalarClient] [SignCommandsHandler] callback error: %v", err)
-// 			}
-
-// 		}); err != nil {
-// 		log.Debug().Msgf("[ScalarClient] [subscribeSignCommandsEvent] Failed: %v", err)
-// 		return err
-// 	} else {
-// 		log.Debug().Msgf("[ScalarClient] [subscribeSignCommandsEvent] success")
-// 	}
-// 	return nil
-// }
-
-func subscribeEVMCompletedEvent(ctx context.Context, network *cosmos.NetworkClient,
-	callback func(ctx context.Context, events []IBCEvent[*types.ChainEventCompleted]) error) error {
-	if _, err := Subscribe(ctx, network, EVMCompletedEvent,
-		func(events []IBCEvent[*types.ChainEventCompleted]) {
-			err := callback(ctx, events)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [EVMCompletedHandler] callback error: %v", err)
-			}
-		}); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] Failed: %v", err)
-		return err
-	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] success")
-	}
-	return nil
-}
-func subscribeAllNewBlockEvent(ctx context.Context, network *cosmos.NetworkClient,
-	callback func(ctx context.Context, events []IBCEvent[ScalarMessage]) error) error {
-	//Subscribe to all events for debug purpose
-	if _, err := Subscribe(ctx, network, AllNewBlockEvent,
-		func(events []IBCEvent[ScalarMessage]) {
-			err := callback(ctx, events)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [AllNewBlockHandler] callback error: %v", err)
-			}
-
-		}); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeAllNewBlockEvent] Failed: %v", err)
-		return err
-	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeAllNewBlockEvent] success")
-	}
-	return nil
-}
-
-func subscribeAllTxEvent(ctx context.Context, network *cosmos.NetworkClient) error {
-	//Subscribe to all events for debug purpose
-	TxEvent := ListenerEvent[ScalarMessage]{
-		Type: "Tx",
-		//TopicId: "tm.event='Tx'",
-		TopicId: "tm.event='*'",
-		Parser: func(events map[string][]string) ([]IBCEvent[ScalarMessage], error) {
-			log.Debug().Msgf("[ScalarClient] [AllTxHandler] events: %v", events)
-			return nil, nil
-		},
-	}
-	callback := func(events []IBCEvent[ScalarMessage]) {
-		log.Debug().Msgf("[ScalarClient] [subscribeAllTxEvent] events: %v", events)
-	}
-	if _, err := Subscribe(ctx, network, TxEvent, callback); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeAllTxEvent] Failed: %v", err)
-		return err
-	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeAllTxEvent] success")
-	}
-	return nil
 }
 
 // https://github.com/cosmos/cosmos-sdk/blob/main/client/rpc/tx.go#L159
@@ -369,10 +247,10 @@ func Subscribe[T proto.Message](ctx context.Context,
 	return event.Type, nil
 }
 
-func (c *Client) ConfirmTxs(ctx context.Context, chainName string, txIds []string) (*sdk.TxResponse, error) {
+func (c *Client) ConfirmEvmTxs(ctx context.Context, chainName string, txIds []string) (*sdk.TxResponse, error) {
 	//1. Create Confirm message request
 	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
-	log.Debug().Msgf("[ScalarClient] [ConfirmTxs] Broadcast for confirmation txs from chain %s: %v", nexusChain, txIds)
+	log.Debug().Msgf("[ScalarClient] [ConfirmEvmTxs] Broadcast for confirmation txs from chain %s: %v", nexusChain, txIds)
 	txHashs := make([]chainstypes.Hash, len(txIds))
 	for i, txId := range txIds {
 		txHashs[i] = chainstypes.Hash(common.HexToHash(txId))
@@ -381,20 +259,40 @@ func (c *Client) ConfirmTxs(ctx context.Context, chainName string, txIds []strin
 	//2. Sign and broadcast the payload using the network client, which has the private key
 	confirmTx, err := c.network.SignAndBroadcastMsgs(ctx, msg)
 	if err != nil {
-		log.Error().Msgf("[ScalarClient] [ConfirmTxs] error from network client: %v", err)
+		log.Error().Msgf("[ScalarClient] [ConfirmEvmTxs] error from network client: %v", err)
 		return nil, err
 	}
 	if confirmTx != nil && confirmTx.Code != 0 {
-		log.Error().Msgf("[ScalarClient] [ConfirmTxs] error from network client: %v", confirmTx.RawLog)
+		log.Error().Msgf("[ScalarClient] [ConfirmEvmTxs] error from network client: %v", confirmTx.RawLog)
 		return nil, fmt.Errorf("error from network client: %v", confirmTx.RawLog)
 	} else {
-		log.Debug().Msgf("[ScalarClient] [ConfirmTxs] success broadcast confirmation txs with tx hash: %s", confirmTx.TxHash)
+		log.Debug().Msgf("[ScalarClient] [ConfirmEvmTxs] success broadcast confirmation txs with tx hash: %s", confirmTx.TxHash)
 		return confirmTx, nil
 	}
 }
 
-func (c *Client) ConfirmBtcTx(ctx context.Context, chainName string, txId string) (*sdk.TxResponse, error) {
-	return c.ConfirmEvmTx(ctx, chainName, txId)
+func (c *Client) ConfirmBtcTxs(ctx context.Context, chainName string, txIds []string) (*sdk.TxResponse, error) {
+	//1. Create Confirm message request
+	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
+	log.Debug().Msgf("[ScalarClient] [ConfirmBtcTxs] Broadcast for confirmation txs from chain %s: %v", nexusChain, txIds)
+	txHashs := make([]chainstypes.Hash, len(txIds))
+	for i, txId := range txIds {
+		txHashs[i] = chainstypes.Hash(common.HexToHash(txId))
+	}
+	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, txHashs)
+	//2. Sign and broadcast the payload using the network client, which has the private key
+	confirmTx, err := c.network.SignAndBroadcastMsgs(ctx, msg)
+	if err != nil {
+		log.Error().Msgf("[ScalarClient] [ConfirmBtcTxs] error from network client: %v", err)
+		return nil, err
+	}
+	if confirmTx != nil && confirmTx.Code != 0 {
+		log.Error().Msgf("[ScalarClient] [ConfirmBtcTxs] error from network client: %v", confirmTx.RawLog)
+		return nil, fmt.Errorf("error from network client: %v", confirmTx.RawLog)
+	} else {
+		log.Debug().Msgf("[ScalarClient] [ConfirmBtcTxs] success broadcast confirmation txs with tx hash: %s", confirmTx.TxHash)
+		return confirmTx, nil
+	}
 }
 
 // Relayer call this function for request Scalar network to confirm the transaction on the source chain

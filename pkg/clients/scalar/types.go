@@ -1,6 +1,7 @@
 package scalar
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -15,17 +16,20 @@ import (
 // Add this new type definition
 
 const (
-	EventTypeDestCallApproved               = "scalar.chains.v1beta1.DestCallApproved"
-	EventTypeEVMEventCompleted              = "scalar.chains.v1beta1.EVMEventCompleted"
-	EventTypeTokenSent                      = "scalar.chains.v1beta1.EventTokenSent"
-	EventTypeMintCommand                    = "scalar.chains.v1beta1.MintCommand"
-	EventTypeContractCallSubmitted          = "scalar.scalarnet.v1beta1.ContractCallSubmitted"
-	EventTypeContractCallWithTokenSubmitted = "scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted"
-	TokenSentEventTopicId                   = "tm.event='NewBlock' AND scalar.chains.v1beta1.EventTokenSent.event_id EXISTS"
-	MintCommandEventTopicId                 = "tm.event='NewBlock' AND scalar.chains.v1beta1.MintCommand.event_id EXISTS"
-	DestCallApprovedEventTopicId            = "tm.event='NewBlock' AND scalar.chains.v1beta1.DestCallApproved.event_id EXISTS"
-	SignCommandsEventTopicId                = "tm.event='NewBlock' AND sign.batchedCommandID EXISTS"
-	EVMCompletedEventTopicId                = "tm.event='NewBlock' AND scalar.chains.v1beta1.EVMEventCompleted.event_id EXISTS"
+	EventTypeMintCommand                     = "scalar.chains.v1beta1.MintCommand"
+	EventTypeContractCallApproved            = "scalar.chains.v1beta1.ContractCallApproved"
+	EventTypeContractCallWithMintApproved    = "scalar.chains.v1beta1.ContractCallWithMintApproved"
+	EventTypeTokenSent                       = "scalar.chains.v1beta1.EventTokenSent"
+	EventTypeEVMEventCompleted               = "scalar.chains.v1beta1.EVMEventCompleted"
+	EventTypeCommandBatchSigned              = "scalar.chains.v1beta1.CommandBatchSigned"
+	EventTypeContractCallSubmitted           = "scalar.scalarnet.v1beta1.ContractCallSubmitted"
+	EventTypeContractCallWithTokenSubmitted  = "scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted"
+	TokenSentEventTopicId                    = "tm.event='NewBlock' AND scalar.chains.v1beta1.EventTokenSent.event_id EXISTS"
+	MintCommandEventTopicId                  = "tm.event='NewBlock' AND scalar.chains.v1beta1.MintCommand.event_id EXISTS"
+	ContractCallApprovedEventTopicId         = "tm.event='NewBlock' AND scalar.chains.v1beta1.ContractCallApproved.event_id EXISTS"
+	ContractCallWithMintApprovedEventTopicId = "tm.event='NewBlock' AND scalar.chains.v1beta1.ContractCallWithMintApproved.event_id EXISTS"
+	CommandBatchSignedEventTopicId           = "tm.event='NewBlock' AND scalar.chains.v1beta1.CommandBatchSigned.event_id EXISTS"
+	EVMCompletedEventTopicId                 = "tm.event='NewBlock' AND scalar.chains.v1beta1.EVMEventCompleted.event_id EXISTS"
 	//For future use
 	ContractCallSubmittedEventTopicId = "tm.event='Tx' AND scalar.scalarnet.v1beta1.ContractCallSubmitted.message_id EXISTS"
 	ContractCallWithTokenEventTopicId = "tm.event='Tx' AND scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted.message_id EXISTS"
@@ -55,13 +59,31 @@ func UnmarshalJson(jsonData map[string]string, e proto.Message) error {
 	switch e := e.(type) {
 	case *types.EventTokenSent:
 		return UnmarshalTokenSent(jsonData, e)
-	case *types.DestCallApproved:
-		return UnmarshalDestCallApproved(jsonData, e)
+	case *types.ContractCallApproved:
+		return UnmarshalContractCallApproved(jsonData, e)
+	case *types.EventContractCallWithMintApproved:
+		return UnmarshalContractCallWithMintApproved(jsonData, e)
+	case *types.CommandBatchSigned:
+		return UnmarshalCommandBatchSigned(jsonData, e)
 	case *types.ChainEventCompleted:
 		return UnmarshalChainEventCompleted(jsonData, e)
 	default:
 		return fmt.Errorf("unsupport type %T", e)
 	}
+}
+func UnamrshalAsset(jsonData string) (sdk.Coin, error) {
+	var rawCoin map[string]string
+	err := json.Unmarshal([]byte(jsonData), &rawCoin)
+	if err != nil {
+		log.Debug().Err(err).Msg("Cannot unmarshalling coin data")
+		return sdk.NewCoin("", sdk.NewInt(0)), err
+	}
+	denom := rawCoin["denom"]
+	amount, ok := sdk.NewIntFromString(rawCoin["amount"])
+	if !ok {
+		amount = sdk.NewInt(0)
+	}
+	return sdk.NewCoin(denom, amount), nil
 }
 func UnmarshalTokenSent(jsonData map[string]string, e *types.EventTokenSent) error {
 	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
@@ -75,18 +97,7 @@ func UnmarshalTokenSent(jsonData map[string]string, e *types.EventTokenSent) err
 	}
 	assetData, ok := jsonData["asset"]
 	if ok {
-		var rawCoin map[string]string
-		fmt.Printf("assetData %s\n", assetData)
-		err := json.Unmarshal([]byte(assetData), &rawCoin)
-		if err != nil {
-			log.Debug().Err(err).Msg("Cannot unmarshalling coin data")
-		} else {
-			denom := rawCoin["denom"]
-			amount, ok := sdk.NewIntFromString(rawCoin["amount"])
-			if ok {
-				e.Asset = sdk.NewCoin(denom, amount)
-			}
-		}
+		e.Asset, _ = UnamrshalAsset(assetData)
 	}
 	return nil
 }
@@ -100,7 +111,7 @@ func UnmarshalChainEventCompleted(jsonData map[string]string, e *types.ChainEven
 	return nil
 }
 
-func UnmarshalDestCallApproved(jsonData map[string]string, e *types.DestCallApproved) error {
+func UnmarshalContractCallApproved(jsonData map[string]string, e *types.ContractCallApproved) error {
 	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
 	e.EventID = types.EventID(removeQuote(jsonData["event_id"]))
 	commandIDHex, err := DecodeIntArrayToHexString(jsonData["command_id"])
@@ -122,34 +133,44 @@ func UnmarshalDestCallApproved(jsonData map[string]string, e *types.DestCallAppr
 	return nil
 }
 
-// type DestCallApproved struct {
-// 	MessageID        string `json:"messageId"`
-// 	Sender           string `json:"sender"`
-// 	SourceChain      string `json:"sourceChain"`
-// 	DestinationChain string `json:"destinationChain"`
-// 	ContractAddress  string `json:"contractAddress"`
-// 	CommandID        string `json:"commandId"`
-// 	Payload          string `json:"payload"`
-// 	PayloadHash      string `json:"payloadHash"`
-// }
+func UnmarshalContractCallWithMintApproved(jsonData map[string]string, e *types.EventContractCallWithMintApproved) error {
+	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
+	e.EventID = types.EventID(removeQuote(jsonData["event_id"]))
+	commandIDHex, err := DecodeIntArrayToHexString(jsonData["command_id"])
+	if err != nil {
+		log.Warn().Msgf("Failed to decode command ID: %v, error: %v", jsonData["command_id"], err)
+	}
+	e.CommandID, _ = types.HexToCommandID(commandIDHex)
+	e.Sender = removeQuote(jsonData["sender"])
+	e.DestinationChain = exported.ChainName(removeQuote(jsonData["destination_chain"]))
+	e.ContractAddress = removeQuote(jsonData["contract_address"])
 
-// type ContractCallSubmitted struct {
-// 	MessageID        string `json:"messageId"`
-// 	Sender           string `json:"sender"`
-// 	SourceChain      string `json:"sourceChain"`
-// 	DestinationChain string `json:"destinationChain"`
-// 	ContractAddress  string `json:"contractAddress"`
-// 	CommandID        string `json:"commandId"`
-// 	Payload          string `json:"payload"`
-// 	PayloadHash      string `json:"payloadHash"`
-// }
+	payloadHex, err := DecodeIntArrayToHexString(jsonData["payload_hash"])
+	if err != nil {
+		log.Warn().Msgf("Failed to decode payload hash: %v, error: %v", jsonData["payload_hash"], err)
+	}
+	e.PayloadHash = types.Hash(common.HexToHash(payloadHex))
+	assetData, ok := jsonData["asset"]
+	if ok {
+		e.Asset, _ = UnamrshalAsset(assetData)
+	}
+	log.Debug().Any("JsonData", jsonData).Msg("Input data")
+	log.Debug().Any("result", e).Msg("Resut data")
+	return nil
+}
 
-// type ContractCallApproved = ContractCallSubmitted
-
-type SignCommands struct {
-	DestinationChain string `json:"destinationChain"`
-	TxHash           string `json:"txHash"`
-	MessageID        string `json:"messageId"`
+func UnmarshalCommandBatchSigned(jsonData map[string]string, e *types.CommandBatchSigned) error {
+	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
+	commandBatchIDHex, err := DecodeIntArrayToHexString(jsonData["command_batch_id"])
+	if err != nil {
+		log.Warn().Msgf("Failed to decode command ID: %v, error: %v", jsonData["command_id"], err)
+		return err
+	}
+	e.CommandBatchID, err = hex.DecodeString(commandBatchIDHex)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 type ContractCallWithTokenSubmitted struct {
@@ -196,16 +217,22 @@ var (
 		Parser:  ParseIBCEvent[*types.MintCommand],
 		//Parser:  ParseTokenSentEvent,
 	}
-	DestCallApprovedEvent = ListenerEvent[*types.DestCallApproved]{
-		TopicId: DestCallApprovedEventTopicId,
-		Type:    EventTypeDestCallApproved,
-		Parser:  ParseIBCEvent[*types.DestCallApproved],
-		//Parser:  ParseDestCallApprovedEvent,
+	ContractCallWithMintApprovedEvent = ListenerEvent[*types.EventContractCallWithMintApproved]{
+		TopicId: ContractCallWithMintApprovedEventTopicId,
+		Type:    EventTypeContractCallWithMintApproved,
+		Parser:  ParseIBCEvent[*types.EventContractCallWithMintApproved],
+		//Parser:  ParseTokenSentEvent,
 	}
-	SignCommandsEvent = ListenerEvent[SignCommands]{
-		TopicId: SignCommandsEventTopicId,
-		Type:    "sign",
-		Parser:  ParseSignCommandsEvent,
+	ContractCallApprovedEvent = ListenerEvent[*types.ContractCallApproved]{
+		TopicId: ContractCallApprovedEventTopicId,
+		Type:    EventTypeContractCallApproved,
+		Parser:  ParseIBCEvent[*types.ContractCallApproved],
+		//Parser:  ParseContractCallApprovedEvent,
+	}
+	BatchCommandSignedEvent = ListenerEvent[*types.CommandBatchSigned]{
+		TopicId: CommandBatchSignedEventTopicId,
+		Type:    EventTypeCommandBatchSigned,
+		Parser:  ParseIBCEvent[*types.CommandBatchSigned],
 	}
 
 	EVMCompletedEvent = ListenerEvent[*types.ChainEventCompleted]{
