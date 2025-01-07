@@ -73,7 +73,6 @@ func UnmarshalJson(jsonData map[string]string, e proto.Message) error {
 }
 func UnamrshalAsset(jsonData string) (sdk.Coin, error) {
 	var rawCoin map[string]string
-	fmt.Printf("assetData %s\n", jsonData)
 	err := json.Unmarshal([]byte(jsonData), &rawCoin)
 	if err != nil {
 		log.Debug().Err(err).Msg("Cannot unmarshalling coin data")

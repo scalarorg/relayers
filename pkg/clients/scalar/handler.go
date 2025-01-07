@@ -27,12 +27,11 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*t
 			updates = append(updates, *result)
 		}
 	}
-	//return c.dbAdapter.UpdateBatchRelayDataStatus(updates, len(updates))
-	return nil
+	return c.dbAdapter.UpdateBatchRelayDataStatus(updates, len(updates))
 }
 
 func (c *Client) handleTokenSentEvent(ctx context.Context, event *IBCEvent[*types.EventTokenSent]) (*db.RelaydataExecuteResult, error) {
-	log.Debug().Interface("event", event).Msg("[ScalarClient] [preprocessTokenSentEvent]")
+	log.Debug().Interface("event", event).Msg("[ScalarClient] [handleTokenSentEvent]")
 	//1. Get pending transfer from Scalar network
 	destinationChain := event.Args.DestinationChain.String()
 	txRes, err := c.network.CreatePendingTransfersRequest(ctx, destinationChain)
@@ -51,10 +50,10 @@ func (c *Client) handleTokenSentEvent(ctx context.Context, event *IBCEvent[*type
 	}
 	log.Debug().Any("pendingCommands", pendingCommands).Msgf("[ScalarClient] [handleTokenSentEvent]")
 	//2. Sign the commands request
-	chainName := exported.ChainName(destinationChain)
-	if types.IsEvmChain(chainName) {
+	destChainName := exported.ChainName(destinationChain)
+	if types.IsEvmChain(destChainName) {
 		return c.signEvmCommandsRequest(ctx, string(event.Args.EventID), destinationChain)
-	} else if types.IsBitcoinChain(chainName) {
+	} else if types.IsBitcoinChain(destChainName) {
 		return c.signBtcCommandsRequest(ctx, string(event.Args.EventID), destinationChain)
 	}
 	return nil, nil
@@ -162,10 +161,10 @@ func (c *Client) signEvmCommandsRequest(ctx context.Context, eventId string, des
 	//Relayer is waiting for event CommandBatchSigned
 	//3. Wait for the sign event
 	//Todo: Check if the sign event is received
-	// batchCommandId, commandIDs := c.waitForSignCommandsEvent(ctx, signRes.TxHash)
-	// if batchCommandId == "" || commandIDs == "" {
-	// 	return nil, fmt.Errorf("BatchCommandId not found")
-	// }
+	batchCommandId, commandIDs := c.waitForSignCommandsEvent(ctx, signRes.TxHash)
+	if batchCommandId == "" || commandIDs == "" {
+		return nil, fmt.Errorf("BatchCommandId not found")
+	}
 	// log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] Successfully received sign commands event with batch command id: %s", batchCommandId)
 	// // 2. Old version, loop for get ExecuteData from batch command id
 	// batchCmdRes, err := c.waitForExecuteData(ctx, destinationChain, batchCommandId)
@@ -296,16 +295,21 @@ func (c *Client) waitForSignCommandsEvent(ctx context.Context, txHash string) (s
 	time.Sleep(5 * time.Second)
 	for {
 		txRes, err = c.queryClient.QueryTx(ctx, txHash)
-		if err != nil || txRes == nil || txRes.Code != 0 || len(txRes.Logs) == 0 {
-			log.Debug().Err(err).Msgf("[ScalarClient] [waitForSignCommandsEvent]")
+		if err != nil {
+			log.Debug().Err(err).Str("TxHash", txHash).Msgf("[ScalarClient] [waitForSignCommandsEvent]")
 			//Wait for 2 seconds before retry
 			time.Sleep(2 * time.Second)
 			continue
+		} else if txRes == nil {
+			log.Debug().
+				Str("TxHash", txHash).
+				Msg("[ScalarClient] [waitForSignCommandsEvent] txResponse not found")
+		} else if txRes.Code != 0 || len(txRes.Logs) == 0 {
+			log.Debug().
+				Str("TxHash", txRes.TxHash).
+				Any("TxRes", txRes).
+				Msg("[ScalarClient] [waitForSignCommandsEvent]")
 		}
-		log.Debug().
-			Str("TxHash", txRes.TxHash).
-			Any("Log events", txRes.Logs[0].Events).
-			Msg("[ScalarClient] [waitForSignCommandsEvent]")
 		batchCommandId := findEventAttribute(txRes.Logs[0].Events, "sign", "batchedCommandID")
 		commandIDs := findEventAttribute(txRes.Logs[0].Events, "sign", "commandIDs")
 		if batchCommandId == "" {

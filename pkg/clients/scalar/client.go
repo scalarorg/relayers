@@ -113,6 +113,10 @@ func (c *Client) Start(ctx context.Context) error {
 		}
 	}()
 	go func() {
+		log.Info().Msg("[ScalarClient] Start ProcessPendingCommands process")
+		c.ProcessPendingCommands(ctx)
+	}()
+	go func() {
 		c.subscribeWithHeatBeat(ctx)
 	}()
 	log.Info().Msg("Scalar client started")
