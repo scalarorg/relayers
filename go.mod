@@ -43,7 +43,7 @@ require (
 	github.com/ethereum/go-verkle v0.1.1-0.20240829091221-dffa7562dbe9 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
-	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250106020336-b25ac241e483 // indirect
+	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250107012525-dcf1036a148d // indirect
 	github.com/supranational/blst v0.3.13 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )

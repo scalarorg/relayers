@@ -9,7 +9,7 @@ const (
 	EVENT_CUSTODIAL_SIGNATURES_CONFIRMED = "Custodial.SignaturesConfirmed"
 	EVENT_ELECTRS_VAULT_TRANSACTION      = "Electrs.VaultTransaction"
 	EVENT_SCALAR_TOKEN_SENT              = "Scalar.TokenSent"
-	EVENT_SCALAR_DEST_CALL_APPROVED      = "Scalar.DestCallApproved"
+	EVENT_SCALAR_DEST_CALL_APPROVED      = "Scalar.ContractCallApproved"
 	EVENT_SCALAR_BATCHCOMMAND_SIGNED     = "Scalar.BatchCommandSigned"
 	EVENT_SCALAR_COMMAND_EXECUTED        = "Scalar.CommandExecuted"
 	EVENT_EVM_CONTRACT_CALL_APPROVED     = "ContractCallApproved"

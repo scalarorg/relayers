@@ -149,12 +149,12 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 
 		err = subscribeContractCallWithTokenApprovedEvent(cancelCtx, c.network, c.handleContractCallWithTokenApprovedEvents)
 		if err != nil {
-			log.Error().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] error: %v", err)
+			log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
 		}
 
-		err = subscribeContractCallApprovedEvent(cancelCtx, c.network, c.handleDestCallApprovedEvents)
+		err = subscribeContractCallApprovedEvent(cancelCtx, c.network, c.handleContractCallApprovedEvents)
 		if err != nil {
-			log.Error().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] error: %v", err)
+			log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
 		}
 		err = subscribeCommandBatchSignedEvent(cancelCtx, c.network, c.handleCommandBatchSignedEvent)
 		if err != nil {

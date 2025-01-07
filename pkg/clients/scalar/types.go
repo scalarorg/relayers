@@ -16,18 +16,20 @@ import (
 // Add this new type definition
 
 const (
-	EventTypeDestCallApproved               = "scalar.chains.v1beta1.DestCallApproved"
-	EventTypeEVMEventCompleted              = "scalar.chains.v1beta1.EVMEventCompleted"
-	EventTypeTokenSent                      = "scalar.chains.v1beta1.EventTokenSent"
-	EventTypeMintCommand                    = "scalar.chains.v1beta1.MintCommand"
-	EventTypeCommandBatchSigned             = "scalar.chains.v1beta1.CommandBatchSigned"
-	EventTypeContractCallSubmitted          = "scalar.scalarnet.v1beta1.ContractCallSubmitted"
-	EventTypeContractCallWithTokenSubmitted = "scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted"
-	TokenSentEventTopicId                   = "tm.event='NewBlock' AND scalar.chains.v1beta1.EventTokenSent.event_id EXISTS"
-	MintCommandEventTopicId                 = "tm.event='NewBlock' AND scalar.chains.v1beta1.MintCommand.event_id EXISTS"
-	DestCallApprovedEventTopicId            = "tm.event='NewBlock' AND scalar.chains.v1beta1.DestCallApproved.event_id EXISTS"
-	CommandBatchSignedEventTopicId          = "tm.event='NewBlock' AND scalar.chains.v1beta1.CommandBatchSigned.event_id EXISTS"
-	EVMCompletedEventTopicId                = "tm.event='NewBlock' AND scalar.chains.v1beta1.EVMEventCompleted.event_id EXISTS"
+	EventTypeMintCommand                     = "scalar.chains.v1beta1.MintCommand"
+	EventTypeContractCallApproved            = "scalar.chains.v1beta1.ContractCallApproved"
+	EventTypeContractCallWithMintApproved    = "scalar.chains.v1beta1.ContractCallWithMintApproved"
+	EventTypeTokenSent                       = "scalar.chains.v1beta1.EventTokenSent"
+	EventTypeEVMEventCompleted               = "scalar.chains.v1beta1.EVMEventCompleted"
+	EventTypeCommandBatchSigned              = "scalar.chains.v1beta1.CommandBatchSigned"
+	EventTypeContractCallSubmitted           = "scalar.scalarnet.v1beta1.ContractCallSubmitted"
+	EventTypeContractCallWithTokenSubmitted  = "scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted"
+	TokenSentEventTopicId                    = "tm.event='NewBlock' AND scalar.chains.v1beta1.EventTokenSent.event_id EXISTS"
+	MintCommandEventTopicId                  = "tm.event='NewBlock' AND scalar.chains.v1beta1.MintCommand.event_id EXISTS"
+	ContractCallApprovedEventTopicId         = "tm.event='NewBlock' AND scalar.chains.v1beta1.ContractCallApproved.event_id EXISTS"
+	ContractCallWithMintApprovedEventTopicId = "tm.event='NewBlock' AND scalar.chains.v1beta1.ContractCallWithMintApproved.event_id EXISTS"
+	CommandBatchSignedEventTopicId           = "tm.event='NewBlock' AND scalar.chains.v1beta1.CommandBatchSigned.event_id EXISTS"
+	EVMCompletedEventTopicId                 = "tm.event='NewBlock' AND scalar.chains.v1beta1.EVMEventCompleted.event_id EXISTS"
 	//For future use
 	ContractCallSubmittedEventTopicId = "tm.event='Tx' AND scalar.scalarnet.v1beta1.ContractCallSubmitted.message_id EXISTS"
 	ContractCallWithTokenEventTopicId = "tm.event='Tx' AND scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted.message_id EXISTS"
@@ -57,8 +59,8 @@ func UnmarshalJson(jsonData map[string]string, e proto.Message) error {
 	switch e := e.(type) {
 	case *types.EventTokenSent:
 		return UnmarshalTokenSent(jsonData, e)
-	case *types.DestCallApproved:
-		return UnmarshalDestCallApproved(jsonData, e)
+	case *types.ContractCallApproved:
+		return UnmarshalContractCallApproved(jsonData, e)
 	case *types.EventContractCallWithMintApproved:
 		return UnmarshalContractCallWithMintApproved(jsonData, e)
 	case *types.CommandBatchSigned:
@@ -110,7 +112,7 @@ func UnmarshalChainEventCompleted(jsonData map[string]string, e *types.ChainEven
 	return nil
 }
 
-func UnmarshalDestCallApproved(jsonData map[string]string, e *types.DestCallApproved) error {
+func UnmarshalContractCallApproved(jsonData map[string]string, e *types.ContractCallApproved) error {
 	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
 	e.EventID = types.EventID(removeQuote(jsonData["event_id"]))
 	commandIDHex, err := DecodeIntArrayToHexString(jsonData["command_id"])
@@ -216,17 +218,17 @@ var (
 		Parser:  ParseIBCEvent[*types.MintCommand],
 		//Parser:  ParseTokenSentEvent,
 	}
-	ContractCallWithTokenEvent = ListenerEvent[*types.EventContractCallWithMintApproved]{
-		TopicId: MintCommandEventTopicId,
-		Type:    EventTypeMintCommand,
+	ContractCallWithMintApprovedEvent = ListenerEvent[*types.EventContractCallWithMintApproved]{
+		TopicId: ContractCallWithMintApprovedEventTopicId,
+		Type:    EventTypeContractCallWithMintApproved,
 		Parser:  ParseIBCEvent[*types.EventContractCallWithMintApproved],
 		//Parser:  ParseTokenSentEvent,
 	}
-	DestCallApprovedEvent = ListenerEvent[*types.DestCallApproved]{
-		TopicId: DestCallApprovedEventTopicId,
-		Type:    EventTypeDestCallApproved,
-		Parser:  ParseIBCEvent[*types.DestCallApproved],
-		//Parser:  ParseDestCallApprovedEvent,
+	ContractCallApprovedEvent = ListenerEvent[*types.ContractCallApproved]{
+		TopicId: ContractCallApprovedEventTopicId,
+		Type:    EventTypeContractCallApproved,
+		Parser:  ParseIBCEvent[*types.ContractCallApproved],
+		//Parser:  ParseContractCallApprovedEvent,
 	}
 	BatchCommandSignedEvent = ListenerEvent[*types.CommandBatchSigned]{
 		TopicId: CommandBatchSignedEventTopicId,

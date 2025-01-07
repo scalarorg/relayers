@@ -270,9 +270,9 @@ func ParseTokenSentEvent(event map[string][]string) ([]IBCEvent[*types.EventToke
 	return nil, nil
 }
 
-// func ParseDestCallApprovedEvent(event map[string][]string) ([]IBCEvent[*DestCallApproved], error) {
-// 	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] start parser")
-// 	key := EventTypeDestCallApproved
+// func ParseContractCallApprovedEvent(event map[string][]string) ([]IBCEvent[*ContractCallApproved], error) {
+// 	log.Debug().Msgf("[ScalarClient] [ParseContractCallApprovedEvent] start parser")
+// 	key := EventTypeContractCallApproved
 // 	eventIds := event[key+".event_id"]
 // 	senders := event[key+".sender"]
 // 	sourceChains := event[key+".chain"]
@@ -282,7 +282,7 @@ func ParseTokenSentEvent(event map[string][]string) ([]IBCEvent[*types.EventToke
 // 	payloadHashes := event[key+".payload_hash"]
 // 	srcChannels := event["write_acknowledgement.packet_src_channel"]
 // 	destChannels := event["write_acknowledgement.packet_dst_channel"]
-// 	events := make([]IBCEvent[*types.DestCallApproved], len(eventIds))
+// 	events := make([]IBCEvent[*types.ContractCallApproved], len(eventIds))
 // 	for ind, eventId := range eventIds {
 // 		eventID := removeQuote(eventId)
 // 		hash := strings.Split(eventID, "-")[0]
@@ -295,7 +295,7 @@ func ParseTokenSentEvent(event map[string][]string) ([]IBCEvent[*types.EventToke
 // 			log.Warn().Msgf("Failed to decode command ID: %v, error: %v", commandIds[ind], err)
 // 		}
 // 		commandID, err := types.HexToCommandID(commandIDHex)
-// 		data := &types.DestCallApproved{
+// 		data := &types.ContractCallApproved{
 // 			EventID:          types.EventID(eventID),
 // 			Sender:           removeQuote(senders[ind]),
 // 			Chain:            exported.ChainName(removeQuote(sourceChains[ind])),
@@ -313,22 +313,16 @@ func ParseTokenSentEvent(event map[string][]string) ([]IBCEvent[*types.EventToke
 // 		if len(destChannels) > ind {
 // 			destChannel = destChannels[ind]
 // 		}
-// 		events[ind] = IBCEvent[*types.DestCallApproved]{
+// 		events[ind] = IBCEvent[*types.ContractCallApproved]{
 // 			Hash:        hash,
 // 			SrcChannel:  srcChannel,
 // 			DestChannel: destChannel,
 // 			Args:        data,
 // 		}
 // 	}
-// 	log.Debug().Msgf("[ScalarClient] [ParseDestCallApprovedEvent] parsed events: %v", events)
+// 	log.Debug().Msgf("[ScalarClient] [ParseContractCallApprovedEvent] parsed events: %v", events)
 // 	return events, nil
 // }
-
-func ParseSignCommandsEvent(event map[string][]string) ([]IBCEvent[SignCommands], error) {
-	log.Debug().Msgf("[ScalarClient] [ParseSignCommandsEvent] input event: %v", event)
-	events := make([]IBCEvent[SignCommands], 0)
-	return events, nil
-}
 
 //	func ParseEvmEventCompletedEvent(event map[string][]string) ([]IBCEvent[EVMEventCompleted], error) {
 //		log.Debug().Msgf("[ScalarClient] [ParseEvmEventCompletedEvent] start parser")

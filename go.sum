@@ -1468,6 +1468,8 @@ github.com/scalarorg/scalar-core v0.0.1-staking.0.20250105095623-e2a09e74c43c h1
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250105095623-e2a09e74c43c/go.mod h1:1QJEQ7d6aOdiAm4dauUwHKTTuzRQCqqJRpdhNpVD3/E=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250106020336-b25ac241e483 h1:Bh5FHOvL2P2/EswTCaptcqp0E0BjdSpR+s6pRujJ6oU=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250106020336-b25ac241e483/go.mod h1:1QJEQ7d6aOdiAm4dauUwHKTTuzRQCqqJRpdhNpVD3/E=
+github.com/scalarorg/scalar-core v0.0.1-staking.0.20250107012525-dcf1036a148d h1:+brfYOFU2XwZ5NCv0eXG0ceoOXwwzIVBiovnrbxrQtQ=
+github.com/scalarorg/scalar-core v0.0.1-staking.0.20250107012525-dcf1036a148d/go.mod h1:1QJEQ7d6aOdiAm4dauUwHKTTuzRQCqqJRpdhNpVD3/E=
 github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible h1:Bn1aCHHRnjv4Bl16T8rcaFjYSrGrIZvpiGO6P3Q4GpU=
 github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible/go.mod h1:5b4v6he4MtMOwMlS0TUMTu2PcXUg8+E1lC7eC3UO/RA=
 github.com/shirou/gopsutil/v3 v3.23.12 h1:z90NtUkp3bMtmICZKpC4+WaknU1eXtp5vtbQ11DgpE4=

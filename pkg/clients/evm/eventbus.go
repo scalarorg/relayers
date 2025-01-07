@@ -17,7 +17,7 @@ func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
 		Msg("[EvmClient] [handleEventBusMessage]")
 	switch event.EventType {
 	case events.EVENT_SCALAR_BATCHCOMMAND_SIGNED:
-		//Emitted from scalar.handleDestCallApprovedEvent with event.Data as executeData
+		//Emitted from scalar.handleContractCallApprovedEvent with event.Data as executeData
 		err := ec.handleScalarBatchCommandSigned(event.DestinationChain, event.Data.(string))
 		if err != nil {
 			log.Error().
@@ -27,7 +27,7 @@ func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
 			return err
 		}
 	case events.EVENT_SCALAR_TOKEN_SENT:
-		//Emitted from scalar.handleDestCallApprovedEvent with event.Data as executeData
+		//Emitted from scalar.handleContractCallApprovedEvent with event.Data as executeData
 		err := ec.handleScalarTokenSent(event.Data.(string))
 		if err != nil {
 			log.Error().
@@ -37,8 +37,8 @@ func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
 			return err
 		}
 	case events.EVENT_SCALAR_DEST_CALL_APPROVED:
-		//Emitted from scalar.handleDestCallApprovedEvent with event.Data as executeData
-		err := ec.handleScalarDestCallApproved(event.MessageID, event.Data.(string))
+		//Emitted from scalar.handleContractCallApprovedEvent with event.Data as executeData
+		err := ec.handleScalarContractCallApproved(event.MessageID, event.Data.(string))
 		if err != nil {
 			log.Error().
 				Err(err).
@@ -94,7 +94,7 @@ func (ec *EvmClient) handleScalarTokenSent(executeData string) error {
 	//3. Update status of the event
 	// err = ec.dbAdapter.UpdateRelayDataStatueWithExecuteHash(messageID, relaydata.SUCCESS, &txHash)
 	// if err != nil {
-	// 	log.Error().Err(err).Str("txHash", txHash).Msg("[EvmClient] [handleScalarDestCallApproved]")
+	// 	log.Error().Err(err).Str("txHash", txHash).Msg("[EvmClient] [handleScalarContractCallApproved]")
 	// 	return err
 	// }
 	return nil
@@ -154,11 +154,11 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, executeData 
 // 1. ContractCallApproved event -> relayer will handle this event for execute protocol's contract method
 // 2. Executed event -> relayer will handle this event for create a record in the db for scanner
 
-func (ec *EvmClient) handleScalarDestCallApproved(messageID string, executeData string) error {
+func (ec *EvmClient) handleScalarContractCallApproved(messageID string, executeData string) error {
 	log.Debug().
 		Str("messageID", messageID).
 		Str("executeData", executeData).
-		Msg("[EvmClient] [handleScalarDestCallApproved]")
+		Msg("[EvmClient] [handleScalarContractCallApproved]")
 	decodedExecuteData, err := DecodeExecuteData(executeData)
 	if err != nil {
 		return fmt.Errorf("failed to decode execute data: %w", err)
@@ -169,8 +169,8 @@ func (ec *EvmClient) handleScalarDestCallApproved(messageID string, executeData 
 	if ec.auth == nil {
 		log.Error().
 			Str("chainId", ec.evmConfig.GetId()).
-			Msg("[EvmClient] [handleScalarDestCallApproved] auth is nil")
-		return fmt.Errorf("[EvmClient] [handleScalarDestCallApproved] auth is nil")
+			Msg("[EvmClient] [handleScalarContractCallApproved] auth is nil")
+		return fmt.Errorf("[EvmClient] [handleScalarContractCallApproved] auth is nil")
 	}
 	signedTx, err := ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
 	if err != nil {
@@ -178,7 +178,7 @@ func (ec *EvmClient) handleScalarDestCallApproved(messageID string, executeData 
 			Str("input", hex.EncodeToString(decodedExecuteData.Input)).
 			Str("contractAddress", ec.evmConfig.Gateway).
 			Str("signer", ec.auth.From.String()).
-			Msg("[EvmClient] [handleScalarDestCallApproved]")
+			Msg("[EvmClient] [handleScalarContractCallApproved]")
 		return err
 	}
 	//Or send raw transaction to the network directly
@@ -191,14 +191,14 @@ func (ec *EvmClient) handleScalarDestCallApproved(messageID string, executeData 
 		Uint64("nonce", signedTx.Nonce()).
 		Int64("chainId", signedTx.ChainId().Int64()).
 		Str("signer", signedTx.To().Hex()).
-		Msg("[EvmClient] [handleScalarDestCallApproved]")
+		Msg("[EvmClient] [handleScalarContractCallApproved]")
 	txHash := signedTx.Hash().String()
 	//2. Add the transaction waiting to be mined
 	ec.pendingTxs.AddTx(txHash, time.Now())
 	//3. Update status of the event
 	err = ec.dbAdapter.UpdateRelayDataStatueWithExecuteHash(messageID, relaydata.SUCCESS, &txHash)
 	if err != nil {
-		log.Error().Err(err).Str("txHash", txHash).Msg("[EvmClient] [handleScalarDestCallApproved]")
+		log.Error().Err(err).Str("txHash", txHash).Msg("[EvmClient] [handleScalarContractCallApproved]")
 		return err
 	}
 	return nil
@@ -212,6 +212,6 @@ func (ec *EvmClient) observeScalarExecuteData(decodedExecuteData *DecodedExecute
 	log.Debug().
 		Int("inputLength", len(decodedExecuteData.Input)).
 		Strs("commandIds", commandIds).
-		Msg("[EvmClient] [ScalarDestCallApproved]")
+		Msg("[EvmClient] [ScalarContractCallApproved]")
 	return nil
 }

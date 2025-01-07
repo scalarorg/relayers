@@ -14,13 +14,13 @@ func subscribeTokenSentEvent(ctx context.Context, network *cosmos.NetworkClient,
 		func(events []IBCEvent[*types.EventTokenSent]) {
 			err := callback(ctx, events)
 			if err != nil {
-				log.Error().Msgf("[ScalarClient] [DestCallApprovedHandler] callback error: %v", err)
+				log.Error().Msgf("[ScalarClient] [ContractCallApprovedHandler] callback error: %v", err)
 			}
 		}); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] Failed: %v", err)
+		log.Debug().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] Failed: %v", err)
 		return err
 	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] success")
+		log.Debug().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] success")
 	}
 	return nil
 }
@@ -30,45 +30,45 @@ func subscribeMintCommand(ctx context.Context, network *cosmos.NetworkClient,
 		func(events []IBCEvent[*types.MintCommand]) {
 			err := callback(ctx, events)
 			if err != nil {
-				log.Error().Msgf("[ScalarClient] [DestCallApprovedHandler] callback error: %v", err)
+				log.Error().Msgf("[ScalarClient] [ContractCallApprovedHandler] callback error: %v", err)
 			}
 		}); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] Failed: %v", err)
+		log.Debug().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] Failed: %v", err)
 		return err
 	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] success")
+		log.Debug().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] success")
 	}
 	return nil
 }
 func subscribeContractCallWithTokenApprovedEvent(ctx context.Context, network *cosmos.NetworkClient,
 	callback func(ctx context.Context, events []IBCEvent[*types.EventContractCallWithMintApproved]) error) error {
-	if _, err := Subscribe(ctx, network, ContractCallWithTokenEvent,
+	if _, err := Subscribe(ctx, network, ContractCallWithMintApprovedEvent,
 		func(events []IBCEvent[*types.EventContractCallWithMintApproved]) {
 			err := callback(ctx, events)
 			if err != nil {
-				log.Error().Msgf("[ScalarClient] [DestCallApprovedHandler] callback error: %v", err)
+				log.Error().Msgf("[ScalarClient] [ContractCallWithMintApprovedHandler] callback error: %v", err)
 			}
 		}); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] Failed: %v", err)
+		log.Debug().Msgf("[ScalarClient] [ContractCallWithMintApprovedHandler] Failed: %v", err)
 		return err
 	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] success")
+		log.Debug().Msgf("[ScalarClient] [ContractCallWithMintApprovedHandler] success")
 	}
 	return nil
 }
 func subscribeContractCallApprovedEvent(ctx context.Context, network *cosmos.NetworkClient,
-	callback func(ctx context.Context, events []IBCEvent[*types.DestCallApproved]) error) error {
-	if _, err := Subscribe(ctx, network, DestCallApprovedEvent,
-		func(events []IBCEvent[*types.DestCallApproved]) {
+	callback func(ctx context.Context, events []IBCEvent[*types.ContractCallApproved]) error) error {
+	if _, err := Subscribe(ctx, network, ContractCallApprovedEvent,
+		func(events []IBCEvent[*types.ContractCallApproved]) {
 			err := callback(ctx, events)
 			if err != nil {
-				log.Error().Msgf("[ScalarClient] [DestCallApprovedHandler] callback error: %v", err)
+				log.Error().Msgf("[ScalarClient] [ContractCallApprovedHandler] callback error: %v", err)
 			}
 		}); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] Failed: %v", err)
+		log.Debug().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] Failed: %v", err)
 		return err
 	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeDestCallApprovedEvent] success")
+		log.Debug().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] success")
 	}
 	return nil
 }
