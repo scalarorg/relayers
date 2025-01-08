@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	relaydata "github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 )
 
 func (c *BtcClient) handleEventBusMessage(event *events.EventEnvelope) error {
@@ -26,6 +29,9 @@ func (c *BtcClient) handleEventBusMessage(event *events.EventEnvelope) error {
 	case events.EVENT_SCALAR_DEST_CALL_APPROVED:
 		//Broadcast from scalar.handleContractCallApprovedEvent
 		return c.handleScalarContractCallApproved(event.MessageID, event.Data.(string))
+	case events.EVENT_SCALAR_CREATE_PSBT_REQUEST:
+		//Broadcast from scalar.handleContractCallApprovedEvent
+		return c.handleScalarCreatePsbtRequest(event.MessageID, event.Data.([]chainstypes.QueryCommandResponse))
 	case events.EVENT_CUSTODIAL_SIGNATURES_CONFIRMED:
 		return c.handleCustodialSignaturesConfirmed(event.MessageID, event.Data.(string))
 	}
@@ -55,6 +61,36 @@ func (c *BtcClient) handleScalarContractCallApproved(messageID string, executeDa
 	if err != nil {
 		return fmt.Errorf("failed to update relay data status: %w", err)
 	}
+	return nil
+}
+func (c *BtcClient) handleScalarCreatePsbtRequest(messageId string, commandResponses []chainstypes.QueryCommandResponse) error {
+	taprootAddress := c.btcConfig.Address
+	outpoints := make([]*wire.TxOut, len(commandResponses))
+	for i, cmd := range commandResponses {
+		amount, err := strconv.ParseInt(cmd.Params["amount"], 10, 64)
+		if err != nil {
+			return fmt.Errorf("cannot parse param %s to int value", cmd.Params["amount"])
+		}
+		pkScript := []byte{}
+		outpoints[i] = wire.NewTxOut(amount, pkScript)
+	}
+	if taprootAddress == nil {
+		return fmt.Errorf("taproot address is not set")
+	}
+	psbt, err := c.createPsbt(*taprootAddress, outpoints)
+	if err != nil {
+
+	}
+	// 1. Get Utxo list from external service (mempool) by taproot address
+	// Todo: Get taproot address from scalar node
+
+	// 2. Send unsigned finalized psbt to scalar client for broadcasting to scalar node to get signed pbst
+	c.eventBus.BroadcastEvent(&events.EventEnvelope{
+		EventType:        events.EVENT_BTC_PSBT_SIGN_REQUEST,
+		DestinationChain: events.SCALAR_NETWORK_NAME,
+		MessageID:        messageId,
+		Data:             psbt,
+	})
 	return nil
 }
 func (c *BtcClient) executeBtcCommand(messageID string, commandId [32]byte, command string, params []byte) error {
@@ -206,7 +242,7 @@ func (c *BtcClient) requestProtocolSignature(executeParams *types.ExecuteParams,
 		return "", fmt.Errorf("failed to decode response: %w", err)
 	}
 	if response.TxHex == "" {
-		return "", fmt.Errorf("Signed psbt not found: %s", response.TxHex)
+		return "", fmt.Errorf("signed psbt not found: %s", response.TxHex)
 	}
 	return response.TxHex, nil
 }

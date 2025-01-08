@@ -27,8 +27,9 @@ type BtcNetworkConfig struct {
 	User       string  `mapstructure:"user"`
 	Password   string  `mapstructure:"password"`
 	SSL        *bool   `mapstructure:"ssl,omitempty"`
+	MempoolUrl string  `mapstructure:"mempool_url,omitempty"`
 	PrivateKey string  `mapstructure:"private_key,omitempty"`
-	Address    *string `mapstructure:"address,omitempty"`
+	Address    *string `mapstructure:"address,omitempty"` //Taproot address. Todo: set it as parameter from scalar note
 	MaxFeeRate float64 `mapstructure:"max_fee_rate,omitempty"`
 }
 
@@ -50,3 +51,15 @@ func (c *BtcNetworkConfig) GetFamily() string {
 type DecodedExecuteData = evm.DecodedExecuteData
 
 var DecodeExecuteData = evm.DecodeExecuteData
+
+type Utxo struct {
+	Txid   string `json:"txid"`
+	Vout   uint32 `json:"vout"`
+	Status struct {
+		Confirmed   bool   `json:"confirmed"`
+		BlockHeight uint64 `json:"block_height"`
+		BlockHash   string `json:"block_hash"`
+		BlockTime   uint64 `json:"block_time"`
+	} `json:"status"`
+	Value uint64 `json:"value"`
+}

@@ -2,9 +2,12 @@ package scalar
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/events"
+	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
 
 func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
@@ -15,6 +18,8 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 		return c.requestConfirmBtcTxs(event.Data.(events.ConfirmTxsRequest))
 	case events.EVENT_EVM_TOKEN_SENT, events.EVENT_EVM_CONTRACT_CALL, events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN:
 		return c.requestConfirmEvmTxs(event.Data.(events.ConfirmTxsRequest))
+	case events.EVENT_BTC_PSBT_SIGN_REQUEST:
+		return c.requestPsbtSign(event.DestinationChain, event.Data.(covtypes.Psbt))
 	}
 
 	return nil
@@ -44,6 +49,14 @@ func (c *Client) requestConfirmEvmTxs(confirmRequest events.ConfirmTxsRequest) e
 		}
 	} else {
 		log.Debug().Str("sourceChain", sourceChain).Msg("[ScalarClient] [handleEvmContractCall] no valid txs to confirm")
+	}
+	return nil
+}
+
+func (c *Client) requestPsbtSign(destinationChain string, psbt covtypes.Psbt) error {
+	signRes, err := c.network.SignBtcCommandsRequest(context.Background(), destinationChain, psbt)
+	if err != nil || signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") || signRes.TxHash == "" {
+		return fmt.Errorf("[ScalarClient] [requestPsbtSign] failed to sign psbt request: %v, %w", signRes, err)
 	}
 	return nil
 }

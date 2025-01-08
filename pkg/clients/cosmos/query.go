@@ -88,7 +88,7 @@ func (c *QueryClient) QueryBatchedCommands(ctx context.Context, destinationChain
 	return resp, nil
 }
 
-func (c *QueryClient) QueryPendingCommand(ctx context.Context, destinationChain string) ([]chainstypes.QueryCommandResponse, error) {
+func (c *QueryClient) QueryPendingCommands(ctx context.Context, destinationChain string) ([]chainstypes.QueryCommandResponse, error) {
 	req := &chainstypes.PendingCommandsRequest{
 		Chain: destinationChain,
 	}

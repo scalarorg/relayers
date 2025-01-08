@@ -52,7 +52,7 @@ func NewBtcClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 		if btcConfig.MaxFeeRate == 0 {
 			btcConfig.MaxFeeRate = 0.10
 		}
-		client, err := newBtcClientFromConfig(globalConfig, &btcConfig, dbAdapter, eventBus)
+		client, err := NewBtcClientFromConfig(globalConfig, &btcConfig, dbAdapter, eventBus)
 		if err != nil {
 			log.Warn().Msgf("Failed to create btc client for %s: %v", btcConfig.Name, err)
 			continue
@@ -63,7 +63,7 @@ func NewBtcClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 	return btcClients, nil
 }
 
-func newBtcClientFromConfig(globalConfig *config.Config, btcConfig *BtcNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*BtcClient, error) {
+func NewBtcClientFromConfig(globalConfig *config.Config, btcConfig *BtcNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*BtcClient, error) {
 	// Configure connection
 	connCfg := &rpcclient.ConnConfig{
 		Host:         fmt.Sprintf("%s:%d", btcConfig.Host, btcConfig.Port),

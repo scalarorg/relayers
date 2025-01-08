@@ -40,7 +40,7 @@ func (c *Client) handleTokenSentEvent(ctx context.Context, event *IBCEvent[*type
 	}
 	log.Debug().Msgf("Successfull create pending transfer request for chain %s", destinationChain)
 	//1. Get pending command from Scalar network
-	pendingCommands, err := c.queryClient.QueryPendingCommand(ctx, destinationChain)
+	pendingCommands, err := c.queryClient.QueryPendingCommands(ctx, destinationChain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pending command: %w", err)
 	}
@@ -100,7 +100,7 @@ func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBC
 	log.Debug().Interface("event", event).Msg("[ScalarClient] [preprocessContractCallApprovedEvent]")
 	//1. Get pending command from Scalar network
 	destinationChain := event.Args.DestinationChain.String()
-	pendingCommands, err := c.queryClient.QueryPendingCommand(ctx, destinationChain)
+	pendingCommands, err := c.queryClient.QueryPendingCommands(ctx, destinationChain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pending command: %w", err)
 	}
@@ -135,7 +135,7 @@ func (c *Client) handleContractCallWithTokenApprovedEvent(ctx context.Context, e
 	log.Debug().Interface("event", event).Msg("[ScalarClient] [handleContractCallWithTokenApprovedEvent]")
 	//1. Get pending command from Scalar network
 	destinationChain := event.Args.DestinationChain.String()
-	pendingCommands, err := c.queryClient.QueryPendingCommand(ctx, destinationChain)
+	pendingCommands, err := c.queryClient.QueryPendingCommands(ctx, destinationChain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pending command: %w", err)
 	}
@@ -145,12 +145,21 @@ func (c *Client) handleContractCallWithTokenApprovedEvent(ctx context.Context, e
 	}
 	log.Debug().Any("pendingCommands", pendingCommands).Msgf("[ScalarClient] [handleContractCallWithTokenApprovedEvent]")
 	//2. Sign the commands request
-	if types.IsEvmChain(exported.ChainName(destinationChain)) {
+	chainName := exported.ChainName(destinationChain)
+	if types.IsEvmChain(chainName) {
 		return c.signEvmCommandsRequest(ctx, string(event.Args.EventID), destinationChain)
-	} else {
-		//For Vault Tx from btc, scalar client emit EventTokenSent
+	} else if types.IsBitcoinChain(chainName) {
+		//Request btc client form psbt from pending commands then send sign psbt request back to the scalar node
+		eventEnvelope := events.EventEnvelope{
+			EventType:        events.EVENT_SCALAR_CREATE_PSBT_REQUEST,
+			DestinationChain: destinationChain,
+			MessageID:        string(event.Args.EventID),
+			Data:             pendingCommands,
+		}
+		c.eventBus.BroadcastEvent(&eventEnvelope)
 		return nil, nil
 	}
+	return nil, nil
 }
 func (c *Client) signEvmCommandsRequest(ctx context.Context, eventId string, destinationChain string) (*db.RelaydataExecuteResult, error) {
 	signRes, err := c.network.SignCommandsRequest(ctx, destinationChain)

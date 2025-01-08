@@ -163,9 +163,7 @@ func (c *NetworkClient) ConfirmEvmTx(ctx context.Context, msg *chainstypes.Confi
 	return c.SignAndBroadcastMsgs(ctx, msg)
 }
 
-func (c *NetworkClient) SignBtcCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
-	//Todo: Form psbt
-	var psbt covtypes.Psbt
+func (c *NetworkClient) SignBtcCommandsRequest(ctx context.Context, destinationChain string, psbt covtypes.Psbt) (*sdk.TxResponse, error) {
 	req := chainstypes.NewSignBTCCommandsRequest(
 		c.GetAddress(),
 		destinationChain,
