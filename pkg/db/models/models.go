@@ -52,8 +52,6 @@ type CallContract struct {
 	BlockNumber          uint64 `gorm:"default:0"`
 	LogIndex             uint
 	ContractAddress      string `gorm:"type:varchar(255)"`
-	Amount               uint64 `gorm:"type:bigint"`
-	Symbol               string `gorm:"type:varchar(255)"`
 	Payload              []byte
 	PayloadHash          string  `gorm:"type:varchar(255);uniqueIndex"`
 	SourceAddress        string  `gorm:"type:varchar(255)"`
@@ -66,6 +64,7 @@ type CallContract struct {
 type CallContractWithToken struct {
 	CallContract
 	TokenContractAddress string `gorm:"type:varchar(255)"`
+	Symbol               string `gorm:"type:varchar(255)"`
 	Amount               uint64 `gorm:"type:bigint"`
 }
 
@@ -110,18 +109,19 @@ type CallContractApproved struct {
 
 type TokenSent struct {
 	gorm.Model
-	ID                 string `gorm:"primaryKey"`
-	TxHash             string `gorm:"type:varchar(255)"`
-	TxHex              []byte
-	BlockNumber        uint64 `gorm:"default:0"`
-	LogIndex           uint
-	SourceAddress      string `gorm:"type:varchar(255)"`
-	DestinationAddress string `gorm:"type:varchar(255)"`
-	Amount             uint64 `gorm:"type:bigint"`
-	Symbol             string `gorm:"type:varchar(255)"`
-	TokenSentApproved  *TokenSentApproved
-	RelayDataID        string     `gorm:"type:varchar(255)"`
-	RelayData          *RelayData `gorm:"foreignKey:RelayDataID"`
+	ID                   string `gorm:"primaryKey"`
+	TxHash               string `gorm:"type:varchar(255)"`
+	TxHex                []byte
+	BlockNumber          uint64 `gorm:"default:0"`
+	LogIndex             uint
+	SourceAddress        string `gorm:"type:varchar(255)"`
+	DestinationAddress   string `gorm:"type:varchar(255)"`
+	TokenContractAddress string `gorm:"type:varchar(255)"`
+	Amount               uint64 `gorm:"type:bigint"`
+	Symbol               string `gorm:"type:varchar(255)"`
+	TokenSentApproved    *TokenSentApproved
+	RelayDataID          string     `gorm:"type:varchar(255)"`
+	RelayData            *RelayData `gorm:"foreignKey:RelayDataID"`
 }
 
 type TokenSentApproved struct {
@@ -144,17 +144,17 @@ type TokenSentApproved struct {
 	UpdatedAt        time.Time  `gorm:"type:timestamp(6);default:current_timestamp(6)"`
 }
 
-type ProtocolInfo struct {
-	gorm.Model
-	//ID                   string `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	ChainID              string `gorm:"column:chain_id"`               //Evm chain id
-	ChainName            string `gorm:"column:chain_name;not null"`    //Evm chain name
-	BTCAddressHex        string `gorm:"column:btc_address_hex"`        //Btc address
-	PublicKeyHex         string `gorm:"column:public_key_hex"`         //Btc public key
-	SmartContractAddress string `gorm:"column:smart_contract_address"` //Evm contract address which is extended from the IScalarExecutable
-	TokenContractAddress string `gorm:"column:token_contract_address"` //Evm ERC20 token contract address
-	State                bool   `gorm:"column:state"`
-	ChainEndpoint        string `gorm:"column:chain_endpoint"` //Service endpoint for handling evm tx
-	RPCUrl               string `gorm:"column:rpc_url"`        //Service endpoint for handling psbt signing
-	AccessToken          string `gorm:"column:access_token"`   //Access token for the signing service
-}
+// type ProtocolInfo struct {
+// 	gorm.Model
+// 	//ID                   string `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+// 	ChainID              string `gorm:"column:chain_id"`               //Evm chain id
+// 	ChainName            string `gorm:"column:chain_name;not null"`    //Evm chain name
+// 	BTCAddressHex        string `gorm:"column:btc_address_hex"`        //Btc address
+// 	PublicKeyHex         string `gorm:"column:public_key_hex"`         //Btc public key
+// 	SmartContractAddress string `gorm:"column:smart_contract_address"` //Evm contract address which is extended from the IScalarExecutable
+// 	TokenContractAddress string `gorm:"column:token_contract_address"` //Evm ERC20 token contract address
+// 	State                bool   `gorm:"column:state"`
+// 	ChainEndpoint        string `gorm:"column:chain_endpoint"` //Service endpoint for handling evm tx
+// 	RPCUrl               string `gorm:"column:rpc_url"`        //Service endpoint for handling psbt signing
+// 	AccessToken          string `gorm:"column:access_token"`   //Access token for the signing service
+// }

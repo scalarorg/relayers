@@ -1,21 +1,17 @@
 package btc
 
 import (
-	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strconv"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/rs/zerolog/log"
+	vault "github.com/scalarorg/bitcoin-vault/ffi/go-vault"
+	"github.com/scalarorg/bitcoin-vault/go-utils/encode"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	relaydata "github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
-	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 )
 
 func (c *BtcClient) handleEventBusMessage(event *events.EventEnvelope) error {
@@ -31,7 +27,7 @@ func (c *BtcClient) handleEventBusMessage(event *events.EventEnvelope) error {
 		return c.handleScalarContractCallApproved(event.MessageID, event.Data.(string))
 	case events.EVENT_SCALAR_CREATE_PSBT_REQUEST:
 		//Broadcast from scalar.handleContractCallApprovedEvent
-		return c.handleScalarCreatePsbtRequest(event.MessageID, event.Data.([]chainstypes.QueryCommandResponse))
+		return c.handleScalarCreatePsbtRequest(event.MessageID, event.Data.(types.PsbtSigningRequest))
 	case events.EVENT_CUSTODIAL_SIGNATURES_CONFIRMED:
 		return c.handleCustodialSignaturesConfirmed(event.MessageID, event.Data.(string))
 	}
@@ -63,21 +59,31 @@ func (c *BtcClient) handleScalarContractCallApproved(messageID string, executeDa
 	}
 	return nil
 }
-func (c *BtcClient) handleScalarCreatePsbtRequest(messageId string, commandResponses []chainstypes.QueryCommandResponse) error {
+func (c *BtcClient) handleScalarCreatePsbtRequest(messageId string, psbtSigningRequest types.PsbtSigningRequest) error {
 	taprootAddress := c.btcConfig.Address
-	outpoints := make([]*wire.TxOut, len(commandResponses))
-	for i, cmd := range commandResponses {
-		amount, err := strconv.ParseInt(cmd.Params["amount"], 10, 64)
+	outpoints := make([]CommandOutPoint, len(psbtSigningRequest.Commands))
+	for i, cmd := range psbtSigningRequest.Commands {
+		amount, err := strconv.ParseUint(cmd.Params["amount"], 10, 64)
 		if err != nil {
 			return fmt.Errorf("cannot parse param %s to int value", cmd.Params["amount"])
 		}
-		pkScript := []byte{}
-		outpoints[i] = wire.NewTxOut(amount, pkScript)
+		feeOpts, rbf, pkScript, err := encode.DecodeContractCallWithTokenPayload(cmd.Payload)
+		if err != nil {
+			return fmt.Errorf("failed to decode contract call with token payload: %w", err)
+		}
+		outpoints[i] = CommandOutPoint{
+			BTCFeeOpts: feeOpts,
+			RBF:        rbf,
+			OutPoint: vault.UnstakingOutput{
+				Amount:        amount,
+				LockingScript: pkScript,
+			},
+		}
 	}
 	if taprootAddress == nil {
 		return fmt.Errorf("taproot address is not set")
 	}
-	psbt, err := c.createPsbt(*taprootAddress, outpoints)
+	psbt, err := c.createPsbts(psbtSigningRequest.Params, outpoints)
 	if err != nil {
 
 	}
@@ -136,7 +142,7 @@ func (c *BtcClient) broadcastForSignatures(messageID string, executeParams *type
 	//Real base64Psbt is without the first 2 bytes
 	signingType, finalBase64Psbt := c.detectSigningType(executeParams, base64Psbt)
 	log.Debug().Msgf("[BtcClient] [broadcastForSignatures] signingType: %v", signingType)
-	var signedPsbtHex string
+	// var signedPsbtHex string
 	var err error
 	if signingType == CUSTODIAL_ONLY {
 		//2. Request custodial signatures
@@ -148,17 +154,17 @@ func (c *BtcClient) broadcastForSignatures(messageID string, executeParams *type
 		}
 	} else {
 		//2. Request protocol signature
-		log.Debug().Msgf("[BtcClient] [broadcastForSignatures] request protocol signature")
-		signedPsbtHex, err = c.requestProtocolSignature(executeParams, finalBase64Psbt)
-		if err != nil {
-			return fmt.Errorf("[BtcClient] [broadcastForSignatures] failed to request protocol signature: %w", err)
-		}
-		//3. Broadcast to the network
-		txHash, err := c.BroadcastRawTx(signedPsbtHex)
-		if err != nil {
-			return fmt.Errorf("[BtcClient] [broadcastForSignatures] failed to broadcast tx: %w", err)
-		}
-		log.Debug().Msgf("[BtcClient] [broadcastForSignatures] broadcasted txHash: %s", txHash)
+		// log.Debug().Msgf("[BtcClient] [broadcastForSignatures] request protocol signature")
+		// signedPsbtHex, err = c.requestProtocolSignature(executeParams, finalBase64Psbt)
+		// if err != nil {
+		// 	return fmt.Errorf("[BtcClient] [broadcastForSignatures] failed to request protocol signature: %w", err)
+		// }
+		// //3. Broadcast to the network
+		// txHash, err := c.BroadcastRawTx(signedPsbtHex)
+		// if err != nil {
+		// 	return fmt.Errorf("[BtcClient] [broadcastForSignatures] failed to broadcast tx: %w", err)
+		// }
+		// log.Debug().Msgf("[BtcClient] [broadcastForSignatures] broadcasted txHash: %s", txHash)
 
 	}
 	//4. Todo:Update status in the db
@@ -181,71 +187,73 @@ func (c *BtcClient) detectSigningType(executeParams *types.ExecuteParams, base64
 		return CUSTODIAL_ONLY, base64Psbt
 	}
 }
-func (c *BtcClient) requestProtocolSignature(executeParams *types.ExecuteParams, base64Psbt string) (string, error) {
-	//1. Find protocol info
-	protocolInfo, err := c.dbAdapter.FindProtocolInfo(executeParams.SourceChain, executeParams.ContractAddress.Hex())
-	if err != nil {
-		return "", fmt.Errorf("[BtcClient] [requestProtocolSignature] failed to find protocol info by chain name and contract address: %s, %s, %w",
-			executeParams.SourceChain, executeParams.ContractAddress, err)
-	}
-	if protocolInfo.RPCUrl == "" {
-		return "", fmt.Errorf("[BtcClient] [requestProtocolSignature] protocol info does not have rpc url: %s, %s",
-			executeParams.SourceChain, executeParams.ContractAddress)
-	}
-	//singingUrl := fmt.Sprintf("%s/v1/sign-unbonding-tx", protocolInfo.RPCUrl)
-	signingUrl := protocolInfo.RPCUrl
-	accessToken := protocolInfo.AccessToken
-	// Create request payload
-	payload := map[string]interface{}{
-		"evm_chain_name":        executeParams.SourceChain,
-		"evm_tx_id":             executeParams.SourceTxHash,
-		"unbonding_psbt_base64": base64Psbt,
-	}
 
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal request payload: %w", err)
-	}
+//Todo:
+// func (c *BtcClient) requestProtocolSignature(executeParams *types.ExecuteParams, base64Psbt string) (string, error) {
+// 	//1. Find protocol info
+// 	protocolInfo, err := c.dbAdapter.FindProtocolInfo(executeParams.SourceChain, executeParams.ContractAddress.Hex())
+// 	if err != nil {
+// 		return "", fmt.Errorf("[BtcClient] [requestProtocolSignature] failed to find protocol info by chain name and contract address: %s, %s, %w",
+// 			executeParams.SourceChain, executeParams.ContractAddress, err)
+// 	}
+// 	if protocolInfo.RPCUrl == "" {
+// 		return "", fmt.Errorf("[BtcClient] [requestProtocolSignature] protocol info does not have rpc url: %s, %s",
+// 			executeParams.SourceChain, executeParams.ContractAddress)
+// 	}
+// 	//singingUrl := fmt.Sprintf("%s/v1/sign-unbonding-tx", protocolInfo.RPCUrl)
+// 	signingUrl := protocolInfo.RPCUrl
+// 	accessToken := protocolInfo.AccessToken
+// 	// Create request payload
+// 	payload := map[string]interface{}{
+// 		"evm_chain_name":        executeParams.SourceChain,
+// 		"evm_tx_id":             executeParams.SourceTxHash,
+// 		"unbonding_psbt_base64": base64Psbt,
+// 	}
 
-	// Create request
-	req, err := http.NewRequest("POST", signingUrl, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
+// 	jsonData, err := json.Marshal(payload)
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to marshal request payload: %w", err)
+// 	}
 
-	// Add headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+// 	// Create request
+// 	req, err := http.NewRequest("POST", signingUrl, bytes.NewBuffer(jsonData))
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to create request: %w", err)
+// 	}
 
-	// Make request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to make POST request: %w", err)
-	}
-	defer resp.Body.Close()
+// 	// Add headers
+// 	req.Header.Set("Content-Type", "application/json")
+// 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	// Check response status
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
-	}
+// 	// Make request
+// 	client := &http.Client{}
+// 	resp, err := client.Do(req)
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to make POST request: %w", err)
+// 	}
+// 	defer resp.Body.Close()
 
-	// Parse response
-	//Todo: Modify protocol signer to return signed psbt hex only
-	var response struct {
-		TxId  string `json:"tx_id"`  //If protocol signer broadcast the it return broadcasted Tx
-		TxHex string `json:"tx_hex"` //Signed raw btc tx hex, which is ready for broadcast
-	}
+// 	// Check response status
+// 	if resp.StatusCode != http.StatusOK {
+// 		body, _ := io.ReadAll(resp.Body)
+// 		return "", fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+// 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
-	}
-	if response.TxHex == "" {
-		return "", fmt.Errorf("signed psbt not found: %s", response.TxHex)
-	}
-	return response.TxHex, nil
-}
+// 	// Parse response
+// 	//Todo: Modify protocol signer to return signed psbt hex only
+// 	var response struct {
+// 		TxId  string `json:"tx_id"`  //If protocol signer broadcast the it return broadcasted Tx
+// 		TxHex string `json:"tx_hex"` //Signed raw btc tx hex, which is ready for broadcast
+// 	}
+
+// 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+// 		return "", fmt.Errorf("failed to decode response: %w", err)
+// 	}
+// 	if response.TxHex == "" {
+// 		return "", fmt.Errorf("signed psbt not found: %s", response.TxHex)
+// 	}
+// 	return response.TxHex, nil
+// }
 
 // Request custodial signatures from custodial network
 func (c *BtcClient) requestCustodialSignatures(messageID string, executeParams *types.ExecuteParams, base64Psbt string) error {

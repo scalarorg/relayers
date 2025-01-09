@@ -1,7 +1,9 @@
 package btc
 
 import (
+	vault "github.com/scalarorg/bitcoin-vault/ffi/go-vault"
 	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
+	"github.com/scalarorg/bitcoin-vault/go-utils/types"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 )
 
@@ -62,4 +64,10 @@ type Utxo struct {
 		BlockTime   uint64 `json:"block_time"`
 	} `json:"status"`
 	Value uint64 `json:"value"`
+}
+
+type CommandOutPoint struct {
+	BTCFeeOpts types.BTCFeeOpts
+	RBF        bool
+	OutPoint   vault.UnstakingOutput
 }

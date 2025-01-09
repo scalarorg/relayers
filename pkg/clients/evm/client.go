@@ -392,16 +392,20 @@ func (c *EvmClient) ListenToEvents(ctx context.Context) error {
 	return nil
 }
 
+// handle event from missing events recovery
 func (c *EvmClient) handleEvent(event any) error {
 	switch e := event.(type) {
+	case *contracts.IScalarGatewayTokenSent:
+		return c.HandleTokenSent(e)
+	case *contracts.IScalarGatewayContractCallWithToken:
+		return c.handleContractCallWithToken(e)
 	case *contracts.IScalarGatewayContractCall:
 		return c.handleContractCall(e)
 	case *contracts.IScalarGatewayContractCallApproved:
 		return c.HandleContractCallApproved(e)
 	case *contracts.IScalarGatewayExecuted:
 		return c.HandleCommandExecuted(e)
-	case *contracts.IScalarGatewayTokenSent:
-		return c.HandleTokenSent(e)
+
 	}
 	return nil
 }
@@ -415,16 +419,17 @@ func watchForEvent(c *EvmClient, ctx context.Context, eventName string) error {
 	watchOpts := bind.WatchOpts{Start: &lastCheckpoint.BlockNumber, Context: ctx}
 	log.Info().Str("eventName", eventName).Msg("[EvmClient] [watchForEvent] started watching for new events")
 	switch eventName {
-	case events.EVENT_EVM_CONTRACT_CALL:
-		return c.watchContractCall(&watchOpts)
+	case events.EVENT_EVM_TOKEN_SENT:
+		return c.watchEVMTokenSent(&watchOpts)
 	case events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN:
 		return c.watchContractCallWithToken(&watchOpts)
+	case events.EVENT_EVM_CONTRACT_CALL:
+		return c.watchContractCall(&watchOpts)
 	case events.EVENT_EVM_CONTRACT_CALL_APPROVED:
 		return c.watchContractCallApproved(&watchOpts)
 	case events.EVENT_EVM_COMMAND_EXECUTED:
-		return c.watchEVMExecuted(&watchOpts)
-	case events.EVENT_EVM_TOKEN_SENT:
-		return c.watchEVMTokenSent(&watchOpts)
+		return c.watchCommandExecuted(&watchOpts)
+
 	}
 	return nil
 }
@@ -505,7 +510,7 @@ func (c *EvmClient) watchContractCallApproved(watchOpts *bind.WatchOpts) error {
 	return nil
 }
 
-func (c *EvmClient) watchEVMExecuted(watchOpts *bind.WatchOpts) error {
+func (c *EvmClient) watchCommandExecuted(watchOpts *bind.WatchOpts) error {
 	sink := make(chan *contracts.IScalarGatewayExecuted)
 	subscription, err := c.Gateway.WatchExecuted(watchOpts, sink, nil)
 	if err != nil {

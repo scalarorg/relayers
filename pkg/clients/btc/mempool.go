@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
@@ -71,7 +69,7 @@ func GetMempoolTx(txID string, network string) (*btcjson.GetTransactionResult, e
 	return nil, fmt.Errorf("transaction not found after %d attempts", maxRetries)
 }
 
-func (c *BtcClient) GetAddressTxsUtxo(taprootAddress string) ([]wire.TxIn, error) {
+func (c *BtcClient) GetAddressTxsUtxo(taprootAddress string) ([]Utxo, error) {
 	url := fmt.Sprintf("%s/address/%s/utxo", c.btcConfig.MempoolUrl, taprootAddress)
 
 	resp, err := http.Get(url)
@@ -92,22 +90,5 @@ func (c *BtcClient) GetAddressTxsUtxo(taprootAddress string) ([]wire.TxIn, error
 		return nil, fmt.Errorf("failed to decode UTXOs: %w", err)
 	}
 	log.Debug().Msgf("[BtcClient] [GetAddressTxsUtxo] utxos: %v", utxos)
-
-	txIns := make([]wire.TxIn, 0, len(utxos))
-	for _, utxo := range utxos {
-		hash, err := chainhash.NewHashFromStr(utxo.Txid)
-		if err != nil {
-			return nil, fmt.Errorf("invalid txid %s: %w", utxo.Txid, err)
-		}
-
-		txIn := wire.TxIn{
-			PreviousOutPoint: wire.OutPoint{
-				Hash:  *hash,
-				Index: utxo.Vout,
-			},
-		}
-		txIns = append(txIns, txIn)
-	}
-
-	return txIns, nil
+	return utxos, nil
 }

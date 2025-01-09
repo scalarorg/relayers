@@ -12,9 +12,10 @@ require (
 	github.com/gogo/protobuf v1.3.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/rs/zerolog v1.33.0
-	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250107104524-6c675765e3b0
-	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250107104524-6c675765e3b0
-	github.com/scalarorg/go-electrum v0.1.1
+	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250109031324-77f9f86c76c3
+	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250109031324-77f9f86c76c3
+	github.com/scalarorg/go-electrum v0.1.2-0.20250109054544-05860f7f34a4
+	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250109032506-b6ae90bff7ee
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
@@ -43,7 +44,6 @@ require (
 	github.com/ethereum/go-verkle v0.1.1-0.20240829091221-dffa7562dbe9 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
-	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250107012525-dcf1036a148d // indirect
 	github.com/supranational/blst v0.3.13 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )

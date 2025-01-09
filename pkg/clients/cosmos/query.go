@@ -13,6 +13,7 @@ import (
 	auth "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/rs/zerolog/log"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	protypes "github.com/scalarorg/scalar-core/x/protocol/types"
 	scalartypes "github.com/scalarorg/scalar-core/x/scalarnet/types"
 	//gogogrpc "github.com/cosmos/gogoproto/grpc"
 	//pbgrpc "github.com/gogo/protobuf/grpc"
@@ -54,6 +55,22 @@ func (c *QueryClient) GetChainQueryServiceClient() (chainstypes.QueryServiceClie
 		return nil, err
 	}
 	return chainstypes.NewQueryServiceClient(clientCtx), nil
+}
+
+func (c *QueryClient) GetProtocolQueryClient() (protypes.QueryClient, error) {
+	clientCtx, err := c.GetClientCtx()
+	if err != nil {
+		return nil, err
+	}
+	return protypes.NewQueryClient(clientCtx), nil
+}
+
+func (c *QueryClient) GetScalarnetQueryClient() (scalartypes.QueryServiceClient, error) {
+	clientCtx, err := c.GetClientCtx()
+	if err != nil {
+		return nil, err
+	}
+	return scalartypes.NewQueryServiceClient(clientCtx), nil
 }
 
 func (c *QueryClient) GetMsgServiceClient() (scalartypes.MsgServiceClient, error) {
