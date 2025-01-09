@@ -34,16 +34,15 @@ func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayDa
 	relayData := models.RelayData{
 		ID:   id,
 		From: c.electrumConfig.SourceChain,
-		CallContract: &models.CallContract{
-			ID:              id,
-			TxHash:          vaultTx.TxHash,
-			BlockNumber:     uint64(vaultTx.Height),
-			LogIndex:        uint(vaultTx.TxPosition),
-			ContractAddress: strings.ToLower(vaultTx.DestContractAddress),
-			SourceAddress:   strings.ToLower(vaultTx.StakerAddress),
-			StakerPublicKey: &vaultTx.StakerPubkey,
-			Amount:          vaultTx.Amount,
-			Symbol:          "",
+		TokenSent: &models.TokenSent{
+			ID:                   id,
+			TxHash:               vaultTx.TxHash,
+			BlockNumber:          uint64(vaultTx.Height),
+			LogIndex:             uint(vaultTx.TxPosition),
+			SourceAddress:        strings.ToLower(vaultTx.StakerAddress),
+			DestinationAddress:   strings.ToLower(vaultTx.DestRecipientAddress),
+			TokenContractAddress: vaultTx.DestTokenAddress,
+			Amount:               vaultTx.Amount,
 		},
 	}
 	relayData.CreatedAt = time.Unix(int64(vaultTx.Timestamp), 0)

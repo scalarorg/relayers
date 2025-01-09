@@ -1,8 +1,12 @@
 package types
 
 import (
+	"github.com/btcsuite/btcd/btcutil"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/scalarorg/bitcoin-vault/ffi/go-vault"
+	address "github.com/scalarorg/bitcoin-vault/go-utils/address"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 )
 
 type ExecuteParams struct {
@@ -80,4 +84,25 @@ type RouteMessageRequest struct {
 type SignCommandsRequest struct {
 	Sender []byte `json:"sender"`
 	Chain  string `json:"chain"`
+}
+
+type PsbtParams struct {
+	ScalarTag      []byte
+	Version        uint8
+	ProtocolTag    []byte
+	NetworkKind    vault.NetworkKind //mainnet, testnet
+	NetworkType    string            //mainnet, testnet, testnet4, regtest
+	CovenantPubKey []vault.PublicKey
+	CovenantQuorum uint8
+	CovenantScript []byte
+}
+
+type PsbtSigningRequest struct {
+	Commands []chainstypes.QueryCommandResponse
+	Params   PsbtParams
+}
+
+// Calculate taproot address from covenant pubkey and network
+func (p *PsbtParams) GetTaprootAddress() (btcutil.Address, error) {
+	return address.ScriptPubKeyToAddress(p.CovenantScript, p.NetworkType)
 }

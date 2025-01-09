@@ -26,7 +26,7 @@ func (c *Client) ProcessPendingCommands(ctx context.Context) {
 		}
 		chainsWithPendingCmds := []string{}
 		for _, chain := range activedChains {
-			pendingCommands, err := c.queryClient.QueryPendingCommand(ctx, chain)
+			pendingCommands, err := c.queryClient.QueryPendingCommands(ctx, chain)
 			if err != nil {
 				log.Error().Err(err).Msg("[ScalarClient] [ProcessSigCommand] failed to get pending command")
 			} else if len(pendingCommands) > 0 {

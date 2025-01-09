@@ -149,12 +149,12 @@ func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
 	err = db.AutoMigrate(
 		&models.RelayData{},
 		&models.TokenSent{},
-		&models.TokenSentApproved{},
 		&models.CallContract{},
 		&models.CallContractWithToken{},
+		&models.TokenSentApproved{},
+		&models.CallContractApproved{},
 		&models.CallContractApproved{},
 		&models.CommandExecuted{},
-		&models.ProtocolInfo{},
 		&models.EventCheckPoint{},
 	)
 

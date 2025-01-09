@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
@@ -66,4 +67,28 @@ func GetMempoolTx(txID string, network string) (*btcjson.GetTransactionResult, e
 	}
 
 	return nil, fmt.Errorf("transaction not found after %d attempts", maxRetries)
+}
+
+func (c *BtcClient) GetAddressTxsUtxo(taprootAddress string) ([]Utxo, error) {
+	url := fmt.Sprintf("%s/address/%s/utxo", c.btcConfig.MempoolUrl, taprootAddress)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get UTXOs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	//log.Debug().Msgf("[BtcClient] [GetAddressTxsUtxo] body: %v", string(body))
+
+	var utxos []Utxo
+	if err := json.Unmarshal(body, &utxos); err != nil {
+		return nil, fmt.Errorf("failed to decode UTXOs: %w", err)
+	}
+	log.Debug().Msgf("[BtcClient] [GetAddressTxsUtxo] utxos: %v", utxos)
+	return utxos, nil
 }

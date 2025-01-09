@@ -44,7 +44,6 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IScalarGatewayC
 			Payload:         event.Payload,
 			//Use for bitcoin vault tx only
 			StakerPublicKey: nil,
-			Symbol:          "",
 		},
 	}
 	return relayData, nil
@@ -65,15 +64,18 @@ func (c *EvmClient) ContractCallWithToken2RelayData(event *contracts.IScalarGate
 		Payload:         event.Payload,
 		//Use for bitcoin vault tx only
 		StakerPublicKey: nil,
-		Symbol:          event.Symbol,
 	}
+	//Todo: get token contract address from scalar-core by source chain and token symbol
+	tokenContractAddress := "" //strings.ToLower(event.TokenContractAddress.String())
 	relayData := models.RelayData{
 		ID:   id,
 		From: c.evmConfig.GetId(),
 		To:   event.DestinationChain,
 		CallContractWithToken: &models.CallContractWithToken{
-			CallContract: callContract,
-			Amount:       event.Amount.Uint64(),
+			CallContract:         callContract,
+			TokenContractAddress: tokenContractAddress,
+			Symbol:               event.Symbol,
+			Amount:               event.Amount.Uint64(),
 		},
 	}
 	return relayData, nil

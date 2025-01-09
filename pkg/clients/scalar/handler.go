@@ -12,11 +12,12 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
-	"github.com/scalarorg/scalar-core/x/chains/types"
+	"github.com/scalarorg/relayers/pkg/types"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	"github.com/scalarorg/scalar-core/x/nexus/exported"
 )
 
-func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*types.EventTokenSent]) error {
+func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*chainstypes.EventTokenSent]) error {
 	updates := make([]db.RelaydataExecuteResult, 0)
 	for _, event := range events {
 		result, err := c.handleTokenSentEvent(ctx, &event)
@@ -30,7 +31,7 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*t
 	return c.dbAdapter.UpdateBatchRelayDataStatus(updates, len(updates))
 }
 
-func (c *Client) handleTokenSentEvent(ctx context.Context, event *IBCEvent[*types.EventTokenSent]) (*db.RelaydataExecuteResult, error) {
+func (c *Client) handleTokenSentEvent(ctx context.Context, event *IBCEvent[*chainstypes.EventTokenSent]) (*db.RelaydataExecuteResult, error) {
 	log.Debug().Interface("event", event).Msg("[ScalarClient] [handleTokenSentEvent]")
 	//1. Get pending transfer from Scalar network
 	destinationChain := event.Args.DestinationChain.String()
@@ -40,7 +41,7 @@ func (c *Client) handleTokenSentEvent(ctx context.Context, event *IBCEvent[*type
 	}
 	log.Debug().Msgf("Successfull create pending transfer request for chain %s", destinationChain)
 	//1. Get pending command from Scalar network
-	pendingCommands, err := c.queryClient.QueryPendingCommand(ctx, destinationChain)
+	pendingCommands, err := c.queryClient.QueryPendingCommands(ctx, destinationChain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pending command: %w", err)
 	}
@@ -51,15 +52,17 @@ func (c *Client) handleTokenSentEvent(ctx context.Context, event *IBCEvent[*type
 	log.Debug().Any("pendingCommands", pendingCommands).Msgf("[ScalarClient] [handleTokenSentEvent]")
 	//2. Sign the commands request
 	destChainName := exported.ChainName(destinationChain)
-	if types.IsEvmChain(destChainName) {
+	// Jan 09, 2025: Apply for transfer token from EVM to EVM only
+	// For send token from EVM to BTC, user need to call to the method gatewayContract.ContractCallWithToken
+	if chainstypes.IsEvmChain(destChainName) {
 		return c.signEvmCommandsRequest(ctx, string(event.Args.EventID), destinationChain)
-	} else if types.IsBitcoinChain(destChainName) {
-		return c.signBtcCommandsRequest(ctx, string(event.Args.EventID), destinationChain)
+	} else {
+		log.Debug().Msgf("[ScalarClient] [handleTokenSentEvent] Not support chain: %s", destChainName)
+		return nil, nil
 	}
-	return nil, nil
 }
 
-func (c *Client) handleMintCommandEvents(ctx context.Context, events []IBCEvent[*types.MintCommand]) error {
+func (c *Client) handleMintCommandEvents(ctx context.Context, events []IBCEvent[*chainstypes.MintCommand]) error {
 	//updates := make([]db.RelaydataExecuteResult, 0)
 	for _, event := range events {
 		_, err := c.handleMintCommandEvent(ctx, &event)
@@ -74,7 +77,7 @@ func (c *Client) handleMintCommandEvents(ctx context.Context, events []IBCEvent[
 	return nil
 }
 
-func (c *Client) handleMintCommandEvent(ctx context.Context, event *IBCEvent[*types.MintCommand]) (*sdk.TxResponse, error) {
+func (c *Client) handleMintCommandEvent(ctx context.Context, event *IBCEvent[*chainstypes.MintCommand]) (*sdk.TxResponse, error) {
 	log.Debug().Interface("event", event).Msg("[ScalarClient] [preprocessTokenSentEvent]")
 	signRes, err := c.network.SignCommandsRequest(ctx, string(event.Args.DestinationChain))
 	if err != nil || signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") || signRes.TxHash == "" {
@@ -83,7 +86,7 @@ func (c *Client) handleMintCommandEvent(ctx context.Context, event *IBCEvent[*ty
 	return signRes, nil
 }
 
-func (c *Client) handleContractCallApprovedEvents(ctx context.Context, events []IBCEvent[*types.ContractCallApproved]) error {
+func (c *Client) handleContractCallApprovedEvents(ctx context.Context, events []IBCEvent[*chainstypes.ContractCallApproved]) error {
 	updates := make([]db.RelaydataExecuteResult, 0)
 	for _, event := range events {
 		result, err := c.handleContractCallApprovedEvent(ctx, &event)
@@ -96,11 +99,11 @@ func (c *Client) handleContractCallApprovedEvents(ctx context.Context, events []
 	}
 	return c.dbAdapter.UpdateBatchRelayDataStatus(updates, len(updates))
 }
-func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBCEvent[*types.ContractCallApproved]) (*db.RelaydataExecuteResult, error) {
+func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBCEvent[*chainstypes.ContractCallApproved]) (*db.RelaydataExecuteResult, error) {
 	log.Debug().Interface("event", event).Msg("[ScalarClient] [preprocessContractCallApprovedEvent]")
 	//1. Get pending command from Scalar network
 	destinationChain := event.Args.DestinationChain.String()
-	pendingCommands, err := c.queryClient.QueryPendingCommand(ctx, destinationChain)
+	pendingCommands, err := c.queryClient.QueryPendingCommands(ctx, destinationChain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pending command: %w", err)
 	}
@@ -110,7 +113,7 @@ func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBC
 	}
 	log.Debug().Any("pendingCommands", pendingCommands).Msgf("[ScalarClient] [handleContractCallApprovedEvent]")
 	//2. Sign the commands request
-	if types.IsEvmChain(exported.ChainName(destinationChain)) {
+	if chainstypes.IsEvmChain(exported.ChainName(destinationChain)) {
 		return c.signEvmCommandsRequest(ctx, string(event.Args.EventID), destinationChain)
 	} else {
 		//For Vault Tx from btc, scalar client emit EventTokenSent
@@ -118,7 +121,7 @@ func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBC
 	}
 }
 
-func (c *Client) handleContractCallWithTokenApprovedEvents(ctx context.Context, events []IBCEvent[*types.EventContractCallWithMintApproved]) error {
+func (c *Client) handleContractCallWithTokenApprovedEvents(ctx context.Context, events []IBCEvent[*chainstypes.EventContractCallWithMintApproved]) error {
 	updates := make([]db.RelaydataExecuteResult, 0)
 	for _, event := range events {
 		result, err := c.handleContractCallWithTokenApprovedEvent(ctx, &event)
@@ -131,11 +134,11 @@ func (c *Client) handleContractCallWithTokenApprovedEvents(ctx context.Context, 
 	}
 	return c.dbAdapter.UpdateBatchRelayDataStatus(updates, len(updates))
 }
-func (c *Client) handleContractCallWithTokenApprovedEvent(ctx context.Context, event *IBCEvent[*types.EventContractCallWithMintApproved]) (*db.RelaydataExecuteResult, error) {
+func (c *Client) handleContractCallWithTokenApprovedEvent(ctx context.Context, event *IBCEvent[*chainstypes.EventContractCallWithMintApproved]) (*db.RelaydataExecuteResult, error) {
 	log.Debug().Interface("event", event).Msg("[ScalarClient] [handleContractCallWithTokenApprovedEvent]")
 	//1. Get pending command from Scalar network
 	destinationChain := event.Args.DestinationChain.String()
-	pendingCommands, err := c.queryClient.QueryPendingCommand(ctx, destinationChain)
+	pendingCommands, err := c.queryClient.QueryPendingCommands(ctx, destinationChain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pending command: %w", err)
 	}
@@ -145,12 +148,25 @@ func (c *Client) handleContractCallWithTokenApprovedEvent(ctx context.Context, e
 	}
 	log.Debug().Any("pendingCommands", pendingCommands).Msgf("[ScalarClient] [handleContractCallWithTokenApprovedEvent]")
 	//2. Sign the commands request
-	if types.IsEvmChain(exported.ChainName(destinationChain)) {
+	chainName := exported.ChainName(destinationChain)
+	if chainstypes.IsEvmChain(chainName) {
 		return c.signEvmCommandsRequest(ctx, string(event.Args.EventID), destinationChain)
-	} else {
-		//For Vault Tx from btc, scalar client emit EventTokenSent
+	} else if chainstypes.IsBitcoinChain(chainName) {
+		//Request btc client form psbt from pending commands then send sign psbt request back to the scalar node
+		psbtSigningRequest := types.PsbtSigningRequest{
+			Commands: pendingCommands,
+			Params:   c.GetPsbtParams(destinationChain),
+		}
+		eventEnvelope := events.EventEnvelope{
+			EventType:        events.EVENT_SCALAR_CREATE_PSBT_REQUEST,
+			DestinationChain: destinationChain,
+			MessageID:        string(event.Args.EventID),
+			Data:             psbtSigningRequest,
+		}
+		c.eventBus.BroadcastEvent(&eventEnvelope)
 		return nil, nil
 	}
+	return nil, nil
 }
 func (c *Client) signEvmCommandsRequest(ctx context.Context, eventId string, destinationChain string) (*db.RelaydataExecuteResult, error) {
 	signRes, err := c.network.SignCommandsRequest(ctx, destinationChain)
@@ -225,7 +241,7 @@ func (c *Client) signBtcCommandsRequest(ctx context.Context, eventId string, des
 	}, nil
 }
 
-func (c *Client) handleCommandBatchSignedEvent(ctx context.Context, events []IBCEvent[*types.CommandBatchSigned]) error {
+func (c *Client) handleCommandBatchSignedEvent(ctx context.Context, events []IBCEvent[*chainstypes.CommandBatchSigned]) error {
 	for _, event := range events {
 		err := c.handleCommantBatchSignedsEvent(ctx, &event)
 		if err != nil {
@@ -235,13 +251,13 @@ func (c *Client) handleCommandBatchSignedEvent(ctx context.Context, events []IBC
 	return nil
 }
 
-func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *IBCEvent[*types.CommandBatchSigned]) error {
+func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *IBCEvent[*chainstypes.CommandBatchSigned]) error {
 	destinationChain := string(event.Args.Chain)
 	client, err := c.GetQueryClient().GetChainQueryServiceClient()
 	if err != nil {
 		return fmt.Errorf("failed to create service client: %w", err)
 	}
-	res, err := client.BatchedCommands(ctx, &types.BatchedCommandsRequest{
+	res, err := client.BatchedCommands(ctx, &chainstypes.BatchedCommandsRequest{
 		Chain: destinationChain,
 		Id:    hex.EncodeToString(event.Args.CommandBatchID),
 	})
@@ -252,7 +268,7 @@ func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *IBCE
 	// Broadcast the execute data to the Event bus
 	// Todo:After the executeData is broadcasted,
 	// Update status of the RelayerData to Approved
-	if c.eventBus != nil && res.Status == types.BatchSigned {
+	if c.eventBus != nil && res.Status == chainstypes.BatchSigned {
 		c.eventBus.BroadcastEvent(&events.EventEnvelope{
 			EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
 			DestinationChain: string(event.Args.Chain),
@@ -261,7 +277,7 @@ func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *IBCE
 		})
 		//Find commands by ids for update db status
 		for _, cmdID := range res.CommandIDs {
-			cmdRes, err := client.Command(ctx, &types.CommandRequest{Chain: destinationChain, ID: cmdID})
+			cmdRes, err := client.Command(ctx, &chainstypes.CommandRequest{Chain: destinationChain, ID: cmdID})
 			if err != nil {
 				return fmt.Errorf("[ScalarClient] [handleCommantBatchSignedsEvent] failed to get command by ID: %w", err)
 			}
@@ -318,7 +334,7 @@ func (c *Client) waitForSignCommandsEvent(ctx context.Context, txHash string) (s
 		return batchCommandId, commandIDs
 	}
 }
-func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string, batchCommandId string) (*types.BatchedCommandsResponse, error) {
+func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string, batchCommandId string) (*chainstypes.BatchedCommandsResponse, error) {
 	res, err := c.queryClient.QueryBatchedCommands(ctx, destinationChain, batchCommandId)
 	for {
 		if err != nil {
@@ -340,7 +356,7 @@ func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string
 	return res, nil
 }
 
-func (c *Client) handleEVMCompletedEvents(ctx context.Context, events []IBCEvent[*types.ChainEventCompleted]) error {
+func (c *Client) handleEVMCompletedEvents(ctx context.Context, events []IBCEvent[*chainstypes.ChainEventCompleted]) error {
 	for _, event := range events {
 		err := c.handleEVMCompletedEvent(ctx, &event)
 		if err != nil {
@@ -349,7 +365,7 @@ func (c *Client) handleEVMCompletedEvents(ctx context.Context, events []IBCEvent
 	}
 	return nil
 }
-func (c *Client) handleEVMCompletedEvent(ctx context.Context, event *IBCEvent[*types.ChainEventCompleted]) error {
+func (c *Client) handleEVMCompletedEvent(ctx context.Context, event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
 	payload, err := c.preprocessEVMCompletedEvent(event)
 	if err != nil {
 		return err
@@ -383,7 +399,7 @@ func (c *Client) handleEVMCompletedEvent(ctx context.Context, event *IBCEvent[*t
 	return nil
 }
 
-func (c *Client) preprocessEVMCompletedEvent(event *IBCEvent[*types.ChainEventCompleted]) (any, error) {
+func (c *Client) preprocessEVMCompletedEvent(event *IBCEvent[*chainstypes.ChainEventCompleted]) (any, error) {
 	log.Debug().Msgf("EVMCompletedEvent: %v", event)
 	// Load payload from the db
 	includeCallContract := true
