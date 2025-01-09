@@ -35,7 +35,6 @@ func (c *Client) ProcessPendingCommands(ctx context.Context) {
 			}
 		}
 		if counter >= 100 {
-			log.Info().Msgf("No pending commands found. Sleep for %ds then retry.(This message is printed one of 100)", int64(interval.Seconds()))
 			counter = 0
 		}
 		time.Sleep(interval)
@@ -61,7 +60,7 @@ func (c *Client) checkChainPendingCommands(ctx context.Context, chain string, co
 		c.pendingChainCommands.Store(chain, 1)
 	} else {
 		if counter >= 100 {
-			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [ProcessPendingCommands] No pending command found")
+			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [ProcessPendingCommands] No pending command found. This message is printed one of 100	")
 		}
 	}
 }
@@ -82,7 +81,8 @@ func (c *Client) processSignCommandTxs(ctx context.Context) {
 			} else if txRes == nil || txRes.Code != 0 || txRes.Logs == nil || len(txRes.Logs) == 0 {
 				log.Debug().
 					Str("TxHash", txHash).
-					Msg("[ScalarClient] [processSignCommandTxs] txResponse not found")
+					Str("Chain", chain).
+					Msg("[ScalarClient] [processSignCommandTxs] Sign command request not found")
 			} else if len(txRes.Logs) > 0 {
 				batchCommandId := findEventAttribute(txRes.Logs[0].Events, "sign", "batchedCommandID")
 				if batchCommandId == "" {
@@ -106,11 +106,19 @@ func (c *Client) processBatchCommands(ctx context.Context) {
 		for batchCommandId, destChain := range hashes {
 			res, err := c.queryClient.QueryBatchedCommands(ctx, destChain, batchCommandId)
 			if err != nil {
-				log.Debug().Err(err).Str("BatchCommandId", batchCommandId).Msgf("[ScalarClient] [processBatchCommands] batched command not found")
+				log.Debug().Err(err).
+					Str("Chain", destChain).
+					Str("BatchCommandId", batchCommandId).
+					Msgf("[ScalarClient] [processBatchCommands] batched command not found")
+				continue
 			}
 			if res.Status == 3 {
 				c.pendingBatchCommands.Delete(batchCommandId)
-				log.Debug().Str("Chain", destChain).Any("BatchCommandResponse", res).Msg("[ScalarClient] [processBatchCommands] Found batchCommand response. Broadcast to eventBus")
+				log.Debug().
+					Str("Chain", destChain).
+					Str("BatchCommandId", batchCommandId).
+					Any("BatchCommandResponse", res).
+					Msg("[ScalarClient] [processBatchCommands] Found batchCommand response. Broadcast to eventBus")
 				eventEnvelope := events.EventEnvelope{
 					EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
 					DestinationChain: destChain,
