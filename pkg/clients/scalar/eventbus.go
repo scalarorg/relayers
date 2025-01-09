@@ -11,7 +11,6 @@ import (
 )
 
 func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
-	log.Info().Msgf("[ScalarClient] [handleEventBusMessage]: %v", event)
 	switch event.EventType {
 	case events.EVENT_ELECTRS_VAULT_TRANSACTION:
 		//Broadcast from electrs.handleVaultTransaction

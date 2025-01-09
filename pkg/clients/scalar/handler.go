@@ -205,41 +205,6 @@ func (c *Client) signEvmCommandsRequest(ctx context.Context, eventId string, des
 	// }, nil
 	return nil, nil
 }
-func (c *Client) signBtcCommandsRequest(ctx context.Context, eventId string, destinationChain string) (*db.RelaydataExecuteResult, error) {
-	signRes, err := c.network.SignCommandsRequest(ctx, destinationChain)
-	if err != nil || signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") || signRes.TxHash == "" {
-		return nil, fmt.Errorf("[ScalarClient] [handleContractCallApprovedEvent] failed to sign commands request: %v, %w", signRes, err)
-	}
-	log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] Successfully broadcasted sign commands request with txHash: %s. Waiting for sign event...", signRes.TxHash)
-	//3. Wait for the sign event
-	//Todo: Check if the sign event is received
-	batchCommandId, commandIDs := c.waitForSignCommandsEvent(ctx, signRes.TxHash)
-	if batchCommandId == "" || commandIDs == "" {
-		return nil, fmt.Errorf("BatchCommandId not found")
-	}
-	log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] Successfully received sign commands event with batch command id: %s", batchCommandId)
-	// 2. Old version, loop for get ExecuteData from batch command id
-	batchCmdRes, err := c.waitForExecuteData(ctx, destinationChain, batchCommandId)
-	if err != nil {
-		return nil, fmt.Errorf("[ScalarClient] [handleContractCallApprovedEvent] failed to get execute data: %w", err)
-	}
-	eventEnvelope := events.EventEnvelope{
-		EventType:        events.EVENT_SCALAR_DEST_CALL_APPROVED,
-		DestinationChain: destinationChain,
-		MessageID:        eventId,
-		Data:             batchCmdRes.ExecuteData,
-	}
-	log.Debug().Msgf("[ScalarClient] [handleContractCallApprovedEvent] broadcast to eventBus: EventType: %s, DestinationChain: %s, MessageID: %v",
-		eventEnvelope.EventType, eventEnvelope.DestinationChain, eventEnvelope.MessageID)
-	// 3. Broadcast the execute data to the Event bus
-	// Todo:After the executeData is broadcasted,
-	// Update status of the RelayerData to Approved
-	c.eventBus.BroadcastEvent(&eventEnvelope)
-	return &db.RelaydataExecuteResult{
-		Status:      db.APPROVED,
-		RelayDataId: eventId,
-	}, nil
-}
 
 func (c *Client) handleCommandBatchSignedEvent(ctx context.Context, events []IBCEvent[*chainstypes.CommandBatchSigned]) error {
 	for _, event := range events {
@@ -307,6 +272,8 @@ func (c *Client) findBatchCommandId(ctx context.Context, txHash string) (string,
 func (c *Client) waitForSignCommandsEvent(ctx context.Context, txHash string) (string, string) {
 	var txRes *sdk.TxResponse
 	var err error
+	var batchCommandId string
+	var commandIDs string
 	//First time wait for 5 seconds
 	time.Sleep(5 * time.Second)
 	for {
@@ -316,20 +283,13 @@ func (c *Client) waitForSignCommandsEvent(ctx context.Context, txHash string) (s
 			//Wait for 2 seconds before retry
 			time.Sleep(2 * time.Second)
 			continue
-		} else if txRes == nil {
+		} else if txRes == nil || txRes.Code != 0 || txRes.Logs == nil || len(txRes.Logs) == 0 {
 			log.Debug().
 				Str("TxHash", txHash).
 				Msg("[ScalarClient] [waitForSignCommandsEvent] txResponse not found")
-		} else if txRes.Code != 0 || len(txRes.Logs) == 0 {
-			log.Debug().
-				Str("TxHash", txRes.TxHash).
-				Any("TxRes", txRes).
-				Msg("[ScalarClient] [waitForSignCommandsEvent]")
-		}
-		batchCommandId := findEventAttribute(txRes.Logs[0].Events, "sign", "batchedCommandID")
-		commandIDs := findEventAttribute(txRes.Logs[0].Events, "sign", "commandIDs")
-		if batchCommandId == "" {
-			log.Debug().Msgf("[ScalarClient] [waitForSignCommandsEvent] no batch command id found in the tx: %v", txRes.TxHash)
+		} else if len(txRes.Logs) > 0 {
+			batchCommandId = findEventAttribute(txRes.Logs[0].Events, "sign", "batchedCommandID")
+			commandIDs = findEventAttribute(txRes.Logs[0].Events, "sign", "commandIDs")
 		}
 		return batchCommandId, commandIDs
 	}
