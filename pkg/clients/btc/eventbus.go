@@ -12,6 +12,7 @@ import (
 	relaydata "github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 )
 
 func (c *BtcClient) handleEventBusMessage(event *events.EventEnvelope) error {
@@ -28,6 +29,8 @@ func (c *BtcClient) handleEventBusMessage(event *events.EventEnvelope) error {
 	case events.EVENT_SCALAR_CREATE_PSBT_REQUEST:
 		//Broadcast from scalar.handleContractCallApprovedEvent
 		return c.handleScalarCreatePsbtRequest(event.MessageID, event.Data.(types.CreatePsbtRequest))
+	case events.EVENT_SCALAR_BATCHCOMMAND_SIGNED:
+		return c.handleScalarBatchCommandSigned(event.DestinationChain, event.Data.(*chainstypes.BatchedCommandsResponse))
 	case events.EVENT_CUSTODIAL_SIGNATURES_CONFIRMED:
 		return c.handleCustodialSignaturesConfirmed(event.MessageID, event.Data.(string))
 	}
@@ -98,6 +101,33 @@ func (c *BtcClient) handleScalarCreatePsbtRequest(messageId string, psbtSigningR
 			Psbts:     psbts,
 		},
 	})
+	return nil
+}
+
+// Broadcast signed psbt to the bitcoin network
+func (c *BtcClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRes *chainstypes.BatchedCommandsResponse) error {
+	log.Debug().
+		Str("ChainId", chainId).
+		Str("BatchedCommandID", batchedCmdRes.ID).
+		Any("CommandIDs", batchedCmdRes.CommandIDs).
+		Msgf("[BtcClient] [handleScalarBatchCommandSigned] broadcasting signed psbt")
+	//Broadcast to the network
+	txHash, err := c.BroadcastRawTx(batchedCmdRes.ExecuteData)
+	if err != nil {
+		log.Error().Err(err).
+			Str("signedPsbt", batchedCmdRes.ExecuteData).
+			Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to broadcast tx")
+		return err
+	}
+	txHashStr := txHash.String()
+	log.Debug().Msgf("[BtcClient] [handleScalarBatchCommandSigned] broadcasted txHash: %s", txHashStr)
+	// err = c.dbAdapter.UpdateRelayDataStatueWithExecuteHash(messageID, relaydata.SUCCESS, &txHashStr)
+	// if err != nil {
+	// 	log.Error().Err(err).
+	// 		Str("messageID", messageID).
+	// 		Str("signedPsbt", signedPsbt).
+	// 		Msg("[BtcClient] [handleCustodialSignaturesConfirmed] failed to update relay data status")
+	// }
 	return nil
 }
 func (c *BtcClient) executeBtcCommand(messageID string, commandId [32]byte, command string, params []byte) error {

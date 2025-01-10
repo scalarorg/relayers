@@ -50,6 +50,11 @@ func (c *Client) ProcessPendingCommands(ctx context.Context) {
 }
 func (c *Client) checkChainPendingCommands(ctx context.Context, chain string, counter int) {
 	pendingCommands, err := c.queryClient.QueryPendingCommands(ctx, chain)
+	isInSigningProcess := c.checkLatestBatchCommandIsSigning(ctx, chain)
+	if isInSigningProcess {
+		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] The latest batch command is in signing process, skip send new signing request")
+		return
+	}
 	if err != nil {
 		log.Error().Err(err).Msg("[ScalarClient] [ProcessSigCommand] failed to get pending command")
 		return
@@ -147,7 +152,7 @@ func (c *Client) processBatchCommands(ctx context.Context) {
 					Msgf("[ScalarClient] [processBatchCommands] batched command not found")
 				continue
 			}
-			if res.Status == 3 {
+			if res.Status == chainstypes.BatchSigned {
 				c.pendingBatchCommands.Delete(batchCommandId)
 				log.Debug().
 					Str("Chain", destChain).
@@ -156,7 +161,8 @@ func (c *Client) processBatchCommands(ctx context.Context) {
 				eventEnvelope := events.EventEnvelope{
 					EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
 					DestinationChain: destChain,
-					Data:             res.ExecuteData,
+					CommandIDs:       res.CommandIDs,
+					Data:             res,
 				}
 				c.eventBus.BroadcastEvent(&eventEnvelope)
 			}
@@ -176,6 +182,14 @@ func (c *Client) processPsbtCommands(ctx context.Context) {
 			return true
 		})
 		for chain, psbt := range hashes {
+			//Check if the latest batch command is not in signing process
+			//Query the latest batch command by set batchedCommandId to empty string
+			isInSigningProcess := c.checkLatestBatchCommandIsSigning(ctx, chain)
+			if isInSigningProcess {
+				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] The latest batch command is in signing process, skip send new sign command request")
+				continue
+			}
+
 			log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] Sign psbt request")
 			signRes, err := c.network.SignBtcCommandsRequest(context.Background(), chain, psbt)
 			if err != nil {
@@ -194,13 +208,18 @@ func (c *Client) processPsbtCommands(ctx context.Context) {
 						c.pendingChainPsbtCommands.Store(chain, psbts)
 					}
 				}
-				c.pendingChainPsbtCommands.Delete(chain)
-				//Add the tx hash to the pending buffer
-				c.pendingSignCommandTxs.Store(signRes.TxHash, chain)
 			}
 		}
 		time.Sleep(time.Second * 3)
 	}
+}
+func (c *Client) checkLatestBatchCommandIsSigning(ctx context.Context, chain string) bool {
+	res, err := c.queryClient.QueryBatchedCommands(ctx, chain, "")
+	if err != nil {
+		log.Error().Err(err).Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] failed to get batched commands")
+		return false
+	}
+	return res.Status == chainstypes.BatchSigning
 }
 
 // func (c *Client) processPendingCommandsForChain(ctx context.Context, destChain string) error {

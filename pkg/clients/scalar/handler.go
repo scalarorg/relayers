@@ -245,7 +245,6 @@ func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *IBCE
 			c.eventBus.BroadcastEvent(&events.EventEnvelope{
 				EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
 				DestinationChain: string(event.Args.Chain),
-				MessageID:        "",
 				Data:             res.ExecuteData,
 			})
 		} else if chainstypes.IsBitcoinChain(chainName) {

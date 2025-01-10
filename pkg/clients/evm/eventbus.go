@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	relaydata "github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 )
 
 func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
@@ -18,7 +19,7 @@ func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
 	switch event.EventType {
 	case events.EVENT_SCALAR_BATCHCOMMAND_SIGNED:
 		//Emitted from scalar.handleContractCallApprovedEvent with event.Data as executeData
-		err := ec.handleScalarBatchCommandSigned(event.DestinationChain, event.Data.(string))
+		err := ec.handleScalarBatchCommandSigned(event.DestinationChain, event.Data.(*chainstypes.BatchedCommandsResponse))
 		if err != nil {
 			log.Error().
 				Err(err).
@@ -100,12 +101,13 @@ func (ec *EvmClient) handleScalarTokenSent(executeData string) error {
 	return nil
 }
 
-func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, executeData string) error {
+func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRes *chainstypes.BatchedCommandsResponse) error {
 	log.Debug().
 		Str("ChainId", chainId).
-		Str("executeData", executeData).
+		Str("BatchedCommandID", batchedCmdRes.ID).
+		Any("CommandIDs", batchedCmdRes.CommandIDs).
 		Msg("[EvmClient] [handleScalarBatchCommandSigned]")
-	decodedExecuteData, err := DecodeExecuteData(executeData)
+	decodedExecuteData, err := DecodeExecuteData(batchedCmdRes.ExecuteData)
 	if err != nil {
 		return fmt.Errorf("failed to decode execute data: %w", err)
 	}
