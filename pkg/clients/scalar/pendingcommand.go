@@ -1,6 +1,7 @@
 package scalar
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	"github.com/scalarorg/scalar-core/x/nexus/exported"
 )
 
@@ -24,6 +26,8 @@ func (c *Client) ProcessPendingCommands(ctx context.Context) {
 	//Start a goroutine to process batch commands
 	go c.processBatchCommands(ctx)
 
+	//Start a goroutine to process psbt commands
+	go c.processPsbtCommands(ctx)
 	counter := 0
 	for {
 		counter += 1
@@ -66,7 +70,7 @@ func (c *Client) checkChainPendingCommands(ctx context.Context, chain string, co
 			log.Debug().Msgf("[ScalarClient] [checkChainPendingCommands] Successfully broadcasted sign commands request with txHash: %s. Add it to pendingSignCommandTxs...", signRes.TxHash)
 		} else if chainstypes.IsBitcoinChain(nexusChain) {
 			//For bitcoin chain, we need to get psbt from pending commands then send sign psbt request back to the scalar node
-			psbtSigningRequest := types.PsbtSigningRequest{
+			psbtSigningRequest := types.CreatePsbtRequest{
 				Commands: pendingCommands,
 				Params:   c.GetPsbtParams(chain),
 			}
@@ -155,6 +159,44 @@ func (c *Client) processBatchCommands(ctx context.Context) {
 					Data:             res.ExecuteData,
 				}
 				c.eventBus.BroadcastEvent(&eventEnvelope)
+			}
+		}
+		time.Sleep(time.Second * 3)
+	}
+}
+
+func (c *Client) processPsbtCommands(ctx context.Context) {
+	for {
+		var hashes = map[string]covtypes.Psbt{}
+		c.pendingChainPsbtCommands.Range(func(key, value interface{}) bool {
+			psbts := value.([]covtypes.Psbt)
+			if len(psbts) > 0 {
+				hashes[key.(string)] = psbts[0]
+			}
+			return true
+		})
+		for chain, psbt := range hashes {
+			log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] Sign psbt request")
+			signRes, err := c.network.SignBtcCommandsRequest(context.Background(), chain, psbt)
+			if err != nil {
+				log.Error().Err(err).Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] failed to sign psbt request")
+			} else if signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") {
+				log.Error().Str("Chain", chain).Any("SignResponse", signRes).Msg("[ScalarClient] [processPsbtCommands] failed to sign psbt request")
+			} else if signRes.TxHash == "" {
+				log.Error().Str("Chain", chain).Any("SignResponse", signRes).Msg("[ScalarClient] [processPsbtCommands] failed to sign psbt request (without tx hash)")
+			} else {
+				log.Debug().Str("Chain", chain).Str("TxHash", signRes.TxHash).Msg("[ScalarClient] [processPsbtCommands] Successfully signed psbt request")
+				//Remove the psbt from the pending buffer
+				if value, ok := c.pendingChainPsbtCommands.Load(chain); ok && value != nil {
+					psbts := value.([]covtypes.Psbt)
+					if len(psbts) > 0 && bytes.Equal(psbts[0], psbt) {
+						psbts = psbts[1:]
+						c.pendingChainPsbtCommands.Store(chain, psbts)
+					}
+				}
+				c.pendingChainPsbtCommands.Delete(chain)
+				//Add the tx hash to the pending buffer
+				c.pendingSignCommandTxs.Store(signRes.TxHash, chain)
 			}
 		}
 		time.Sleep(time.Second * 3)

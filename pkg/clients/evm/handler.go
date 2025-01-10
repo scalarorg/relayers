@@ -105,7 +105,7 @@ func (ec *EvmClient) handleContractCallWithToken(event *contracts.IScalarGateway
 	//2. Send to the bus
 	confirmTxs := events.ConfirmTxsRequest{
 		ChainName: ec.evmConfig.GetId(),
-		TxHashs:   map[string]string{relayData.CallContract.TxHash: relayData.To},
+		TxHashs:   map[string]string{relayData.CallContractWithToken.TxHash: relayData.To},
 	}
 	if ec.eventBus != nil {
 		ec.eventBus.BroadcastEvent(&events.EventEnvelope{

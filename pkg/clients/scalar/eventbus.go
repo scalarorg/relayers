@@ -2,12 +2,10 @@ package scalar
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/events"
-	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
+	"github.com/scalarorg/relayers/pkg/types"
 )
 
 func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
@@ -18,7 +16,7 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 	case events.EVENT_EVM_TOKEN_SENT, events.EVENT_EVM_CONTRACT_CALL, events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN:
 		return c.requestConfirmEvmTxs(event.Data.(events.ConfirmTxsRequest))
 	case events.EVENT_BTC_PSBT_SIGN_REQUEST:
-		return c.requestPsbtSign(event.DestinationChain, event.Data.(covtypes.Psbt))
+		return c.requestPsbtSign(event.Data.(types.SignPsbtsRequest))
 	}
 
 	return nil
@@ -52,17 +50,15 @@ func (c *Client) requestConfirmEvmTxs(confirmRequest events.ConfirmTxsRequest) e
 	return nil
 }
 
-func (c *Client) requestPsbtSign(destinationChain string, psbt covtypes.Psbt) error {
-	signRes, err := c.network.SignBtcCommandsRequest(context.Background(), destinationChain, psbt)
-	if err != nil || signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") || signRes.TxHash == "" {
-		return fmt.Errorf("[ScalarClient] [requestPsbtSign] failed to sign psbt request: %v, %w", signRes, err)
-	}
+func (c *Client) requestPsbtSign(psbt types.SignPsbtsRequest) error {
+	log.Debug().Str("ChainName", psbt.ChainName).Int("psbtCount", len(psbt.Psbts)).Msgf("[ScalarClient] [requestPsbtSign] Set psbts to pendingChainPsbtCommands")
+	c.pendingChainPsbtCommands.Store(psbt.ChainName, psbt.Psbts)
 	return nil
 }
 
 func (c *Client) extractValidConfirmTxs(confirmRequest events.ConfirmTxsRequest) (string, []string) {
 	txHashes := make([]string, 0)
-	for txHash, _ := range confirmRequest.TxHashs {
+	for txHash := range confirmRequest.TxHashs {
 		txHashes = append(txHashes, txHash)
 		// if c.globalConfig.ActiveChains[destChain] {
 		// 	txHashes = append(txHashes, txHash)

@@ -12,6 +12,7 @@ import (
 type ValidEvmEvent interface {
 	*contracts.IScalarGatewayContractCallApproved |
 		*contracts.IScalarGatewayContractCall |
+		*contracts.IScalarGatewayContractCallWithToken |
 		*contracts.IScalarGatewayExecuted |
 		*contracts.IScalarGatewayTokenSent
 }
