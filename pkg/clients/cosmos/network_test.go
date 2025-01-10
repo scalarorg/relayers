@@ -128,6 +128,12 @@ func TestSignCommandsRequest(t *testing.T) {
 	// fmt.Printf("%v", txRes)
 }
 
+func TestQueryAccount(t *testing.T) {
+	account, err := networkClient.GetQueryClient().QueryAccount(context.Background(), networkClient.GetAddress())
+	require.NoError(t, err)
+	require.NotNil(t, account)
+}
+
 func verifySignature(txf tx.Factory, pubKey cryptotypes.PubKey, msg authsigning.Tx) error {
 	sigTx, ok := msg.(authsigning.SigVerifiableTx)
 	if !ok {

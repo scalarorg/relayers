@@ -246,6 +246,7 @@ func (c *NetworkClient) CreateTxFactory(ctx context.Context) tx.Factory {
 		//If sequence number is greater than current sequence number, update the sequence number
 		//This is to avoid the situation where the transaction is not included in the next block
 		//Then account sequence number is not updated on the server side
+		//Todo: better set sequence = resp.Sequence + number of pendingTx
 		if resp.Sequence >= txf.Sequence() {
 			txf = txf.WithSequence(resp.Sequence)
 		}
@@ -330,6 +331,7 @@ func (c *NetworkClient) trySignAndBroadcastMsgs(ctx context.Context, txBuilder c
 			log.Debug().Msgf("[ScalarNetworkClient] [trySignAndBroadcast] sleep for %d milliseconds due to error: %s", c.config.RetryInterval, result.RawLog)
 			time.Sleep(time.Duration(c.config.RetryInterval) * time.Millisecond)
 		} else {
+			log.Error().Msgf("[ScalarNetworkClient] [trySignAndBroadcast] successfully to broadcast tx after %d retries", c.config.MaxRetries)
 			return result, nil
 		}
 	}
@@ -526,4 +528,8 @@ func (c *NetworkClient) GetRpcClient() (rpcclient.Client, error) {
 func (c *NetworkClient) RemoveRpcClient() {
 	//Todo: Figure out how to clean up resource
 	c.rpcClient = nil
+}
+
+func (c *NetworkClient) GetQueryClient() *QueryClient {
+	return c.queryClient
 }
