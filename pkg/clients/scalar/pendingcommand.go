@@ -2,7 +2,6 @@ package scalar
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -13,10 +12,15 @@ import (
 // Periodically call to the scalar network to check if there is any pending SignCommand
 // Then request signCommand request
 func (c *Client) ProcessPendingCommands(ctx context.Context) {
-	interval := time.Second
+	interval := time.Second * 5
 	if c.networkConfig.CommandInterval > 0 {
 		interval = time.Millisecond * time.Duration(c.networkConfig.CommandInterval)
 	}
+	//Start a goroutine to process sign command txs
+	go c.processSignCommandTxs(ctx)
+	//Start a goroutine to process batch commands
+	go c.processBatchCommands(ctx)
+
 	counter := 0
 	for {
 		counter += 1
@@ -24,68 +28,147 @@ func (c *Client) ProcessPendingCommands(ctx context.Context) {
 		if err != nil {
 			log.Error().Err(err).Msg("[ScalarClient] [ProcessSigCommand] Cannot get actived chains")
 		}
-		chainsWithPendingCmds := []string{}
 		for _, chain := range activedChains {
-			pendingCommands, err := c.queryClient.QueryPendingCommands(ctx, chain)
-			if err != nil {
-				log.Error().Err(err).Msg("[ScalarClient] [ProcessSigCommand] failed to get pending command")
-			} else if len(pendingCommands) > 0 {
-				chainsWithPendingCmds = append(chainsWithPendingCmds, chain)
-			} else {
-				// log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [ProcessPendingCommands] No pending command found")
+			//Only check if there is no pending command is processing for the chain
+			if value, ok := c.pendingChainCommands.Load(chain); !ok || value == nil {
+				go c.checkChainPendingCommands(ctx, chain, counter)
 			}
 		}
-		if len(chainsWithPendingCmds) > 0 {
-			log.Info().Msgf("Found chains with pending command %v", chainsWithPendingCmds)
-			for _, chain := range chainsWithPendingCmds {
-				go func() {
-					err := c.processPendingCommandsForChain(ctx, chain)
-					if err != nil {
-						log.Error().Err(err).Msg("[ScalarClient] ProcessPendingCommands with error")
-					}
-				}()
-			}
-		}
-		time.Sleep(interval)
 		if counter >= 100 {
-			log.Info().Msgf("No pending commands found. Sleep for %ds then retry.(This message is printed one of 100)", int64(interval.Seconds()))
 			counter = 0
 		}
+		time.Sleep(interval)
+
 	}
 }
-
-func (c *Client) processPendingCommandsForChain(ctx context.Context, destChain string) error {
-	log.Debug().Str("Chain", destChain).Msg("[ScalarClient] [processPendingCommandsForChain]")
-	//1. Sign the commands request
-	signRes, err := c.network.SignCommandsRequest(ctx, destChain)
-	if err != nil || signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") || signRes.TxHash == "" {
-		return fmt.Errorf("[ScalarClient] [processPendingCommandsForChain] failed to sign commands request: %v, %w", signRes, err)
-	}
-	log.Debug().Msgf("[ScalarClient] [processPendingCommandsForChain] Successfully broadcasted sign commands request with txHash: %s. Waiting for sign event...", signRes.TxHash)
-	//3. Wait for the sign event
-	//Todo: Check if the sign event is received
-
-	batchCommandId, commandIDs := c.waitForSignCommandsEvent(ctx, signRes.TxHash)
-	if batchCommandId == "" || commandIDs == "" {
-		return fmt.Errorf("BatchCommandId not found")
-	}
-	log.Debug().Msgf("[ScalarClient] [processPendingCommandsForChain] Successfully received sign commands event with batch command id: %s", batchCommandId)
-	// 2. Old version, loop for get ExecuteData from batch command id
-	res, err := c.waitForExecuteData(ctx, destChain, batchCommandId)
+func (c *Client) checkChainPendingCommands(ctx context.Context, chain string, counter int) {
+	pendingCommands, err := c.queryClient.QueryPendingCommands(ctx, chain)
 	if err != nil {
-		return fmt.Errorf("[ScalarClient] [processPendingCommandsForChain] failed to get execute data: %w", err)
+		log.Error().Err(err).Msg("[ScalarClient] [ProcessSigCommand] failed to get pending command")
+		return
 	}
-	log.Debug().Str("Chain", destChain).Any("BatchCommandResponse", res).Msg("[ScalarClient] [processPendingCommandsForChain] BatchCommand response")
-
-	eventEnvelope := events.EventEnvelope{
-		EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
-		DestinationChain: destChain,
-		Data:             res.ExecuteData,
+	if len(pendingCommands) > 0 {
+		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] found pending commands")
+		//1. Sign the commands request
+		signRes, err := c.network.SignCommandsRequest(ctx, chain)
+		if err != nil || signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") || signRes.TxHash == "" {
+			log.Debug().Msgf("[ScalarClient] [checkChainPendingCommands] Failed to broadcast sign commands request!")
+			return
+		}
+		log.Debug().Msgf("[ScalarClient] [checkChainPendingCommands] Successfully broadcasted sign commands request with txHash: %s. Add it to pendingSignCommandTxs...", signRes.TxHash)
+		c.pendingSignCommandTxs.Store(signRes.TxHash, chain)
+		c.pendingChainCommands.Store(chain, 1)
+	} else {
+		if counter >= 100 {
+			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [ProcessPendingCommands] No pending command found. This message is printed one of 100	")
+		}
 	}
-	log.Debug().Str("Chain", destChain).Str("BatchCommandId", res.ID).Any("CommandIDs", res.CommandIDs).
-		Msgf("[ScalarClient] [processPendingCommandsForChain] broadcast to eventBus")
-	// 3. Broadcast the execute data to the Event bus
-	c.eventBus.BroadcastEvent(&eventEnvelope)
-
-	return nil
 }
+
+func (c *Client) processSignCommandTxs(ctx context.Context) {
+	for {
+		//Get map txHash and chain
+		var hashes = map[string]string{}
+		c.pendingSignCommandTxs.Range(func(key, value interface{}) bool {
+			hashes[key.(string)] = value.(string)
+			return true
+		})
+
+		for txHash, chain := range hashes {
+			txRes, err := c.queryClient.QueryTx(ctx, txHash)
+			if err != nil {
+				log.Debug().Err(err).Str("TxHash", txHash).Msgf("[ScalarClient] [processSignCommandTxs]")
+			} else if txRes == nil || txRes.Code != 0 || txRes.Logs == nil || len(txRes.Logs) == 0 {
+				log.Debug().
+					Str("TxHash", txHash).
+					Str("Chain", chain).
+					Msg("[ScalarClient] [processSignCommandTxs] Sign command request not found")
+			} else if len(txRes.Logs) > 0 {
+				batchCommandId := findEventAttribute(txRes.Logs[0].Events, "sign", "batchedCommandID")
+				if batchCommandId == "" {
+					log.Debug().Str("TxHash", txHash).Msg("[ScalarClient] [processSignCommandTxs] batchCommandId not found")
+				} else {
+					c.foundBatchCommand(chain, txHash, batchCommandId)
+				}
+				//commandIDs = findEventAttribute(txRes.Logs[0].Events, "sign", "commandIDs")
+			}
+		}
+		time.Sleep(time.Second * 3)
+	}
+}
+func (c *Client) processBatchCommands(ctx context.Context) {
+	for {
+		var hashes = map[string]string{}
+		c.pendingBatchCommands.Range(func(key, value interface{}) bool {
+			hashes[key.(string)] = value.(string)
+			return true
+		})
+		for batchCommandId, destChain := range hashes {
+			res, err := c.queryClient.QueryBatchedCommands(ctx, destChain, batchCommandId)
+			if err != nil {
+				log.Debug().Err(err).
+					Str("Chain", destChain).
+					Str("BatchCommandId", batchCommandId).
+					Msgf("[ScalarClient] [processBatchCommands] batched command not found")
+				continue
+			}
+			if res.Status == 3 {
+				c.pendingBatchCommands.Delete(batchCommandId)
+				log.Debug().
+					Str("Chain", destChain).
+					Str("BatchCommandId", batchCommandId).
+					Any("BatchCommandResponse", res).
+					Msg("[ScalarClient] [processBatchCommands] Found batchCommand response. Broadcast to eventBus")
+				eventEnvelope := events.EventEnvelope{
+					EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
+					DestinationChain: destChain,
+					Data:             res.ExecuteData,
+				}
+				c.eventBus.BroadcastEvent(&eventEnvelope)
+			}
+		}
+		time.Sleep(time.Second * 3)
+	}
+}
+
+func (c *Client) foundBatchCommand(chain string, txHash string, batchCommandId string) {
+	c.pendingChainCommands.Delete(chain)
+	c.pendingSignCommandTxs.Delete(txHash)
+	c.pendingBatchCommands.Store(batchCommandId, chain)
+}
+
+// func (c *Client) processPendingCommandsForChain(ctx context.Context, destChain string) error {
+// 	log.Debug().Str("Chain", destChain).Msg("[ScalarClient] [processPendingCommandsForChain]")
+// 	//1. Sign the commands request
+// 	signRes, err := c.network.SignCommandsRequest(ctx, destChain)
+// 	if err != nil || signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") || signRes.TxHash == "" {
+// 		return fmt.Errorf("[ScalarClient] [processPendingCommandsForChain] failed to sign commands request: %v, %w", signRes, err)
+// 	}
+// 	log.Debug().Msgf("[ScalarClient] [processPendingCommandsForChain] Successfully broadcasted sign commands request with txHash: %s. Waiting for sign event...", signRes.TxHash)
+// 	//3. Wait for the sign event
+// 	//Todo: Check if the sign event is received
+
+// 	batchCommandId, commandIDs := c.waitForSignCommandsEvent(ctx, signRes.TxHash)
+// 	if batchCommandId == "" || commandIDs == "" {
+// 		return fmt.Errorf("BatchCommandId not found")
+// 	}
+// 	log.Debug().Msgf("[ScalarClient] [processPendingCommandsForChain] Successfully received sign commands event with batch command id: %s", batchCommandId)
+// 	// 2. Old version, loop for get ExecuteData from batch command id
+// 	res, err := c.waitForExecuteData(ctx, destChain, batchCommandId)
+// 	if err != nil {
+// 		return fmt.Errorf("[ScalarClient] [processPendingCommandsForChain] failed to get execute data: %w", err)
+// 	}
+// 	log.Debug().Str("Chain", destChain).Any("BatchCommandResponse", res).Msg("[ScalarClient] [processPendingCommandsForChain] BatchCommand response")
+
+// 	eventEnvelope := events.EventEnvelope{
+// 		EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
+// 		DestinationChain: destChain,
+// 		Data:             res.ExecuteData,
+// 	}
+// 	log.Debug().Str("Chain", destChain).Str("BatchCommandId", res.ID).Any("CommandIDs", res.CommandIDs).
+// 		Msgf("[ScalarClient] [processPendingCommandsForChain] broadcast to eventBus")
+// 	// 3. Broadcast the execute data to the Event bus
+// 	c.eventBus.BroadcastEvent(&eventEnvelope)
+
+// 	return nil
+// }

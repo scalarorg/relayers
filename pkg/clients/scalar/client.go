@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -25,14 +26,17 @@ import (
 )
 
 type Client struct {
-	globalConfig   *config.Config
-	networkConfig  *cosmos.CosmosNetworkConfig
-	txConfig       client.TxConfig
-	network        *cosmos.NetworkClient
-	queryClient    *cosmos.QueryClient
-	dbAdapter      *db.DatabaseAdapter
-	eventBus       *events.EventBus
-	subscriberName string //Use as subscriber for networkClient
+	globalConfig          *config.Config
+	networkConfig         *cosmos.CosmosNetworkConfig
+	txConfig              client.TxConfig
+	network               *cosmos.NetworkClient
+	queryClient           *cosmos.QueryClient
+	dbAdapter             *db.DatabaseAdapter
+	eventBus              *events.EventBus
+	subscriberName        string   //Use as subscriber for networkClient
+	pendingChainCommands  sync.Map //key: chain, value: number of pending commands (0 or 1)
+	pendingSignCommandTxs sync.Map //Sign command request tx hash => chain, used for check if the tx is included in the block
+	pendingBatchCommands  sync.Map //Batched command id => chain, used for get batched command to get execute data
 	// Add other necessary fields like chain ID, gas prices, etc.
 }
 
@@ -88,14 +92,17 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 		return nil, err
 	}
 	client := &Client{
-		globalConfig:   globalConfig,
-		networkConfig:  config,
-		txConfig:       txConfig,
-		network:        networkClient,
-		queryClient:    queryClient,
-		subscriberName: subscriberName,
-		dbAdapter:      dbAdapter,
-		eventBus:       eventBus,
+		globalConfig:          globalConfig,
+		networkConfig:         config,
+		txConfig:              txConfig,
+		network:               networkClient,
+		queryClient:           queryClient,
+		subscriberName:        subscriberName,
+		dbAdapter:             dbAdapter,
+		eventBus:              eventBus,
+		pendingChainCommands:  sync.Map{},
+		pendingSignCommandTxs: sync.Map{},
+		pendingBatchCommands:  sync.Map{},
 	}
 	return client, nil
 }
