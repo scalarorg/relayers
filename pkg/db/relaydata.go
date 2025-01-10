@@ -137,7 +137,7 @@ func (db *DatabaseAdapter) FindRelayDataByContractCall(contractCall *models.Call
 	result := db.PostgresClient.
 		Joins("CallContract").
 		Where("contract_address = ? AND source_address = ? AND payload_hash = ?",
-			strings.ToLower(contractCall.ContractAddress),
+			strings.ToLower(contractCall.DestContractAddress),
 			strings.ToLower(contractCall.SourceAddress),
 			strings.ToLower(contractCall.PayloadHash)).
 		Where("status IN ?", []int{int(PENDING), int(APPROVED)}).
@@ -148,7 +148,7 @@ func (db *DatabaseAdapter) FindRelayDataByContractCall(contractCall *models.Call
 		return relayDatas, fmt.Errorf("find relaydatas by contract call with error: %w", result.Error)
 	}
 	if len(relayDatas) == 0 {
-		log.Warn().Str("contractAddress", contractCall.ContractAddress).Str("sourceAddress", contractCall.SourceAddress).Str("payloadHash", contractCall.PayloadHash).Msg("[DatabaseAdapter] [FindRelayDataByContractCall] no relaydata found")
+		log.Warn().Str("contractAddress", contractCall.DestContractAddress).Str("sourceAddress", contractCall.SourceAddress).Str("payloadHash", contractCall.PayloadHash).Msg("[DatabaseAdapter] [FindRelayDataByContractCall] no relaydata found")
 	}
 	return relayDatas, nil
 

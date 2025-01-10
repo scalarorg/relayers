@@ -158,7 +158,7 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 			log.Error().Msgf("[ScalarClient] [subscribeMintCommand] error: %v", err)
 		}
 
-		err = subscribeContractCallWithTokenApprovedEvent(cancelCtx, c.network, c.handleContractCallWithTokenApprovedEvents)
+		err = subscribeContractCallWithTokenApprovedEvent(cancelCtx, c.network, c.handleContractCallWithMintApprovedEvents)
 		if err != nil {
 			log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
 		}
@@ -171,7 +171,8 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 		if err != nil {
 			log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
 		}
-		err = subscribeEVMCompletedEvent(cancelCtx, c.network, c.handleEVMCompletedEvents)
+		//Todo: check if the handler is correct
+		err = subscribeEVMCompletedEvent(cancelCtx, c.network, c.handleCompletedEvents)
 		if err != nil {
 			log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] error: %v", err)
 		}
@@ -180,10 +181,10 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 		// 	log.Error().Msgf("[ScalarClient] [subscribeAllEvent] Failed: %v", err)
 		// }
 		// For debug purpose, subscribe to all tx events, findout if there is sign commands event
-		err = subscribeAllTxEvent(cancelCtx, c.network)
-		if err != nil {
-			log.Error().Msgf("[ScalarClient] [subscribeAllTxEvent] Failed: %v", err)
-		}
+		// err = subscribeAllTxEvent(cancelCtx, c.network)
+		// if err != nil {
+		// 	log.Error().Msgf("[ScalarClient] [subscribeAllTxEvent] Failed: %v", err)
+		// }
 		//HeatBeat
 		aliveCount := 0
 		for {
@@ -224,7 +225,7 @@ func Subscribe[T proto.Message](ctx context.Context,
 					log.Debug().Msgf("[ScalarClient] [Subscribe] Event query is not match query: %v, topicId: %s", evt.Query, event.TopicId)
 				} else {
 					//Extract the data from the event
-					log.Debug().Str("Topic", evt.Query).Any("Events", evt.Events).Msg("Received new event")
+					log.Debug().Str("Topic", evt.Query).Any("Events", evt.Events).Msg("[ScalarClient] [Subscribe] Received new event")
 					// var args T
 					// msgType := reflect.TypeOf(args).Elem()
 					// msg := reflect.New(msgType).Interface().(T)
