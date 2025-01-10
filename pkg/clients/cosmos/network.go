@@ -176,7 +176,7 @@ func (c *NetworkClient) SignBtcCommandsRequest(ctx context.Context, destinationC
 	return txRes, nil
 }
 
-func (c *NetworkClient) SignCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
+func (c *NetworkClient) SignEvmCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
 	req := chainstypes.NewSignCommandsRequest(
 		c.GetAddress(),
 		destinationChain)

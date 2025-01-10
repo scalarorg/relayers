@@ -76,6 +76,16 @@ func (db *DatabaseAdapter) UpdateEventStatus(id string, status RelayDataStatus) 
 	return nil
 }
 
+func (db *DatabaseAdapter) UpdateTokenSents(tokenSents []models.TokenSent) error {
+	for _, entity := range tokenSents {
+		result := db.PostgresClient.Model(&models.TokenSent{}).Where("event_id = ?", entity.EventID).Updates(entity)
+		if result.Error != nil {
+			log.Error().Any("TokenSent", entity).Msgf("[DBUpdate] UpdateTokenSent with error: %v", result.Error)
+		}
+	}
+	return nil
+}
+
 // func (db *DatabaseAdapter) CreateEvmExecutedEvent(event *types.EvmEvent[*contracts.IScalarGatewayExecuted]) error {
 // 	id := fmt.Sprintf("%s-%d", event.Hash, event.LogIndex)
 // 	log.Debug().Msgf("[DatabaseClient] Create EvmExecuted: %s", id)

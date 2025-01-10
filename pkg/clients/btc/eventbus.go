@@ -60,7 +60,6 @@ func (c *BtcClient) handleScalarContractCallApproved(messageID string, executeDa
 	return nil
 }
 func (c *BtcClient) handleScalarCreatePsbtRequest(messageId string, psbtSigningRequest types.PsbtSigningRequest) error {
-	taprootAddress := c.btcConfig.Address
 	outpoints := make([]CommandOutPoint, len(psbtSigningRequest.Commands))
 	for i, cmd := range psbtSigningRequest.Commands {
 		amount, err := strconv.ParseUint(cmd.Params["amount"], 10, 64)
@@ -79,6 +78,10 @@ func (c *BtcClient) handleScalarCreatePsbtRequest(messageId string, psbtSigningR
 				LockingScript: pkScript,
 			},
 		}
+	}
+	taprootAddress, err := psbtSigningRequest.Params.GetTaprootAddress()
+	if err != nil || taprootAddress == nil {
+		return fmt.Errorf("failed to get taproot address: %w", err)
 	}
 	if taprootAddress == nil {
 		return fmt.Errorf("taproot address is not set")

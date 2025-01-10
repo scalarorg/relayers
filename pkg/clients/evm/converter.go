@@ -26,22 +26,22 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IScalarGatewayC
 	// 		break
 	// 	}
 	// }
-	id := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
+	eventId := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
 	senderAddress := event.Sender.String()
 	relayData := models.RelayData{
-		ID:   id,
+		ID:   eventId,
 		From: c.evmConfig.GetId(),
 		To:   event.DestinationChain,
 		CallContract: &models.CallContract{
-			ID:          id,
+			EventID:     eventId,
 			TxHash:      event.Raw.TxHash.String(),
 			BlockNumber: event.Raw.BlockNumber,
 			LogIndex:    event.Raw.Index,
 			//3 follows field are used for query to get back payload, so need to convert to lower case
-			ContractAddress: strings.ToLower(event.DestinationContractAddress),
-			SourceAddress:   strings.ToLower(senderAddress),
-			PayloadHash:     strings.ToLower(hex.EncodeToString(event.PayloadHash[:])),
-			Payload:         event.Payload,
+			DestContractAddress: strings.ToLower(event.DestinationContractAddress),
+			SourceAddress:       strings.ToLower(senderAddress),
+			PayloadHash:         strings.ToLower(hex.EncodeToString(event.PayloadHash[:])),
+			Payload:             event.Payload,
 			//Use for bitcoin vault tx only
 			StakerPublicKey: nil,
 		},
@@ -50,25 +50,25 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IScalarGatewayC
 }
 
 func (c *EvmClient) ContractCallWithToken2RelayData(event *contracts.IScalarGatewayContractCallWithToken) (models.RelayData, error) {
-	id := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
+	eventId := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
 	senderAddress := event.Sender.String()
 	callContract := models.CallContract{
-		ID:          id,
+		EventID:     eventId,
 		TxHash:      event.Raw.TxHash.String(),
 		BlockNumber: event.Raw.BlockNumber,
 		LogIndex:    event.Raw.Index,
 		//3 follows field are used for query to get back payload, so need to convert to lower case
-		ContractAddress: strings.ToLower(event.DestinationContractAddress),
-		SourceAddress:   strings.ToLower(senderAddress),
-		PayloadHash:     strings.ToLower(hex.EncodeToString(event.PayloadHash[:])),
-		Payload:         event.Payload,
+		DestContractAddress: strings.ToLower(event.DestinationContractAddress),
+		SourceAddress:       strings.ToLower(senderAddress),
+		PayloadHash:         strings.ToLower(hex.EncodeToString(event.PayloadHash[:])),
+		Payload:             event.Payload,
 		//Use for bitcoin vault tx only
 		StakerPublicKey: nil,
 	}
 	//Todo: get token contract address from scalar-core by source chain and token symbol
 	tokenContractAddress := "" //strings.ToLower(event.TokenContractAddress.String())
 	relayData := models.RelayData{
-		ID:   id,
+		ID:   eventId,
 		From: c.evmConfig.GetId(),
 		To:   event.DestinationChain,
 		CallContractWithToken: &models.CallContractWithToken{
@@ -82,14 +82,14 @@ func (c *EvmClient) ContractCallWithToken2RelayData(event *contracts.IScalarGate
 }
 
 func (c *EvmClient) TokenSentEvent2RelayData(event *contracts.IScalarGatewayTokenSent) (models.RelayData, error) {
-	id := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
+	eventId := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
 	senderAddress := event.Sender.String()
 	relayData := models.RelayData{
-		ID:   id,
+		ID:   eventId,
 		From: c.evmConfig.GetId(),
 		To:   event.DestinationChain,
 		TokenSent: &models.TokenSent{
-			ID:          id,
+			EventID:     eventId,
 			TxHash:      event.Raw.TxHash.String(),
 			BlockNumber: event.Raw.BlockNumber,
 			LogIndex:    event.Raw.Index,
@@ -103,22 +103,20 @@ func (c *EvmClient) TokenSentEvent2RelayData(event *contracts.IScalarGatewayToke
 	return relayData, nil
 }
 
-func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGatewayContractCallApproved) (models.CallContractApproved, error) {
+func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGatewayContractCallApproved) (models.ContractCallApproved, error) {
 	txHash := event.Raw.TxHash.String()
-	id := strings.ToLower(fmt.Sprintf("%s-%d-%d", txHash, event.SourceEventIndex, event.Raw.Index))
+	eventId := strings.ToLower(fmt.Sprintf("%s-%d-%d", txHash, event.SourceEventIndex, event.Raw.Index))
 	sourceEventIndex := uint64(0)
 	if event.SourceEventIndex != nil && event.SourceEventIndex.IsUint64() {
 		sourceEventIndex = event.SourceEventIndex.Uint64()
 	}
-	record := models.CallContractApproved{
-		ID:               id,
+	record := models.ContractCallApproved{
+		EventID:          eventId,
 		SourceChain:      event.SourceChain,
 		DestinationChain: c.evmConfig.GetId(),
 		TxHash:           strings.ToLower(txHash),
-		BlockNumber:      event.Raw.BlockNumber,
-		LogIndex:         event.Raw.Index,
-		CommandId:        hex.EncodeToString(event.CommandId[:]),
-		SourceAddress:    strings.ToLower(event.SourceAddress),
+		CommandID:        hex.EncodeToString(event.CommandId[:]),
+		Sender:           strings.ToLower(event.SourceAddress),
 		ContractAddress:  strings.ToLower(event.ContractAddress.String()),
 		PayloadHash:      strings.ToLower(hex.EncodeToString(event.PayloadHash[:])),
 		SourceTxHash:     strings.ToLower(hex.EncodeToString(event.SourceTxHash[:])),

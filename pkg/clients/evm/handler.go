@@ -214,9 +214,9 @@ func (ec *EvmClient) HandleContractCallApproved(event *contracts.IScalarGatewayC
 	// This contract call (initiated by the user call to the source chain) is approved by EVM network
 	// So anyone can execute it on the EVM by broadcast the corresponding payload to protocol's smart contract on the destination chain
 	contractCall := models.CallContract{
-		ContractAddress: strings.TrimLeft(event.ContractAddress.Hex(), "0x"),
-		SourceAddress:   strings.TrimLeft(event.SourceAddress, "0x"),
-		PayloadHash:     strings.TrimLeft(hex.EncodeToString(event.PayloadHash[:]), "0x"),
+		DestContractAddress: strings.TrimLeft(event.ContractAddress.Hex(), "0x"),
+		SourceAddress:       strings.TrimLeft(event.SourceAddress, "0x"),
+		PayloadHash:         strings.TrimLeft(hex.EncodeToString(event.PayloadHash[:]), "0x"),
 	}
 	relayDatas, err := ec.dbAdapter.FindRelayDataByContractCall(&contractCall)
 	if err != nil {

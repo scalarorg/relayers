@@ -30,6 +30,18 @@ type RelayData struct {
 	TokenSent             *TokenSent
 }
 
+type MintCommand struct {
+	gorm.Model
+	TxHash           string `gorm:"type:varchar(64)"`
+	SourceChain      string `gorm:"type:varchar(20);not null"`
+	DestinationChain string `gorm:"type:varchar(20);not null"`
+	TransferID       uint64 `gorm:"type:varchar(50);not null"`
+	CommandID        string `gorm:"type:varchar(64);not null"`
+	Amount           int64
+	Symbol           string `gorm:"type:varchar(10);not null"`
+	Recipient        string `gorm:"type:varchar(64);not null"`
+}
+
 type CommandExecuted struct {
 	gorm.Model
 	ID               string `gorm:"primaryKey;type:varchar(255)"`
@@ -45,20 +57,23 @@ type CommandExecuted struct {
 }
 
 type CallContract struct {
-	gorm.Model
-	ID                   string `gorm:"primaryKey"`
-	TxHash               string `gorm:"type:varchar(255)"`
-	TxHex                []byte
-	BlockNumber          uint64 `gorm:"default:0"`
-	LogIndex             uint
-	ContractAddress      string `gorm:"type:varchar(255)"`
-	Payload              []byte
-	PayloadHash          string  `gorm:"type:varchar(255);uniqueIndex"`
-	SourceAddress        string  `gorm:"type:varchar(255)"`
-	StakerPublicKey      *string `gorm:"type:varchar(255)"`
-	CallContractApproved *CallContractApproved
-	RelayDataID          string     `gorm:"type:varchar(255)"`
-	RelayData            *RelayData `gorm:"foreignKey:RelayDataID"`
+	EventID             string `gorm:"primaryKey"`
+	TxHash              string `gorm:"type:varchar(255)"`
+	TxHex               []byte
+	BlockNumber         uint64 `gorm:"default:0"`
+	LogIndex            uint
+	SourceChain         string `gorm:"type:varchar(64)"`
+	SourceAddress       string `gorm:"type:varchar(255)"`
+	Payload             []byte
+	PayloadHash         string     `gorm:"type:varchar(255);uniqueIndex"`
+	DestinationChain    string     `gorm:"type:varchar(64)"`
+	DestContractAddress string     `gorm:"type:varchar(255)"`
+	StakerPublicKey     *string    `gorm:"type:varchar(255)"`
+	RelayDataID         string     `gorm:"type:varchar(255)"`
+	RelayData           *RelayData `gorm:"foreignKey:RelayDataID"`
+	CreatedAt           time.Time  `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+	UpdatedAt           time.Time  `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+	DeletedAt           gorm.DeletedAt
 }
 
 type CallContractWithToken struct {
@@ -68,93 +83,67 @@ type CallContractWithToken struct {
 	Amount               uint64 `gorm:"type:bigint"`
 }
 
-// type Approved struct {
-// 	ID               string `gorm:"primaryKey;type:varchar(255)"`
-// 	SourceChain      string `gorm:"type:varchar(255)"`
-// 	DestinationChain string `gorm:"type:varchar(255)"`
-// 	TxHash           string `gorm:"type:varchar(255)"`
-// 	BlockNumber      int
-// 	LogIndex         int
-// 	SourceAddress    string `gorm:"type:varchar(255)"`
-// 	ContractAddress  string `gorm:"type:varchar(255)"`
-// 	SourceTxHash     string `gorm:"type:varchar(255)"`
-// 	SourceEventIndex *big.Int
-// 	PayloadHash      string `gorm:"type:varchar(255)"`
-// 	Symbol           string `gorm:"type:varchar(255)"`
-// 	Amount           *big.Int
-// 	CommandId        string
-// 	CreatedAt        time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
-// 	UpdatedAt        time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
-// }
-
-type CallContractApproved struct {
-	gorm.Model
-	ID               string `gorm:"primaryKey;type:varchar(255)"`
-	SourceChain      string `gorm:"type:varchar(255)"`
-	DestinationChain string `gorm:"type:varchar(255)"`
-	TxHash           string `gorm:"type:varchar(255)"`
-	BlockNumber      uint64
-	LogIndex         uint
-	SourceAddress    string `gorm:"type:varchar(255)"`
-	ContractAddress  string `gorm:"type:varchar(255)"`
-	SourceTxHash     string `gorm:"type:varchar(255)"`
-	SourceEventIndex uint64
-	PayloadHash      string `gorm:"type:varchar(255)"`
-	CommandId        string
-	CallContractID   *string       `gorm:"type:varchar(255);unique"`
-	CallContract     *CallContract `gorm:"foreignKey:CallContractID"`
-	CreatedAt        time.Time     `gorm:"type:timestamp(6);default:current_timestamp(6)"`
-	UpdatedAt        time.Time     `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+type ContractCallApprovedWithMint struct {
+	ContractCallApproved
+	Symbol string `gorm:"type:varchar(255)"`
+	Amount uint64 `gorm:"type:bigint"`
+}
+type ContractCallApproved struct {
+	EventID          string    `gorm:"primaryKey"`
+	TxHash           string    `gorm:"type:varchar(255)"`
+	SourceChain      string    `gorm:"type:varchar(255)"`
+	DestinationChain string    `gorm:"type:varchar(255)"`
+	CommandID        string    `gorm:"type:varchar(255)"`
+	Sender           string    `gorm:"type:varchar(255)"`
+	ContractAddress  string    `gorm:"type:varchar(255)"`
+	PayloadHash      string    `gorm:"type:varchar(255)"`
+	Status           int       `gorm:"default:1"`
+	SourceTxHash     string    `gorm:"type:varchar(255)"`
+	SourceEventIndex uint64    `gorm:"type:bigint"`
+	CreatedAt        time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+	UpdatedAt        time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+	DeletedAt        gorm.DeletedAt
 }
 
 type TokenSent struct {
-	gorm.Model
-	ID                   string `gorm:"primaryKey"`
+	EventID              string `gorm:"primaryKey"`
 	TxHash               string `gorm:"type:varchar(255)"`
 	TxHex                []byte
 	BlockNumber          uint64 `gorm:"default:0"`
 	LogIndex             uint
-	SourceAddress        string `gorm:"type:varchar(255)"`
-	DestinationAddress   string `gorm:"type:varchar(255)"`
-	TokenContractAddress string `gorm:"type:varchar(255)"`
-	Amount               uint64 `gorm:"type:bigint"`
-	Symbol               string `gorm:"type:varchar(255)"`
-	TokenSentApproved    *TokenSentApproved
+	SourceChain          string     `gorm:"type:varchar(64)"`
+	SourceAddress        string     `gorm:"type:varchar(255)"`
+	DestinationChain     string     `gorm:"type:varchar(64)"`
+	DestinationAddress   string     `gorm:"type:varchar(255)"`
+	TokenContractAddress string     `gorm:"type:varchar(255)"`
+	Amount               uint64     `gorm:"type:bigint"`
+	Symbol               string     `gorm:"type:varchar(255)"`
+	Status               int        `gorm:"default:0"`
 	RelayDataID          string     `gorm:"type:varchar(255)"`
 	RelayData            *RelayData `gorm:"foreignKey:RelayDataID"`
+	CreatedAt            time.Time  `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+	UpdatedAt            time.Time  `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+	DeletedAt            gorm.DeletedAt
 }
 
 type TokenSentApproved struct {
-	gorm.Model
-	ID               string `gorm:"primaryKey;type:varchar(255)"`
-	SourceChain      string `gorm:"type:varchar(255)"`
-	DestinationChain string `gorm:"type:varchar(255)"`
-	TxHash           string `gorm:"type:varchar(255)"`
-	BlockNumber      uint64
-	LogIndex         uint
-	SourceAddress    string `gorm:"type:varchar(255)"`
-	ContractAddress  string `gorm:"type:varchar(255)"`
-	SourceTxHash     string `gorm:"type:varchar(255)"`
-	SourceEventIndex uint64
-	PayloadHash      string `gorm:"type:varchar(255)"`
-	CommandId        string
-	TokenSentID      *string    `gorm:"type:varchar(255);unique"`
-	TokenSent        *TokenSent `gorm:"foreignKey:TokenSentID"`
-	CreatedAt        time.Time  `gorm:"type:timestamp(6);default:current_timestamp(6)"`
-	UpdatedAt        time.Time  `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+	EventID            string `gorm:"primaryKey;type:varchar(255)"`
+	SourceChain        string `gorm:"type:varchar(255)"`
+	SourceAddress      string `gorm:"type:varchar(255)"`
+	DestinationChain   string `gorm:"type:varchar(255)"`
+	DestinationAddress string `gorm:"type:varchar(255)"`
+	TxHash             string `gorm:"type:varchar(255)"`
+	BlockNumber        uint64
+	LogIndex           uint
+	Amount             uint64 `gorm:"type:bigint"`
+	Symbol             string `gorm:"type:varchar(255)"`
+	Status             int    `gorm:"default:0"`
+	ContractAddress    string `gorm:"type:varchar(255)"`
+	SourceTxHash       string `gorm:"type:varchar(255)"`
+	SourceEventIndex   uint64
+	CommandId          string
+	TransferID         uint64    `gorm:"type:bigint"`
+	CreatedAt          time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+	UpdatedAt          time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+	DeletedAt          gorm.DeletedAt
 }
-
-// type ProtocolInfo struct {
-// 	gorm.Model
-// 	//ID                   string `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-// 	ChainID              string `gorm:"column:chain_id"`               //Evm chain id
-// 	ChainName            string `gorm:"column:chain_name;not null"`    //Evm chain name
-// 	BTCAddressHex        string `gorm:"column:btc_address_hex"`        //Btc address
-// 	PublicKeyHex         string `gorm:"column:public_key_hex"`         //Btc public key
-// 	SmartContractAddress string `gorm:"column:smart_contract_address"` //Evm contract address which is extended from the IScalarExecutable
-// 	TokenContractAddress string `gorm:"column:token_contract_address"` //Evm ERC20 token contract address
-// 	State                bool   `gorm:"column:state"`
-// 	ChainEndpoint        string `gorm:"column:chain_endpoint"` //Service endpoint for handling evm tx
-// 	RPCUrl               string `gorm:"column:rpc_url"`        //Service endpoint for handling psbt signing
-// 	AccessToken          string `gorm:"column:access_token"`   //Access token for the signing service
-// }

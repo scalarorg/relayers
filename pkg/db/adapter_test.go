@@ -70,7 +70,7 @@ func SetupTestDB(busEventChan chan *events.EventEnvelope, receiverChanBufSize in
 	err = postgresDb.AutoMigrate(
 		&models.RelayData{},
 		&models.CallContract{},
-		&models.CallContractApproved{},
+		&models.ContractCallApproved{},
 		&models.CommandExecuted{},
 		&models.TokenSent{},
 		&models.TokenSentApproved{},
@@ -87,10 +87,10 @@ func SetupTestDB(busEventChan chan *events.EventEnvelope, receiverChanBufSize in
 		To:     "sepolia",
 		Status: int(PENDING),
 		CallContract: &models.CallContract{
-			PayloadHash:     "0000000000000000000000000000000000000000000000000000000000000000",
-			SourceAddress:   "0x24a1db57fa3ecafcbad91d6ef068439aceeae090",
-			ContractAddress: "0x0000000000000000000000000000000000000000",
-			Payload:         []byte("test-payload"),
+			PayloadHash:         "0000000000000000000000000000000000000000000000000000000000000000",
+			SourceAddress:       "0x24a1db57fa3ecafcbad91d6ef068439aceeae090",
+			DestContractAddress: "0x0000000000000000000000000000000000000000",
+			Payload:             []byte("test-payload"),
 		},
 	}
 
@@ -101,10 +101,10 @@ func SetupTestDB(busEventChan chan *events.EventEnvelope, receiverChanBufSize in
 		To:     "sepolia",
 		Status: int(APPROVED),
 		CallContract: &models.CallContract{
-			PayloadHash:     "0000000000000000000000000000000000000000000000000000000000000000",
-			SourceAddress:   "0x24a1db57fa3ecafcbad91d6ef068439aceeae090",
-			ContractAddress: "0x0000000000000000000000000000000000000000",
-			Payload:         []byte("test-payload-2"),
+			PayloadHash:         "0000000000000000000000000000000000000000000000000000000000000000",
+			SourceAddress:       "0x24a1db57fa3ecafcbad91d6ef068439aceeae090",
+			DestContractAddress: "0x0000000000000000000000000000000000000000",
+			Payload:             []byte("test-payload-2"),
 		},
 	}
 

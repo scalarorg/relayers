@@ -14,13 +14,13 @@ func subscribeTokenSentEvent(ctx context.Context, network *cosmos.NetworkClient,
 		func(events []IBCEvent[*types.EventTokenSent]) {
 			err := callback(ctx, events)
 			if err != nil {
-				log.Error().Msgf("[ScalarClient] [ContractCallApprovedHandler] callback error: %v", err)
+				log.Error().Msgf("[ScalarClient] [TokenSendHandler] callback error: %v", err)
 			}
 		}); err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] Failed: %v", err)
+		log.Debug().Msgf("[ScalarClient] [TokenSendHandler] Failed: %v", err)
 		return err
 	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] success")
+		log.Debug().Msgf("[ScalarClient] [TokenSendHandler] success")
 	}
 	return nil
 }

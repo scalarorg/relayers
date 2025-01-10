@@ -152,8 +152,9 @@ func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
 		&models.CallContract{},
 		&models.CallContractWithToken{},
 		&models.TokenSentApproved{},
-		&models.CallContractApproved{},
-		&models.CallContractApproved{},
+		&models.ContractCallApproved{},
+		&models.ContractCallApprovedWithMint{},
+		&models.MintCommand{},
 		&models.CommandExecuted{},
 		&models.EventCheckPoint{},
 	)

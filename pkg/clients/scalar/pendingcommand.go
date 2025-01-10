@@ -7,6 +7,9 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/events"
+	"github.com/scalarorg/relayers/pkg/types"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	"github.com/scalarorg/scalar-core/x/nexus/exported"
 )
 
 // Periodically call to the scalar network to check if there is any pending SignCommand
@@ -50,14 +53,31 @@ func (c *Client) checkChainPendingCommands(ctx context.Context, chain string, co
 	if len(pendingCommands) > 0 {
 		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] found pending commands")
 		//1. Sign the commands request
-		signRes, err := c.network.SignCommandsRequest(ctx, chain)
-		if err != nil || signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") || signRes.TxHash == "" {
-			log.Debug().Msgf("[ScalarClient] [checkChainPendingCommands] Failed to broadcast sign commands request!")
-			return
+		nexusChain := exported.ChainName(chain)
+		if chainstypes.IsEvmChain(nexusChain) {
+			//For evm chain, payload is already prepared in the scalar node, we just need to sign it before broadcast to evm node
+			signRes, err := c.network.SignEvmCommandsRequest(ctx, chain)
+			if err != nil || signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") || signRes.TxHash == "" {
+				log.Debug().Msgf("[ScalarClient] [checkChainPendingCommands] Failed to broadcast sign commands request!")
+				return
+			}
+			c.pendingSignCommandTxs.Store(signRes.TxHash, chain)
+			c.pendingChainCommands.Store(chain, 1)
+			log.Debug().Msgf("[ScalarClient] [checkChainPendingCommands] Successfully broadcasted sign commands request with txHash: %s. Add it to pendingSignCommandTxs...", signRes.TxHash)
+		} else if chainstypes.IsBitcoinChain(nexusChain) {
+			//For bitcoin chain, we need to get psbt from pending commands then send sign psbt request back to the scalar node
+			psbtSigningRequest := types.PsbtSigningRequest{
+				Commands: pendingCommands,
+				Params:   c.GetPsbtParams(chain),
+			}
+			eventEnvelope := events.EventEnvelope{
+				EventType:        events.EVENT_SCALAR_CREATE_PSBT_REQUEST,
+				DestinationChain: chain,
+				Data:             psbtSigningRequest,
+			}
+			c.eventBus.BroadcastEvent(&eventEnvelope)
 		}
-		log.Debug().Msgf("[ScalarClient] [checkChainPendingCommands] Successfully broadcasted sign commands request with txHash: %s. Add it to pendingSignCommandTxs...", signRes.TxHash)
-		c.pendingSignCommandTxs.Store(signRes.TxHash, chain)
-		c.pendingChainCommands.Store(chain, 1)
+
 	} else {
 		if counter >= 100 {
 			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [ProcessPendingCommands] No pending command found. This message is printed one of 100	")
@@ -84,13 +104,24 @@ func (c *Client) processSignCommandTxs(ctx context.Context) {
 					Str("Chain", chain).
 					Msg("[ScalarClient] [processSignCommandTxs] Sign command request not found")
 			} else if len(txRes.Logs) > 0 {
+				c.pendingChainCommands.Delete(chain)
+				c.pendingSignCommandTxs.Delete(txHash)
 				batchCommandId := findEventAttribute(txRes.Logs[0].Events, "sign", "batchedCommandID")
-				if batchCommandId == "" {
-					log.Debug().Str("TxHash", txHash).Msg("[ScalarClient] [processSignCommandTxs] batchCommandId not found")
-				} else {
-					c.foundBatchCommand(chain, txHash, batchCommandId)
-				}
 				//commandIDs = findEventAttribute(txRes.Logs[0].Events, "sign", "commandIDs")
+				if batchCommandId == "" {
+					log.Debug().
+						Str("Chain", chain).
+						Str("TxHash", txHash).
+						Any("Logs", txRes.Logs).
+						Msg("[ScalarClient] [processSignCommandTxs] Found transaction response but batchCommandId not found. Remove chain and txHash from pending buffer")
+				} else {
+					log.Debug().
+						Str("TxHash", txHash).
+						Str("Chain", chain).
+						Str("BatchCommandId", batchCommandId).
+						Msg("[ScalarClient] [processSignCommandTxs] BatchCommandId found, Set it  to the pending buffer for further processing.")
+					c.pendingBatchCommands.Store(batchCommandId, chain)
+				}
 			}
 		}
 		time.Sleep(time.Second * 3)
@@ -116,7 +147,6 @@ func (c *Client) processBatchCommands(ctx context.Context) {
 				c.pendingBatchCommands.Delete(batchCommandId)
 				log.Debug().
 					Str("Chain", destChain).
-					Str("BatchCommandId", batchCommandId).
 					Any("BatchCommandResponse", res).
 					Msg("[ScalarClient] [processBatchCommands] Found batchCommand response. Broadcast to eventBus")
 				eventEnvelope := events.EventEnvelope{
@@ -129,12 +159,6 @@ func (c *Client) processBatchCommands(ctx context.Context) {
 		}
 		time.Sleep(time.Second * 3)
 	}
-}
-
-func (c *Client) foundBatchCommand(chain string, txHash string, batchCommandId string) {
-	c.pendingChainCommands.Delete(chain)
-	c.pendingSignCommandTxs.Delete(txHash)
-	c.pendingBatchCommands.Store(batchCommandId, chain)
 }
 
 // func (c *Client) processPendingCommandsForChain(ctx context.Context, destChain string) error {
