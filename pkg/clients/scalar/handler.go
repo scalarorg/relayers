@@ -32,6 +32,10 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*c
 		model.Status = int(db.APPROVED)
 		updates[i] = model
 	}
+	err := c.dbAdapter.CreateOrUpdateTokenSentApproveds(updates)
+	if err != nil {
+		return err
+	}
 	for chain, counter := range chains {
 		log.Debug().Str("Chain", chain).
 			Int("EventCounter", counter).
@@ -44,7 +48,7 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*c
 				Msgf("[ScalarClient] [handleTokenSentEvents] failed to sign transfer request.")
 		}
 	}
-	return c.dbAdapter.CreateOrUpdateTokenSentApproveds(updates)
+	return nil
 }
 
 // For TokenSentEvent from scalar network, relayer need to create pending transfer request and send to the scalar network
@@ -241,7 +245,6 @@ func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *IBCE
 			c.eventBus.BroadcastEvent(&events.EventEnvelope{
 				EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
 				DestinationChain: string(event.Args.Chain),
-				MessageID:        "",
 				Data:             res.ExecuteData,
 			})
 		} else if chainstypes.IsBitcoinChain(chainName) {

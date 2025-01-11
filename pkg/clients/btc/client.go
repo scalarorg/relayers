@@ -146,6 +146,32 @@ func (c *BtcClient) BroadcastRawTx(signedPsbtHex string) (*chainhash.Hash, error
 	return future.Receive()
 }
 
+func (c *BtcClient) TestMempoolRawTx(signedPsbtHex string) (*chainhash.Hash, error) {
+	// First decode the hex string to MsgTx
+	msgTx := wire.NewMsgTx(wire.TxVersion)
+	txBytes, err := hex.DecodeString(signedPsbtHex)
+	if err != nil {
+		return nil, err
+	}
+	if err := msgTx.Deserialize(bytes.NewReader(txBytes)); err != nil {
+		return nil, err
+	}
+
+	// Test mempool accept
+	results, err := c.TestMempoolAccept([]*wire.MsgTx{msgTx}, c.btcConfig.MaxFeeRate)
+	if err != nil {
+		return nil, err
+	}
+
+	// If accepted, return the transaction hash
+	if len(results) > 0 && results[0].Allowed {
+		hash := msgTx.TxHash()
+		return &hash, nil
+	}
+
+	return nil, fmt.Errorf("transaction rejected: %v", results[0].RejectReason)
+}
+
 // if maxFeeRate is not nil, set the feeSetting parameter
 // otherwise, don't set the feeSetting parameter use default value which is set by bitcoind 0.10
 func (c *BtcClient) creatSendRawTransactionCmd(rawTxHex string, maxFeeRate *float64) *btcjson.SendRawTransactionCmd {

@@ -229,6 +229,15 @@ func (c *EvmClient) RecoverMissingEvents(ctx context.Context) error {
 		log.Error().Err(err).Str("eventName", events.EVENT_EVM_CONTRACT_CALL).Msg("failed to recover missing events")
 		return err
 	}
+	if err := RecoverEvent[*contracts.IScalarGatewayContractCallWithToken](c, ctx,
+		events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN, func(log types.Log) *contracts.IScalarGatewayContractCallWithToken {
+			return &contracts.IScalarGatewayContractCallWithToken{
+				Raw: log,
+			}
+		}); err != nil {
+		log.Error().Err(err).Str("eventName", events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN).Msg("failed to recover missing events")
+		return err
+	}
 	if err := RecoverEvent[*contracts.IScalarGatewayContractCallApproved](c, ctx,
 		events.EVENT_EVM_CONTRACT_CALL_APPROVED, func(log types.Log) *contracts.IScalarGatewayContractCallApproved {
 			return &contracts.IScalarGatewayContractCallApproved{
@@ -324,6 +333,7 @@ func GetMissingEvents[T ValidEvmEvent](c *EvmClient, eventName string, lastCheck
 	}
 
 	// Set up a query for logs
+	// Todo: config default last checkpoint block number to make sure we don't recover too old events
 	query := ethereum.FilterQuery{
 		FromBlock: big.NewInt(int64(lastCheckpoint.BlockNumber)),
 		Addresses: []common.Address{c.GatewayAddress},

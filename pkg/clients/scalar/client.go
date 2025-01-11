@@ -34,8 +34,8 @@ type Client struct {
 	dbAdapter             *db.DatabaseAdapter
 	eventBus              *events.EventBus
 	subscriberName        string   //Use as subscriber for networkClient
-	pendingChainCommands  sync.Map //key: chain, value: number of pending commands (0 or 1)
-	pendingSignCommandTxs sync.Map //Sign command request tx hash => chain, used for check if the tx is included in the block
+	pendingPsbtCommands   sync.Map //key: chain, value psbts
+	pendingSignCommandTxs sync.Map //Sign command request chain => tx hash, used for check if the tx is included in the block
 	pendingBatchCommands  sync.Map //Batched command id => chain, used for get batched command to get execute data
 	// Add other necessary fields like chain ID, gas prices, etc.
 }
@@ -100,8 +100,8 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 		subscriberName:        subscriberName,
 		dbAdapter:             dbAdapter,
 		eventBus:              eventBus,
-		pendingChainCommands:  sync.Map{},
 		pendingSignCommandTxs: sync.Map{},
+		pendingPsbtCommands:   sync.Map{},
 		pendingBatchCommands:  sync.Map{},
 	}
 	return client, nil

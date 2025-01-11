@@ -7,6 +7,7 @@ import (
 	"github.com/scalarorg/bitcoin-vault/ffi/go-vault"
 	address "github.com/scalarorg/bitcoin-vault/go-utils/address"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
 
 type ExecuteParams struct {
@@ -97,7 +98,11 @@ type PsbtParams struct {
 	CovenantScript []byte
 }
 
-type PsbtSigningRequest struct {
+type SignPsbtsRequest struct {
+	ChainName string
+	Psbts     []covtypes.Psbt
+}
+type CreatePsbtRequest struct {
 	Commands []chainstypes.QueryCommandResponse
 	Params   PsbtParams
 }
