@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
@@ -69,7 +69,41 @@ func GetMempoolTx(txID string, network string) (*btcjson.GetTransactionResult, e
 	return nil, fmt.Errorf("transaction not found after %d attempts", maxRetries)
 }
 
-func (c *BtcClient) GetAddressTxsUtxo(taprootAddress string) ([]Utxo, error) {
+func (c *BtcClient) GetAddressTxsUtxo(taprootAddress string, totalAmount uint64) ([]Utxo, error) {
+	if taprootAddress == "" {
+		return nil, fmt.Errorf("taproot address cannot be empty")
+	}
+	if totalAmount == 0 {
+		return nil, fmt.Errorf("total amount must be greater than 0")
+	}
+
+	utxos, err := c.getListOfUTXOs(taprootAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get UTXOs: %w", err)
+	}
+
+	utxos = sortUTXOsByValue(utxos)
+
+	selectedUTXOs := make([]Utxo, 0, len(utxos))
+	totalValue := uint64(0)
+
+	for _, utxo := range utxos {
+		selectedUTXOs = append(selectedUTXOs, utxo)
+		totalValue += utxo.Value
+		if totalValue >= totalAmount {
+			break
+		}
+	}
+
+	if totalValue < totalAmount {
+		return nil, fmt.Errorf("insufficient funds: available balance %d is less than required amount %d",
+			totalValue, totalAmount)
+	}
+
+	return selectedUTXOs, nil
+}
+
+func (c BtcClient) getListOfUTXOs(taprootAddress string) ([]Utxo, error) {
 	url := fmt.Sprintf("%s/address/%s/utxo", c.btcConfig.MempoolUrl, taprootAddress)
 
 	resp, err := http.Get(url)
@@ -89,6 +123,13 @@ func (c *BtcClient) GetAddressTxsUtxo(taprootAddress string) ([]Utxo, error) {
 	if err := json.Unmarshal(body, &utxos); err != nil {
 		return nil, fmt.Errorf("failed to decode UTXOs: %w", err)
 	}
-	log.Debug().Msgf("[BtcClient] [GetAddressTxsUtxo] utxos: %v", utxos)
 	return utxos, nil
+
+}
+
+func sortUTXOsByValue(utxos []Utxo) []Utxo {
+	sort.Slice(utxos, func(i, j int) bool {
+		return utxos[i].Value > utxos[j].Value
+	})
+	return utxos
 }

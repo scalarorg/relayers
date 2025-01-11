@@ -82,11 +82,8 @@ func (c *BtcClient) handleScalarCreatePsbtRequest(messageId string, psbtSigningR
 			},
 		}
 	}
-	taprootAddress, err := psbtSigningRequest.Params.GetTaprootAddress()
-	if err != nil || taprootAddress == nil {
-		return fmt.Errorf("failed to get taproot address: %w", err)
-	}
-	psbts, err := c.createPsbts(psbtSigningRequest.Params, outpoints)
+
+	psbts, err := c.CreatePsbts(psbtSigningRequest.Params, outpoints)
 	if err != nil {
 		return fmt.Errorf("failed to create psbts: %w", err)
 	}
