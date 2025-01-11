@@ -264,5 +264,3 @@ var (
 	// 	Parser:  ParseExecuteMessageEvent,
 	// }
 )
-
-//For example

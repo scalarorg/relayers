@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
+	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
 
 func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
@@ -41,18 +42,27 @@ func (c *Client) requestConfirmEvmTxs(confirmRequest events.ConfirmTxsRequest) e
 	if len(txHashes) > 0 {
 		_, err := c.ConfirmEvmTxs(context.Background(), sourceChain, txHashes)
 		if err != nil {
-			log.Error().Err(err).Msg("[ScalarClient] [handleEvmContractCall] error confirming txs")
+			log.Error().Err(err).Msg("[ScalarClient] [requestConfirmEvmTxs] error confirming txs")
 			return err
+		} else {
+			log.Debug().Str("sourceChain", sourceChain).Msgf("[ScalarClient] [requestConfirmEvmTxs] successfully confirmed txs %v", txHashes)
 		}
 	} else {
-		log.Debug().Str("sourceChain", sourceChain).Msg("[ScalarClient] [handleEvmContractCall] no valid txs to confirm")
+		log.Debug().Str("sourceChain", sourceChain).Msg("[ScalarClient] [requestConfirmEvmTxs] no valid txs to confirm")
 	}
 	return nil
 }
 
+// Add psbts to pendingChainPsbtCommands
 func (c *Client) requestPsbtSign(psbt types.SignPsbtsRequest) error {
 	log.Debug().Str("ChainName", psbt.ChainName).Int("psbtCount", len(psbt.Psbts)).Msgf("[ScalarClient] [requestPsbtSign] Set psbts to pendingChainPsbtCommands")
-	c.pendingChainPsbtCommands.Store(psbt.ChainName, psbt.Psbts)
+	pendingPsbt, ok := c.pendingPsbtCommands.Load(psbt.ChainName)
+	if ok {
+		newPsbts := append(pendingPsbt.([]covtypes.Psbt), psbt.Psbts...)
+		c.pendingPsbtCommands.Store(psbt.ChainName, newPsbts)
+	} else {
+		c.pendingPsbtCommands.Store(psbt.ChainName, psbt.Psbts)
+	}
 	return nil
 }
 

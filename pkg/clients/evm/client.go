@@ -333,6 +333,7 @@ func GetMissingEvents[T ValidEvmEvent](c *EvmClient, eventName string, lastCheck
 	}
 
 	// Set up a query for logs
+	// Todo: config default last checkpoint block number to make sure we don't recover too old events
 	query := ethereum.FilterQuery{
 		FromBlock: big.NewInt(int64(lastCheckpoint.BlockNumber)),
 		Addresses: []common.Address{c.GatewayAddress},
