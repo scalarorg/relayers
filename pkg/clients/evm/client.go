@@ -81,7 +81,7 @@ func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*EvmClient, error) {
 	// Setup
 	ctx := context.Background()
-
+	log.Info().Any("evmConfig", evmConfig).Msgf("[EvmClient] [NewEvmClient] connecting to EVM network")
 	// Connect to a test network
 	rpc, err := rpc.DialContext(ctx, evmConfig.RPCUrl)
 	if err != nil {
