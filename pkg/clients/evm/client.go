@@ -64,7 +64,7 @@ func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 		}
 		//Set default gaslimit to 300000
 		if evmConfig.GasLimit == 0 {
-			evmConfig.GasLimit = 300000
+			evmConfig.GasLimit = 3000000
 		}
 		client, err := NewEvmClient(globalConfig, &evmConfig, dbAdapter, eventBus)
 		if err != nil {
