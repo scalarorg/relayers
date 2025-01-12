@@ -393,7 +393,7 @@ func (c *EvmClient) ListenToEvents(ctx context.Context) error {
 	for _, eventName := range events {
 		go func() {
 			if err = watchForEvent(c, ctx, eventName); err != nil {
-				log.Error().Err(err).Msgf("[EvmClient] [ListenToEvents] failed to watch for event: %s", eventName)
+				log.Error().Err(err).Any("Config", c.evmConfig).Msgf("[EvmClient] [ListenToEvents] failed to watch for event: %s", eventName)
 			}
 		}()
 	}
