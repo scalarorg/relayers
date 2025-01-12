@@ -83,6 +83,7 @@ func (c *EvmClient) ContractCallWithToken2RelayData(event *contracts.IScalarGate
 
 func (c *EvmClient) TokenSentEvent2RelayData(event *contracts.IScalarGatewayTokenSent) (models.RelayData, error) {
 	eventId := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
+	eventId = strings.TrimPrefix(eventId, "0x")
 	senderAddress := event.Sender.String()
 	relayData := models.RelayData{
 		ID:   eventId,
@@ -90,19 +91,26 @@ func (c *EvmClient) TokenSentEvent2RelayData(event *contracts.IScalarGatewayToke
 		To:   event.DestinationChain,
 		TokenSent: &models.TokenSent{
 			EventID:     eventId,
+			SourceChain: c.evmConfig.GetId(),
 			TxHash:      event.Raw.TxHash.String(),
 			BlockNumber: event.Raw.BlockNumber,
 			LogIndex:    event.Raw.Index,
 			//3 follows field are used for query to get back payload, so need to convert to lower case
-			SourceAddress:      strings.ToLower(senderAddress),
-			DestinationAddress: strings.ToLower(event.DestinationAddress),
-			Symbol:             event.Symbol,
-			Amount:             event.Amount.Uint64(),
+			SourceAddress:        strings.ToLower(senderAddress),
+			DestinationChain:     event.DestinationChain,
+			DestinationAddress:   strings.ToLower(event.DestinationAddress),
+			Symbol:               event.Symbol,
+			TokenContractAddress: c.GetTokenContractAddressFromSymbol(event.Symbol, c.evmConfig.GetId()),
+			Amount:               event.Amount.Uint64(),
 		},
 	}
 	return relayData, nil
 }
 
+// Todo: Implement this function
+func (c *EvmClient) GetTokenContractAddressFromSymbol(symbol string, sourceChain string) string {
+	return ""
+}
 func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGatewayContractCallApproved) (models.ContractCallApproved, error) {
 	txHash := event.Raw.TxHash.String()
 	eventId := strings.ToLower(fmt.Sprintf("%s-%d-%d", txHash, event.SourceEventIndex, event.Raw.Index))

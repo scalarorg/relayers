@@ -7,8 +7,8 @@ DOCKER := $(shell which docker)
 DOCKER_BUF := $(DOCKER) run --rm -v $(CURDIR):/workspace --workdir /workspace bufbuild/buf
 HTTPS_GIT := https://github.com/scalarorg/relayers.git
 PUSH_DOCKER_IMAGE := true
-LIB_DIR := $(shell pwd)/lib
-LIBRARY_PATH := $(shell pwd)/../bitcoin-vault/target/release
+#LIB_DIR := $(shell pwd)/lib
+#LIBRARY_PATH := $(shell pwd)/../bitcoin-vault/target/release
 
 # Default values that can be overridden by the caller via `make VAR=value [target]`
 # NOTE: Avoid adding comments on the same line as the variable assignment since trailing spaces will be included in the variable by make
@@ -20,7 +20,7 @@ IBC_WASM_HOOKS := false
 # Export env var to go build so Cosmos SDK can see it
 export CGO_ENABLED := 1
 # Add bitcoin-vault lib to CGO_LDFLAGS and CGO_CFLAGS
-export CGO_LDFLAGS := ${CGO_LDFLAGS} -L$(LIB_DIR) -lbitcoin_vault_ffi
+export CGO_LDFLAGS := ${CGO_LDFLAGS} -lbitcoin_vault_ffi #-L$(LIB_DIR)
 
 
 $(info $$WASM is [${WASM}])
