@@ -23,8 +23,7 @@ func (db *DatabaseAdapter) FindPendingBtcTokenSent(sourceChain string, height in
 	if len(tokenSents) == 0 {
 		log.Warn().
 			Str("sourceChain", sourceChain).
-			Str("height", fmt.Sprintf("%d", height)).
-			Msg("[DatabaseAdapter] [FindPendingBtcTokenSent] no token sent found")
+			Msgf("[DatabaseAdapter] [FindPendingBtcTokenSent] no token sent with block height before %d found", height)
 	}
 	return tokenSents, nil
 }

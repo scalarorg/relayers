@@ -1464,10 +1464,14 @@ github.com/scalarorg/data-models v0.0.0-20250110082742-2450fb11dfb5 h1:uVuSfEKOL
 github.com/scalarorg/data-models v0.0.0-20250110082742-2450fb11dfb5/go.mod h1:kIETfvOtm6s9SC3+w9+z7m932RHSLtn7LiJLlLPm48w=
 github.com/scalarorg/data-models v0.0.0-20250113041627-3d5f6290f24c h1:scOazVeUrcKx6CeYlaIqBpiziz2BdCOPf1elbNEoTzw=
 github.com/scalarorg/data-models v0.0.0-20250113041627-3d5f6290f24c/go.mod h1:kIETfvOtm6s9SC3+w9+z7m932RHSLtn7LiJLlLPm48w=
+github.com/scalarorg/data-models v0.0.0-20250113072030-d754aa32e12a h1:jY+WmeZoDhWptkqoikgE9TMDaV7TJ1f+EZpkoyzAdoY=
+github.com/scalarorg/data-models v0.0.0-20250113072030-d754aa32e12a/go.mod h1:kIETfvOtm6s9SC3+w9+z7m932RHSLtn7LiJLlLPm48w=
 github.com/scalarorg/go-electrum v0.1.2-0.20250109054544-05860f7f34a4 h1:4isJb4ZAGyUbD37nBV0j/DqvbRx7bFfkBjxNWuA3TC8=
 github.com/scalarorg/go-electrum v0.1.2-0.20250109054544-05860f7f34a4/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
 github.com/scalarorg/go-electrum v0.1.2-0.20250113055817-01ba7455338f h1:b/YSobb4P9aJ0itJJUzgMtH8VjPtjwCDRJbtQn1yX8k=
 github.com/scalarorg/go-electrum v0.1.2-0.20250113055817-01ba7455338f/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
+github.com/scalarorg/go-electrum v0.1.2-0.20250113074812-84502fb16a1a h1:nChfsP2X/lIEK4wNk/z8dcE9JrRdMYt0ydsr+dlV5Zw=
+github.com/scalarorg/go-electrum v0.1.2-0.20250113074812-84502fb16a1a/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250109032506-b6ae90bff7ee h1:196+Qm2qwearwuidRY/wJplYOsiu/7zGLMJ+rWVHtP8=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250109032506-b6ae90bff7ee/go.mod h1:6YkxYvpaeMh47h1mNm8EmZ5V9WZU1nZSHuK5OPovu5o=
 github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible h1:Bn1aCHHRnjv4Bl16T8rcaFjYSrGrIZvpiGO6P3Q4GpU=

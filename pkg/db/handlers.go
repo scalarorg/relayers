@@ -12,7 +12,7 @@ import (
 func (db *DatabaseAdapter) SaveValuesWithCheckpoint(values any, lastCheckpoint *models.EventCheckPoint) error {
 	//Up date checkpoint and relayDatas in a transaction
 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
-		result := tx.Create(values)
+		result := tx.Save(values)
 		if result.Error != nil {
 			return result.Error
 		}
@@ -27,18 +27,18 @@ func (db *DatabaseAdapter) SaveValuesWithCheckpoint(values any, lastCheckpoint *
 	return nil
 }
 
-func (db *DatabaseAdapter) CreateSingleValue(value any) error {
-	result := db.PostgresClient.Create(value)
+func (db *DatabaseAdapter) SaveSingleValue(value any) error {
+	result := db.PostgresClient.Save(value)
 	if result.Error != nil {
 		return result.Error
 	}
 	return nil
 }
 
-func (db *DatabaseAdapter) CreateSingleValueWithCheckpoint(value any, lastCheckpoint *models.EventCheckPoint) error {
+func (db *DatabaseAdapter) SaveSingleValueWithCheckpoint(value any, lastCheckpoint *models.EventCheckPoint) error {
 	//Up date checkpoint and relayDatas in a transaction
 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
-		result := tx.Create(&value)
+		result := tx.Save(&value)
 		if result.Error != nil {
 			return result.Error
 		}

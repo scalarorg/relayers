@@ -18,12 +18,17 @@ func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err err
 		log.Debug().Msg("[ElectrumClient] [BlockchainHeaderHandler] No blockchain header received")
 		return nil
 	}
+	c.currentHeight = header.Height
 	// Check pending vault transactions in the relayer db, if the confirmation is enough, send to the event bus
-	lastConfirmedBlockNumber := header.Height - c.electrumConfig.Confirmations
+	lastConfirmedBlockNumber := header.Height - c.electrumConfig.Confirmations + 1
 	tokenSents, err := c.dbAdapter.FindPendingBtcTokenSent(c.electrumConfig.SourceChain, lastConfirmedBlockNumber)
 	if err != nil {
 		log.Error().Err(err).Msg("[ElectrumClient] [BlockchainHeaderHandler] Failed to get pending vault transactions from db")
 		return fmt.Errorf("failed to get pending vault transactions from db: %w", err)
+	}
+	if len(tokenSents) == 0 {
+		log.Debug().Msgf("[ElectrumClient] [BlockchainHeaderHandler] No pending vault transactions with %d confirmations found", c.electrumConfig.Confirmations)
+		return nil
 	}
 	confirmTxs := events.ConfirmTxsRequest{
 		ChainName: c.electrumConfig.SourceChain,
@@ -79,29 +84,28 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 			lastCheckpoint.EventKey = tx.Key
 		}
 	}
-	// If confirmations is 1, set status to verifying, and send to the event bus for verification
-	if c.electrumConfig.Confirmations == 1 {
-		for _, tokenSent := range tokenSents {
+	confirmTxs := events.ConfirmTxsRequest{
+		ChainName: c.electrumConfig.SourceChain,
+		TxHashs:   make(map[string]string),
+	}
+	//If confirmations is 1, send to the event bus with destination chain is scalar for confirmation
+	//If confirmations is greater than 1, wait for the next blocks to get more confirmations before broadcasting to the scalar network
+	for _, tokenSent := range tokenSents {
+		if c.electrumConfig.Confirmations <= 1 || c.currentHeight-int(tokenSent.BlockNumber) >= c.electrumConfig.Confirmations {
 			tokenSent.Status = chains.TokenSentStatusVerifying
+			confirmTxs.TxHashs[tokenSent.TxHash] = tokenSent.DestinationChain
 		}
 	}
+
 	//3. store relay data to the db, update last checkpoint
 	err = c.dbAdapter.SaveValuesWithCheckpoint(tokenSents, lastCheckpoint)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to store relay data to the db")
 		return fmt.Errorf("failed to store relay data to the db: %w", err)
 	}
-	//If confirmations is 1, send to the event bus with destination chain is scalar for confirmation
-	//If confirmations is greater than 1, wait for the next blocks to get more confirmations before broadcasting to the scalar network
-	if c.electrumConfig.Confirmations == 1 {
-		//4. Send to the event bus with destination chain is scalar for confirmation
-		confirmTxs := events.ConfirmTxsRequest{
-			ChainName: c.electrumConfig.SourceChain,
-			TxHashs:   make(map[string]string),
-		}
-		for _, item := range tokenSents {
-			confirmTxs.TxHashs[item.TxHash] = item.DestinationChain
-		}
+
+	//4. Send to the event bus with destination chain is scalar for confirmation
+	if len(confirmTxs.TxHashs) > 0 {
 		if c.eventBus != nil {
 			c.eventBus.BroadcastEvent(&events.EventEnvelope{
 				EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
@@ -112,6 +116,7 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 			log.Warn().Msg("[ElectrumClient] [vaultTxMessageHandler] event bus is undefined")
 		}
 	}
+
 	return nil
 }
 

@@ -161,7 +161,7 @@ func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) e
 		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.Index)
 	}
 	//3. store relay data to the db, update last checkpoint
-	err = ec.dbAdapter.CreateSingleValueWithCheckpoint(tokenSent, lastCheckpoint)
+	err = ec.dbAdapter.SaveSingleValueWithCheckpoint(tokenSent, lastCheckpoint)
 	if err != nil {
 		return fmt.Errorf("failed to create evm token send: %w", err)
 	}
@@ -209,7 +209,7 @@ func (ec *EvmClient) HandleContractCallApproved(event *contracts.IScalarGatewayC
 	if err != nil {
 		return fmt.Errorf("failed to convert ContractCallApprovedEvent to RelayData: %w", err)
 	}
-	err = ec.dbAdapter.CreateSingleValue(&contractCallApproved)
+	err = ec.dbAdapter.SaveSingleValue(&contractCallApproved)
 	if err != nil {
 		return fmt.Errorf("failed to create contract call approved: %w", err)
 	}
@@ -330,7 +330,7 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecut
 	// }
 	// cmdExecuted.CallContract = contractCall
 	// cmdExecuted.ReferenceTxHash = &contractCall.TxHash
-	err := ec.dbAdapter.CreateSingleValue(&cmdExecuted)
+	err := ec.dbAdapter.SaveSingleValue(&cmdExecuted)
 	if err != nil {
 		return fmt.Errorf("failed to create evm executed: %w", err)
 	}
