@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	chains "github.com/scalarorg/data-models/chains"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	relaydata "github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
@@ -81,30 +82,26 @@ func (c *EvmClient) ContractCallWithToken2RelayData(event *contracts.IScalarGate
 	return relayData, nil
 }
 
-func (c *EvmClient) TokenSentEvent2RelayData(event *contracts.IScalarGatewayTokenSent) (models.RelayData, error) {
+func (c *EvmClient) TokenSentEvent2Model(event *contracts.IScalarGatewayTokenSent) (chains.TokenSent, error) {
 	eventId := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
 	eventId = strings.TrimPrefix(eventId, "0x")
 	senderAddress := event.Sender.String()
-	relayData := models.RelayData{
-		ID:   eventId,
-		From: c.evmConfig.GetId(),
-		To:   event.DestinationChain,
-		TokenSent: &models.TokenSent{
-			EventID:     eventId,
-			SourceChain: c.evmConfig.GetId(),
-			TxHash:      event.Raw.TxHash.String(),
-			BlockNumber: event.Raw.BlockNumber,
-			LogIndex:    event.Raw.Index,
-			//3 follows field are used for query to get back payload, so need to convert to lower case
-			SourceAddress:        strings.ToLower(senderAddress),
-			DestinationChain:     event.DestinationChain,
-			DestinationAddress:   strings.ToLower(event.DestinationAddress),
-			Symbol:               event.Symbol,
-			TokenContractAddress: c.GetTokenContractAddressFromSymbol(event.Symbol, c.evmConfig.GetId()),
-			Amount:               event.Amount.Uint64(),
-		},
+	tokenSent := chains.TokenSent{
+		EventID:     eventId,
+		SourceChain: c.evmConfig.GetId(),
+		TxHash:      event.Raw.TxHash.String(),
+		BlockNumber: event.Raw.BlockNumber,
+		LogIndex:    event.Raw.Index,
+		//3 follows field are used for query to get back payload, so need to convert to lower case
+		SourceAddress:        strings.ToLower(senderAddress),
+		DestinationChain:     event.DestinationChain,
+		DestinationAddress:   strings.ToLower(event.DestinationAddress),
+		Symbol:               event.Symbol,
+		TokenContractAddress: c.GetTokenContractAddressFromSymbol(event.Symbol, c.evmConfig.GetId()),
+		Amount:               event.Amount.Uint64(),
+		Status:               chains.TokenSentStatusPending,
 	}
-	return relayData, nil
+	return tokenSent, nil
 }
 
 // Todo: Implement this function
@@ -144,7 +141,6 @@ func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IScalarGatewayEx
 		LogIndex:         uint(event.Raw.Index),
 		CommandId:        hex.EncodeToString(event.CommandId[:]),
 		Status:           int(relaydata.SUCCESS),
-		ReferenceTxHash:  nil,
 	}
 	return cmdExecuted
 }

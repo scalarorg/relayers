@@ -9,10 +9,46 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+func (db *DatabaseAdapter) SaveValuesWithCheckpoint(values any, lastCheckpoint *models.EventCheckPoint) error {
+	//Up date checkpoint and relayDatas in a transaction
+	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		result := tx.Create(values)
+		if result.Error != nil {
+			return result.Error
+		}
+		if lastCheckpoint != nil {
+			UpdateLastEventCheckPoint(tx, lastCheckpoint)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create Single value with checkpoint: %w", err)
+	}
+	return nil
+}
+
 func (db *DatabaseAdapter) CreateSingleValue(value any) error {
 	result := db.PostgresClient.Create(value)
 	if result.Error != nil {
 		return result.Error
+	}
+	return nil
+}
+
+func (db *DatabaseAdapter) CreateSingleValueWithCheckpoint(value any, lastCheckpoint *models.EventCheckPoint) error {
+	//Up date checkpoint and relayDatas in a transaction
+	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		result := tx.Create(&value)
+		if result.Error != nil {
+			return result.Error
+		}
+		if lastCheckpoint != nil {
+			UpdateLastEventCheckPoint(tx, lastCheckpoint)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create Single value with checkpoint: %w", err)
 	}
 	return nil
 }
@@ -73,16 +109,6 @@ func (db *DatabaseAdapter) UpdateEventStatus(id string, status RelayDataStatus) 
 	}
 
 	log.Info().Msgf("[DBUpdate] %v", data)
-	return nil
-}
-
-func (db *DatabaseAdapter) UpdateTokenSents(tokenSents []models.TokenSent) error {
-	for _, entity := range tokenSents {
-		result := db.PostgresClient.Model(&models.TokenSent{}).Where("event_id = ?", entity.EventID).Updates(entity)
-		if result.Error != nil {
-			log.Error().Any("TokenSent", entity).Msgf("[DBUpdate] UpdateTokenSent with error: %v", result.Error)
-		}
-	}
 	return nil
 }
 

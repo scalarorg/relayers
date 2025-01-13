@@ -8,8 +8,8 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/go-electrum/electrum"
-	"github.com/scalarorg/go-electrum/electrum/types"
 	"github.com/scalarorg/relayers/config"
+	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
@@ -21,9 +21,10 @@ type Client struct {
 	electrs        *electrum.Client
 	dbAdapter      *db.DatabaseAdapter
 	eventBus       *events.EventBus
+	scalarClient   *scalar.Client
 }
 
-func NewElectrumClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) ([]*Client, error) {
+func NewElectrumClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus, scalarClient *scalar.Client) ([]*Client, error) {
 	if globalConfig == nil || globalConfig.ConfigPath == "" {
 		return nil, fmt.Errorf("config path is required")
 	}
@@ -38,7 +39,7 @@ func NewElectrumClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapt
 		if config.BatchSize == 0 {
 			config.BatchSize = 1
 		}
-		client, err := NewElectrumClient(globalConfig, &config, dbAdapter, eventBus)
+		client, err := NewElectrumClient(globalConfig, &config, dbAdapter, eventBus, scalarClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create electrum client: %w", err)
 		}
@@ -46,7 +47,7 @@ func NewElectrumClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapt
 	}
 	return clients, nil
 }
-func NewElectrumClient(globalConfig *config.Config, config *Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*Client, error) {
+func NewElectrumClient(globalConfig *config.Config, config *Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus, scalarClient *scalar.Client) (*Client, error) {
 	if config.Host == "" {
 		return nil, fmt.Errorf("electrum rpc host is required")
 	}
@@ -55,6 +56,9 @@ func NewElectrumClient(globalConfig *config.Config, config *Config, dbAdapter *d
 	}
 	if dbAdapter == nil {
 		return nil, fmt.Errorf("dbAdapter is required")
+	}
+	if config.Confirmations == 0 {
+		config.Confirmations = 1
 	}
 	rpcEndpoint := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	electrs, err := electrum.Connect(&electrum.Options{
@@ -75,6 +79,7 @@ func NewElectrumClient(globalConfig *config.Config, config *Config, dbAdapter *d
 		electrs:        electrs,
 		dbAdapter:      dbAdapter,
 		eventBus:       eventBus,
+		scalarClient:   scalarClient,
 	}, nil
 }
 
@@ -93,64 +98,16 @@ func (c *Client) Start(ctx context.Context) error {
 
 	log.Debug().Msgf("[ElectrumClient] [Start] Subscribing to vault transactions with params: %v", params)
 	c.electrs.VaultTransactionSubscribe(ctx, c.vaultTxMessageHandler, params...)
+	log.Debug().Msg("[ElectrumClient] [Start] Subscribing to new block event for request to confirm if vault transaction is get enought confirmation")
+	c.electrs.BlockchainHeaderSubscribe(ctx, c.BlockchainHeaderHandler)
 	return nil
 }
 
-// Handle vault messages
-// Todo: Add some logging, metric and error handling if needed
-func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err error) error {
-	if err != nil {
-		log.Warn().Msgf("[ElectrumClient] [vaultTxMessageHandler] Failed to receive vault transaction: %v", err)
-		return fmt.Errorf("failed to receive vault transaction: %w", err)
+func (c *Client) GetSymbol(chainId string, tokenAddress string) string {
+	if c.scalarClient == nil {
+		return ""
 	}
-	if len(vaultTxs) == 0 {
-		log.Debug().Msg("[ElectrumClient] [vaultTxMessageHandler] No vault transactions received")
-		return nil
-	}
-	c.PreProcessMessages(vaultTxs)
-	//1. parse vault transactions to relay data
-	relayDatas, err := c.CreateRelayDatas(vaultTxs)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to convert vault transaction to relay data")
-		return fmt.Errorf("failed to convert vault transaction to relay data: %w", err)
-	} else {
-		log.Debug().Msgf("Successfully stored %d vault transactions to relay data", len(relayDatas))
-	}
-	//2. update last checkpoint
-	lastCheckpoint := c.getLastCheckpoint()
-	for _, tx := range vaultTxs {
-		if uint64(tx.Height) > lastCheckpoint.BlockNumber ||
-			(uint64(tx.Height) == lastCheckpoint.BlockNumber && uint(tx.TxPosition) > lastCheckpoint.LogIndex) {
-			lastCheckpoint.BlockNumber = uint64(tx.Height)
-			lastCheckpoint.TxHash = tx.TxHash
-			lastCheckpoint.LogIndex = uint(tx.TxPosition)
-			lastCheckpoint.EventKey = tx.Key
-		}
-	}
-	//3. store relay data to the db, update last checkpoint
-	err = c.dbAdapter.CreateRelayDatas(relayDatas, lastCheckpoint)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to store relay data to the db")
-		return fmt.Errorf("failed to store relay data to the db: %w", err)
-	}
-	//4. Send to the event bus with destination chain is scalar for confirmation
-	confirmTxs := events.ConfirmTxsRequest{
-		ChainName: c.electrumConfig.SourceChain,
-		TxHashs:   make(map[string]string),
-	}
-	for _, item := range relayDatas {
-		confirmTxs.TxHashs[item.TokenSent.TxHash] = item.To
-	}
-	if c.eventBus != nil {
-		c.eventBus.BroadcastEvent(&events.EventEnvelope{
-			EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
-			DestinationChain: events.SCALAR_NETWORK_NAME,
-			Data:             confirmTxs,
-		})
-	} else {
-		log.Warn().Msg("[ElectrumClient] [vaultTxMessageHandler] event bus is undefined")
-	}
-	return nil
+	return c.scalarClient.GetSymbol(context.Background(), chainId, tokenAddress)
 }
 
 // Get lastcheck point from db, return default value if not found
@@ -163,13 +120,4 @@ func (c *Client) getLastCheckpoint() *models.EventCheckPoint {
 			Msg("[ElectrumClient] [getLastCheckpoint] using default value")
 	}
 	return lastCheckpoint
-}
-
-// Todo: Log and validate incomming message
-func (c *Client) PreProcessMessages(vaultTxs []types.VaultTransaction) error {
-	log.Info().Msgf("Received %d vault transactions", len(vaultTxs))
-	for _, vaultTx := range vaultTxs {
-		log.Debug().Msgf("Received vaultTx with key=>%v; stakerAddress=>%v; stakerPubkey=>%v", vaultTx.Key, vaultTx.StakerAddress, vaultTx.StakerPubkey)
-	}
-	return nil
 }

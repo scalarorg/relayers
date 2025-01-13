@@ -6,56 +6,59 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/go-electrum/electrum/types"
-	"github.com/scalarorg/relayers/pkg/db/models"
 )
 
-func (c *Client) CreateRelayDatas(vaultTxs []types.VaultTransaction) ([]models.RelayData, error) {
-	relayDatas := make([]models.RelayData, len(vaultTxs))
-	for i, vaultTx := range vaultTxs {
-		relayData, err := c.CreateRelayData(vaultTx)
+func (c *Client) CreateTokenSents(vaultTxs []types.VaultTransaction) ([]*chains.TokenSent, error) {
+	tokenSents := []*chains.TokenSent{}
+	for _, vaultTx := range vaultTxs {
+		tokenSent, err := c.CreateTokenSent(vaultTx)
 		if err != nil {
 			return nil, err
 		}
-		relayDatas[i] = relayData
+		if tokenSent.Symbol == "" {
+			log.Error().Msgf("[ElectrumClient] [CreateTokenSents] symbol not found for token: %s", vaultTx.DestTokenAddress)
+		} else {
+			tokenSents = append(tokenSents, &tokenSent)
+		}
 	}
-	return relayDatas, nil
+	return tokenSents, nil
 }
 
-func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayData, error) {
+func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (chains.TokenSent, error) {
 	//For btc vault tx, the log index is tx position in the block
 	index := vaultTx.TxPosition
 	eventId := fmt.Sprintf("%s-%d", strings.ToLower(vaultTx.TxHash), index)
-	relayData := models.RelayData{
-		ID:   eventId,
-		From: c.electrumConfig.SourceChain,
-		TokenSent: &models.TokenSent{
-			EventID:              eventId,
-			TxHash:               vaultTx.TxHash,
-			BlockNumber:          uint64(vaultTx.Height),
-			LogIndex:             uint(vaultTx.TxPosition),
-			SourceChain:          c.electrumConfig.SourceChain,
-			SourceAddress:        strings.ToLower(vaultTx.StakerAddress),
-			DestinationAddress:   strings.ToLower(vaultTx.DestRecipientAddress),
-			TokenContractAddress: vaultTx.DestTokenAddress,
-			Amount:               vaultTx.Amount,
-		},
+	tokenSent := chains.TokenSent{
+		EventID:              eventId,
+		TxHash:               vaultTx.TxHash,
+		BlockNumber:          uint64(vaultTx.Height),
+		LogIndex:             uint(vaultTx.TxPosition),
+		SourceChain:          c.electrumConfig.SourceChain,
+		SourceAddress:        strings.ToLower(vaultTx.StakerAddress),
+		DestinationAddress:   strings.ToLower(vaultTx.DestRecipientAddress),
+		TokenContractAddress: vaultTx.DestTokenAddress,
+		Amount:               vaultTx.Amount,
+		Status:               chains.TokenSentStatusPending,
+		CreatedAt:            time.Unix(int64(vaultTx.Timestamp), 0),
+		UpdatedAt:            time.Unix(int64(vaultTx.Timestamp), 0),
 	}
-	relayData.CreatedAt = time.Unix(int64(vaultTx.Timestamp), 0)
 	//parse chain id to chain name
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, vaultTx.DestChain)
 	chainInfo := chain.NewChainInfoFromBytes(buf)
 	if chainInfo == nil {
-		return relayData, fmt.Errorf("invalid destination chain: %d", vaultTx.DestChain)
+		return tokenSent, fmt.Errorf("invalid destination chain: %d", vaultTx.DestChain)
 	}
 	destinationChainName, err := c.globalConfig.GetStringIdByChainId(chainInfo.ChainType.String(), chainInfo.ChainID)
 	if err != nil {
-		return relayData, fmt.Errorf("chain not found for input chainId: %v, %w	", chainInfo, err)
+		return tokenSent, fmt.Errorf("chain not found for input chainId: %v, %w	", chainInfo, err)
 	}
-	relayData.To = destinationChainName
-	relayData.TokenSent.DestinationChain = destinationChainName
+	tokenSent.DestinationChain = destinationChainName
+	tokenSent.Symbol = c.GetSymbol(destinationChainName, vaultTx.DestTokenAddress)
 	// Convert VaultTxHex and Payload to byte slices
 	// txHexBytes, err := hex.DecodeString(strings.TrimPrefix(vaultTx.TxContent, "0x"))
 	// if err != nil {
@@ -68,5 +71,5 @@ func (c *Client) CreateRelayData(vaultTx types.VaultTransaction) (models.RelayDa
 	// }
 	// relayData.CallContract.Payload = payloadBytes
 	// relayData.CallContract.PayloadHash = strings.ToLower(payloadHash)
-	return relayData, nil
+	return tokenSent, nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/chains"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
@@ -139,10 +140,12 @@ func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) e
 	//0. Preprocess the event
 	ec.preprocessTokenSent(event)
 	//1. Convert into a RelayData instance then store to the db
-	relayData, err := ec.TokenSentEvent2RelayData(event)
+	tokenSent, err := ec.TokenSentEvent2Model(event)
 	if err != nil {
 		return fmt.Errorf("failed to convert ContractCallEvent to RelayData: %w", err)
 	}
+	//For evm, the token sent is verified immediately by the scalarnet
+	tokenSent.Status = chains.TokenSentStatusVerifying
 	//2. update last checkpoint
 	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.evmConfig.GetId(), events.EVENT_EVM_TOKEN_SENT)
 	if err != nil {
@@ -158,14 +161,14 @@ func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) e
 		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.Index)
 	}
 	//3. store relay data to the db, update last checkpoint
-	err = ec.dbAdapter.CreateRelayDatas([]models.RelayData{relayData}, lastCheckpoint)
+	err = ec.dbAdapter.CreateSingleValueWithCheckpoint(tokenSent, lastCheckpoint)
 	if err != nil {
 		return fmt.Errorf("failed to create evm token send: %w", err)
 	}
 	//2. Send to the bus
 	confirmTxs := events.ConfirmTxsRequest{
 		ChainName: ec.evmConfig.GetId(),
-		TxHashs:   map[string]string{relayData.TokenSent.TxHash: relayData.To},
+		TxHashs:   map[string]string{tokenSent.TxHash: tokenSent.DestinationChain},
 	}
 	if ec.eventBus != nil {
 		ec.eventBus.BroadcastEvent(&events.EventEnvelope{

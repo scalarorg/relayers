@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/spf13/viper"
@@ -148,7 +149,7 @@ func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
 	// Auto Migrate the schema
 	err = db.AutoMigrate(
 		&models.RelayData{},
-		&models.TokenSent{},
+		&chains.TokenSent{},
 		&models.CallContract{},
 		&models.CallContractWithToken{},
 		&models.TokenSentApproved{},
