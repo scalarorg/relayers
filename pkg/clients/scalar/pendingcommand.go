@@ -34,7 +34,6 @@ func (c *Client) ProcessPendingCommands(ctx context.Context) {
 	go c.processSignCommandTxs(ctx)
 	//Start a goroutine to process batch commands
 	go c.processBatchCommands(ctx)
-
 	//Start a goroutine to process psbt commands
 	go c.processPsbtCommands(ctx)
 	counter := 0
@@ -44,7 +43,6 @@ func (c *Client) ProcessPendingCommands(ctx context.Context) {
 		if err != nil {
 			log.Error().Err(err).Msg("[ScalarClient] [ProcessSigCommand] Cannot get actived chains")
 		}
-		log.Debug().Msgf("[ScalarClient] [ProcessPendingCommands] Actived chains: %v", activedChains)
 		for _, chain := range activedChains {
 			go func() {
 				if c.checkChainPendingCommands(ctx, chain) {

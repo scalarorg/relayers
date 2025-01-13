@@ -34,7 +34,7 @@ func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
 		return nil, fmt.Errorf("failed to create scalar client: %w", err)
 	}
 	// Initialize Electrs clients
-	electrsClients, err := electrs.NewElectrumClients(config, dbAdapter, eventBus)
+	electrsClients, err := electrs.NewElectrumClients(config, dbAdapter, eventBus, scalarClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create electrum clients: %w", err)
 	}

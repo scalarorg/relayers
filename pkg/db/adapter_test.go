@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/testcontainers/testcontainers-go"
@@ -72,7 +73,7 @@ func SetupTestDB(busEventChan chan *events.EventEnvelope, receiverChanBufSize in
 		&models.CallContract{},
 		&models.ContractCallApproved{},
 		&models.CommandExecuted{},
-		&models.TokenSent{},
+		&chains.TokenSent{},
 		&models.TokenSentApproved{},
 	)
 	if err != nil {

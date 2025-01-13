@@ -322,3 +322,23 @@ func (c *Client) ConfirmEvmTx(ctx context.Context, chainName string, txId string
 func (c *Client) GetQueryClient() *cosmos.QueryClient {
 	return c.queryClient
 }
+
+func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress string) string {
+	client, err := c.queryClient.GetChainQueryServiceClient()
+	if err != nil {
+		log.Error().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
+		return ""
+	}
+	tokenRequest := chainstypes.TokenInfoRequest{
+		Chain: chainId,
+		FindBy: &chainstypes.TokenInfoRequest_Address{
+			Address: tokenAddress,
+		},
+	}
+	response, err := client.TokenInfo(ctx, &tokenRequest)
+	if err != nil {
+		log.Error().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get token info")
+		return ""
+	}
+	return response.Asset
+}
