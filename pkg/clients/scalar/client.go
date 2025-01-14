@@ -324,11 +324,11 @@ func (c *Client) GetQueryClient() *cosmos.QueryClient {
 	return c.queryClient
 }
 
-func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress string) string {
+func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress string) (string, error) {
 	client, err := c.queryClient.GetChainQueryServiceClient()
 	if err != nil {
 		log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
-		return ""
+		return "", err
 	}
 	if !strings.HasPrefix(tokenAddress, "0x") {
 		tokenAddress = "0x" + tokenAddress
@@ -341,8 +341,7 @@ func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress str
 	}
 	response, err := client.TokenInfo(ctx, &tokenRequest)
 	if err != nil {
-		log.Error().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get token info")
-		return ""
+		return "", err
 	}
-	return response.Asset
+	return response.Asset, nil
 }

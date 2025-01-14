@@ -104,9 +104,9 @@ func (c *Client) Start(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) GetSymbol(chainId string, tokenAddress string) string {
+func (c *Client) GetSymbol(chainId string, tokenAddress string) (string, error) {
 	if c.scalarClient == nil {
-		return ""
+		return "", fmt.Errorf("scalar client is not initialized")
 	}
 	return c.scalarClient.GetSymbol(context.Background(), chainId, tokenAddress)
 }

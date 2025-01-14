@@ -66,12 +66,10 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	}
 	c.PreProcessVaultsMessages(vaultTxs)
 	//1. parse vault transactions to relay data
-	tokenSents, err := c.CreateTokenSents(vaultTxs)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to convert vault transaction to relay data")
-		return fmt.Errorf("failed to convert vault transaction to relay data: %w", err)
-	} else {
-		log.Debug().Msgf("Successfully stored %d vault transactions to relay data", len(tokenSents))
+	tokenSents := c.CreateTokenSents(vaultTxs)
+	if len(tokenSents) == 0 {
+		log.Warn().Msg("No Valid vault transactions to convert to relay data")
+		return nil
 	}
 	//2. update last checkpoint
 	lastCheckpoint := c.getLastCheckpoint()
@@ -98,12 +96,16 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	}
 
 	//3. store relay data to the db, update last checkpoint
-	err = c.dbAdapter.SaveValuesWithCheckpoint(tokenSents, lastCheckpoint)
+	if len(tokenSents) > 0 {
+		err = c.dbAdapter.SaveValuesWithCheckpoint(tokenSents, lastCheckpoint)
+	} else {
+		log.Warn().Msg("No Valid vault transactions to store to the db, update last checkpoint only")
+		err = c.dbAdapter.UpdateLastEventCheckPoint(lastCheckpoint)
+	}
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to store relay data to the db")
 		return fmt.Errorf("failed to store relay data to the db: %w", err)
 	}
-
 	//4. Send to the event bus with destination chain is scalar for confirmation
 	if len(confirmTxs.TxHashs) > 0 {
 		if c.eventBus != nil {

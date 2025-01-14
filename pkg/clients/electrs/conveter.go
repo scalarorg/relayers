@@ -12,20 +12,19 @@ import (
 	"github.com/scalarorg/go-electrum/electrum/types"
 )
 
-func (c *Client) CreateTokenSents(vaultTxs []types.VaultTransaction) ([]*chains.TokenSent, error) {
+func (c *Client) CreateTokenSents(vaultTxs []types.VaultTransaction) []*chains.TokenSent {
 	tokenSents := []*chains.TokenSent{}
 	for _, vaultTx := range vaultTxs {
 		tokenSent, err := c.CreateTokenSent(vaultTx)
 		if err != nil {
-			return nil, err
-		}
-		if tokenSent.Symbol == "" {
+			log.Error().Err(err).Any("VaultTx", vaultTx).Msgf("[ElectrumClient] [CreateTokenSents] failed to create token sent: %v", vaultTx)
+		} else if tokenSent.Symbol == "" {
 			log.Error().Msgf("[ElectrumClient] [CreateTokenSents] symbol not found for token: %s", vaultTx.DestTokenAddress)
 		} else {
 			tokenSents = append(tokenSents, &tokenSent)
 		}
 	}
-	return tokenSents, nil
+	return tokenSents
 }
 
 func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (chains.TokenSent, error) {
@@ -58,7 +57,11 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (chains.TokenSe
 		return tokenSent, fmt.Errorf("chain not found for input chainId: %v, %w	", chainInfo, err)
 	}
 	tokenSent.DestinationChain = destinationChainName
-	tokenSent.Symbol = c.GetSymbol(destinationChainName, vaultTx.DestTokenAddress)
+	symbol, err := c.GetSymbol(destinationChainName, vaultTx.DestTokenAddress)
+	if err != nil {
+		return tokenSent, fmt.Errorf("failed to get symbol: %w", err)
+	}
+	tokenSent.Symbol = symbol
 	// Convert VaultTxHex and Payload to byte slices
 	// txHexBytes, err := hex.DecodeString(strings.TrimPrefix(vaultTx.TxContent, "0x"))
 	// if err != nil {
