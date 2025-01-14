@@ -55,7 +55,7 @@ func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err err
 
 // Handle vault messages
 // Todo: Add some logging, metric and error handling if needed
-func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err error) error {
+func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err error) error {
 	if err != nil {
 		log.Warn().Msgf("[ElectrumClient] [vaultTxMessageHandler] Failed to receive vault transaction: %v", err)
 		return fmt.Errorf("failed to receive vault transaction: %w", err)
@@ -70,6 +70,8 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	if len(tokenSents) == 0 {
 		log.Warn().Msg("No Valid vault transactions to convert to relay data")
 		return nil
+	} else {
+		log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [VaultTxMessageHandler] Received %d validvault transactions", len(tokenSents))
 	}
 	//2. update last checkpoint
 	lastCheckpoint := c.getLastCheckpoint()
@@ -109,6 +111,7 @@ func (c *Client) vaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	//4. Send to the event bus with destination chain is scalar for confirmation
 	if len(confirmTxs.TxHashs) > 0 {
 		if c.eventBus != nil {
+			log.Debug().Msgf("[ElectrumClient] [VaultTxMessageHandler] Broadcasting confirm tx request: %v", confirmTxs)
 			c.eventBus.BroadcastEvent(&events.EventEnvelope{
 				EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
 				DestinationChain: events.SCALAR_NETWORK_NAME,

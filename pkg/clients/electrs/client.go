@@ -18,7 +18,7 @@ import (
 type Client struct {
 	globalConfig   *config.Config
 	electrumConfig *Config
-	electrs        *electrum.Client
+	Electrs        *electrum.Client
 	dbAdapter      *db.DatabaseAdapter
 	eventBus       *events.EventBus
 	scalarClient   *scalar.Client
@@ -77,7 +77,7 @@ func NewElectrumClient(globalConfig *config.Config, config *Config, dbAdapter *d
 	return &Client{
 		globalConfig:   globalConfig,
 		electrumConfig: config,
-		electrs:        electrs,
+		Electrs:        electrs,
 		dbAdapter:      dbAdapter,
 		eventBus:       eventBus,
 		scalarClient:   scalarClient,
@@ -97,9 +97,9 @@ func (c *Client) Start(ctx context.Context) error {
 		params = append(params, c.electrumConfig.LastVaultTx)
 	}
 	log.Debug().Msg("[ElectrumClient] [Start] Subscribing to new block event for request to confirm if vault transaction is get enought confirmation")
-	c.electrs.BlockchainHeaderSubscribe(ctx, c.BlockchainHeaderHandler)
+	c.Electrs.BlockchainHeaderSubscribe(ctx, c.BlockchainHeaderHandler)
 	log.Debug().Msgf("[ElectrumClient] [Start] Subscribing to vault transactions with params: %v", params)
-	c.electrs.VaultTransactionSubscribe(ctx, c.vaultTxMessageHandler, params...)
+	c.Electrs.VaultTransactionSubscribe(ctx, c.VaultTxMessageHandler, params...)
 
 	return nil
 }
