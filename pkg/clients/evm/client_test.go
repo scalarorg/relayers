@@ -184,7 +184,7 @@ func TestRecoverEvent(t *testing.T) {
 			Raw: log,
 		}
 	}
-	err := evm.RecoverEvent[*contracts.IScalarGatewayContractCall](evmClient, context.Background(), events.EVENT_EVM_CONTRACT_CALL, fnCreateEventData)
+	err := evm.RecoverEvent[*contracts.IScalarGatewayContractCall](evmClient, context.Background(), 100000, events.EVENT_EVM_CONTRACT_CALL, fnCreateEventData)
 	require.NoError(t, err)
 }
 func TestEvmSubscribe(t *testing.T) {
@@ -286,6 +286,9 @@ func TestSendTokenFromSepoliaToBnb(t *testing.T) {
 	tx, err := sepoliaGateway.SendToken(transOpts, CHAIN_ID_BNB, evmUserAddress, TOKEN_SYMBOL, amount)
 	assert.NoError(t, err)
 	fmt.Printf("SendToken tx %v\n", tx)
+}
+func TestBnbRecoverTokenSentEvent(t *testing.T) {
+
 }
 func createErc20ProxyContract(proxyAddress string, client *ethclient.Client) (*contracts.IScalarERC20CrossChain, error) {
 	proxy, err := contracts.NewIScalarERC20CrossChain(common.HexToAddress(proxyAddress), client)
