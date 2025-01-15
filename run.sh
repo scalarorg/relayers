@@ -5,7 +5,7 @@ start() {
     CGO_LDFLAGS="-L./lib -lbitcoin_vault_ffi" CGO_CFLAGS="-I./lib" go run ./main.go --env ${1:-""}
 }
  # example ./run.sh test clients/scalar
- # example ./run.sh test clients/scalar/client_test.go
+ # example ./run.sh test TestEvmClientWatchTokenSent clients/evm/client_test.go
 test() {
     OPTIONS="-timeout 10m -v -count=1"
 

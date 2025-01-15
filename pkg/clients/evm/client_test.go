@@ -57,8 +57,8 @@ var (
 		ChainID:    97,
 		ID:         CHAIN_ID_BNB,
 		Name:       "Ethereum bnb",
-		RPCUrl:     "https://data-seed-prebsc-1-s1.binance.org:8545",
-		Gateway:    "0xc9c5EC5975070a5CF225656e36C53e77eEa318b5",
+		RPCUrl:     "wss://bnb-testnet.g.alchemy.com/v2/DpCscOiv_evEPscGYARI3cOVeJ59CRo8",
+		Gateway:    "0x8cFc0173f7D1701bf5010B15B9762264d88c4235",
 		PrivateKey: "",
 		Finality:   1,
 		BlockTime:  time.Second * 12,
@@ -240,6 +240,27 @@ func TestEvmSubscribe(t *testing.T) {
 	select {}
 }
 
+func TestEvmClientWatchTokenSent(t *testing.T) {
+	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
+	sink := make(chan *contracts.IScalarGatewayTokenSent)
+	bnbClient, err := evm.NewEvmClient(&globalConfig, bnbConfig, nil, nil, nil)
+	if err != nil {
+		log.Error().Msgf("failed to create evm client: %v", err)
+	}
+	subscription, err := bnbClient.Gateway.WatchTokenSent(&watchOpts, sink, nil)
+	require.NoError(t, err)
+	defer subscription.Unsubscribe()
+	log.Info().Msgf("[EvmClient] [watchEVMTokenSent] success. Listening to TokenSent")
+
+	for {
+		select {
+		case err := <-subscription.Err():
+			log.Error().Msgf("[EvmClient] [watchEVMTokenSent] error: %v", err)
+		case event := <-sink:
+			log.Info().Any("event", event).Msgf("EvmClient] [watchEVMTokenSent]")
+		}
+	}
+}
 func TestSendTokenFromSepoliaToBnb(t *testing.T) {
 	fmt.Println("Test SendToken From Sepolia to BnB")
 	fmt.Printf("DestChain %s, TokenSymbol %s, UserAddress %s", CHAIN_ID_BNB, TOKEN_SYMBOL, evmUserAddress)
