@@ -1,6 +1,9 @@
 package db
 
-import "github.com/scalarorg/relayers/pkg/db/models"
+import (
+	"github.com/scalarorg/data-models/scalarnet"
+	"github.com/scalarorg/relayers/pkg/db/models"
+)
 
 // -------------------------------------------------------------------------------------------------
 // Add methods to DBAdapter for MintCommand operations
@@ -33,7 +36,7 @@ func (d *DatabaseAdapter) GetMintCommand(id string) (*models.MintCommand, error)
 // -------------------------------------------------------------------------------------------------
 // Add methods to DBAdapter for TokenSentApproved operations
 // -------------------------------------------------------------------------------------------------
-func (db *DatabaseAdapter) CreateOrUpdateTokenSentApproveds(approvals []models.TokenSentApproved) error {
+func (db *DatabaseAdapter) CreateOrUpdateTokenSentApproveds(approvals []scalarnet.TokenSentApproved) error {
 	return db.PostgresClient.Save(approvals).Error
 }
 

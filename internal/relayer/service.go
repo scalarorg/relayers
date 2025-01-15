@@ -39,7 +39,7 @@ func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
 		return nil, fmt.Errorf("failed to create electrum clients: %w", err)
 	}
 	// Initialize EVM clients
-	evmClients, err := evm.NewEvmClients(config, dbAdapter, eventBus)
+	evmClients, err := evm.NewEvmClients(config, dbAdapter, eventBus, scalarClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create evm clients: %w", err)
 	}

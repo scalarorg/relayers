@@ -10,6 +10,8 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
@@ -18,25 +20,33 @@ import (
 )
 
 func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*chainstypes.EventTokenSent]) error {
-	updates := make([]models.TokenSentApproved, len(events))
-	chains := make(map[string]int, 0)
+	tokenSentApproveds := make([]scalarnet.TokenSentApproved, len(events))
+	tokenSentStatuses := make([]chains.TokenSent, len(events))
+	var allModels []any
+	mapChains := make(map[string]int, 0)
 	for i, event := range events {
 		chain := string(event.Args.DestinationChain)
-		counter, ok := chains[chain]
+		counter, ok := mapChains[chain]
 		if !ok {
 			counter = 0
 		}
-		chains[chain] = counter + 1
-		model := models.TokenSentApproved{}
-		model.BindTokenSentApprovedFromScalarEvent(event.Args)
+		mapChains[chain] = counter + 1
+		model := models.EventTokenSent2Model(event.Args)
 		model.Status = int(db.APPROVED)
-		updates[i] = model
+		tokenSentStatuses[i] = chains.TokenSent{
+			EventID: model.EventID,
+			Status:  chains.TokenSentStatusApproved,
+		}
+		tokenSentApproveds[i] = model
+		allModels = append(allModels, model)
+		allModels = append(allModels, tokenSentStatuses[i])
 	}
-	err := c.dbAdapter.CreateOrUpdateTokenSentApproveds(updates)
+	// err := c.dbAdapter.CreateOrUpdateTokenSentApproveds(tokenSentApproveds)
+	err := c.dbAdapter.SaveValues(allModels)
 	if err != nil {
 		return err
 	}
-	for chain, counter := range chains {
+	for chain, counter := range mapChains {
 		log.Debug().Str("Chain", chain).
 			Int("EventCounter", counter).
 			Msg("[ScalarClient] [handleTokenSentEvents] create pending transfer request for chain")

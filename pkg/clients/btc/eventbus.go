@@ -62,6 +62,8 @@ func (c *BtcClient) handleScalarContractCallApproved(messageID string, executeDa
 	}
 	return nil
 }
+
+// Todo: form psbt for triangle model
 func (c *BtcClient) handleScalarCreatePsbtRequest(messageId string, psbtSigningRequest types.CreatePsbtRequest) error {
 	outpoints := make([]CommandOutPoint, len(psbtSigningRequest.Commands))
 	for i, cmd := range psbtSigningRequest.Commands {

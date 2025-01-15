@@ -87,7 +87,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Error().Msgf("failed to create db adapter: %v", err)
 	}
-	evmClient, err = evm.NewEvmClient(&globalConfig, sepoliaConfig, dbAdapter, nil)
+	evmClient, err = evm.NewEvmClient(&globalConfig, sepoliaConfig, dbAdapter, nil, nil)
 	if err != nil {
 		log.Error().Msgf("failed to create evm client: %v", err)
 	}
