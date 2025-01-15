@@ -147,35 +147,44 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 			continue
 		}
 		log.Info().Msgf("[ScalarClient] [Start] Start rpc client success. Subscribing for events...")
-
-		err = subscribeTokenSentEvent(cancelCtx, c.network, c.handleTokenSentEvents)
-		if err != nil {
-			log.Error().Msgf("[ScalarClient] [subscribeTokenSentEvent] error: %v", err)
-		}
-
-		err = subscribeMintCommand(cancelCtx, c.network, c.handleMintCommandEvents)
-		if err != nil {
-			log.Error().Msgf("[ScalarClient] [subscribeMintCommand] error: %v", err)
-		}
-
-		err = subscribeContractCallWithTokenApprovedEvent(cancelCtx, c.network, c.handleContractCallWithMintApprovedEvents)
-		if err != nil {
-			log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
-		}
-
-		err = subscribeContractCallApprovedEvent(cancelCtx, c.network, c.handleContractCallApprovedEvents)
-		if err != nil {
-			log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
-		}
-		err = subscribeCommandBatchSignedEvent(cancelCtx, c.network, c.handleCommandBatchSignedEvent)
-		if err != nil {
-			log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
-		}
-		//Todo: check if the handler is correct
-		err = subscribeEVMCompletedEvent(cancelCtx, c.network, c.handleCompletedEvents)
-		if err != nil {
-			log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] error: %v", err)
-		}
+		//Handle the event in a separate goroutine
+		go func() {
+			err = subscribeTokenSentEvent(cancelCtx, c.network, c.handleTokenSentEvents)
+			if err != nil {
+				log.Error().Msgf("[ScalarClient] [subscribeTokenSentEvent] error: %v", err)
+			}
+		}()
+		go func() {
+			err = subscribeMintCommand(cancelCtx, c.network, c.handleMintCommandEvents)
+			if err != nil {
+				log.Error().Msgf("[ScalarClient] [subscribeMintCommand] error: %v", err)
+			}
+		}()
+		go func() {
+			err = subscribeContractCallWithTokenApprovedEvent(cancelCtx, c.network, c.handleContractCallWithMintApprovedEvents)
+			if err != nil {
+				log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
+			}
+		}()
+		go func() {
+			err = subscribeContractCallApprovedEvent(cancelCtx, c.network, c.handleContractCallApprovedEvents)
+			if err != nil {
+				log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
+			}
+		}()
+		go func() {
+			err = subscribeCommandBatchSignedEvent(cancelCtx, c.network, c.handleCommandBatchSignedEvent)
+			if err != nil {
+				log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
+			}
+		}()
+		go func() {
+			//Todo: check if the handler is correct
+			err = subscribeEVMCompletedEvent(cancelCtx, c.network, c.handleCompletedEvents)
+			if err != nil {
+				log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] error: %v", err)
+			}
+		}()
 		// err = subscribeAllNewBlockEvent(cancelCtx, c.network, c.handleAnyEvents)
 		// if err != nil {
 		// 	log.Error().Msgf("[ScalarClient] [subscribeAllEvent] Failed: %v", err)
@@ -216,43 +225,76 @@ func Subscribe[T proto.Message](ctx context.Context,
 	if err != nil {
 		return "", fmt.Errorf("failed to subscribe to Event: %v, %w", event, err)
 	}
-	//Handle the event in a separate goroutine
-	go func() {
-		for {
-			select {
-			case evt := <-eventCh:
-				if evt.Query != event.TopicId {
-					log.Debug().Msgf("[ScalarClient] [Subscribe] Event query is not match query: %v, topicId: %s", evt.Query, event.TopicId)
-				} else {
-					//Extract the data from the event
-					log.Debug().Str("Topic", evt.Query).Any("Events", evt.Events).Msg("[ScalarClient] [Subscribe] Received new event")
-					// var args T
-					// msgType := reflect.TypeOf(args).Elem()
-					// msg := reflect.New(msgType).Interface().(T)
-					events, err := ParseIBCEvent[T](evt.Events)
-					if err != nil {
-						log.Debug().Msgf("[ScalarClient] [Subscribe] parser event with query: %v error: %v", evt.Query, err)
-					}
-					callback(events)
-
-					// fmt.Printf("Result %v", result)
-					// //data, err := event.Parser(evt.Events)
-					// if err != nil {
-					// 	log.Debug().Msgf("[ScalarClient] [Subscribe] parser event with query: %v error: %v", evt.Query, err)
-					// } else if len(data) == 0 {
-					// 	log.Debug().Msgf("[ScalarClient] [Subscribe] Empty event with query: %v", evt.Query)
-					// } else {
-					// 	callback(result)
-					// }
+	for {
+		select {
+		case <-ctx.Done():
+			log.Debug().Msgf("[ScalarClient] [Subscribe] timed out waiting for event, the transaction could have already been included or wasn't yet included")
+			network.UnSubscribeAll(context.Background(), event.Type) //nolint:errcheck // ignore
+			return "", fmt.Errorf("context done")
+		case evt := <-eventCh:
+			if evt.Query != event.TopicId {
+				log.Debug().Msgf("[ScalarClient] [Subscribe] Event query is not match query: %v, topicId: %s", evt.Query, event.TopicId)
+			} else {
+				//Extract the data from the event
+				log.Debug().Str("Topic", evt.Query).Any("Events", evt.Events).Msg("[ScalarClient] [Subscribe] Received new event")
+				// var args T
+				// msgType := reflect.TypeOf(args).Elem()
+				// msg := reflect.New(msgType).Interface().(T)
+				events, err := ParseIBCEvent[T](evt.Events)
+				if err != nil {
+					log.Debug().Msgf("[ScalarClient] [Subscribe] parser event with query: %v error: %v", evt.Query, err)
 				}
-			case <-ctx.Done():
-				log.Debug().Msgf("[ScalarClient] [Subscribe] timed out waiting for event, the transaction could have already been included or wasn't yet included")
-				network.UnSubscribeAll(context.Background(), event.Type) //nolint:errcheck // ignore
-				return
+				callback(events)
 			}
 		}
-	}()
-	return event.Type, nil
+	}
+}
+
+// https://github.com/cosmos/cosmos-sdk/blob/main/client/rpc/tx.go#L159
+func SubscribeWithTimeout[T proto.Message](ctx context.Context,
+	timeout time.Duration,
+	network *cosmos.NetworkClient,
+	event ListenerEvent[T],
+	callback EventHandlerCallBack[T]) (string, error) {
+	eventCh, err := network.Subscribe(ctx, event.Type, event.TopicId)
+	if err != nil {
+		return "", fmt.Errorf("failed to subscribe to Event: %v, %w", event, err)
+	}
+	for {
+		timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+		select {
+		case <-ctx.Done():
+			log.Debug().Msgf("[ScalarClient] [Subscribe] timed out waiting for event, the transaction could have already been included or wasn't yet included")
+			network.UnSubscribeAll(context.Background(), event.Type) //nolint:errcheck // ignore
+			cancel()
+			return "", fmt.Errorf("context done")
+		case <-timeoutCtx.Done():
+			cancel()
+			log.Debug().Msgf("[ScalarClient] [Subscribe] Reconnecting...")
+			eventCh, err = network.Subscribe(ctx, event.Type, event.TopicId)
+			if err != nil {
+				log.Error().Msgf("[ScalarClient] [Subscribe] Failed to subscribe to Event: %v, %v", event, err)
+				time.Sleep(5 * time.Second)
+			}
+			continue
+		case evt := <-eventCh:
+			cancel()
+			if evt.Query != event.TopicId {
+				log.Debug().Msgf("[ScalarClient] [Subscribe] Event query is not match query: %v, topicId: %s", evt.Query, event.TopicId)
+			} else {
+				//Extract the data from the event
+				log.Debug().Str("Topic", evt.Query).Any("Events", evt.Events).Msg("[ScalarClient] [Subscribe] Received new event")
+				// var args T
+				// msgType := reflect.TypeOf(args).Elem()
+				// msg := reflect.New(msgType).Interface().(T)
+				events, err := ParseIBCEvent[T](evt.Events)
+				if err != nil {
+					log.Debug().Msgf("[ScalarClient] [Subscribe] parser event with query: %v error: %v", evt.Query, err)
+				}
+				callback(events)
+			}
+		}
+	}
 }
 
 func (c *Client) ConfirmEvmTxs(ctx context.Context, chainName string, txIds []string) (*sdk.TxResponse, error) {
