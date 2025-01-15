@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"strings"
 	"sync"
 	"time"
 
@@ -322,26 +321,4 @@ func (c *Client) ConfirmEvmTx(ctx context.Context, chainName string, txId string
 
 func (c *Client) GetQueryClient() *cosmos.QueryClient {
 	return c.queryClient
-}
-
-func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress string) (string, error) {
-	client, err := c.queryClient.GetChainQueryServiceClient()
-	if err != nil {
-		log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
-		return "", err
-	}
-	if !strings.HasPrefix(tokenAddress, "0x") {
-		tokenAddress = "0x" + tokenAddress
-	}
-	tokenRequest := chainstypes.TokenInfoRequest{
-		Chain: chainId,
-		FindBy: &chainstypes.TokenInfoRequest_Address{
-			Address: tokenAddress,
-		},
-	}
-	response, err := client.TokenInfo(ctx, &tokenRequest)
-	if err != nil {
-		return "", err
-	}
-	return response.Asset, nil
 }

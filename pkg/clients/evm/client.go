@@ -18,6 +18,7 @@ import (
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/clients/evm/parser"
 	"github.com/scalarorg/relayers/pkg/clients/evm/pending"
+	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
@@ -27,6 +28,7 @@ type EvmClient struct {
 	globalConfig   *config.Config
 	evmConfig      *EvmNetworkConfig
 	Client         *ethclient.Client
+	ScalarClient   *scalar.Client
 	ChainName      string
 	GatewayAddress common.Address
 	Gateway        *contracts.IScalarGateway
@@ -42,7 +44,7 @@ type EvmClient struct {
 // format: wss:// -> https://
 // Todo: Improve this implementation
 
-func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) ([]*EvmClient, error) {
+func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus, scalarClient *scalar.Client) ([]*EvmClient, error) {
 	if globalConfig == nil || globalConfig.ConfigPath == "" {
 		return nil, fmt.Errorf("config path is not set")
 	}
@@ -66,7 +68,7 @@ func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 		if evmConfig.GasLimit == 0 {
 			evmConfig.GasLimit = 3000000
 		}
-		client, err := NewEvmClient(globalConfig, &evmConfig, dbAdapter, eventBus)
+		client, err := NewEvmClient(globalConfig, &evmConfig, dbAdapter, eventBus, scalarClient)
 		if err != nil {
 			log.Warn().Msgf("Failed to create evm client for %s: %v", evmConfig.GetName(), err)
 			continue
@@ -78,7 +80,7 @@ func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 	return evmClients, nil
 }
 
-func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*EvmClient, error) {
+func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus, scalarClient *scalar.Client) (*EvmClient, error) {
 	// Setup
 	ctx := context.Background()
 	log.Info().Any("evmConfig", evmConfig).Msgf("[EvmClient] [NewEvmClient] connecting to EVM network")
@@ -102,6 +104,7 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		globalConfig:   globalConfig,
 		evmConfig:      evmConfig,
 		Client:         client,
+		ScalarClient:   scalarClient,
 		GatewayAddress: *gatewayAddress,
 		Gateway:        gateway,
 		auth:           auth,

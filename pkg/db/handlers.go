@@ -9,6 +9,10 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+func (db *DatabaseAdapter) SaveValues(values any) error {
+	return db.SaveSingleValueWithCheckpoint(values, nil)
+}
+
 func (db *DatabaseAdapter) SaveValuesWithCheckpoint(values any, lastCheckpoint *models.EventCheckPoint) error {
 	//Up date checkpoint and relayDatas in a transaction
 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {

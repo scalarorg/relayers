@@ -323,14 +323,19 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecut
 	ec.preprocessCommandExecuted(event)
 	//1. Convert into a RelayData instance then store to the db
 	cmdExecuted := ec.CommandExecutedEvent2Model(event)
-	//Find the ContractCall by sourceTxHash and sourceEventIndex
-	// contractCall, err := ec.dbAdapter.FindContractCallByCommnadId(cmdExecuted.CommandId)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to find contract call by sourceTxHash and sourceEventIndex: %w", err)
-	// }
-	// cmdExecuted.CallContract = contractCall
-	// cmdExecuted.ReferenceTxHash = &contractCall.TxHash
-	err := ec.dbAdapter.SaveSingleValue(&cmdExecuted)
+	var models []any
+	//Get commandId from scalarnet
+	if ec.ScalarClient != nil {
+		command, err := ec.ScalarClient.GetCommand(cmdExecuted.SourceChain, cmdExecuted.CommandId)
+		if err != nil {
+			log.Warn().Err(err).Msgf("[EvmClient] [HandleCommandExecuted] failed to get commandId from scalarnet")
+		} else if command != nil {
+			log.Info().Any("command", command).Msg("[EvmClient] [HandleCommandExecuted] get command from scalarnet")
+		}
+	}
+	models = append(models, cmdExecuted)
+	//err := ec.dbAdapter.SaveSingleValue(&cmdExecuted)
+	err := ec.dbAdapter.SaveValues(models)
 	if err != nil {
 		return fmt.Errorf("failed to create evm executed: %w", err)
 	}

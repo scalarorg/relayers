@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/scalarorg/data-models/scalarnet"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/scalar-core/x/chains/types"
 )
@@ -51,16 +52,20 @@ func (e *ContractCallApprovedWithMint) BindCallContractApprovedWithMintFromEvmEv
 	e.PayloadHash = hex.EncodeToString(event.PayloadHash[:])
 }
 
-func (e *TokenSentApproved) BindTokenSentApprovedFromScalarEvent(event *types.EventTokenSent) {
-	e.EventID = string(event.EventID)
-	e.TransferID = uint64(event.TransferID)
-	e.SourceChain = string(event.Chain)
-	e.SourceAddress = event.Sender
-	e.DestinationChain = string(event.DestinationChain)
-	e.DestinationAddress = event.DestinationAddress
-	e.Amount = event.Asset.Amount.Uint64()
-	e.Symbol = event.Asset.Denom
+func EventTokenSent2Model(event *types.EventTokenSent) scalarnet.TokenSentApproved {
+	model := scalarnet.TokenSentApproved{
+		EventID:            string(event.EventID),
+		TransferID:         uint64(event.TransferID),
+		SourceChain:        string(event.Chain),
+		SourceAddress:      event.Sender,
+		DestinationChain:   string(event.DestinationChain),
+		DestinationAddress: event.DestinationAddress,
+		Amount:             event.Asset.Amount.Uint64(),
+		Symbol:             event.Asset.Denom,
+	}
+	return model
 }
+
 func (cmd *MintCommand) BindMintCommandFromScalarEvent(event *types.MintCommand) {
 	cmd.TransferID = uint64(event.TransferID)
 	cmd.CommandID = hex.EncodeToString(event.CommandID[:])

@@ -7,7 +7,6 @@ import (
 
 	chains "github.com/scalarorg/data-models/chains"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
-	relaydata "github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
 )
 
@@ -130,17 +129,14 @@ func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGate
 	return record, nil
 }
 
-func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IScalarGatewayExecuted) models.CommandExecuted {
-	id := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
-	cmdExecuted := models.CommandExecuted{
-		ID:               id,
-		SourceChain:      c.evmConfig.GetId(),
-		DestinationChain: "", //TODO: need to get the destination chain from the db by the commandId
-		TxHash:           strings.ToLower(event.Raw.TxHash.String()),
-		BlockNumber:      uint64(event.Raw.BlockNumber),
-		LogIndex:         uint(event.Raw.Index),
-		CommandId:        hex.EncodeToString(event.CommandId[:]),
-		Status:           int(relaydata.SUCCESS),
+func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IScalarGatewayExecuted) chains.CommandExecuted {
+	cmdExecuted := chains.CommandExecuted{
+		SourceChain: c.evmConfig.GetId(),
+		Address:     event.Raw.Address.String(),
+		TxHash:      strings.ToLower(event.Raw.TxHash.String()),
+		BlockNumber: uint64(event.Raw.BlockNumber),
+		LogIndex:    uint(event.Raw.Index),
+		CommandId:   hex.EncodeToString(event.CommandId[:]),
 	}
 	return cmdExecuted
 }
