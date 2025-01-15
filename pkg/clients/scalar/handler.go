@@ -10,8 +10,8 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
-	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
@@ -29,7 +29,7 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*c
 		}
 		mapChains[chain] = counter + 1
 		model := models.EventTokenSent2Model(event.Args)
-		model.Status = int(db.APPROVED)
+		model.Status = string(chains.TokenSentStatusApproved)
 		tokenSentApproveds[i] = model
 	}
 	err := c.dbAdapter.SaveTokenSentApproveds(tokenSentApproveds)
@@ -341,7 +341,7 @@ func (c *Client) handleCompletedEvent(ctx context.Context, event *IBCEvent[*chai
 	if err != nil {
 		return err
 	}
-	status := db.FAILED
+	status := chains.ContractCallStatusFailed
 	var sequence *int = nil
 	var eventId = string(event.Args.EventID)
 	//1. Sign and broadcast RouteMessageRequest
@@ -352,7 +352,7 @@ func (c *Client) handleCompletedEvent(ctx context.Context, event *IBCEvent[*chai
 	log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] txRes: %v", txRes)
 	if strings.Contains(txRes.RawLog, "already executed") {
 		log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] Already sent an executed tx for %s. Marked it as success.", eventId)
-		status = db.SUCCESS
+		status = chains.ContractCallStatusSuccess
 	} else {
 		log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] Executed RouteMessageRequest %s.", txRes.TxHash)
 		attrValue := findEventAttribute(txRes.Logs[0].Events, "send_packet", "packet_sequence")
@@ -360,10 +360,10 @@ func (c *Client) handleCompletedEvent(ctx context.Context, event *IBCEvent[*chai
 			value, _ := strconv.Atoi(attrValue)
 			sequence = &value
 		}
-		status = db.FAILED
+		status = chains.ContractCallStatusFailed
 	}
 	//2. Update the db
-	err = c.dbAdapter.UpdateRelayDataStatueWithPacketSequence(eventId, status, sequence)
+	err = c.dbAdapter.UpdateEventStatusWithPacketSequence(eventId, status, sequence)
 	if err != nil {
 		return fmt.Errorf("failed to update contract call approved: %w", err)
 	}
@@ -372,16 +372,11 @@ func (c *Client) handleCompletedEvent(ctx context.Context, event *IBCEvent[*chai
 
 func (c *Client) preprocessEVMCompletedEvent(event *IBCEvent[*chainstypes.ChainEventCompleted]) (any, error) {
 	log.Debug().Msgf("EVMCompletedEvent: %v", event)
-	// Load payload from the db
-	includeCallContract := true
-	queryOption := &db.QueryOptions{
-		IncludeCallContract: &includeCallContract,
-	}
-	relayData, err := c.dbAdapter.FindRelayDataById(string(event.Args.EventID), queryOption)
+	callConttract, err := c.dbAdapter.FindCallContractPayloadByEventId(string(event.Args.EventID))
 	if err != nil {
 		return "", fmt.Errorf("failed to get payload: %w", err)
 	}
-	payload := hex.EncodeToString(relayData.CallContract.Payload)
+	payload := hex.EncodeToString(callConttract.Payload)
 	return payload, nil
 }
 

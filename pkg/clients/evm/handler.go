@@ -14,7 +14,6 @@ import (
 	"github.com/scalarorg/data-models/chains"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
-	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
 )
 
@@ -22,7 +21,7 @@ func (ec *EvmClient) handleContractCall(event *contracts.IScalarGatewayContractC
 	//0. Preprocess the event
 	ec.preprocessContractCall(event)
 	//1. Convert into a RelayData instance then store to the db
-	relayData, err := ec.ContractCallEvent2RelayData(event)
+	contractCall, err := ec.ContractCallEvent2Model(event)
 	if err != nil {
 		return fmt.Errorf("failed to convert ContractCallEvent to RelayData: %w", err)
 	}
@@ -41,14 +40,14 @@ func (ec *EvmClient) handleContractCall(event *contracts.IScalarGatewayContractC
 		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.Index)
 	}
 	//3. store relay data to the db, update last checkpoint
-	err = ec.dbAdapter.CreateRelayDatas([]models.RelayData{relayData}, lastCheckpoint)
+	err = ec.dbAdapter.CreateContractCall(contractCall, lastCheckpoint)
 	if err != nil {
 		return fmt.Errorf("failed to create evm contract call: %w", err)
 	}
 	//2. Send to the bus
 	confirmTxs := events.ConfirmTxsRequest{
 		ChainName: ec.evmConfig.GetId(),
-		TxHashs:   map[string]string{relayData.CallContract.TxHash: relayData.To},
+		TxHashs:   map[string]string{contractCall.TxHash: contractCall.DestinationChain},
 	}
 	if ec.eventBus != nil {
 		ec.eventBus.BroadcastEvent(&events.EventEnvelope{
@@ -80,7 +79,7 @@ func (ec *EvmClient) handleContractCallWithToken(event *contracts.IScalarGateway
 	//0. Preprocess the event
 	ec.preprocessContractCallWithToken(event)
 	//1. Convert into a RelayData instance then store to the db
-	relayData, err := ec.ContractCallWithToken2RelayData(event)
+	contractCallWithToken, err := ec.ContractCallWithToken2Model(event)
 	if err != nil {
 		return fmt.Errorf("failed to convert ContractCallEvent to RelayData: %w", err)
 	}
@@ -99,14 +98,14 @@ func (ec *EvmClient) handleContractCallWithToken(event *contracts.IScalarGateway
 		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.Index)
 	}
 	//3. store relay data to the db, update last checkpoint
-	err = ec.dbAdapter.CreateRelayDatas([]models.RelayData{relayData}, lastCheckpoint)
+	err = ec.dbAdapter.CreateContractCallWithToken(contractCallWithToken, lastCheckpoint)
 	if err != nil {
 		return fmt.Errorf("failed to create evm contract call: %w", err)
 	}
 	//2. Send to the bus
 	confirmTxs := events.ConfirmTxsRequest{
 		ChainName: ec.evmConfig.GetId(),
-		TxHashs:   map[string]string{relayData.CallContractWithToken.TxHash: relayData.To},
+		TxHashs:   map[string]string{contractCallWithToken.TxHash: contractCallWithToken.DestinationChain},
 	}
 	if ec.eventBus != nil {
 		ec.eventBus.BroadcastEvent(&events.EventEnvelope{
@@ -217,12 +216,10 @@ func (ec *EvmClient) HandleContractCallApproved(event *contracts.IScalarGatewayC
 	// Find relayData from the db by combination (contractAddress, sourceAddress, payloadHash)
 	// This contract call (initiated by the user call to the source chain) is approved by EVM network
 	// So anyone can execute it on the EVM by broadcast the corresponding payload to protocol's smart contract on the destination chain
-	contractCall := models.CallContract{
-		DestContractAddress: strings.TrimLeft(event.ContractAddress.Hex(), "0x"),
-		SourceAddress:       strings.TrimLeft(event.SourceAddress, "0x"),
-		PayloadHash:         strings.TrimLeft(hex.EncodeToString(event.PayloadHash[:]), "0x"),
-	}
-	relayDatas, err := ec.dbAdapter.FindRelayDataByContractCall(&contractCall)
+	destContractAddress := strings.TrimLeft(event.ContractAddress.Hex(), "0x")
+	sourceAddress := strings.TrimLeft(event.SourceAddress, "0x")
+	payloadHash := strings.TrimLeft(hex.EncodeToString(event.PayloadHash[:]), "0x")
+	relayDatas, err := ec.dbAdapter.FindContractCallByParams(sourceAddress, destContractAddress, payloadHash)
 	if err != nil {
 		log.Error().Err(err).Msg("[EvmClient] [handleContractCallApproved] find relay data")
 		return err
@@ -239,36 +236,36 @@ func (ec *EvmClient) HandleContractCallApproved(event *contracts.IScalarGatewayC
 	}
 	// Done; Don't need to send to the bus
 	// TODO: Do we need to update relay data atomically?
-	err = ec.dbAdapter.UpdateBatchRelayDataStatus(executeResults, len(executeResults))
+	err = ec.dbAdapter.UpdateBatchContractCallStatus(executeResults, len(executeResults))
 	if err != nil {
 		return fmt.Errorf("failed to update relay data status to executed: %w", err)
 	}
 	return nil
 }
-func (ec *EvmClient) executeDestinationCall(event *contracts.IScalarGatewayContractCallApproved, relayDatas []models.RelayData) ([]db.RelaydataExecuteResult, error) {
-	executeResults := []db.RelaydataExecuteResult{}
+func (ec *EvmClient) executeDestinationCall(event *contracts.IScalarGatewayContractCallApproved, contractCalls []chains.ContractCall) ([]db.ContractCallExecuteResult, error) {
+	executeResults := []db.ContractCallExecuteResult{}
 	executed, err := ec.isContractCallExecuted(event)
 	if err != nil {
 		return executeResults, fmt.Errorf("[EvmClient] [executeDestinationCall] failed to check if contract call is approved: %w", err)
 	}
 	if executed {
 		//Update the relay data status to executed
-		for _, relayData := range relayDatas {
-			executeResults = append(executeResults, db.RelaydataExecuteResult{
-				Status:      db.SUCCESS,
-				RelayDataId: relayData.ID,
+		for _, contractCall := range contractCalls {
+			executeResults = append(executeResults, db.ContractCallExecuteResult{
+				Status:  chains.ContractCallStatusSuccess,
+				EventId: contractCall.EventId,
 			})
 		}
 		return executeResults, fmt.Errorf("destination contract call is already executed")
 	}
-	if len(relayDatas) > 0 {
-		for _, relayData := range relayDatas {
-			if len(relayData.CallContract.Payload) == 0 {
+	if len(contractCalls) > 0 {
+		for _, contractCall := range contractCalls {
+			if len(contractCall.Payload) == 0 {
 				continue
 			}
-			log.Info().Str("payload", hex.EncodeToString(relayData.CallContract.Payload)).
+			log.Info().Str("payload", hex.EncodeToString(contractCall.Payload)).
 				Msg("[EvmClient] [executeDestinationCall]")
-			receipt, err := ec.ExecuteDestinationCall(event.ContractAddress, event.CommandId, event.SourceChain, event.SourceAddress, relayData.CallContract.Payload)
+			receipt, err := ec.ExecuteDestinationCall(event.ContractAddress, event.CommandId, event.SourceChain, event.SourceAddress, contractCall.Payload)
 			if err != nil {
 				return executeResults, fmt.Errorf("execute destination call with error: %w", err)
 			}
@@ -276,14 +273,14 @@ func (ec *EvmClient) executeDestinationCall(event *contracts.IScalarGatewayContr
 			log.Info().Any("txReceipt", receipt).Msg("[EvmClient] [executeDestinationCall]")
 
 			if receipt.Hash() != (common.Hash{}) {
-				executeResults = append(executeResults, db.RelaydataExecuteResult{
-					Status:      db.SUCCESS,
-					RelayDataId: relayData.ID,
+				executeResults = append(executeResults, db.ContractCallExecuteResult{
+					Status:  chains.ContractCallStatusSuccess,
+					EventId: contractCall.EventId,
 				})
 			} else {
-				executeResults = append(executeResults, db.RelaydataExecuteResult{
-					Status:      db.FAILED,
-					RelayDataId: relayData.ID,
+				executeResults = append(executeResults, db.ContractCallExecuteResult{
+					Status:  chains.ContractCallStatusFailed,
+					EventId: contractCall.EventId,
 				})
 			}
 		}

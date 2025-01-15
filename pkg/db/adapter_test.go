@@ -9,7 +9,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
-	"github.com/scalarorg/relayers/pkg/db/models"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -69,56 +69,55 @@ func SetupTestDB(busEventChan chan *events.EventEnvelope, receiverChanBufSize in
 
 	// Auto migrate the schema
 	err = postgresDb.AutoMigrate(
-		&models.RelayData{},
-		&models.CallContract{},
-		&models.ContractCallApproved{},
-		&models.CommandExecuted{},
+		&scalarnet.CallContract{},
+		&scalarnet.ContractCallApproved{},
+		&chains.CommandExecuted{},
 		&chains.TokenSent{},
-		&models.TokenSentApproved{},
+		&scalarnet.TokenSentApproved{},
 	)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Mock up data
-	// Create test data
-	relayData := models.RelayData{
-		ID:     "test-id",
-		From:   "cosmos",
-		To:     "sepolia",
-		Status: int(PENDING),
-		CallContract: &models.CallContract{
-			PayloadHash:         "0000000000000000000000000000000000000000000000000000000000000000",
-			SourceAddress:       "0x24a1db57fa3ecafcbad91d6ef068439aceeae090",
-			DestContractAddress: "0x0000000000000000000000000000000000000000",
-			Payload:             []byte("test-payload"),
-		},
-	}
+	// // Mock up data
+	// // Create test data
+	// relayData := models.RelayData{
+	// 	ID:     "test-id",
+	// 	From:   "cosmos",
+	// 	To:     "sepolia",
+	// 	Status: int(PENDING),
+	// 	CallContract: &models.CallContract{
+	// 		PayloadHash:         "0000000000000000000000000000000000000000000000000000000000000000",
+	// 		SourceAddress:       "0x24a1db57fa3ecafcbad91d6ef068439aceeae090",
+	// 		DestContractAddress: "0x0000000000000000000000000000000000000000",
+	// 		Payload:             []byte("test-payload"),
+	// 	},
+	// }
 
-	// Create another test data with different status
-	relayData2 := models.RelayData{
-		ID:     "test-id-2",
-		From:   "cosmos",
-		To:     "sepolia",
-		Status: int(APPROVED),
-		CallContract: &models.CallContract{
-			PayloadHash:         "0000000000000000000000000000000000000000000000000000000000000000",
-			SourceAddress:       "0x24a1db57fa3ecafcbad91d6ef068439aceeae090",
-			DestContractAddress: "0x0000000000000000000000000000000000000000",
-			Payload:             []byte("test-payload-2"),
-		},
-	}
+	// // Create another test data with different status
+	// relayData2 := models.RelayData{
+	// 	ID:     "test-id-2",
+	// 	From:   "cosmos",
+	// 	To:     "sepolia",
+	// 	Status: int(APPROVED),
+	// 	CallContract: &models.CallContract{
+	// 		PayloadHash:         "0000000000000000000000000000000000000000000000000000000000000000",
+	// 		SourceAddress:       "0x24a1db57fa3ecafcbad91d6ef068439aceeae090",
+	// 		DestContractAddress: "0x0000000000000000000000000000000000000000",
+	// 		Payload:             []byte("test-payload-2"),
+	// 	},
+	// }
 
 	// Insert test data
-	result := postgresDb.Create(&relayData)
-	if result.Error != nil {
-		return nil, nil, result.Error
-	}
+	// result := postgresDb.Create(&relayData)
+	// if result.Error != nil {
+	// 	return nil, nil, result.Error
+	// }
 
-	result = postgresDb.Create(&relayData2)
-	if result.Error != nil {
-		return nil, nil, result.Error
-	}
+	// result = postgresDb.Create(&relayData2)
+	// if result.Error != nil {
+	// 	return nil, nil, result.Error
+	// }
 
 	// Create test DatabaseAdapter
 	testAdapter := &DatabaseAdapter{
