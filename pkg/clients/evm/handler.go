@@ -142,7 +142,8 @@ func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) e
 	//1. Convert into a RelayData instance then store to the db
 	tokenSent, err := ec.TokenSentEvent2Model(event)
 	if err != nil {
-		return fmt.Errorf("failed to convert ContractCallEvent to RelayData: %w", err)
+		log.Error().Err(err).Msg("[EvmClient] [HandleTokenSent] failed to convert TokenSentEvent to model data")
+		return err
 	}
 	//For evm, the token sent is verified immediately by the scalarnet
 	tokenSent.Status = chains.TokenSentStatusVerifying
@@ -161,7 +162,7 @@ func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) e
 		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.Index)
 	}
 	//3. store relay data to the db, update last checkpoint
-	err = ec.dbAdapter.SaveSingleValueWithCheckpoint(tokenSent, lastCheckpoint)
+	err = ec.dbAdapter.SaveTokenSent(tokenSent, lastCheckpoint)
 	if err != nil {
 		return fmt.Errorf("failed to create evm token send: %w", err)
 	}
@@ -177,7 +178,7 @@ func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) e
 			Data:             confirmTxs,
 		})
 	} else {
-		log.Warn().Msg("[EvmClient] [handleContractCall] event bus is undefined")
+		log.Warn().Msg("[EvmClient] [HandleTokenSent] event bus is undefined")
 	}
 	return nil
 }
@@ -323,7 +324,6 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecut
 	ec.preprocessCommandExecuted(event)
 	//1. Convert into a RelayData instance then store to the db
 	cmdExecuted := ec.CommandExecutedEvent2Model(event)
-	var models []any
 	//Get commandId from scalarnet
 	if ec.ScalarClient != nil {
 		command, err := ec.ScalarClient.GetCommand(cmdExecuted.SourceChain, cmdExecuted.CommandId)
@@ -333,10 +333,9 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecut
 			log.Info().Any("command", command).Msg("[EvmClient] [HandleCommandExecuted] get command from scalarnet")
 		}
 	}
-	models = append(models, cmdExecuted)
-	//err := ec.dbAdapter.SaveSingleValue(&cmdExecuted)
-	err := ec.dbAdapter.SaveValues(models)
+	err := ec.dbAdapter.SaveSingleValue(&cmdExecuted)
 	if err != nil {
+		log.Error().Err(err).Msg("[EvmClient] [HandleCommandExecuted] failed to save evm executed to the db")
 		return fmt.Errorf("failed to create evm executed: %w", err)
 	}
 	//Done; Don't need to send to the bus

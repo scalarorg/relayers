@@ -1,8 +1,10 @@
 package db
 
 import (
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/db/models"
+	"gorm.io/gorm"
 )
 
 // -------------------------------------------------------------------------------------------------
@@ -36,8 +38,23 @@ func (d *DatabaseAdapter) GetMintCommand(id string) (*models.MintCommand, error)
 // -------------------------------------------------------------------------------------------------
 // Add methods to DBAdapter for TokenSentApproved operations
 // -------------------------------------------------------------------------------------------------
-func (db *DatabaseAdapter) CreateOrUpdateTokenSentApproveds(approvals []scalarnet.TokenSentApproved) error {
-	return db.PostgresClient.Save(approvals).Error
+func (db *DatabaseAdapter) SaveTokenSentApproveds(approvals []scalarnet.TokenSentApproved) error {
+	eventIds := make([]string, len(approvals))
+	for i, approval := range approvals {
+		eventIds[i] = approval.EventID
+	}
+	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		result := tx.Save(approvals)
+		if result.Error != nil {
+			return result.Error
+		}
+		result = tx.Model(&chains.TokenSent{}).Where("event_id IN (?)", eventIds).Updates(map[string]interface{}{"status": chains.TokenSentStatusApproved})
+		if result.Error != nil {
+			return result.Error
+		}
+		return nil
+	})
+	return err
 }
 
 // -------------------------------------------------------------------------------------------------

@@ -21,6 +21,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
+	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -239,7 +240,29 @@ func TestEvmSubscribe(t *testing.T) {
 	// Keep the program running
 	select {}
 }
-
+func TestRecoverEventTokenSent(t *testing.T) {
+	bnbClient, err := evm.NewEvmClient(&globalConfig, bnbConfig, nil, nil, nil)
+	require.NoError(t, err)
+	//Get current block number
+	blockNumber, err := bnbClient.Client.BlockNumber(context.Background())
+	require.NoError(t, err)
+	lastCheckpoint := models.EventCheckPoint{
+		ChainName:   bnbConfig.ID,
+		EventName:   events.EVENT_EVM_TOKEN_SENT,
+		BlockNumber: blockNumber - 10000,
+		TxHash:      "",
+		LogIndex:    0,
+		EventKey:    "",
+	}
+	missingEvents, err := evm.GetMissingEvents[*contracts.IScalarGatewayTokenSent](bnbClient, events.EVENT_EVM_TOKEN_SENT,
+		&lastCheckpoint, func(log types.Log) *contracts.IScalarGatewayTokenSent {
+			return &contracts.IScalarGatewayTokenSent{
+				Raw: log,
+			}
+		})
+	require.NoError(t, err)
+	fmt.Printf("missingEvents %v\n", missingEvents)
+}
 func TestEvmClientWatchTokenSent(t *testing.T) {
 	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayTokenSent)

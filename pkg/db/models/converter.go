@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/scalarorg/data-models/scalarnet"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
@@ -53,8 +54,9 @@ func (e *ContractCallApprovedWithMint) BindCallContractApprovedWithMintFromEvmEv
 }
 
 func EventTokenSent2Model(event *types.EventTokenSent) scalarnet.TokenSentApproved {
+	eventId := strings.TrimPrefix(string(event.EventID), "0x")
 	model := scalarnet.TokenSentApproved{
-		EventID:            string(event.EventID),
+		EventID:            eventId,
 		TransferID:         uint64(event.TransferID),
 		SourceChain:        string(event.Chain),
 		SourceAddress:      event.Sender,

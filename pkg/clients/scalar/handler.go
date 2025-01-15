@@ -10,7 +10,6 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/db/models"
@@ -21,8 +20,6 @@ import (
 
 func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*chainstypes.EventTokenSent]) error {
 	tokenSentApproveds := make([]scalarnet.TokenSentApproved, len(events))
-	tokenSentStatuses := make([]chains.TokenSent, len(events))
-	var allModels []any
 	mapChains := make(map[string]int, 0)
 	for i, event := range events {
 		chain := string(event.Args.DestinationChain)
@@ -33,17 +30,11 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*c
 		mapChains[chain] = counter + 1
 		model := models.EventTokenSent2Model(event.Args)
 		model.Status = int(db.APPROVED)
-		tokenSentStatuses[i] = chains.TokenSent{
-			EventID: model.EventID,
-			Status:  chains.TokenSentStatusApproved,
-		}
 		tokenSentApproveds[i] = model
-		allModels = append(allModels, model)
-		allModels = append(allModels, tokenSentStatuses[i])
 	}
-	// err := c.dbAdapter.CreateOrUpdateTokenSentApproveds(tokenSentApproveds)
-	err := c.dbAdapter.SaveValues(allModels)
+	err := c.dbAdapter.SaveTokenSentApproveds(tokenSentApproveds)
 	if err != nil {
+		log.Error().Msgf("[ScalarClient] [handleTokenSentEvents] failed to save token sent approveds: %v", err)
 		return err
 	}
 	for chain, counter := range mapChains {

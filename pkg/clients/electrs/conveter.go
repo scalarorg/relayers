@@ -31,6 +31,7 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (chains.TokenSe
 	//For btc vault tx, the log index is tx position in the block
 	index := vaultTx.TxPosition
 	eventId := fmt.Sprintf("%s-%d", strings.ToLower(vaultTx.TxHash), index)
+	eventId = strings.TrimPrefix(eventId, "0x")
 	tokenSent := chains.TokenSent{
 		EventID:              eventId,
 		TxHash:               vaultTx.TxHash,

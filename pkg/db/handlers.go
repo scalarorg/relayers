@@ -9,9 +9,9 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func (db *DatabaseAdapter) SaveValues(values any) error {
-	return db.SaveSingleValueWithCheckpoint(values, nil)
-}
+// func (db *DatabaseAdapter) SaveValues(values any) error {
+// 	return db.SaveSingleValueWithCheckpoint(values, nil)
+// }
 
 func (db *DatabaseAdapter) SaveValuesWithCheckpoint(values any, lastCheckpoint *models.EventCheckPoint) error {
 	//Up date checkpoint and relayDatas in a transaction
@@ -39,23 +39,23 @@ func (db *DatabaseAdapter) SaveSingleValue(value any) error {
 	return nil
 }
 
-func (db *DatabaseAdapter) SaveSingleValueWithCheckpoint(value any, lastCheckpoint *models.EventCheckPoint) error {
-	//Up date checkpoint and relayDatas in a transaction
-	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
-		result := tx.Save(&value)
-		if result.Error != nil {
-			return result.Error
-		}
-		if lastCheckpoint != nil {
-			UpdateLastEventCheckPoint(tx, lastCheckpoint)
-		}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create Single value with checkpoint: %w", err)
-	}
-	return nil
-}
+// func (db *DatabaseAdapter) SaveSingleValueWithCheckpoint(value any, lastCheckpoint *models.EventCheckPoint) error {
+// 	//Up date checkpoint and relayDatas in a transaction
+// 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+// 		result := tx.Save(value)
+// 		if result.Error != nil {
+// 			return result.Error
+// 		}
+// 		if lastCheckpoint != nil {
+// 			UpdateLastEventCheckPoint(tx, lastCheckpoint)
+// 		}
+// 		return nil
+// 	})
+// 	if err != nil {
+// 		return fmt.Errorf("failed to create Single value with checkpoint: %w", err)
+// 	}
+// 	return nil
+// }
 
 func (db *DatabaseAdapter) CreateBatchValue(values any, batchSize int) error {
 	result := db.PostgresClient.CreateInBatches(values, batchSize)

@@ -230,7 +230,7 @@ func (c *EvmClient) RecoverMissingEvents(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
-	log.Info().Uint64("Current BlockNumber", blockNumber).Msg("[EvmClient] [RecoverThenWatchForEvent]")
+	log.Info().Str("Chain", c.evmConfig.ID).Uint64("Current BlockNumber", blockNumber).Msg("[EvmClient] [RecoverThenWatchForEvent]")
 	//Recover ContractCall events
 	if err := RecoverEvent[*contracts.IScalarGatewayContractCall](c, ctx, blockNumber,
 		events.EVENT_EVM_CONTRACT_CALL, func(log types.Log) *contracts.IScalarGatewayContractCall {
@@ -285,8 +285,6 @@ func RecoverEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context, blockNumbe
 	}
 	if blockNumber-lastCheckpoint.BlockNumber > c.evmConfig.MaxRecoverRange {
 		lastCheckpoint.BlockNumber = blockNumber - c.evmConfig.MaxRecoverRange
-		log.Info().Str("eventName", eventName).Msg("[EvmClient] [RecoverEvent] no more missing events")
-		return nil
 	}
 	//recover missing events from the last checkpoint block number to the current block number
 	// We already filtered received event (defined by block and logIndex)

@@ -7,8 +7,8 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/config"
-	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -148,16 +148,15 @@ func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
 
 	// Auto Migrate the schema
 	err = db.AutoMigrate(
-		&models.RelayData{},
 		&chains.TokenSent{},
-		&models.CallContract{},
-		&models.CallContractWithToken{},
-		&models.TokenSentApproved{},
-		&models.ContractCallApproved{},
-		&models.ContractCallApprovedWithMint{},
-		&models.MintCommand{},
-		&models.CommandExecuted{},
-		&models.EventCheckPoint{},
+		&chains.MintCommand{},
+		&chains.CommandExecuted{},
+		&scalarnet.CallContract{},
+		&scalarnet.CallContractWithToken{},
+		&scalarnet.TokenSentApproved{},
+		&scalarnet.ContractCallApproved{},
+		&scalarnet.ContractCallApprovedWithMint{},
+		&scalarnet.EventCheckPoint{},
 	)
 
 	if err != nil {

@@ -214,6 +214,6 @@ func (ec *EvmClient) observeScalarExecuteData(decodedExecuteData *DecodedExecute
 	log.Debug().
 		Int("inputLength", len(decodedExecuteData.Input)).
 		Strs("commandIds", commandIds).
-		Msg("[EvmClient] [ScalarContractCallApproved]")
+		Msg("[EvmClient] [observeScalarExecuteData]")
 	return nil
 }
