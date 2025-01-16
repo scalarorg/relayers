@@ -21,18 +21,18 @@ func SubscribeAllNewBlockEvent(ctx context.Context, network *cosmos.NetworkClien
 	for {
 		select {
 		case <-ctx.Done():
-			log.Debug().Msgf("[ScalarClient] [Subscribe] timed out waiting for event, the transaction could have already been included or wasn't yet included")
+			log.Debug().Msgf("[ScalarClient] [SubscribeAllNewBlockEvent] timed out waiting for event, the transaction could have already been included or wasn't yet included")
 			network.UnSubscribeAll(context.Background(), AllNewBlockEvent.Type) //nolint:errcheck // ignore
 			return fmt.Errorf("context done")
 		case evt := <-eventCh:
 			if evt.Query != AllNewBlockEvent.TopicId {
-				log.Debug().Msgf("[ScalarClient] [Subscribe] Event query is not match query: %v, topicId: %s", evt.Query, AllNewBlockEvent.TopicId)
+				log.Debug().Msgf("[ScalarClient] [SubscribeAllNewBlockEvent] Event query is not match query: %v, topicId: %s", evt.Query, AllNewBlockEvent.TopicId)
 			} else {
 				//Extract the data from the event
-				log.Debug().Str("Topic", evt.Query).Msgf("[ScalarClient] [Subscribe] Received new event with data: %v", evt.Data)
+				log.Debug().Str("Topic", evt.Query).Msgf("[ScalarClient] [SubscribeAllNewBlockEvent] Received new event")
 				err := callback(ctx, evt.Events)
 				if err != nil {
-					log.Error().Msgf("[ScalarClient] [Subscribe] callback error: %v", err)
+					log.Error().Msgf("[ScalarClient] [SubscribeAllNewBlockEvent] callback error: %v", err)
 				}
 			}
 		}

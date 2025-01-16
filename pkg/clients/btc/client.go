@@ -41,6 +41,9 @@ func NewBtcClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 	}
 	btcClients := make([]*BtcClient, 0, len(configs))
 	for _, btcConfig := range configs {
+		if btcConfig.MempoolUrl == "" {
+			panic(fmt.Sprintf("mempool url is not set for %s", btcConfig.Name))
+		}
 		if btcConfig.PrivateKey == "" {
 			if config.GlobalConfig.BtcPrivateKey == "" {
 				log.Warn().Msgf("btc private key is not set for %s", btcConfig.Name)

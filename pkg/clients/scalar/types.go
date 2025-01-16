@@ -1,7 +1,7 @@
 package scalar
 
 import (
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -161,15 +161,13 @@ func UnmarshalContractCallWithMintApproved(jsonData map[string]string, e *types.
 
 func UnmarshalCommandBatchSigned(jsonData map[string]string, e *types.CommandBatchSigned) error {
 	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
-	commandBatchIDHex, err := DecodeIntArrayToHexString(jsonData["command_batch_id"])
+	batchCommandId := removeQuote(jsonData["command_batch_id"])
+	commandBatch, err := base64.StdEncoding.DecodeString(batchCommandId)
 	if err != nil {
-		log.Warn().Msgf("Failed to decode command ID: %v, error: %v", jsonData["command_id"], err)
+		log.Warn().Msgf("Failed to decode command ID: %v, error: %v", batchCommandId, err)
 		return err
 	}
-	e.CommandBatchID, err = hex.DecodeString(commandBatchIDHex)
-	if err != nil {
-		return err
-	}
+	e.CommandBatchID = commandBatch
 	return nil
 }
 

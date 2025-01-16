@@ -82,7 +82,7 @@ func ParseIBCEvent[T proto.Message](rawData map[string][]string) ([]IBCEvent[T],
 		if err != nil {
 			log.Error().Err(err).Any("JsonData", data).Msg("Cannot unmarshal message")
 		} else {
-			log.Debug().Any("Instance", instance).Msg("UnmarshalJson success")
+			log.Debug().Any("Instance", instance).Msg("Parse event successfull")
 		}
 		args := instance.(T)
 		result = append(result, IBCEvent[T]{

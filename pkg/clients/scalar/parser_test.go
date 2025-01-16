@@ -1,6 +1,8 @@
 package scalar_test
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -146,4 +148,13 @@ func TestParseIBCEvent(t *testing.T) {
 	assert.NoError(t, err)
 	fmt.Printf("Events %v", events)
 
+}
+
+func TestDecodeCommandBatchId(t *testing.T) {
+	commandBatchId := "jvZKxerRPJ0lVMAJIuA8GVJDcOpMN5NSrf1SRI3RXNI="
+	decoded, err := base64.StdEncoding.DecodeString(commandBatchId)
+	assert.NoError(t, err)
+	fmt.Printf("Decoded %v\n", decoded)
+	decodedHex := hex.EncodeToString(decoded)
+	assert.Equal(t, "8ef64ac5ead13c9d2554c00922e03c19524370ea4c379352adfd52448dd15cd2", decodedHex)
 }
