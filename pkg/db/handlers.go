@@ -3,7 +3,7 @@ package db
 import (
 	"fmt"
 
-	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -102,19 +102,21 @@ func UpdateLastEventCheckPoint(db *gorm.DB, value *models.EventCheckPoint) error
 	return nil
 }
 
-func (db *DatabaseAdapter) UpdateEventStatus(id string, status RelayDataStatus) error {
-	data := models.RelayData{
-		Status: int(status),
-	}
-
-	result := db.PostgresClient.Model(&models.RelayData{}).Where("id = ?", id).Updates(data)
-	if result.Error != nil {
-		return result.Error
-	}
-
-	log.Info().Msgf("[DBUpdate] %v", data)
+func (db *DatabaseAdapter) UpdateEventStatusWithPacketSequence(id string, status chains.ContractCallStatus, sequence *int) error {
+	// data := models.RelayData{
+	// 	Status: int(status),
+	// }
 	return nil
 }
+
+// 	result := db.PostgresClient.Model(&models.RelayData{}).Where("id = ?", id).Updates(data)
+// 	if result.Error != nil {
+// 		return result.Error
+// 	}
+
+// 	log.Info().Msgf("[DBUpdate] %v", data)
+// 	return nil
+// }
 
 // func (db *DatabaseAdapter) CreateEvmExecutedEvent(event *types.EvmEvent[*contracts.IScalarGatewayExecuted]) error {
 // 	id := fmt.Sprintf("%s-%d", event.Hash, event.LogIndex)

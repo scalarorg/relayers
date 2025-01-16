@@ -8,8 +8,8 @@ import (
 	"github.com/rs/zerolog/log"
 	vault "github.com/scalarorg/bitcoin-vault/ffi/go-vault"
 	"github.com/scalarorg/bitcoin-vault/go-utils/encode"
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
-	relaydata "github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
@@ -56,10 +56,10 @@ func (c *BtcClient) handleScalarContractCallApproved(messageID string, executeDa
 	}
 	//2. Update status of the event
 	//txHash := tx.Hash().String()
-	err = c.dbAdapter.UpdateRelayDataStatueWithExecuteHash(messageID, relaydata.SUCCESS, nil)
-	if err != nil {
-		return fmt.Errorf("failed to update relay data status: %w", err)
-	}
+	// err = c.dbAdapter.UpdateRelayDataStatueWithExecuteHash(messageID, relaydata.SUCCESS, nil)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to update relay data status: %w", err)
+	// }
 	return nil
 }
 
@@ -138,7 +138,7 @@ func (c *BtcClient) executeBtcCommand(messageID string, commandId [32]byte, comm
 	//1. Find payload by hash from db
 	// This payload is stored in the db when the VaultTx is indexed
 	payloadHash := hex.EncodeToString(executeParams.PayloadHash[:])
-	encodedPsbtPayload, err := c.dbAdapter.FindPayloadByHash(payloadHash)
+	encodedPsbtPayload, err := c.dbAdapter.FindContractCallPayloadByHash(payloadHash)
 	if err != nil {
 		log.Error().Err(err).Str("payloadHash", payloadHash).Msg("[BtcClient] [executeBtcCommand] failed to find payload by hash")
 		return err
@@ -318,7 +318,7 @@ func (c *BtcClient) handleCustodialSignaturesConfirmed(messageID string, signedP
 	}
 	txHashStr := txHash.String()
 	log.Debug().Msgf("[BtcClient] [handleCustodialSignaturesConfirmed] broadcasted txHash: %s", txHash)
-	err = c.dbAdapter.UpdateRelayDataStatueWithExecuteHash(messageID, relaydata.SUCCESS, &txHashStr)
+	err = c.dbAdapter.UpdateCallContractWithExecuteHash(messageID, chains.ContractCallStatusSuccess, &txHashStr)
 	if err != nil {
 		log.Error().Err(err).
 			Str("messageID", messageID).

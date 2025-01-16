@@ -10,7 +10,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/db/models"
 )
 
-func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IScalarGatewayContractCall) (models.RelayData, error) {
+func (c *EvmClient) ContractCallEvent2Model(event *contracts.IScalarGatewayContractCall) (chains.ContractCall, error) {
 	//id := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
 	//Calculate eventId by Txhash-logIndex among logs in txreceipt (AxelarEvmModule)
 	//https://github.com/scalarorg/scalar-core/blob/main/vald/evm/gateway_tx_confirmation.go#L73
@@ -27,37 +27,35 @@ func (c *EvmClient) ContractCallEvent2RelayData(event *contracts.IScalarGatewayC
 	// 	}
 	// }
 	eventId := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
+	eventId = strings.TrimPrefix(eventId, "0x")
 	senderAddress := event.Sender.String()
-	relayData := models.RelayData{
-		ID:   eventId,
-		From: c.evmConfig.GetId(),
-		To:   event.DestinationChain,
-		CallContract: &models.CallContract{
-			EventID:     eventId,
-			TxHash:      event.Raw.TxHash.String(),
-			BlockNumber: event.Raw.BlockNumber,
-			LogIndex:    event.Raw.Index,
-			//3 follows field are used for query to get back payload, so need to convert to lower case
-			DestContractAddress: strings.ToLower(event.DestinationContractAddress),
-			SourceAddress:       strings.ToLower(senderAddress),
-			PayloadHash:         strings.ToLower(hex.EncodeToString(event.PayloadHash[:])),
-			Payload:             event.Payload,
-			//Use for bitcoin vault tx only
-			StakerPublicKey: nil,
-		},
-	}
-	return relayData, nil
-}
-
-func (c *EvmClient) ContractCallWithToken2RelayData(event *contracts.IScalarGatewayContractCallWithToken) (models.RelayData, error) {
-	eventId := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
-	senderAddress := event.Sender.String()
-	callContract := models.CallContract{
-		EventID:     eventId,
+	contractCall := chains.ContractCall{
+		EventId:     eventId,
 		TxHash:      event.Raw.TxHash.String(),
 		BlockNumber: event.Raw.BlockNumber,
 		LogIndex:    event.Raw.Index,
+		SourceChain: c.evmConfig.GetId(),
 		//3 follows field are used for query to get back payload, so need to convert to lower case
+		DestinationChain:    event.DestinationChain,
+		DestContractAddress: strings.ToLower(event.DestinationContractAddress),
+		SourceAddress:       strings.ToLower(senderAddress),
+		PayloadHash:         strings.ToLower(hex.EncodeToString(event.PayloadHash[:])),
+		Payload:             event.Payload,
+	}
+	return contractCall, nil
+}
+
+func (c *EvmClient) ContractCallWithToken2Model(event *contracts.IScalarGatewayContractCallWithToken) (chains.ContractCallWithToken, error) {
+	eventId := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
+	senderAddress := event.Sender.String()
+	callContract := chains.ContractCall{
+		EventId:     eventId,
+		TxHash:      event.Raw.TxHash.String(),
+		BlockNumber: event.Raw.BlockNumber,
+		LogIndex:    event.Raw.Index,
+		SourceChain: c.evmConfig.GetId(),
+		//3 follows field are used for query to get back payload, so need to convert to lower case
+		DestinationChain:    event.DestinationChain,
 		DestContractAddress: strings.ToLower(event.DestinationContractAddress),
 		SourceAddress:       strings.ToLower(senderAddress),
 		PayloadHash:         strings.ToLower(hex.EncodeToString(event.PayloadHash[:])),
@@ -67,18 +65,13 @@ func (c *EvmClient) ContractCallWithToken2RelayData(event *contracts.IScalarGate
 	}
 	//Todo: get token contract address from scalar-core by source chain and token symbol
 	tokenContractAddress := "" //strings.ToLower(event.TokenContractAddress.String())
-	relayData := models.RelayData{
-		ID:   eventId,
-		From: c.evmConfig.GetId(),
-		To:   event.DestinationChain,
-		CallContractWithToken: &models.CallContractWithToken{
-			CallContract:         callContract,
-			TokenContractAddress: tokenContractAddress,
-			Symbol:               event.Symbol,
-			Amount:               event.Amount.Uint64(),
-		},
+	contractCallWithToken := chains.ContractCallWithToken{
+		ContractCall:         callContract,
+		TokenContractAddress: tokenContractAddress,
+		Symbol:               event.Symbol,
+		Amount:               event.Amount.Uint64(),
 	}
-	return relayData, nil
+	return contractCallWithToken, nil
 }
 
 func (c *EvmClient) TokenSentEvent2Model(event *contracts.IScalarGatewayTokenSent) (chains.TokenSent, error) {

@@ -54,18 +54,18 @@ type EventCheckPoint struct {
 	EventKey    string `gorm:"type:varchar(255)"`
 }
 
-type RelayData struct {
-	gorm.Model
-	ID                    string  `gorm:"primaryKey;type:varchar(255)"`
-	PacketSequence        *int    `gorm:"unique"`
-	ExecuteHash           *string `gorm:"type:varchar(255)"`
-	Status                int     `gorm:"default:0"`
-	From                  string  `gorm:"type:varchar(255)"`
-	To                    string  `gorm:"type:varchar(255)"`
-	CallContract          *CallContract
-	CallContractWithToken *CallContractWithToken
-	//TokenSent             *TokenSent
-}
+// type RelayData struct {
+// 	gorm.Model
+// 	ID                    string  `gorm:"primaryKey;type:varchar(255)"`
+// 	PacketSequence        *int    `gorm:"unique"`
+// 	ExecuteHash           *string `gorm:"type:varchar(255)"`
+// 	Status                int     `gorm:"default:0"`
+// 	From                  string  `gorm:"type:varchar(255)"`
+// 	To                    string  `gorm:"type:varchar(255)"`
+// 	CallContract          *CallContract
+// 	CallContractWithToken *CallContractWithToken
+// 	//TokenSent             *TokenSent
+// }
 
 type MintCommand struct {
 	gorm.Model
@@ -89,33 +89,6 @@ type CommandExecuted struct {
 	LogIndex         uint
 	CommandId        string
 	Status           int `gorm:"default:0"`
-}
-
-type CallContract struct {
-	EventID             string `gorm:"primaryKey"`
-	TxHash              string `gorm:"type:varchar(255)"`
-	TxHex               []byte
-	BlockNumber         uint64 `gorm:"default:0"`
-	LogIndex            uint
-	SourceChain         string `gorm:"type:varchar(64)"`
-	SourceAddress       string `gorm:"type:varchar(255)"`
-	Payload             []byte
-	PayloadHash         string     `gorm:"type:varchar(255);uniqueIndex"`
-	DestinationChain    string     `gorm:"type:varchar(64)"`
-	DestContractAddress string     `gorm:"type:varchar(255)"`
-	StakerPublicKey     *string    `gorm:"type:varchar(255)"`
-	RelayDataID         string     `gorm:"type:varchar(255)"`
-	RelayData           *RelayData `gorm:"foreignKey:RelayDataID"`
-	CreatedAt           time.Time  `gorm:"type:timestamp(6);default:current_timestamp(6)"`
-	UpdatedAt           time.Time  `gorm:"type:timestamp(6);default:current_timestamp(6)"`
-	DeletedAt           gorm.DeletedAt
-}
-
-type CallContractWithToken struct {
-	CallContract
-	TokenContractAddress string `gorm:"type:varchar(255)"`
-	Symbol               string `gorm:"type:varchar(255)"`
-	Amount               uint64 `gorm:"type:bigint"`
 }
 
 type ContractCallApprovedWithMint struct {

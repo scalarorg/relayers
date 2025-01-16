@@ -1,20 +1,13 @@
 package db
 
-type RelayDataStatus int
-
-const (
-	PENDING RelayDataStatus = iota
-	APPROVED
-	SUCCESS
-	FAILED
-)
+import "github.com/scalarorg/data-models/chains"
 
 type QueryOptions struct {
 	IncludeCallContract          *bool
 	IncludeCallContractWithToken *bool
 }
 
-type RelaydataExecuteResult struct {
-	RelayDataId string
-	Status      RelayDataStatus
+type ContractCallExecuteResult struct {
+	EventId string
+	Status  chains.ContractCallStatus
 }

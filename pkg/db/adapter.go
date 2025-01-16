@@ -151,6 +151,8 @@ func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
 		&chains.TokenSent{},
 		&chains.MintCommand{},
 		&chains.CommandExecuted{},
+		&chains.ContractCall{},
+		&chains.ContractCallWithToken{},
 		&scalarnet.CallContract{},
 		&scalarnet.CallContractWithToken{},
 		&scalarnet.TokenSentApproved{},

@@ -185,7 +185,7 @@ func TestRecoverEvent(t *testing.T) {
 			Raw: log,
 		}
 	}
-	err := evm.RecoverEvent[*contracts.IScalarGatewayContractCall](evmClient, context.Background(), 100000, events.EVENT_EVM_CONTRACT_CALL, fnCreateEventData)
+	err := evm.RecoverEvent[*contracts.IScalarGatewayContractCall](evmClient, context.Background(), events.EVENT_EVM_CONTRACT_CALL, fnCreateEventData)
 	require.NoError(t, err)
 }
 func TestEvmSubscribe(t *testing.T) {
