@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
+	"github.com/scalarorg/bitcoin-vault/go-utils/types"
 )
 
 const (
@@ -41,7 +41,7 @@ func (c *EvmNetworkConfig) GetName() string {
 	return c.Name
 }
 func (c *EvmNetworkConfig) GetFamily() string {
-	return chain.ChainTypeEVM.String()
+	return types.ChainTypeEVM.String()
 }
 
 type DecodedExecuteData struct {

@@ -63,7 +63,7 @@ func (c *BtcClient) CreatePsbts(psbtParams types.PsbtParams, outpoints []Command
 	}
 	mapUtxos[uint64(utils.MinimumFee)] = prevUtxos
 	for feeOpts, outpoints := range mapOutpoints {
-		psbt, err := vault.BuildCovenantOnlyUnstakingTx(
+		psbt, err := vault.BuildCustodianOnlyUnstakingTx(
 			psbtParams.ScalarTag,
 			psbtParams.ProtocolTag,
 			psbtParams.Version,

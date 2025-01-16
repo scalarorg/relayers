@@ -5,7 +5,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/scalarorg/bitcoin-vault/ffi/go-vault"
-	address "github.com/scalarorg/bitcoin-vault/go-utils/address"
+	"github.com/scalarorg/bitcoin-vault/go-utils/btc"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
@@ -109,5 +109,5 @@ type CreatePsbtRequest struct {
 
 // Calculate taproot address from covenant pubkey and network
 func (p *PsbtParams) GetTaprootAddress() (btcutil.Address, error) {
-	return address.ScriptPubKeyToAddress(p.CovenantScript, p.NetworkType)
+	return btc.ScriptPubKeyToAddress(p.CovenantScript, p.NetworkType)
 }
