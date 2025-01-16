@@ -310,8 +310,31 @@ func TestSendTokenFromSepoliaToBnb(t *testing.T) {
 	assert.NoError(t, err)
 	fmt.Printf("SendToken tx %v\n", tx)
 }
-func TestBnbRecoverTokenSentEvent(t *testing.T) {
-
+func TestReconnectWithWatchTokenSent(t *testing.T) {
+	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
+	sink := make(chan *contracts.IScalarGatewayTokenSent)
+	bnbClient, err := evm.NewEvmClient(&globalConfig, bnbConfig, nil, nil, nil)
+	if err != nil {
+		log.Error().Msgf("failed to create evm client: %v", err)
+	}
+	subscription, err := bnbClient.Gateway.WatchTokenSent(&watchOpts, sink, nil)
+	require.NoError(t, err)
+	defer subscription.Unsubscribe()
+	log.Info().Msgf("[EvmClient] [watchEVMTokenSent] success. Listening to TokenSent")
+	done := false
+	for !done {
+		select {
+		case err := <-subscription.Err():
+			log.Error().Err(err).Msg("[EvmClient] [watchEVMTokenSent] error with subscription, perform reconnect")
+			subscription, err = bnbClient.Gateway.WatchTokenSent(&watchOpts, sink, nil)
+			require.NoError(t, err)
+		case <-watchOpts.Context.Done():
+			log.Info().Msgf("[EvmClient] [watchEVMTokenSent] context done")
+			done = true
+		case event := <-sink:
+			log.Info().Any("event", event).Msgf("EvmClient] [watchEVMTokenSent]")
+		}
+	}
 }
 func createErc20ProxyContract(proxyAddress string, client *ethclient.Client) (*contracts.IScalarERC20CrossChain, error) {
 	proxy, err := contracts.NewIScalarERC20CrossChain(common.HexToAddress(proxyAddress), client)
