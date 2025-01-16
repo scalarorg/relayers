@@ -51,12 +51,12 @@ func (c *Client) GetPsbtParams(chainName string) types.PsbtParams {
 	} else {
 		//Get first protocol
 		protocol := protocols.Protocols[0]
-		params.CovenantPubKey = make([]vault.PublicKey, len(protocol.CustodianGroup.Custodians))
+		params.CustodianPubKey = make([]vault.PublicKey, len(protocol.CustodianGroup.Custodians))
 		for i, custodian := range protocol.CustodianGroup.Custodians {
-			params.CovenantPubKey[i] = vault.PublicKey(custodian.BtcPubkey)
+			params.CustodianPubKey[i] = vault.PublicKey(custodian.BtcPubkey)
 		}
-		params.CovenantQuorum = uint8(protocol.CustodianGroup.Quorum)
-		params.CovenantScript = protocol.CustodianGroup.BtcPubkey
+		params.CustodianQuorum = uint8(protocol.CustodianGroup.Quorum)
+		params.CustodianScript = protocol.CustodianGroup.BtcPubkey
 		params.ProtocolTag = protocol.Tag
 	}
 	return params

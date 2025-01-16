@@ -80,14 +80,14 @@ func TestCreatePsbts(t *testing.T) {
 	}
 
 	psbtParams := types.PsbtParams{
-		ScalarTag:      []byte("SC4L4R"),
-		Version:        0,
-		ProtocolTag:    []byte("tPepe"),
-		NetworkKind:    vault.NetworkKind(1), //testnet
-		NetworkType:    "testnet4",
-		CovenantPubKey: custodianPubKeys,
-		CovenantQuorum: 3,
-		CovenantScript: covScript,
+		ScalarTag:       []byte("SC4L4R"),
+		Version:         0,
+		ProtocolTag:     []byte("tPepe"),
+		NetworkKind:     vault.NetworkKind(1), //testnet
+		NetworkType:     "testnet4",
+		CustodianPubKey: custodianPubKeys,
+		CustodianQuorum: 3,
+		CustodianScript: covScript,
 	}
 
 	lockingScript, _ := hex.DecodeString("001450dceca158a9c872eb405d52293d351110572c9e")

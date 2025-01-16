@@ -2,7 +2,6 @@ package btc
 
 import (
 	vault "github.com/scalarorg/bitcoin-vault/ffi/go-vault"
-	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
 	"github.com/scalarorg/bitcoin-vault/go-utils/types"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 )
@@ -45,7 +44,7 @@ func (c *BtcNetworkConfig) GetName() string {
 	return c.Name
 }
 func (c *BtcNetworkConfig) GetFamily() string {
-	return chain.ChainTypeBitcoin.String()
+	return types.ChainTypeBitcoin.String()
 }
 
 // Todo: When xchains core user separated module for handling btc execution data,

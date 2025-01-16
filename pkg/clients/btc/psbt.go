@@ -58,20 +58,20 @@ func (c *BtcClient) CreatePsbts(psbtParams types.PsbtParams, outpoints []Command
 				Vout: utxo.Vout,
 			},
 			Amount: utxo.Value,
-			Script: psbtParams.CovenantScript,
+			Script: psbtParams.CustodianScript,
 		})
 	}
 	mapUtxos[uint64(utils.MinimumFee)] = prevUtxos
 	for feeOpts, outpoints := range mapOutpoints {
-		psbt, err := vault.BuildCovenantOnlyUnstakingTx(
+		psbt, err := vault.BuildCustodianOnlyUnstakingTx(
 			psbtParams.ScalarTag,
 			psbtParams.ProtocolTag,
 			psbtParams.Version,
 			psbtParams.NetworkKind,
 			mapUtxos[feeOpts],
 			outpoints,
-			psbtParams.CovenantPubKey,
-			psbtParams.CovenantQuorum,
+			psbtParams.CustodianPubKey,
+			psbtParams.CustodianQuorum,
 			replaceByFee,
 			uint64(1), // TODO: handle fee opts
 		)

@@ -1,6 +1,6 @@
 package cosmos
 
-import "github.com/scalarorg/bitcoin-vault/go-utils/chain"
+import "github.com/scalarorg/bitcoin-vault/go-utils/types"
 
 const (
 	DEFAULT_GAS_ADJUSTMENT = 1.2
@@ -27,7 +27,7 @@ type CosmosNetworkConfig struct {
 }
 
 func (c *CosmosNetworkConfig) GetFamily() string {
-	return chain.ChainTypeCosmos.String()
+	return types.ChainTypeCosmos.String()
 }
 
 func (c *CosmosNetworkConfig) GetChainId() uint64 {
