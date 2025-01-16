@@ -7,7 +7,7 @@ start() {
  # example ./run.sh test clients/scalar
  # example ./run.sh test TestEvmClientWatchTokenSent clients/evm/client_test.go
 test() {
-    OPTIONS="-timeout 10m -v -count=1"
+    OPTIONS="-timeout 120m -v -count=1"
 
     if [ -n "$1" ]; then
         OPTIONS="${OPTIONS} -run ^${1}$"

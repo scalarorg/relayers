@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -52,8 +53,30 @@ type NetworkClient struct {
 	txConfig       client.TxConfig
 	txFactory      tx.Factory
 	sequenceNumber uint64
+	seqMutex       sync.Mutex // Add mutex for sequence number synchronization
+
 }
 
+// Add method to safely get sequence number
+func (c *NetworkClient) GetSequenceNumber() uint64 {
+	c.seqMutex.Lock()
+	defer c.seqMutex.Unlock()
+	return c.sequenceNumber
+}
+
+// Add method to safely increment sequence number
+func (c *NetworkClient) IncrementSequenceNumber() {
+	c.seqMutex.Lock()
+	defer c.seqMutex.Unlock()
+	c.sequenceNumber++
+}
+
+// Add method to safely set sequence number
+func (c *NetworkClient) SetSequenceNumber(seq uint64) {
+	c.seqMutex.Lock()
+	defer c.seqMutex.Unlock()
+	c.sequenceNumber = seq
+}
 func NewNetworkClient(config *CosmosNetworkConfig, queryClient *QueryClient, txConfig client.TxConfig) (*NetworkClient, error) {
 	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic, config.Bip44Path)
 	if err != nil {
@@ -247,8 +270,12 @@ func (c *NetworkClient) CreateTxFactory(ctx context.Context) tx.Factory {
 		//This is to avoid the situation where the transaction is not included in the next block
 		//Then account sequence number is not updated on the server side
 		//Todo: better set sequence = resp.Sequence + number of pendingTx
-		if resp.Sequence >= txf.Sequence() {
+		currentSeq := c.GetSequenceNumber()
+		if resp.Sequence > currentSeq {
+			c.SetSequenceNumber(resp.Sequence)
 			txf = txf.WithSequence(resp.Sequence)
+		} else {
+			txf = txf.WithSequence(currentSeq)
 		}
 	}
 	return txf
@@ -286,12 +313,14 @@ func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Ms
 	//Try to sign and broadcast the transaction until success or reach max retry
 	result, err := c.trySignAndBroadcastMsgs(ctx, txBuilder)
 	if err != nil {
+		log.Error().Err(err).Msg("[NetworkClient] [SignAndBroadcastMsgs] error")
 		return nil, err
 	}
 	if result != nil && result.Code == 0 {
 		//log.Debug().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] success broadcast tx with tx hash: %s", result.TxHash)
 		//Update sequence and account number
-		c.txFactory = c.txFactory.WithSequence(c.txFactory.Sequence() + 1)
+		log.Debug().Msgf("[NetworkClient] [SignAndBroadcastMsgs] success broadcast tx with tx hash: %s", result.TxHash)
+		c.IncrementSequenceNumber() // Safely increment sequence number on successful broadcast
 	} else {
 		log.Error().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] failed to broadcast tx: %+v", result)
 	}
