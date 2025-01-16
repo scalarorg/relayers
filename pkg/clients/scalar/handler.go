@@ -213,7 +213,7 @@ func (c *Client) handleContractCallWithMintApprovedEvents(ctx context.Context, e
 // 	return nil, nil
 // }
 
-func (c *Client) handleCommandBatchSignedEvent(ctx context.Context, events []IBCEvent[*chainstypes.CommandBatchSigned]) error {
+func (c *Client) handleCommandBatchSignedEvents(ctx context.Context, events []IBCEvent[*chainstypes.CommandBatchSigned]) error {
 	for _, event := range events {
 		err := c.handleCommantBatchSignedsEvent(ctx, &event)
 		if err != nil {
@@ -380,10 +380,6 @@ func (c *Client) preprocessEVMCompletedEvent(event *IBCEvent[*chainstypes.ChainE
 	return payload, nil
 }
 
-func (c *Client) handleAnyEvents(ctx context.Context, events []IBCEvent[any]) error {
-	log.Debug().Msgf("[ScalarClient] [handleAnyEvents] events: %v", events)
-	return nil
-}
 func findEventAttribute(events []sdk.StringEvent, eventType string, attrKey string) string {
 	for _, event := range events {
 		if event.Type == eventType {

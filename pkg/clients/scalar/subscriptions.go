@@ -2,6 +2,7 @@ package scalar
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -10,6 +11,33 @@ import (
 )
 
 var EventTimeout = 5 * time.Minute
+
+func SubscribeAllNewBlockEvent(ctx context.Context, network *cosmos.NetworkClient,
+	callback func(ctx context.Context, events map[string][]string) error) error {
+	eventCh, err := network.Subscribe(ctx, AllNewBlockEvent.Type, AllNewBlockEvent.TopicId)
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to Event: %v, %w", AllNewBlockEvent, err)
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			log.Debug().Msgf("[ScalarClient] [Subscribe] timed out waiting for event, the transaction could have already been included or wasn't yet included")
+			network.UnSubscribeAll(context.Background(), AllNewBlockEvent.Type) //nolint:errcheck // ignore
+			return fmt.Errorf("context done")
+		case evt := <-eventCh:
+			if evt.Query != AllNewBlockEvent.TopicId {
+				log.Debug().Msgf("[ScalarClient] [Subscribe] Event query is not match query: %v, topicId: %s", evt.Query, AllNewBlockEvent.TopicId)
+			} else {
+				//Extract the data from the event
+				log.Debug().Str("Topic", evt.Query).Msgf("[ScalarClient] [Subscribe] Received new event with data: %v", evt.Data)
+				err := callback(ctx, evt.Events)
+				if err != nil {
+					log.Error().Msgf("[ScalarClient] [Subscribe] callback error: %v", err)
+				}
+			}
+		}
+	}
+}
 
 func subscribeTokenSentEvent(ctx context.Context, network *cosmos.NetworkClient,
 	callback func(ctx context.Context, events []IBCEvent[*types.EventTokenSent]) error) error {
@@ -99,24 +127,6 @@ func subscribeEVMCompletedEvent(ctx context.Context, network *cosmos.NetworkClie
 		return err
 	} else {
 		log.Debug().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] success")
-	}
-	return nil
-}
-func subscribeAllNewBlockEvent(ctx context.Context, network *cosmos.NetworkClient,
-	callback func(ctx context.Context, events []IBCEvent[ScalarMessage]) error) error {
-	internalCallback := func(events []IBCEvent[ScalarMessage]) {
-		err := callback(ctx, events)
-		if err != nil {
-			log.Error().Msgf("[ScalarClient] [AllNewBlockHandler] callback error: %v", err)
-		}
-	}
-	// _, err := SubscribeWithTimeout(ctx, EventTimeout, network, AllNewBlockEvent, internalCallback)
-	_, err := Subscribe(ctx, network, AllNewBlockEvent, internalCallback)
-	if err != nil {
-		log.Debug().Msgf("[ScalarClient] [subscribeAllNewBlockEvent] Failed: %v", err)
-		return err
-	} else {
-		log.Debug().Msgf("[ScalarClient] [subscribeAllNewBlockEvent] success")
 	}
 	return nil
 }

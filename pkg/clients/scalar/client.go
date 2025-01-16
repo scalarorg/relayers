@@ -124,10 +124,61 @@ func (c *Client) Start(ctx context.Context) error {
 		c.ProcessPendingCommands(ctx)
 	}()
 	go func() {
-		c.subscribeWithHeatBeat(ctx)
+		err := c.subscribeAllBlockEventsWithHeatBeat(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("[ScalarClient] [subscribeAllBlockEventsWithHeatBeat] Failed")
+		}
 	}()
+	// go func() {
+	// 	c.subscribeWithHeatBeat(ctx)
+	// }()
 	log.Info().Msg("Scalar client started")
 	return nil
+}
+func (c *Client) subscribeAllBlockEventsWithHeatBeat(ctx context.Context) error {
+	retryInterval := time.Millisecond * time.Duration(c.networkConfig.RetryInterval)
+	deadCount := 0
+	for {
+		cancelCtx, cancelFunc := context.WithCancel(ctx)
+		//Start rpc client
+		log.Debug().Msg("[ScalarClient] [Start] Try to start scalar connection")
+		tmclient, err := c.network.Start()
+		if err != nil {
+			deadCount += 1
+			if deadCount >= 10 {
+				log.Debug().Msgf("[ScalarClient] [Start] Connect to the scalar network failed, sleep for %ds then retry", int64(retryInterval.Seconds()))
+			}
+			c.network.RemoveRpcClient()
+			time.Sleep(retryInterval)
+			continue
+		}
+		log.Info().Msgf("[ScalarClient] [Start] Start rpc client success. Subscribing for events...")
+		go func() {
+			err := SubscribeAllNewBlockEvent(cancelCtx, c.network, c.handleNewBlockEvents)
+			if err != nil {
+				log.Error().Msgf("[ScalarClient] [subscribeAllNewBlockEvent] Failed: %v", err)
+			}
+		}()
+		//HeatBeat
+		aliveCount := 0
+		for {
+			_, err := tmclient.Health(ctx)
+			if err != nil {
+				// clean all subscriber then retry
+				log.Info().Msgf("[ScalarClient] ScalarNode is dead. Perform reconnecting")
+				c.network.RemoveRpcClient()
+				break
+			} else {
+				aliveCount += 1
+				if aliveCount >= 100 {
+					log.Debug().Msgf("[ScalarClient] ScalarNode is alive")
+					aliveCount = 0
+				}
+			}
+			time.Sleep(retryInterval)
+		}
+		cancelFunc()
+	}
 }
 func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 	retryInterval := time.Millisecond * time.Duration(c.networkConfig.RetryInterval)
@@ -173,7 +224,7 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 			}
 		}()
 		go func() {
-			err = subscribeCommandBatchSignedEvent(cancelCtx, c.network, c.handleCommandBatchSignedEvent)
+			err = subscribeCommandBatchSignedEvent(cancelCtx, c.network, c.handleCommandBatchSignedEvents)
 			if err != nil {
 				log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
 			}
@@ -185,10 +236,6 @@ func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 				log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] error: %v", err)
 			}
 		}()
-		// err = subscribeAllNewBlockEvent(cancelCtx, c.network, c.handleAnyEvents)
-		// if err != nil {
-		// 	log.Error().Msgf("[ScalarClient] [subscribeAllEvent] Failed: %v", err)
-		// }
 		// For debug purpose, subscribe to all tx events, findout if there is sign commands event
 		// err = subscribeAllTxEvent(cancelCtx, c.network)
 		// if err != nil {

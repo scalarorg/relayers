@@ -7,15 +7,21 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	auth "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/rs/zerolog/log"
 
 	"github.com/scalarorg/relayers/config"
+	"github.com/scalarorg/relayers/internal/codec"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
+	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/encoding"
 	"google.golang.org/grpc/encoding/proto"
 )
@@ -42,20 +48,27 @@ var (
 		RetryInterval: int64(1000),
 		Mnemonic:      "latin total dream gesture brain bunker truly stove left video cost transfer guide occur bicycle oxygen world ready witness exhibit federal salute half day",
 	}
-	err        error
-	clientCtx  *client.Context
-	accAddress sdk.AccAddress
+	err           error
+	clientCtx     *client.Context
+	accAddress    sdk.AccAddress
+	networkClient *cosmos.NetworkClient
 )
 
-//	func TestMain(m *testing.M) {
-//		config := types.GetConfig()
-//		config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
-//		clientCtx, err = cosmos.CreateClientContext(&ScalarNetworkConfig)
-//		if err != nil {
-//			log.Error().Msgf("failed to create client context: %+v", err)
-//		}
-//		m.Run()
-//	}
+func TestMain(m *testing.M) {
+	config := types.GetConfig()
+	config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
+	clientCtx, err = cosmos.CreateClientContext(&ScalarNetworkConfig)
+	if err != nil {
+		log.Error().Msgf("failed to create client context: %+v", err)
+	}
+	queryClient := cosmos.NewQueryClient(clientCtx)
+	txConfig := tx.NewTxConfig(codec.GetProtoCodec(), tx.DefaultSignModes)
+	networkClient, err = cosmos.NewNetworkClient(&ScalarNetworkConfig, queryClient, txConfig)
+	if err != nil {
+		log.Error().Msgf("failed to create network client: %+v", err)
+	}
+	m.Run()
+}
 func TestAccountAddress(t *testing.T) {
 	accAddress, err := sdk.AccAddressFromBech32(cosmosAddress)
 	if err != nil {
@@ -99,4 +112,65 @@ func TestCosmosGrpcClient(t *testing.T) {
 	}
 	log.Info().Msgf("Sequence: %+v", sequence)
 	log.Info().Msgf("Account: %+v", account)
+}
+
+func TestLongtimeListing(t *testing.T) {
+	retryInterval := time.Second * 5
+	deadCount := 0
+	ctx := context.Background()
+	//cancelCtx, cancelFunc := context.WithCancel(ctx)
+	//Start rpc client
+	log.Debug().Msg("[ScalarClient] [Start] Try to start scalar connection")
+	tmclient, err := networkClient.Start()
+	if err != nil {
+		deadCount += 1
+		if deadCount >= 10 {
+			log.Debug().Msgf("[ScalarClient] [Start] Connect to the scalar network failed, sleep for %ds then retry", int64(retryInterval.Seconds()))
+		}
+		networkClient.RemoveRpcClient()
+		time.Sleep(retryInterval)
+	}
+	log.Info().Msgf("[ScalarClient] [Start] Start rpc client success. Subscribing for events...")
+	go func() {
+		// handler := func(ctx context.Context, events []scalar.IBCEvent[scalar.ScalarMessage]) error {
+		// 	log.Info().Msgf("[ScalarClient] [subscribeAllEvent] events: %+v", events)
+		// 	return nil
+		// }
+		eventCh, err := networkClient.Subscribe(ctx, scalar.AllNewBlockEvent.Type, scalar.AllNewBlockEvent.TopicId)
+		require.NoError(t, err)
+		for {
+			select {
+			case <-ctx.Done():
+				log.Debug().Msgf("[ScalarClient] [Subscribe] timed out waiting for event, the transaction could have already been included or wasn't yet included")
+				networkClient.UnSubscribeAll(context.Background(), scalar.AllNewBlockEvent.Type) //nolint:errcheck // ignore
+				log.Info().Msgf("[ScalarClient] [Subscribe] Unsubscribe all event. Context done")
+			case evt := <-eventCh:
+				if evt.Query != scalar.AllNewBlockEvent.TopicId {
+					log.Debug().Msgf("[ScalarClient] [Subscribe] Event query is not match query: %v, topicId: %s", evt.Query, scalar.AllNewBlockEvent.TopicId)
+				} else {
+					//Extract the data from the event
+					log.Debug().Str("Topic", evt.Query).Any("Events", evt.Events).Msg("[ScalarClient] [Subscribe] Received new event")
+				}
+			}
+		}
+	}()
+	//HeatBeat
+	aliveCount := 0
+	for {
+		_, err := tmclient.Health(ctx)
+		if err != nil {
+			// clean all subscriber then retry
+			log.Info().Msgf("[ScalarClient] ScalarNode is dead. Perform reconnecting")
+			networkClient.RemoveRpcClient()
+			break
+		} else {
+			aliveCount += 1
+			if aliveCount >= 100 {
+				log.Debug().Msgf("[ScalarClient] ScalarNode is alive")
+				aliveCount = 0
+			}
+		}
+		time.Sleep(retryInterval)
+	}
+	//cancelFunc()
 }
