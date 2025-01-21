@@ -1,7 +1,6 @@
 package btc
 
 import (
-	vault "github.com/scalarorg/bitcoin-vault/ffi/go-vault"
 	"github.com/scalarorg/bitcoin-vault/go-utils/types"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 )
@@ -68,5 +67,5 @@ type Utxo struct {
 type CommandOutPoint struct {
 	BTCFeeOpts types.BTCFeeOpts
 	RBF        bool
-	OutPoint   vault.UnstakingOutput
+	OutPoint   types.UnstakingOutput
 }

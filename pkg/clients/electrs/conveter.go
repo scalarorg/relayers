@@ -41,6 +41,10 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (chains.TokenSe
 	index := vaultTx.TxPosition
 	eventId := fmt.Sprintf("%s-%d", strings.ToLower(vaultTx.TxHash), index)
 	eventId = strings.TrimPrefix(eventId, "0x")
+	destAddress := strings.ToLower(vaultTx.DestRecipientAddress)
+	if !strings.HasPrefix(destAddress, "0x") {
+		destAddress = "0x" + destAddress
+	}
 	tokenSent := chains.TokenSent{
 		EventID:              eventId,
 		TxHash:               vaultTx.TxHash,
@@ -48,7 +52,7 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (chains.TokenSe
 		LogIndex:             uint(vaultTx.TxPosition),
 		SourceChain:          c.electrumConfig.SourceChain,
 		SourceAddress:        strings.ToLower(vaultTx.StakerAddress),
-		DestinationAddress:   strings.ToLower(vaultTx.DestRecipientAddress),
+		DestinationAddress:   destAddress,
 		TokenContractAddress: vaultTx.DestTokenAddress,
 		Amount:               vaultTx.Amount,
 		Status:               chains.TokenSentStatusPending,

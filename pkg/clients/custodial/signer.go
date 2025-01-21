@@ -5,6 +5,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/scalarorg/bitcoin-vault/ffi/go-vault"
+	"github.com/scalarorg/bitcoin-vault/go-utils/types"
 )
 
 func (c *Client) SignPsbt(inputBytes []byte, privateKey string, finalize bool) ([]byte, error) {
@@ -13,12 +14,12 @@ func (c *Client) SignPsbt(inputBytes []byte, privateKey string, finalize bool) (
 		return nil, fmt.Errorf("failed to decode WIF: %w", err)
 	}
 	privKeyBytes := wif.PrivKey.Serialize()
-	var networkKind vault.NetworkKind
+	var networkKind types.NetworkKind
 	// TODO: Cross-check with xchains core's btc module
 	if c.networkConfig.SignerNetwork == "bitcoin" {
-		networkKind = vault.NetworkKindMainnet
+		networkKind = types.NetworkKindMainnet
 	} else {
-		networkKind = vault.NetworkKindTestnet
+		networkKind = types.NetworkKindTestnet
 	}
 	partialSignedPsbt, err := vault.SignPsbtBySingleKey(
 		inputBytes,      // []byte containing PSBT

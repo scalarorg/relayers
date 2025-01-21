@@ -6,12 +6,13 @@ import (
 	"strconv"
 
 	"github.com/rs/zerolog/log"
-	vault "github.com/scalarorg/bitcoin-vault/ffi/go-vault"
 	"github.com/scalarorg/bitcoin-vault/go-utils/encode"
+	utiltypes "github.com/scalarorg/bitcoin-vault/go-utils/types"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
+	"github.com/scalarorg/relayers/pkg/utils"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 )
 
@@ -65,23 +66,26 @@ func (c *BtcClient) handleScalarContractCallApproved(messageID string, executeDa
 
 // Todo: form psbt for triangle model
 func (c *BtcClient) handleScalarCreatePsbtRequest(messageId string, psbtSigningRequest types.CreatePsbtRequest) error {
-	outpoints := make([]CommandOutPoint, len(psbtSigningRequest.Commands))
-	for i, cmd := range psbtSigningRequest.Commands {
+	outpoints := []CommandOutPoint{}
+	for _, cmd := range psbtSigningRequest.Commands {
 		amount, err := strconv.ParseUint(cmd.Params["amount"], 10, 64)
 		if err != nil {
 			return fmt.Errorf("cannot parse param %s to int value", cmd.Params["amount"])
 		}
-		feeOpts, rbf, pkScript, err := encode.DecodeContractCallWithTokenPayload(cmd.Payload)
+		payload, err := utils.DecodeContractCallWithTokenPayload(cmd.Payload)
+		//feeOpts, rbf, pkScript, err := encode.DecodeContractCallWithTokenPayload(cmd.Payload)
 		if err != nil {
 			return fmt.Errorf("failed to decode contract call with token payload: %w", err)
 		}
-		outpoints[i] = CommandOutPoint{
-			BTCFeeOpts: feeOpts,
-			RBF:        rbf,
-			OutPoint: vault.UnstakingOutput{
-				Amount:        amount,
-				LockingScript: pkScript,
-			},
+		if payload.PayloadType == encode.ContractCallWithTokenPayloadType_CustodianOnly {
+			outpoints = append(outpoints, CommandOutPoint{
+				BTCFeeOpts: payload.CustodianOnly.FeeOptions,
+				RBF:        payload.CustodianOnly.RBF,
+				OutPoint: utiltypes.UnstakingOutput{
+					Amount:        amount,
+					LockingScript: payload.CustodianOnly.RecipientChainIdentifier,
+				},
+			})
 		}
 	}
 

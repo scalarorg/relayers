@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	vault "github.com/scalarorg/bitcoin-vault/ffi/go-vault"
+	utils "github.com/scalarorg/bitcoin-vault/go-utils/types"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/btc"
 	"github.com/scalarorg/relayers/pkg/db"
@@ -72,18 +72,18 @@ func TestMempoolRawTx(t *testing.T) {
 func TestCreatePsbts(t *testing.T) {
 	covScript, _ := hex.DecodeString("51207f815abf6dfd78423a708aa8db1c2c906eecac910c035132d342e4988a37b8d5")
 
-	custodianPubKeys := []vault.PublicKey{}
+	custodianPubKeys := []utils.PublicKey{}
 
 	for _, pubkey := range pubkeys {
 		p, _ := hex.DecodeString(pubkey)
-		custodianPubKeys = append(custodianPubKeys, vault.PublicKey(p))
+		custodianPubKeys = append(custodianPubKeys, utils.PublicKey(p))
 	}
 
 	psbtParams := types.PsbtParams{
 		ScalarTag:       []byte("SC4L4R"),
 		Version:         0,
 		ProtocolTag:     []byte("tPepe"),
-		NetworkKind:     vault.NetworkKind(1), //testnet
+		NetworkKind:     utils.NetworkKind(1), //testnet
 		NetworkType:     "testnet4",
 		CustodianPubKey: custodianPubKeys,
 		CustodianQuorum: 3,
@@ -96,7 +96,7 @@ func TestCreatePsbts(t *testing.T) {
 		{
 			BTCFeeOpts: 0,
 			RBF:        false,
-			OutPoint:   vault.UnstakingOutput{Amount: 10_000, LockingScript: lockingScript},
+			OutPoint:   utils.UnstakingOutput{Amount: 10_000, LockingScript: lockingScript},
 		},
 	}
 

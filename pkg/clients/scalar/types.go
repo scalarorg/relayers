@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -90,7 +91,8 @@ func UnmarshalTokenSent(jsonData map[string]string, e *types.EventTokenSent) err
 	e.Sender = removeQuote(jsonData["sender"])
 	e.DestinationAddress = removeQuote(jsonData["destination_address"])
 	e.DestinationChain = exported.ChainName(removeQuote(jsonData["destination_chain"]))
-	e.EventID = types.EventID(removeQuote(jsonData["event_id"]))
+	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
+	e.EventID = types.EventID(eventId)
 	transferId, ok := sdk.NewIntFromString(jsonData["transfer_id"])
 	if ok {
 		e.TransferID = exported.TransferID(transferId.Uint64())
@@ -106,14 +108,16 @@ func UnmarshalTokenSent(jsonData map[string]string, e *types.EventTokenSent) err
 
 func UnmarshalChainEventCompleted(jsonData map[string]string, e *types.ChainEventCompleted) error {
 	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
-	e.EventID = types.EventID(removeQuote(jsonData["event_id"]))
+	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
+	e.EventID = types.EventID(eventId)
 	e.Type = removeQuote(jsonData["type"])
 	return nil
 }
 
 func UnmarshalContractCallApproved(jsonData map[string]string, e *types.ContractCallApproved) error {
 	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
-	e.EventID = types.EventID(removeQuote(jsonData["event_id"]))
+	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
+	e.EventID = types.EventID(eventId)
 	commandIDHex, err := DecodeIntArrayToHexString(jsonData["command_id"])
 	if err != nil {
 		log.Warn().Msgf("Failed to decode command ID: %v, error: %v", jsonData["command_id"], err)
@@ -135,7 +139,8 @@ func UnmarshalContractCallApproved(jsonData map[string]string, e *types.Contract
 
 func UnmarshalContractCallWithMintApproved(jsonData map[string]string, e *types.EventContractCallWithMintApproved) error {
 	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
-	e.EventID = types.EventID(removeQuote(jsonData["event_id"]))
+	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
+	e.EventID = types.EventID(eventId)
 	commandIDHex, err := DecodeIntArrayToHexString(jsonData["command_id"])
 	if err != nil {
 		log.Warn().Msgf("Failed to decode command ID: %v, error: %v", jsonData["command_id"], err)

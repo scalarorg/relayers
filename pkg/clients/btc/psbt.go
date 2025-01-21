@@ -33,27 +33,27 @@ func (c *BtcClient) CreatePsbts(psbtParams types.PsbtParams, outpoints []Command
 	}
 
 	//Group output by fee option
-	mapOutpoints := map[uint64][]vault.UnstakingOutput{}
+	mapOutpoints := map[uint64][]utils.UnstakingOutput{}
 	for _, outpoint := range outpoints {
 		//TODO: handle fee opts
 		// feeOpts := uint64(outpoint.BTCFeeOpts)
 		feeOpts := uint64(utils.MinimumFee)
 		outpoints, ok := mapOutpoints[feeOpts]
 		if !ok {
-			outpoints = []vault.UnstakingOutput{}
+			outpoints = []utils.UnstakingOutput{}
 		}
 		mapOutpoints[feeOpts] = append(outpoints, outpoint.OutPoint)
 	}
 	// space out utxos by fee opts
-	mapUtxos := map[uint64][]vault.PreviousStakingUTXO{}
-	prevUtxos := make([]vault.PreviousStakingUTXO, 0, len(utxos))
+	mapUtxos := map[uint64][]utils.PreviousStakingUTXO{}
+	prevUtxos := make([]utils.PreviousStakingUTXO, 0, len(utxos))
 	for _, utxo := range utxos {
 		txid, err := chainhash.NewHashFromStr(utxo.Txid)
 		if err != nil {
 			return nil, fmt.Errorf("invalid txid %s: %w", utxo.Txid, err)
 		}
-		prevUtxos = append(prevUtxos, vault.PreviousStakingUTXO{
-			OutPoint: vault.OutPoint{
+		prevUtxos = append(prevUtxos, utils.PreviousStakingUTXO{
+			OutPoint: utils.OutPoint{
 				Txid: [32]byte(txid.CloneBytes()),
 				Vout: utxo.Vout,
 			},
