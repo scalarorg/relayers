@@ -111,3 +111,6 @@ type CreatePsbtRequest struct {
 func (p *PsbtParams) GetTaprootAddress() (btcutil.Address, error) {
 	return btc.ScriptPubKeyToAddress(p.CustodianScript, p.NetworkType)
 }
+
+type UnstakedVaultTx struct {
+}

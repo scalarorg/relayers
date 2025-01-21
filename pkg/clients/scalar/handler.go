@@ -47,6 +47,15 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*c
 				Str("Chain", chain).
 				Any("TxResponse", txRes).
 				Msgf("[ScalarClient] [handleTokenSentEvents] failed to sign transfer request.")
+		} else {
+			log.Debug().Msgf("[ScalarClient] [handleTokenSentEvents] Successfully create pending transfer request for chain %s", chain)
+			//Todo: Update token sent status to signing
+			// err = c.dbAdapter.UpdateTokenSentsStatus(chain, chains.ContractCallStatusSigning)
+			// if err != nil {
+			// 	log.Error().Err(err).
+			// 		Str("Chain", chain).
+			// 		Msgf("[ScalarClient] [handleTokenSentEvents] failed to update token sent status")
+			// }
 		}
 	}
 	return nil
@@ -365,7 +374,7 @@ func (c *Client) handleCompletedEvent(ctx context.Context, event *IBCEvent[*chai
 	//2. Update the db
 	err = c.dbAdapter.UpdateEventStatusWithPacketSequence(eventId, status, sequence)
 	if err != nil {
-		return fmt.Errorf("failed to update contract call approved: %w", err)
+		return fmt.Errorf("failed to update Event status: %w", err)
 	}
 	return nil
 }

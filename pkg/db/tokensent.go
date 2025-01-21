@@ -54,3 +54,8 @@ func (db *DatabaseAdapter) SaveTokenSent(tokenSent chains.TokenSent, lastCheckpo
 	}
 	return nil
 }
+
+func (db *DatabaseAdapter) UpdateTokenSentsStatus(chain string, status chains.ContractCallStatus) error {
+	tx := db.PostgresClient.Model(&chains.TokenSent{}).Where("destination_chain = ?", chain).Update("status", status)
+	return tx.Error
+}

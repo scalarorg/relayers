@@ -10,21 +10,30 @@ import (
 	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/go-electrum/electrum/types"
+	relaytypes "github.com/scalarorg/relayers/pkg/types"
 )
 
-func (c *Client) CreateTokenSents(vaultTxs []types.VaultTransaction) []*chains.TokenSent {
+func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chains.TokenSent, []*relaytypes.UnstakedVaultTx) {
 	tokenSents := []*chains.TokenSent{}
+	unstakedVaultTxs := []*relaytypes.UnstakedVaultTx{}
 	for _, vaultTx := range vaultTxs {
-		tokenSent, err := c.CreateTokenSent(vaultTx)
-		if err != nil {
-			log.Error().Err(err).Any("VaultTx", vaultTx).Msgf("[ElectrumClient] [CreateTokenSents] failed to create token sent: %v", vaultTx)
-		} else if tokenSent.Symbol == "" {
-			log.Error().Msgf("[ElectrumClient] [CreateTokenSents] symbol not found for token: %s", vaultTx.DestTokenAddress)
-		} else {
-			tokenSents = append(tokenSents, &tokenSent)
+		if vaultTx.VaultTxType == 1 {
+			//1.Staking
+			tokenSent, err := c.CreateTokenSent(vaultTx)
+			if err != nil {
+				log.Error().Err(err).Any("VaultTx", vaultTx).Msgf("[ElectrumClient] [CreateTokenSents] failed to create token sent: %v", vaultTx)
+			} else if tokenSent.Symbol == "" {
+				log.Error().Msgf("[ElectrumClient] [CreateTokenSents] symbol not found for token: %s", vaultTx.DestTokenAddress)
+			} else {
+				tokenSents = append(tokenSents, &tokenSent)
+			}
+		} else if vaultTx.VaultTxType == 2 {
+			//2.Unstaking
+			unstakedVaultTx := c.CreateUnstakedVaultTx(vaultTx)
+			unstakedVaultTxs = append(unstakedVaultTxs, unstakedVaultTx)
 		}
 	}
-	return tokenSents
+	return tokenSents, unstakedVaultTxs
 }
 
 func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (chains.TokenSent, error) {
@@ -76,4 +85,8 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (chains.TokenSe
 	// relayData.CallContract.Payload = payloadBytes
 	// relayData.CallContract.PayloadHash = strings.ToLower(payloadHash)
 	return tokenSent, nil
+}
+
+func (c *Client) CreateUnstakedVaultTx(vaultTx types.VaultTransaction) *relaytypes.UnstakedVaultTx {
+	return &relaytypes.UnstakedVaultTx{}
 }

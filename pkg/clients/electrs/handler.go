@@ -7,6 +7,7 @@ import (
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/go-electrum/electrum/types"
 	"github.com/scalarorg/relayers/pkg/events"
+	pkgtypes "github.com/scalarorg/relayers/pkg/types"
 )
 
 func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err error) error {
@@ -65,8 +66,8 @@ func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 		return nil
 	}
 	c.PreProcessVaultsMessages(vaultTxs)
-	//1. parse vault transactions to relay data
-	tokenSents := c.CreateTokenSents(vaultTxs)
+	//1. parse vault transactions to token sent and unstaked vault txs
+	tokenSents, unstakedVaultTxs := c.CategorizeVaultTxs(vaultTxs)
 	if len(tokenSents) == 0 {
 		log.Warn().Msg("No Valid vault transactions to convert to relay data")
 		return nil
@@ -84,6 +85,7 @@ func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 			lastCheckpoint.EventKey = tx.Key
 		}
 	}
+	err = c.UpdateUnstakedVaultTxs(unstakedVaultTxs)
 	confirmTxs := events.ConfirmTxsRequest{
 		ChainName: c.electrumConfig.SourceChain,
 		TxHashs:   make(map[string]string),
@@ -131,5 +133,10 @@ func (c *Client) PreProcessVaultsMessages(vaultTxs []types.VaultTransaction) err
 	for _, vaultTx := range vaultTxs {
 		log.Debug().Msgf("Received vaultTx with key=>%v; stakerAddress=>%v; stakerPubkey=>%v", vaultTx.Key, vaultTx.StakerAddress, vaultTx.StakerPubkey)
 	}
+	return nil
+}
+
+// Todo: update ContractCallWithToken status with execution confirmation from bitcoin network
+func (c *Client) UpdateUnstakedVaultTxs(unstakedVaultTxs []*pkgtypes.UnstakedVaultTx) error {
 	return nil
 }

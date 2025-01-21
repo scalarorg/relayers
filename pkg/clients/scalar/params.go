@@ -46,7 +46,7 @@ func (c *Client) GetPsbtParams(chainName string) types.PsbtParams {
 	if err != nil {
 		log.Error().Err(err).Msgf("[ScalarClient] [GetPsbtParams] cannot get protocols")
 	}
-	if len(protocols.Protocols) == 0 {
+	if protocols == nil || len(protocols.Protocols) == 0 {
 		log.Error().Msgf("[ScalarClient] [GetPsbtParams] no protocols found")
 	} else {
 		//Get first protocol

@@ -8,7 +8,7 @@ import (
 )
 
 func (c *Client) handleNewBlockEvents(ctx context.Context, events map[string][]string) error {
-	log.Debug().Msgf("[ScalarClient] [handleNewBlockEvents] events: %d", len(events))
+	log.Info().Msgf("[ScalarClient] [handleNewBlockEvents] events: %d", len(events))
 	//Try parse tokenSentEvent
 	err := c.tryHandleTokenSentEvents(ctx, events)
 	if err != nil {

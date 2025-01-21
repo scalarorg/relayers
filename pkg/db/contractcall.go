@@ -34,6 +34,7 @@ func (db *DatabaseAdapter) FindCallContractPayloadByEventId(eventId string) (*ch
 	var contractCall chains.ContractCall
 	result := db.PostgresClient.Where("event_id = ?", eventId).First(&contractCall)
 	if result.Error != nil {
+		log.Error().Err(result.Error).Str("EventId", eventId).Msg("[DatabaseAdapter] [FindCallContractPayloadByEventId] failed to find contract call by event id")
 		return nil, result.Error
 	}
 	return &contractCall, nil
