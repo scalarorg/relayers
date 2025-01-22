@@ -93,7 +93,7 @@ func UnmarshalTokenSent(jsonData map[string]string, e *types.EventTokenSent) err
 	e.DestinationChain = exported.ChainName(removeQuote(jsonData["destination_chain"]))
 	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
 	e.EventID = types.EventID(eventId)
-	transferId, ok := sdk.NewIntFromString(jsonData["transfer_id"])
+	transferId, ok := sdk.NewIntFromString(removeQuote(jsonData["transfer_id"]))
 	if ok {
 		e.TransferID = exported.TransferID(transferId.Uint64())
 	}
