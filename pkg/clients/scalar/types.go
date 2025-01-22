@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -78,8 +79,8 @@ func UnamrshalAsset(jsonData string) (sdk.Coin, error) {
 		log.Debug().Err(err).Msg("Cannot unmarshalling coin data")
 		return sdk.NewCoin("", sdk.NewInt(0)), err
 	}
-	denom := rawCoin["denom"]
-	amount, ok := sdk.NewIntFromString(rawCoin["amount"])
+	denom := removeQuote(rawCoin["denom"])
+	amount, ok := sdk.NewIntFromString(removeQuote(rawCoin["amount"]))
 	if !ok {
 		amount = sdk.NewInt(0)
 	}
@@ -90,7 +91,8 @@ func UnmarshalTokenSent(jsonData map[string]string, e *types.EventTokenSent) err
 	e.Sender = removeQuote(jsonData["sender"])
 	e.DestinationAddress = removeQuote(jsonData["destination_address"])
 	e.DestinationChain = exported.ChainName(removeQuote(jsonData["destination_chain"]))
-	e.EventID = types.EventID(removeQuote(jsonData["event_id"]))
+	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
+	e.EventID = types.EventID(eventId)
 	transferId, ok := sdk.NewIntFromString(jsonData["transfer_id"])
 	if ok {
 		e.TransferID = exported.TransferID(transferId.Uint64())
@@ -105,15 +107,17 @@ func UnmarshalTokenSent(jsonData map[string]string, e *types.EventTokenSent) err
 // {"asset":"{\"denom\":\"pBtc\",\"amount\":\"10000\"}","chain":"\"evm|11155111\"","destination_address":"\"0x982321eb5693cdbAadFfe97056BEce07D09Ba49f\"","destination_chain":"\"evm|97\"","event_id":"\"0x620bc60a616248eaf0a9f5b7e45db3f96eca31420c581034a6c59669cefb7de1-240\"","sender":"\"0x982321eb5693cdbAadFfe97056BEce07D09Ba49f\"","transfer_id":"\"0\""}
 
 func UnmarshalChainEventCompleted(jsonData map[string]string, e *types.ChainEventCompleted) error {
-	e.Chain = exported.ChainName(jsonData["chain"])
-	e.EventID = types.EventID(jsonData["event_id"])
-	e.Type = jsonData["type"]
+	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
+	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
+	e.EventID = types.EventID(eventId)
+	e.Type = removeQuote(jsonData["type"])
 	return nil
 }
 
 func UnmarshalContractCallApproved(jsonData map[string]string, e *types.ContractCallApproved) error {
 	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
-	e.EventID = types.EventID(removeQuote(jsonData["event_id"]))
+	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
+	e.EventID = types.EventID(eventId)
 	commandIDHex, err := DecodeIntArrayToHexString(jsonData["command_id"])
 	if err != nil {
 		log.Warn().Msgf("Failed to decode command ID: %v, error: %v", jsonData["command_id"], err)
@@ -123,7 +127,7 @@ func UnmarshalContractCallApproved(jsonData map[string]string, e *types.Contract
 	e.DestinationChain = exported.ChainName(removeQuote(jsonData["destination_chain"]))
 	e.ContractAddress = removeQuote(jsonData["contract_address"])
 
-	payloadHex, err := DecodeIntArrayToHexString(jsonData["payload_hash"])
+	payloadHex, err := DecodeIntArrayToHexString(removeQuote(jsonData["payload_hash"]))
 	if err != nil {
 		log.Warn().Msgf("Failed to decode payload hash: %v, error: %v", jsonData["payload_hash"], err)
 	}
@@ -135,7 +139,8 @@ func UnmarshalContractCallApproved(jsonData map[string]string, e *types.Contract
 
 func UnmarshalContractCallWithMintApproved(jsonData map[string]string, e *types.EventContractCallWithMintApproved) error {
 	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
-	e.EventID = types.EventID(removeQuote(jsonData["event_id"]))
+	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
+	e.EventID = types.EventID(eventId)
 	commandIDHex, err := DecodeIntArrayToHexString(jsonData["command_id"])
 	if err != nil {
 		log.Warn().Msgf("Failed to decode command ID: %v, error: %v", jsonData["command_id"], err)

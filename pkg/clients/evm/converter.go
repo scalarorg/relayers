@@ -81,7 +81,7 @@ func (c *EvmClient) TokenSentEvent2Model(event *contracts.IScalarGatewayTokenSen
 	tokenSent := chains.TokenSent{
 		EventID:     eventId,
 		SourceChain: c.evmConfig.GetId(),
-		TxHash:      event.Raw.TxHash.String(),
+		TxHash:      strings.TrimPrefix(event.Raw.TxHash.String(), "0x"),
 		BlockNumber: event.Raw.BlockNumber,
 		LogIndex:    event.Raw.Index,
 		//3 follows field are used for query to get back payload, so need to convert to lower case

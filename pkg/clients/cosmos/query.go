@@ -105,6 +105,22 @@ func (c *QueryClient) QueryBatchedCommands(ctx context.Context, destinationChain
 	return resp, nil
 }
 
+func (c *QueryClient) QueryCommand(ctx context.Context, destinationChain string, commandId string) (*chainstypes.CommandResponse, error) {
+	req := &chainstypes.CommandRequest{
+		Chain: destinationChain,
+		ID:    commandId,
+	}
+	client, err := c.GetChainQueryServiceClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service client: %w", err)
+	}
+	resp, err := client.Command(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query batched commands: %w", err)
+	}
+	return resp, nil
+}
+
 func (c *QueryClient) QueryPendingCommands(ctx context.Context, destinationChain string) ([]chainstypes.QueryCommandResponse, error) {
 	req := &chainstypes.PendingCommandsRequest{
 		Chain: destinationChain,

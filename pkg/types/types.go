@@ -4,8 +4,8 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/scalarorg/bitcoin-vault/ffi/go-vault"
 	"github.com/scalarorg/bitcoin-vault/go-utils/btc"
+	"github.com/scalarorg/bitcoin-vault/go-utils/types"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
@@ -91,9 +91,9 @@ type PsbtParams struct {
 	ScalarTag       []byte
 	Version         uint8
 	ProtocolTag     []byte
-	NetworkKind     vault.NetworkKind //mainnet, testnet
+	NetworkKind     types.NetworkKind //mainnet, testnet
 	NetworkType     string            //mainnet, testnet, testnet4, regtest
-	CustodianPubKey []vault.PublicKey
+	CustodianPubKey []types.PublicKey
 	CustodianQuorum uint8
 	CustodianScript []byte
 }
@@ -110,4 +110,7 @@ type CreatePsbtRequest struct {
 // Calculate taproot address from covenant pubkey and network
 func (p *PsbtParams) GetTaprootAddress() (btcutil.Address, error) {
 	return btc.ScriptPubKeyToAddress(p.CustodianScript, p.NetworkType)
+}
+
+type UnstakedVaultTx struct {
 }

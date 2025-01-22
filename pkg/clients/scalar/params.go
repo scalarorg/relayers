@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/bitcoin-vault/ffi/go-vault"
+	utils "github.com/scalarorg/bitcoin-vault/go-utils/types"
 	"github.com/scalarorg/relayers/pkg/types"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	protypes "github.com/scalarorg/scalar-core/x/protocol/types"
@@ -35,7 +35,7 @@ func (c *Client) GetPsbtParams(chainName string) types.PsbtParams {
 	if err != nil {
 		log.Error().Msgf("[ScalarClient] [GetPsbtParams] error: %v", err)
 	}
-	params.NetworkKind = vault.NetworkKind(chainRes.Params.NetworkKind)
+	params.NetworkKind = utils.NetworkKind(chainRes.Params.NetworkKind)
 	params.NetworkType = chainRes.Params.Metadata["params"]
 	//3. Get protocol params
 	protocolClient, err := c.GetQueryClient().GetProtocolQueryClient()
@@ -46,14 +46,14 @@ func (c *Client) GetPsbtParams(chainName string) types.PsbtParams {
 	if err != nil {
 		log.Error().Err(err).Msgf("[ScalarClient] [GetPsbtParams] cannot get protocols")
 	}
-	if len(protocols.Protocols) == 0 {
+	if protocols == nil || len(protocols.Protocols) == 0 {
 		log.Error().Msgf("[ScalarClient] [GetPsbtParams] no protocols found")
 	} else {
 		//Get first protocol
 		protocol := protocols.Protocols[0]
-		params.CustodianPubKey = make([]vault.PublicKey, len(protocol.CustodianGroup.Custodians))
+		params.CustodianPubKey = make([]utils.PublicKey, len(protocol.CustodianGroup.Custodians))
 		for i, custodian := range protocol.CustodianGroup.Custodians {
-			params.CustodianPubKey[i] = vault.PublicKey(custodian.BtcPubkey)
+			params.CustodianPubKey[i] = utils.PublicKey(custodian.BtcPubkey)
 		}
 		params.CustodianQuorum = uint8(protocol.CustodianGroup.Quorum)
 		params.CustodianScript = protocol.CustodianGroup.BtcPubkey

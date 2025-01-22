@@ -3,6 +3,7 @@ package scalar
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -82,7 +83,12 @@ func (c *Client) checkChainPendingCommands(ctx context.Context, chain string) bo
 	if len(pendingCommands) == 0 {
 		return false
 	}
+	//Store pending commands to db
 	log.Debug().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] found pending commands")
+	err = c.StorePendingCommands(ctx, chain, pendingCommands)
+	if err != nil {
+		log.Error().Err(err).Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] failed to store pending commands")
+	}
 	//1. Sign the commands request
 	nexusChain := exported.ChainName(chain)
 	if chainstypes.IsEvmChain(nexusChain) {
@@ -174,6 +180,7 @@ func (c *Client) processBatchCommands(ctx context.Context) {
 					Str("Chain", destChain).
 					Any("BatchCommandResponse", res).
 					Msg("[ScalarClient] [processBatchCommands] Found batchCommand response. Broadcast to eventBus")
+				c.UpdateBatchCommandSigned(ctx, destChain, res)
 				eventEnvelope := events.EventEnvelope{
 					EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
 					DestinationChain: destChain,
@@ -243,6 +250,20 @@ func (c *Client) checkLatestBatchCommandIsSigning(ctx context.Context, chain str
 	} else {
 		return res.Status == chainstypes.BatchSigning
 	}
+}
+func (c *Client) StorePendingCommands(ctx context.Context, chain string, pendingCommands []chainstypes.QueryCommandResponse) error {
+	return nil
+}
+func (c *Client) UpdateBatchCommandSigned(ctx context.Context, destChain string, batchCmds *chainstypes.BatchedCommandsResponse) error {
+	for _, cmdId := range batchCmds.CommandIDs {
+		cmdRes, err := c.queryClient.QueryCommand(ctx, destChain, cmdId)
+		if err != nil {
+			return fmt.Errorf("[ScalarClient] [UpdateBatchCommandSigned] failed to get command by ID: %w", err)
+		}
+		//Todo: Update command status to signed
+		log.Debug().Str("CommandId", cmdId).Any("Command", cmdRes).Msg("Command response")
+	}
+	return nil
 }
 
 // func (c *Client) processPendingCommandsForChain(ctx context.Context, destChain string) error {
