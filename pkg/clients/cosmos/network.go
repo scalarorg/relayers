@@ -186,15 +186,27 @@ func (c *NetworkClient) ConfirmEvmTx(ctx context.Context, msg *chainstypes.Confi
 	return c.SignAndBroadcastMsgs(ctx, msg)
 }
 
-func (c *NetworkClient) SignBtcCommandsRequest(ctx context.Context, destinationChain string, psbt covtypes.Psbt) (*sdk.TxResponse, error) {
-	req := chainstypes.NewSignBTCCommandsRequest(
+func (c *NetworkClient) SignPsbtCommandsRequest(ctx context.Context, destinationChain string, psbt covtypes.Psbt) (*sdk.TxResponse, error) {
+	req := chainstypes.NewSignPsbtCommandRequest(
 		c.GetAddress(),
 		destinationChain,
 		psbt)
 
 	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("[NetworkClient] [SignCommandsRequest] %w", err)
+		return nil, fmt.Errorf("[NetworkClient] [SignPsbtCommandsRequest] %w", err)
+	}
+	return txRes, nil
+}
+
+func (c *NetworkClient) SignBtcCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
+	req := chainstypes.NewSignBtcCommandsRequest(
+		c.GetAddress(),
+		destinationChain)
+
+	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("[NetworkClient] [SignBtcCommandsRequest] %w", err)
 	}
 	return txRes, nil
 }
@@ -217,9 +229,7 @@ func (c *NetworkClient) SignCommandsRequests(ctx context.Context, destinationCha
 		if chainstypes.IsEvmChain(chainName) {
 			requests = append(requests, chainstypes.NewSignCommandsRequest(c.GetAddress(), chain))
 		} else if chainstypes.IsBitcoinChain(chainName) {
-			//Todo: Form psbt
-			var psbt covtypes.Psbt
-			requests = append(requests, chainstypes.NewSignBTCCommandsRequest(c.GetAddress(), chain, psbt))
+			requests = append(requests, chainstypes.NewSignBtcCommandsRequest(c.GetAddress(), chain))
 		}
 	}
 	txRes, err := c.SignAndBroadcastMsgs(ctx, requests...)

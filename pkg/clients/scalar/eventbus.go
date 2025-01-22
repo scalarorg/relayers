@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
-	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
 
 func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
@@ -56,13 +55,7 @@ func (c *Client) requestConfirmEvmTxs(confirmRequest events.ConfirmTxsRequest) e
 // Add psbts to pendingChainPsbtCommands
 func (c *Client) requestPsbtSign(psbt types.SignPsbtsRequest) error {
 	log.Debug().Str("ChainName", psbt.ChainName).Int("psbtCount", len(psbt.Psbts)).Msgf("[ScalarClient] [requestPsbtSign] Set psbts to pendingChainPsbtCommands")
-	pendingPsbt, ok := c.pendingPsbtCommands.Load(psbt.ChainName)
-	if ok {
-		newPsbts := append(pendingPsbt.([]covtypes.Psbt), psbt.Psbts...)
-		c.pendingPsbtCommands.Store(psbt.ChainName, newPsbts)
-	} else {
-		c.pendingPsbtCommands.Store(psbt.ChainName, psbt.Psbts)
-	}
+	c.appendPendingPsbt(psbt.ChainName, psbt.Psbts)
 	return nil
 }
 

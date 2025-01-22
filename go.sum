@@ -1468,6 +1468,8 @@ github.com/scalarorg/go-electrum v0.1.2-0.20250113074812-84502fb16a1a h1:nChfsP2
 github.com/scalarorg/go-electrum v0.1.2-0.20250113074812-84502fb16a1a/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250121140712-c0ce42f5bb5a h1:6ut3hoE07WpMD0P9GriguJeUJZfdmErQpiytlkYPJEQ=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250121140712-c0ce42f5bb5a/go.mod h1:N0RroQWTohaMpPy8jnpB+o+h0G4TFPjOH6dgvhbnU5g=
+github.com/scalarorg/scalar-core v0.0.1-staking.0.20250122085259-5093daddc330 h1:UFMctYhmCWu/Z8aRiYnZDqD39TCxHMoocBWIX+bp15A=
+github.com/scalarorg/scalar-core v0.0.1-staking.0.20250122085259-5093daddc330/go.mod h1:06kHV3btOUpeZ8q7eXfG/6kxKhd44n8RvtU2h4gBLig=
 github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible h1:Bn1aCHHRnjv4Bl16T8rcaFjYSrGrIZvpiGO6P3Q4GpU=
 github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible/go.mod h1:5b4v6he4MtMOwMlS0TUMTu2PcXUg8+E1lC7eC3UO/RA=
 github.com/shirou/gopsutil/v3 v3.23.12 h1:z90NtUkp3bMtmICZKpC4+WaknU1eXtp5vtbQ11DgpE4=

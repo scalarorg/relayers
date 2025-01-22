@@ -14,7 +14,7 @@ import (
 * Create psbt based on taproot address and query command response as utxo output
 * Todo: Seperate psbt by params: feeOpts, rbf
  */
-func (c *BtcClient) CreatePsbts(psbtParams types.PsbtParams, outpoints []CommandOutPoint) ([]covtypes.Psbt, error) {
+func (c *BtcClient) CreatePsbts(psbtParams types.PsbtParams, outpoints []types.CommandOutPoint) ([]covtypes.Psbt, error) {
 	//Todo: handle custom replace by fee
 	replaceByFee := false
 	psbts := []covtypes.Psbt{}

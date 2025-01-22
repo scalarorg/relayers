@@ -1,5 +1,7 @@
 package types
 
+import "github.com/scalarorg/bitcoin-vault/go-utils/types"
+
 type BtcTransaction struct {
 	EventType                   int    `json:"event_type"`
 	VaultTxHashHex              string `json:"vault_tx_hash_hex"`
@@ -31,4 +33,10 @@ type BtcEventTransaction struct {
 	Args                       BtcTransaction `json:"args"`
 	StakerPublicKey            string         `json:"stakerPublicKey"`
 	VaultTxHex                 string         `json:"vaultTxHex"`
+}
+
+type CommandOutPoint struct {
+	BTCFeeOpts types.BTCFeeOpts
+	RBF        bool
+	OutPoint   types.UnstakingOutput
 }
