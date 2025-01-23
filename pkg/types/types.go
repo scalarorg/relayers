@@ -112,4 +112,7 @@ func (p *PsbtParams) GetTaprootAddress() (btcutil.Address, error) {
 }
 
 type UnstakedVaultTx struct {
+	BlockHeight uint64
+	TxHash      string
+	LogIndex    uint
 }

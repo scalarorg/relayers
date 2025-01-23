@@ -68,12 +68,6 @@ func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	c.PreProcessVaultsMessages(vaultTxs)
 	//1. parse vault transactions to token sent and unstaked vault txs
 	tokenSents, unstakedVaultTxs := c.CategorizeVaultTxs(vaultTxs)
-	if len(tokenSents) == 0 {
-		log.Warn().Msg("No Valid vault transactions to convert to relay data")
-		return nil
-	} else {
-		log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [VaultTxMessageHandler] Received %d validvault transactions", len(tokenSents))
-	}
 	//2. update last checkpoint
 	lastCheckpoint := c.getLastCheckpoint()
 	for _, tx := range vaultTxs {
@@ -85,7 +79,41 @@ func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 			lastCheckpoint.EventKey = tx.Key
 		}
 	}
-	err = c.UpdateUnstakedVaultTxs(unstakedVaultTxs)
+	err = c.dbAdapter.UpdateLastEventCheckPoint(lastCheckpoint)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to update last event checkpoint")
+	}
+	if len(tokenSents) == 0 {
+		log.Warn().Msg("No Valid vault transactions to convert to relay data")
+	} else {
+		log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [VaultTxMessageHandler] Received %d validvault transactions", len(tokenSents))
+	}
+	if len(unstakedVaultTxs) > 0 {
+		err = c.UpdateUnstakedVaultTxs(unstakedVaultTxs)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to update unstaked vault transactions")
+		}
+	}
+	if len(tokenSents) > 0 {
+		err := c.handleTokenSents(tokenSents)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to handle token sents")
+		}
+		return err
+	}
+	return nil
+}
+
+// Todo: Log and validate incomming message
+func (c *Client) PreProcessVaultsMessages(vaultTxs []types.VaultTransaction) error {
+	log.Info().Msgf("Received %d vault transactions", len(vaultTxs))
+	for _, vaultTx := range vaultTxs {
+		log.Debug().Msgf("Received vaultTx with key=>%v; stakerAddress=>%v; stakerPubkey=>%v", vaultTx.Key, vaultTx.StakerAddress, vaultTx.StakerPubkey)
+	}
+	return nil
+}
+func (c *Client) handleTokenSents(tokenSents []*chains.TokenSent) error {
+	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [handleTokenSents] Received %d validvault transactions", len(tokenSents))
 	confirmTxs := events.ConfirmTxsRequest{
 		ChainName: c.electrumConfig.SourceChain,
 		TxHashs:   make(map[string]string),
@@ -100,12 +128,7 @@ func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	}
 
 	//3. store relay data to the db, update last checkpoint
-	if len(tokenSents) > 0 {
-		err = c.dbAdapter.SaveValuesWithCheckpoint(tokenSents, lastCheckpoint)
-	} else {
-		log.Warn().Msg("No Valid vault transactions to store to the db, update last checkpoint only")
-		err = c.dbAdapter.UpdateLastEventCheckPoint(lastCheckpoint)
-	}
+	err := c.dbAdapter.SaveTokenSents(tokenSents)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to store relay data to the db")
 		return fmt.Errorf("failed to store relay data to the db: %w", err)
@@ -123,20 +146,16 @@ func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 			log.Warn().Msg("[ElectrumClient] [vaultTxMessageHandler] event bus is undefined")
 		}
 	}
-
-	return nil
-}
-
-// Todo: Log and validate incomming message
-func (c *Client) PreProcessVaultsMessages(vaultTxs []types.VaultTransaction) error {
-	log.Info().Msgf("Received %d vault transactions", len(vaultTxs))
-	for _, vaultTx := range vaultTxs {
-		log.Debug().Msgf("Received vaultTx with key=>%v; stakerAddress=>%v; stakerPubkey=>%v", vaultTx.Key, vaultTx.StakerAddress, vaultTx.StakerPubkey)
-	}
 	return nil
 }
 
 // Todo: update ContractCallWithToken status with execution confirmation from bitcoin network
 func (c *Client) UpdateUnstakedVaultTxs(unstakedVaultTxs []*pkgtypes.UnstakedVaultTx) error {
+	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [UpdateUnstakedVaultTxs] Received %d validvault transactions", len(unstakedVaultTxs))
+	txHashes := make([]string, len(unstakedVaultTxs))
+	for i, tx := range unstakedVaultTxs {
+		txHashes[i] = tx.TxHash
+	}
+	c.dbAdapter.UpdateBtcExecutedCommands(c.electrumConfig.SourceChain, txHashes)
 	return nil
 }

@@ -30,7 +30,7 @@ func (c *EvmClient) ContractCallEvent2Model(event *contracts.IScalarGatewayContr
 	eventId = strings.TrimPrefix(eventId, "0x")
 	senderAddress := event.Sender.String()
 	contractCall := chains.ContractCall{
-		EventId:     eventId,
+		EventID:     eventId,
 		TxHash:      event.Raw.TxHash.String(),
 		BlockNumber: event.Raw.BlockNumber,
 		LogIndex:    event.Raw.Index,
@@ -49,7 +49,7 @@ func (c *EvmClient) ContractCallWithToken2Model(event *contracts.IScalarGatewayC
 	eventId := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
 	senderAddress := event.Sender.String()
 	callContract := chains.ContractCall{
-		EventId:     eventId,
+		EventID:     eventId,
 		TxHash:      event.Raw.TxHash.String(),
 		BlockNumber: event.Raw.BlockNumber,
 		LogIndex:    event.Raw.Index,

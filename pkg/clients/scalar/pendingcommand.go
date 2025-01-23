@@ -3,6 +3,7 @@ package scalar
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -12,6 +13,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/bitcoin-vault/go-utils/encode"
 	utiltypes "github.com/scalarorg/bitcoin-vault/go-utils/types"
+	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
 	"github.com/scalarorg/relayers/pkg/utils"
@@ -323,15 +326,51 @@ func (c *Client) StorePendingCommands(ctx context.Context, chain string, pending
 	return nil
 }
 func (c *Client) UpdateBatchCommandSigned(ctx context.Context, destChain string, batchCmds *chainstypes.BatchedCommandsResponse) error {
+	commandByType := map[string][]string{}
+	commands := []*scalarnet.Command{}
 	for _, cmdId := range batchCmds.CommandIDs {
 		cmdRes, err := c.queryClient.QueryCommand(ctx, destChain, cmdId)
-		if err != nil {
+		if err == nil {
+			log.Debug().Str("CommandId", cmdId).Any("Command", cmdRes).Msg("[ScalarClient] [UpdateBatchCommandSigned] found command")
+			cmds, ok := commandByType[cmdRes.Type]
+			if !ok {
+				commandByType[cmdRes.Type] = []string{cmdId}
+			} else {
+				commandByType[cmdRes.Type] = append(cmds, cmdId)
+			}
+			commands = append(commands, CommandResponse2Model(destChain, batchCmds.ID, cmdRes))
+		} else {
 			return fmt.Errorf("[ScalarClient] [UpdateBatchCommandSigned] failed to get command by ID: %w", err)
+
 		}
-		//Todo: Update command status to signed
 		log.Debug().Str("CommandId", cmdId).Any("Command", cmdRes).Msg("Command response")
 	}
+	for cmdType, cmdIds := range commandByType {
+		switch cmdType {
+		case "approveContractCallWithMint":
+			c.dbAdapter.UpdateContractCallWithMintsStatus(ctx, cmdIds, chains.TokenSentStatusExecuting)
+		case "mintToken":
+			c.dbAdapter.UpdateTokenSentsStatus(ctx, cmdIds, chains.TokenSentStatusExecuting)
+		}
+	}
+	c.dbAdapter.SaveCommands(commands)
 	return nil
+}
+
+func CommandResponse2Model(chainId string, batchCommandId string, command *chainstypes.CommandResponse) *scalarnet.Command {
+	params, err := json.Marshal(command.Params)
+	if err != nil {
+		log.Error().Err(err).Msg("[ScalarClient] [CommandResponse2Model] failed to marshal command params")
+	}
+	return &scalarnet.Command{
+		CommandID:      command.ID,
+		BatchCommandID: batchCommandId,
+		ChainID:        chainId,
+		Params:         string(params),
+		KeyID:          command.KeyID,
+		CommandType:    command.Type,
+		Status:         scalarnet.CommandPending,
+	}
 }
 
 // func (c *Client) processPendingCommandsForChain(ctx context.Context, destChain string) error {

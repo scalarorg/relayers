@@ -51,6 +51,7 @@ func TestMain(m *testing.M) {
 		btcConfig,
 		dbAdapter,
 		eventBus,
+		nil,
 	)
 	os.Exit(m.Run())
 }

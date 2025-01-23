@@ -30,14 +30,14 @@ func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress str
 	return response.Asset, nil
 }
 
-func (c *Client) GetCommand(sourceChain string, commandId string) (*chainstypes.CommandResponse, error) {
+func (c *Client) GetCommand(chainName string, commandId string) (*chainstypes.CommandResponse, error) {
 	client, err := c.queryClient.GetChainQueryServiceClient()
 	if err != nil {
 		log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
 		return nil, err
 	}
 	commandRequest := chainstypes.CommandRequest{
-		Chain: sourceChain,
+		Chain: chainName,
 		ID:    commandId,
 	}
 	response, err := client.Command(context.Background(), &commandRequest)

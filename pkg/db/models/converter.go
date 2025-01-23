@@ -57,6 +57,7 @@ func EventTokenSent2Model(event *types.EventTokenSent) scalarnet.TokenSentApprov
 	eventId := strings.TrimPrefix(string(event.EventID), "0x")
 	model := scalarnet.TokenSentApproved{
 		EventID:            eventId,
+		CommandId:          event.CommandID,
 		TransferID:         uint64(event.TransferID),
 		SourceChain:        string(event.Chain),
 		SourceAddress:      event.Sender,

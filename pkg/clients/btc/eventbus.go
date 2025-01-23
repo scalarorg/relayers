@@ -105,13 +105,14 @@ func (c *BtcClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRes
 	}
 	txHashStr := txHash.String()
 	log.Debug().Msgf("[BtcClient] [handleScalarBatchCommandSigned] broadcasted txHash: %s", txHashStr)
-	// err = c.dbAdapter.UpdateRelayDataStatueWithExecuteHash(messageID, relaydata.SUCCESS, &txHashStr)
-	// if err != nil {
-	// 	log.Error().Err(err).
-	// 		Str("messageID", messageID).
-	// 		Str("signedPsbt", signedPsbt).
-	// 		Msg("[BtcClient] [handleCustodialSignaturesConfirmed] failed to update relay data status")
-	// }
+	err = c.dbAdapter.UpdateBroadcastedCommands(chainId, batchedCmdRes.ID, batchedCmdRes.CommandIDs, txHashStr)
+	if err != nil {
+		log.Error().Err(err).
+			Str("TxHash", txHashStr).
+			Str("ChainId", chainId).
+			Str("BatchedCommandID", batchedCmdRes.ID).
+			Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to update source event status")
+	}
 	return nil
 }
 func (c *BtcClient) executeBtcCommand(messageID string, commandId [32]byte, command string, params []byte) error {

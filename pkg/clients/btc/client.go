@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
+	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 )
@@ -20,6 +21,7 @@ type BtcClient struct {
 	globalConfig *config.Config
 	btcConfig    *BtcNetworkConfig
 	client       *rpcclient.Client
+	scalarClient *scalar.Client
 	dbAdapter    *db.DatabaseAdapter
 	eventBus     *events.EventBus
 }
@@ -29,7 +31,7 @@ type BtcClientInterface interface {
 	TestMempoolAccept(txs []*wire.MsgTx, maxFeeRatePerKb float64) ([]*btcjson.TestMempoolAcceptResult, error)
 }
 
-func NewBtcClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) ([]*BtcClient, error) {
+func NewBtcClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus, scalarClient *scalar.Client) ([]*BtcClient, error) {
 	// Read Scalar config from JSON file
 	if globalConfig == nil || globalConfig.ConfigPath == "" {
 		return nil, fmt.Errorf("btc config path is not set")
@@ -55,7 +57,7 @@ func NewBtcClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 		if btcConfig.MaxFeeRate == 0 {
 			btcConfig.MaxFeeRate = 0.10
 		}
-		client, err := NewBtcClientFromConfig(globalConfig, &btcConfig, dbAdapter, eventBus)
+		client, err := NewBtcClientFromConfig(globalConfig, &btcConfig, dbAdapter, eventBus, scalarClient)
 		if err != nil {
 			log.Warn().Msgf("Failed to create btc client for %s: %v", btcConfig.Name, err)
 			continue
@@ -66,7 +68,7 @@ func NewBtcClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 	return btcClients, nil
 }
 
-func NewBtcClientFromConfig(globalConfig *config.Config, btcConfig *BtcNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus) (*BtcClient, error) {
+func NewBtcClientFromConfig(globalConfig *config.Config, btcConfig *BtcNetworkConfig, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus, scalarClient *scalar.Client) (*BtcClient, error) {
 	// Configure connection
 	connCfg := &rpcclient.ConnConfig{
 		Host:         fmt.Sprintf("%s:%d", btcConfig.Host, btcConfig.Port),
@@ -85,6 +87,7 @@ func NewBtcClientFromConfig(globalConfig *config.Config, btcConfig *BtcNetworkCo
 		globalConfig: globalConfig,
 		btcConfig:    btcConfig,
 		client:       client,
+		scalarClient: scalarClient,
 		dbAdapter:    dbAdapter,
 		eventBus:     eventBus,
 	}

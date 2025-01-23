@@ -132,11 +132,24 @@ func NewDatabaseAdapter(config *config.Config) (*DatabaseAdapter, error) {
 // 	}
 // }
 
-// func (da *DatabaseAdapter) SendEvent(event *types.EventEnvelope) {
-// 	da.BusEventChan <- event
-// 	log.Debug().Msgf("[DatabaseAdapter] Sent event to channel: %v", event.Handler)
-// }
-
+//	func (da *DatabaseAdapter) SendEvent(event *types.EventEnvelope) {
+//		da.BusEventChan <- event
+//		log.Debug().Msgf("[DatabaseAdapter] Sent event to channel: %v", event.Handler)
+//	}
+func AutoMigrate(db *gorm.DB) error {
+	return db.AutoMigrate(
+		&chains.TokenSent{},
+		&chains.MintCommand{},
+		&chains.CommandExecuted{},
+		&chains.ContractCall{},
+		&chains.ContractCallWithToken{},
+		&scalarnet.Command{},
+		&scalarnet.CallContractWithToken{},
+		&scalarnet.TokenSentApproved{},
+		&scalarnet.ContractCallApprovedWithMint{},
+		&scalarnet.EventCheckPoint{},
+	)
+}
 func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
 	if config == nil || config.ConnnectionString == "" {
 		return nil, fmt.Errorf("config is nil or connnection string is empty")
@@ -147,19 +160,7 @@ func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
 	}
 
 	// Auto Migrate the schema
-	err = db.AutoMigrate(
-		&chains.TokenSent{},
-		&chains.MintCommand{},
-		&chains.CommandExecuted{},
-		&chains.ContractCall{},
-		&chains.ContractCallWithToken{},
-		&scalarnet.CallContract{},
-		&scalarnet.CallContractWithToken{},
-		&scalarnet.TokenSentApproved{},
-		&scalarnet.ContractCallApproved{},
-		&scalarnet.ContractCallApprovedWithMint{},
-		&scalarnet.EventCheckPoint{},
-	)
+	err = AutoMigrate(db)
 
 	if err != nil {
 		return nil, err

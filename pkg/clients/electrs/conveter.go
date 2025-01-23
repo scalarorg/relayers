@@ -92,5 +92,9 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (chains.TokenSe
 }
 
 func (c *Client) CreateUnstakedVaultTx(vaultTx types.VaultTransaction) *relaytypes.UnstakedVaultTx {
-	return &relaytypes.UnstakedVaultTx{}
+	return &relaytypes.UnstakedVaultTx{
+		BlockHeight: uint64(vaultTx.Height),
+		TxHash:      vaultTx.TxHash,
+		LogIndex:    uint(vaultTx.TxPosition),
+	}
 }
