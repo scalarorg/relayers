@@ -26,7 +26,7 @@ import (
 
 type EvmClient struct {
 	globalConfig   *config.Config
-	evmConfig      *EvmNetworkConfig
+	EvmConfig      *EvmNetworkConfig
 	Client         *ethclient.Client
 	ScalarClient   *scalar.Client
 	ChainName      string
@@ -105,7 +105,7 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 	}
 	evmClient := &EvmClient{
 		globalConfig:   globalConfig,
-		evmConfig:      evmConfig,
+		EvmConfig:      evmConfig,
 		Client:         client,
 		ScalarClient:   scalarClient,
 		GatewayAddress: *gatewayAddress,
@@ -180,6 +180,7 @@ func preparePrivateKey(evmCfg *EvmNetworkConfig) error {
 func (c *EvmClient) SetAuth(auth *bind.TransactOpts) {
 	c.auth = auth
 }
+
 func (c *EvmClient) Start(ctx context.Context) error {
 	//Subscribe to the event bus
 	c.subscribeEventBus()
@@ -193,10 +194,19 @@ func (c *EvmClient) ConnectWithRetry(ctx context.Context) {
 	defer cancel()
 	var err error
 	for {
-		err = c.RecoverMissingEvents(ctx)
-		if err != nil {
-			log.Printf("Error recovering missing events: %v", err)
-		}
+		// Directly call recovery method in the service before starting listeners
+		// err = c.RecoverInitiatedEvents(ctx)
+		// if err != nil {
+		// 	log.Printf("Error recovering missing events: %v", err)
+		// }
+		// err = c.RecoverApprovedEvents(ctx)
+		// if err != nil {
+		// 	log.Printf("Error recovering missing events: %v", err)
+		// }
+		// err = c.RecoverExecutedEvents(ctx)
+		// if err != nil {
+		// 	log.Printf("Error recovering missing events: %v", err)
+		// }
 		//Listen to new events
 		err = c.ListenToEvents(ctx)
 		if err != nil {
@@ -224,7 +234,11 @@ func (c *EvmClient) ConnectWithRetry(ctx context.Context) {
 func (c *EvmClient) VerifyDeployTokens(ctx context.Context) error {
 	return nil
 }
-func (c *EvmClient) RecoverMissingEvents(ctx context.Context) error {
+
+/*
+ * Recover initiated events
+ */
+func (c *EvmClient) RecoverInitiatedEvents(ctx context.Context) error {
 	//Recover ContractCall events
 	if err := RecoverEvent[*contracts.IScalarGatewayContractCall](c, ctx,
 		events.EVENT_EVM_CONTRACT_CALL, func(log types.Log) *contracts.IScalarGatewayContractCall {
@@ -242,14 +256,6 @@ func (c *EvmClient) RecoverMissingEvents(ctx context.Context) error {
 		}); err != nil {
 		log.Error().Err(err).Str("eventName", events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN).Msg("failed to recover missing events")
 	}
-	if err := RecoverEvent[*contracts.IScalarGatewayContractCallApproved](c, ctx,
-		events.EVENT_EVM_CONTRACT_CALL_APPROVED, func(log types.Log) *contracts.IScalarGatewayContractCallApproved {
-			return &contracts.IScalarGatewayContractCallApproved{
-				Raw: log,
-			}
-		}); err != nil {
-		log.Error().Err(err).Str("eventName", events.EVENT_EVM_CONTRACT_CALL_APPROVED).Msg("failed to recover missing events")
-	}
 	if err := RecoverEvent[*contracts.IScalarGatewayTokenSent](c, ctx,
 		events.EVENT_EVM_TOKEN_SENT, func(log types.Log) *contracts.IScalarGatewayTokenSent {
 			return &contracts.IScalarGatewayTokenSent{
@@ -258,22 +264,39 @@ func (c *EvmClient) RecoverMissingEvents(ctx context.Context) error {
 		}); err != nil {
 		log.Error().Err(err).Str("eventName", events.EVENT_EVM_TOKEN_SENT).Msg("failed to recover missing events")
 	}
-	if err := RecoverEvent[*contracts.IScalarGatewayExecuted](c, ctx,
+	return nil
+}
+func (c *EvmClient) RecoverApprovedEvents(ctx context.Context) error {
+	err := RecoverEvent[*contracts.IScalarGatewayContractCallApproved](c, ctx,
+		events.EVENT_EVM_CONTRACT_CALL_APPROVED, func(log types.Log) *contracts.IScalarGatewayContractCallApproved {
+			return &contracts.IScalarGatewayContractCallApproved{
+				Raw: log,
+			}
+		})
+	if err != nil {
+		log.Error().Err(err).Str("eventName", events.EVENT_EVM_CONTRACT_CALL_APPROVED).Msg("failed to recover missing events")
+	}
+	return err
+}
+
+func (c *EvmClient) RecoverExecutedEvents(ctx context.Context) error {
+	err := RecoverEvent[*contracts.IScalarGatewayExecuted](c, ctx,
 		events.EVENT_EVM_COMMAND_EXECUTED, func(log types.Log) *contracts.IScalarGatewayExecuted {
 			return &contracts.IScalarGatewayExecuted{
 				Raw: log,
 			}
-		}); err != nil {
-		log.Error().Err(err).Str("eventName", events.EVENT_EVM_CONTRACT_CALL_APPROVED).Msg("failed to recover missing events")
+		})
+	if err != nil {
+		log.Error().Err(err).Str("eventName", events.EVENT_EVM_COMMAND_EXECUTED).Msg("failed to recover missing events")
 	}
-	return nil
+	return err
 }
 
 // Try to recover missing events from the last checkpoint block number to the current block number
 func RecoverEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context, eventName string, fnCreateEventData func(types.Log) T) error {
-	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.evmConfig.GetId(), eventName)
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.EvmConfig.GetId(), eventName)
 	if err != nil {
-		log.Warn().Str("chainId", c.evmConfig.GetId()).
+		log.Warn().Str("chainId", c.EvmConfig.GetId()).
 			Str("eventName", eventName).
 			Msg("[EvmClient] [getLastCheckpoint] using default value")
 	}
@@ -282,9 +305,9 @@ func RecoverEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context, eventName 
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
-	log.Info().Str("Chain", c.evmConfig.ID).Uint64("Current BlockNumber", blockNumber).Msg("[EvmClient] [RecoverThenWatchForEvent]")
-	if blockNumber-lastCheckpoint.BlockNumber > c.evmConfig.MaxRecoverRange {
-		lastCheckpoint.BlockNumber = blockNumber - c.evmConfig.MaxRecoverRange + 1 //We add extra 1 to make sure we don't cover over configured range
+	log.Info().Str("Chain", c.EvmConfig.ID).Uint64("Current BlockNumber", blockNumber).Msg("[EvmClient] [RecoverThenWatchForEvent]")
+	if blockNumber-lastCheckpoint.BlockNumber > c.EvmConfig.MaxRecoverRange {
+		lastCheckpoint.BlockNumber = blockNumber - c.EvmConfig.MaxRecoverRange + 1 //We add extra 1 to make sure we don't cover over configured range
 	}
 	//recover missing events from the last checkpoint block number to the current block number
 	// We already filtered received event (defined by block and logIndex)
@@ -397,7 +420,7 @@ func (c *EvmClient) ListenToEvents(ctx context.Context) error {
 		go func() {
 			//there is a loop inside watchForEvent, it finish only when connection is break
 			if err = watchForEvent(c, ctx, eventName); err != nil {
-				log.Error().Err(err).Any("Config", c.evmConfig).Msgf("[EvmClient] [ListenToEvents] failed to watch for event: %s", eventName)
+				log.Error().Err(err).Any("Config", c.EvmConfig).Msgf("[EvmClient] [ListenToEvents] failed to watch for event: %s", eventName)
 			}
 		}()
 	}
@@ -424,9 +447,9 @@ func (c *EvmClient) handleEvent(event any) error {
 	return nil
 }
 func watchForEvent(c *EvmClient, ctx context.Context, eventName string) error {
-	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.evmConfig.GetId(), eventName)
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.EvmConfig.GetId(), eventName)
 	if err != nil {
-		log.Warn().Str("chainId", c.evmConfig.GetId()).
+		log.Warn().Str("chainId", c.EvmConfig.GetId()).
 			Str("eventName", eventName).
 			Msg("[EvmClient] [getLastCheckpoint] using default value")
 	}
@@ -617,8 +640,8 @@ func (c *EvmClient) WatchEVMTokenSent(watchOpts *bind.WatchOpts) error {
 }
 func (c *EvmClient) subscribeEventBus() {
 	if c.eventBus != nil {
-		log.Debug().Msgf("[EvmClient] [Start] subscribe to the event bus %s", c.evmConfig.GetId())
-		receiver := c.eventBus.Subscribe(c.evmConfig.GetId())
+		log.Debug().Msgf("[EvmClient] [Start] subscribe to the event bus %s", c.EvmConfig.GetId())
+		receiver := c.eventBus.Subscribe(c.EvmConfig.GetId())
 		go func() {
 			for event := range receiver {
 				err := c.handleEventBusMessage(event)

@@ -72,18 +72,39 @@ func (s *Service) Start(ctx context.Context) error {
 	} else {
 		log.Warn().Msg("[Relayer] [Start] scalar client is undefined")
 	}
-	//Start electrum clients
+	//Start btc clients
+	for _, client := range s.BtcClient {
+		go client.Start(ctx)
+	}
+	//Recovery evm missing source events
+	for _, client := range s.EvmClients {
+		err := client.RecoverInitiatedEvents(ctx)
+		if err != nil {
+			log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover initiated events for evm client %s", client.EvmConfig.GetId())
+		}
+	}
+	//Start electrum clients. This client can get all vault transactions from last checkpoint of begining if no checkpoint is found
 	for _, client := range s.Electrs {
 		go client.Start(ctx)
+	}
+
+	for _, client := range s.EvmClients {
+		err := client.RecoverApprovedEvents(ctx)
+		if err != nil {
+			log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover initiated events for evm client %s", client.EvmConfig.GetId())
+		}
+	}
+	for _, client := range s.EvmClients {
+		err := client.RecoverExecutedEvents(ctx)
+		if err != nil {
+			log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover initiated events for evm client %s", client.EvmConfig.GetId())
+		}
 	}
 	//Start evm clients
 	for _, client := range s.EvmClients {
 		go client.Start(ctx)
 	}
-	//Start btc clients
-	for _, client := range s.BtcClient {
-		go client.Start(ctx)
-	}
+
 	return nil
 }
 

@@ -65,7 +65,7 @@ func (ec *EvmClient) handleScalarTokenSent(executeData string) error {
 	//Todo add retry
 	if ec.auth == nil {
 		log.Error().
-			Str("chainId", ec.evmConfig.GetId()).
+			Str("chainId", ec.EvmConfig.GetId()).
 			Msg("[EvmClient] [handleScalarTokenSent] auth is nil")
 		return fmt.Errorf("[EvmClient] [handleScalarTokenSent] auth is nil")
 	}
@@ -73,7 +73,7 @@ func (ec *EvmClient) handleScalarTokenSent(executeData string) error {
 	if err != nil {
 		log.Error().Err(err).
 			Str("input", hex.EncodeToString(decodedExecuteData.Input)).
-			Str("contractAddress", ec.evmConfig.Gateway).
+			Str("contractAddress", ec.EvmConfig.Gateway).
 			Str("signer", ec.auth.From.String()).
 			Msg("[EvmClient] [handleScalarTokenSent]")
 		return err
@@ -116,7 +116,7 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 	//Todo add retry
 	if ec.auth == nil {
 		log.Error().
-			Str("chainId", ec.evmConfig.GetId()).
+			Str("chainId", ec.EvmConfig.GetId()).
 			Msg("[EvmClient] [handleScalarBatchCommandSigned] auth is nil")
 		return fmt.Errorf("[EvmClient] [handleScalarBatchCommandSigned] auth is nil")
 	}
@@ -125,7 +125,7 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 	if err != nil {
 		log.Error().Err(err).
 			Str("input", hex.EncodeToString(decodedExecuteData.Input)).
-			Str("contractAddress", ec.evmConfig.Gateway).
+			Str("contractAddress", ec.EvmConfig.Gateway).
 			Str("signer", ec.auth.From.String()).
 			Msg("[EvmClient] [handleScalarBatchCommandSigned]")
 		return err
@@ -170,7 +170,7 @@ func (ec *EvmClient) handleScalarContractCallApproved(messageID string, executeD
 	//Todo add retry
 	if ec.auth == nil {
 		log.Error().
-			Str("chainId", ec.evmConfig.GetId()).
+			Str("chainId", ec.EvmConfig.GetId()).
 			Msg("[EvmClient] [handleScalarContractCallApproved] auth is nil")
 		return fmt.Errorf("[EvmClient] [handleScalarContractCallApproved] auth is nil")
 	}
@@ -178,7 +178,7 @@ func (ec *EvmClient) handleScalarContractCallApproved(messageID string, executeD
 	if err != nil {
 		log.Error().Err(err).
 			Str("input", hex.EncodeToString(decodedExecuteData.Input)).
-			Str("contractAddress", ec.evmConfig.Gateway).
+			Str("contractAddress", ec.EvmConfig.Gateway).
 			Str("signer", ec.auth.From.String()).
 			Msg("[EvmClient] [handleScalarContractCallApproved]")
 		return err

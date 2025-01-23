@@ -1,6 +1,7 @@
 package evm
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -34,7 +35,7 @@ func (c *EvmClient) ContractCallEvent2Model(event *contracts.IScalarGatewayContr
 		TxHash:      event.Raw.TxHash.String(),
 		BlockNumber: event.Raw.BlockNumber,
 		LogIndex:    event.Raw.Index,
-		SourceChain: c.evmConfig.GetId(),
+		SourceChain: c.EvmConfig.GetId(),
 		//3 follows field are used for query to get back payload, so need to convert to lower case
 		DestinationChain:    event.DestinationChain,
 		DestContractAddress: strings.ToLower(event.DestinationContractAddress),
@@ -53,7 +54,7 @@ func (c *EvmClient) ContractCallWithToken2Model(event *contracts.IScalarGatewayC
 		TxHash:      event.Raw.TxHash.String(),
 		BlockNumber: event.Raw.BlockNumber,
 		LogIndex:    event.Raw.Index,
-		SourceChain: c.evmConfig.GetId(),
+		SourceChain: c.EvmConfig.GetId(),
 		//3 follows field are used for query to get back payload, so need to convert to lower case
 		DestinationChain:    event.DestinationChain,
 		DestContractAddress: strings.ToLower(event.DestinationContractAddress),
@@ -63,11 +64,9 @@ func (c *EvmClient) ContractCallWithToken2Model(event *contracts.IScalarGatewayC
 		//Use for bitcoin vault tx only
 		StakerPublicKey: nil,
 	}
-	//Todo: get token contract address from scalar-core by source chain and token symbol
-	tokenContractAddress := "" //strings.ToLower(event.TokenContractAddress.String())
 	contractCallWithToken := chains.ContractCallWithToken{
 		ContractCall:         callContract,
-		TokenContractAddress: tokenContractAddress,
+		TokenContractAddress: c.GetTokenContractAddressFromSymbol(c.EvmConfig.GetId(), event.Symbol),
 		Symbol:               event.Symbol,
 		Amount:               event.Amount.Uint64(),
 	}
@@ -80,7 +79,7 @@ func (c *EvmClient) TokenSentEvent2Model(event *contracts.IScalarGatewayTokenSen
 	senderAddress := event.Sender.String()
 	tokenSent := chains.TokenSent{
 		EventID:     eventId,
-		SourceChain: c.evmConfig.GetId(),
+		SourceChain: c.EvmConfig.GetId(),
 		TxHash:      strings.TrimPrefix(event.Raw.TxHash.String(), "0x"),
 		BlockNumber: event.Raw.BlockNumber,
 		LogIndex:    event.Raw.Index,
@@ -89,7 +88,7 @@ func (c *EvmClient) TokenSentEvent2Model(event *contracts.IScalarGatewayTokenSen
 		DestinationChain:     event.DestinationChain,
 		DestinationAddress:   strings.ToLower(event.DestinationAddress),
 		Symbol:               event.Symbol,
-		TokenContractAddress: c.GetTokenContractAddressFromSymbol(event.Symbol, c.evmConfig.GetId()),
+		TokenContractAddress: c.GetTokenContractAddressFromSymbol(c.EvmConfig.GetId(), event.Symbol),
 		Amount:               event.Amount.Uint64(),
 		Status:               chains.TokenSentStatusPending,
 	}
@@ -97,7 +96,10 @@ func (c *EvmClient) TokenSentEvent2Model(event *contracts.IScalarGatewayTokenSen
 }
 
 // Todo: Implement this function
-func (c *EvmClient) GetTokenContractAddressFromSymbol(symbol string, sourceChain string) string {
+func (c *EvmClient) GetTokenContractAddressFromSymbol(chainId string, symbol string) string {
+	if c.ScalarClient != nil {
+		return c.ScalarClient.GetTokenContractAddressFromSymbol(context.Background(), chainId, symbol)
+	}
 	return ""
 }
 func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGatewayContractCallApproved) (models.ContractCallApproved, error) {
@@ -110,7 +112,7 @@ func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGate
 	record := models.ContractCallApproved{
 		EventID:          eventId,
 		SourceChain:      event.SourceChain,
-		DestinationChain: c.evmConfig.GetId(),
+		DestinationChain: c.EvmConfig.GetId(),
 		TxHash:           strings.ToLower(txHash),
 		CommandID:        hex.EncodeToString(event.CommandId[:]),
 		Sender:           strings.ToLower(event.SourceAddress),
@@ -124,7 +126,7 @@ func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGate
 
 func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IScalarGatewayExecuted) chains.CommandExecuted {
 	cmdExecuted := chains.CommandExecuted{
-		SourceChain: c.evmConfig.GetId(),
+		SourceChain: c.EvmConfig.GetId(),
 		Address:     event.Raw.Address.String(),
 		TxHash:      strings.ToLower(event.Raw.TxHash.String()),
 		BlockNumber: uint64(event.Raw.BlockNumber),

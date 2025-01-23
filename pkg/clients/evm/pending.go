@@ -19,7 +19,7 @@ func (c *EvmClient) WatchPendingTxs() {
 	go func() {
 		for {
 			//Get pending txs that are older than the block time
-			txs, _ := c.pendingTxs.GetTxs(c.evmConfig.BlockTime)
+			txs, _ := c.pendingTxs.GetTxs(c.EvmConfig.BlockTime)
 			for _, tx := range txs {
 				log.Debug().Msgf("[EvmClient] [watchPendingTxs] processing pending tx: %s", tx.TxHash)
 				allEvents, err := c.PollTxForEvents(tx)

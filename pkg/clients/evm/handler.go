@@ -26,9 +26,9 @@ func (ec *EvmClient) handleContractCall(event *contracts.IScalarGatewayContractC
 		return fmt.Errorf("failed to convert ContractCallEvent to RelayData: %w", err)
 	}
 	//2. update last checkpoint
-	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.evmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL)
+	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL)
 	if err != nil {
-		log.Debug().Str("chainId", ec.evmConfig.GetId()).
+		log.Debug().Str("chainId", ec.EvmConfig.GetId()).
 			Str("eventName", events.EVENT_EVM_CONTRACT_CALL).
 			Msg("[EvmClient] [handleContractCall] Get event from begining")
 	}
@@ -46,7 +46,7 @@ func (ec *EvmClient) handleContractCall(event *contracts.IScalarGatewayContractC
 	}
 	//2. Send to the bus
 	confirmTxs := events.ConfirmTxsRequest{
-		ChainName: ec.evmConfig.GetId(),
+		ChainName: ec.EvmConfig.GetId(),
 		TxHashs:   map[string]string{contractCall.TxHash: contractCall.DestinationChain},
 	}
 	if ec.eventBus != nil {
@@ -84,9 +84,9 @@ func (ec *EvmClient) handleContractCallWithToken(event *contracts.IScalarGateway
 		return fmt.Errorf("failed to convert ContractCallEvent to RelayData: %w", err)
 	}
 	//2. update last checkpoint
-	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.evmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN)
+	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN)
 	if err != nil {
-		log.Debug().Str("chainId", ec.evmConfig.GetId()).
+		log.Debug().Str("chainId", ec.EvmConfig.GetId()).
 			Str("eventName", events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN).
 			Msg("[EvmClient] [handleContractCallWithToken] Get event from begining")
 	}
@@ -104,7 +104,7 @@ func (ec *EvmClient) handleContractCallWithToken(event *contracts.IScalarGateway
 	}
 	//2. Send to the bus
 	confirmTxs := events.ConfirmTxsRequest{
-		ChainName: ec.evmConfig.GetId(),
+		ChainName: ec.EvmConfig.GetId(),
 		TxHashs:   map[string]string{contractCallWithToken.TxHash: contractCallWithToken.DestinationChain},
 	}
 	if ec.eventBus != nil {
@@ -147,9 +147,9 @@ func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) e
 	//For evm, the token sent is verified immediately by the scalarnet
 	tokenSent.Status = chains.TokenSentStatusVerifying
 	//2. update last checkpoint
-	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.evmConfig.GetId(), events.EVENT_EVM_TOKEN_SENT)
+	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_TOKEN_SENT)
 	if err != nil {
-		log.Debug().Str("chainId", ec.evmConfig.GetId()).
+		log.Debug().Str("chainId", ec.EvmConfig.GetId()).
 			Str("eventName", events.EVENT_EVM_TOKEN_SENT).
 			Msg("[EvmClient] [handleTokenSent] Get event from begining")
 	}
@@ -167,7 +167,7 @@ func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) e
 	}
 	//2. Send to the bus
 	confirmTxs := events.ConfirmTxsRequest{
-		ChainName: ec.evmConfig.GetId(),
+		ChainName: ec.EvmConfig.GetId(),
 		TxHashs:   map[string]string{tokenSent.TxHash: tokenSent.DestinationChain},
 	}
 	if ec.eventBus != nil {
@@ -389,12 +389,12 @@ func (ec *EvmClient) ExecuteDestinationCall(
 }
 
 func (ec *EvmClient) SubmitTx(signedTx *ethtypes.Transaction, retryAttempt int) (*ethtypes.Receipt, error) {
-	if retryAttempt >= ec.evmConfig.MaxRetry {
+	if retryAttempt >= ec.EvmConfig.MaxRetry {
 		return nil, fmt.Errorf("max retry exceeded")
 	}
 
 	// Create a new context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), ec.evmConfig.TxTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), ec.EvmConfig.TxTimeout)
 	defer cancel()
 
 	// Log transaction details
@@ -407,14 +407,14 @@ func (ec *EvmClient) SubmitTx(signedTx *ethtypes.Transaction, retryAttempt int) 
 	if err != nil {
 		log.Error().
 			Err(err).
-			Str("rpcUrl", ec.evmConfig.RPCUrl).
+			Str("rpcUrl", ec.EvmConfig.RPCUrl).
 			Str("walletAddress", ec.auth.From.String()).
 			Str("to", signedTx.To().String()).
 			Str("data", hex.EncodeToString(signedTx.Data())).
 			Msg("[EvmClient.SubmitTx] Failed to submit transaction")
 
 		// Sleep before retry
-		time.Sleep(ec.evmConfig.RetryDelay)
+		time.Sleep(ec.EvmConfig.RetryDelay)
 
 		log.Debug().
 			Int("attempt", retryAttempt+1).
@@ -437,7 +437,7 @@ func (ec *EvmClient) SubmitTx(signedTx *ethtypes.Transaction, retryAttempt int) 
 }
 
 func (ec *EvmClient) WaitForTransaction(hash string) (*ethtypes.Receipt, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ec.evmConfig.TxTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), ec.EvmConfig.TxTimeout)
 	defer cancel()
 
 	txHash := common.HexToHash(hash)
