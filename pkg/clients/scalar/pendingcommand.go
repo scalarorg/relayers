@@ -3,13 +3,21 @@ package scalar
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/bitcoin-vault/go-utils/encode"
+	utiltypes "github.com/scalarorg/bitcoin-vault/go-utils/types"
+	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
+	"github.com/scalarorg/relayers/pkg/utils"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	"github.com/scalarorg/scalar-core/x/nexus/exported"
@@ -101,21 +109,67 @@ func (c *Client) checkChainPendingCommands(ctx context.Context, chain string) bo
 		c.pendingSignCommandTxs.Store(chain, signRes.TxHash)
 		log.Debug().Msgf("[ScalarClient] [checkChainPendingCommands] Successfully broadcasted sign commands request with txHash: %s. Add it to pendingSignCommandTxs...", signRes.TxHash)
 	} else if chainstypes.IsBitcoinChain(nexusChain) {
-		//For bitcoin chain, we need to get psbt from pending commands then send sign psbt request back to the scalar node
-		psbtSigningRequest := types.CreatePsbtRequest{
-			Commands: pendingCommands,
-			Params:   c.GetPsbtParams(chain),
+
+		// If pending commands is for pooling model then we need to create a single psbt for whole batch command
+		// Otherwise, pending command contains a single command, which allready has psbt, we just need to sign it
+		commandOutpoints := c.tryCreateCommandOutpoints(pendingCommands)
+		if len(commandOutpoints) == 0 {
+			log.Error().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] psbt already formed. Just append empty psbt to pending commands and waiting to broadcast signing request")
+			emptyPsbt := covtypes.Psbt{}
+			c.appendPendingPsbt(chain, []covtypes.Psbt{emptyPsbt})
+
+		} else {
+			psbtSigningRequest := types.CreatePsbtRequest{
+				Outpoints: commandOutpoints,
+				Params:    c.GetPsbtParams(chain),
+			}
+			eventEnvelope := events.EventEnvelope{
+				EventType:        events.EVENT_SCALAR_CREATE_PSBT_REQUEST,
+				DestinationChain: chain,
+				Data:             psbtSigningRequest,
+			}
+			c.eventBus.BroadcastEvent(&eventEnvelope)
 		}
-		eventEnvelope := events.EventEnvelope{
-			EventType:        events.EVENT_SCALAR_CREATE_PSBT_REQUEST,
-			DestinationChain: chain,
-			Data:             psbtSigningRequest,
-		}
-		c.eventBus.BroadcastEvent(&eventEnvelope)
 	}
 	return true
 }
-
+func (c *Client) tryCreateCommandOutpoints(pendingCommands []chainstypes.QueryCommandResponse) []types.CommandOutPoint {
+	outpoints := []types.CommandOutPoint{}
+	for _, cmd := range pendingCommands {
+		commandOutPoint, err := TryExtractCommandOutPoint(cmd)
+		if err == nil {
+			outpoints = append(outpoints, commandOutPoint)
+		} else if err != nil {
+			log.Debug().Err(err).Msg("[BtcClient] [tryCreatePsbtRequest] failed to parse command to outpoint")
+		}
+	}
+	return outpoints
+}
+func TryExtractCommandOutPoint(cmd chainstypes.QueryCommandResponse) (types.CommandOutPoint, error) {
+	var commandOutPoint types.CommandOutPoint
+	amount, err := strconv.ParseUint(cmd.Params["amount"], 10, 64)
+	if err != nil {
+		return commandOutPoint, fmt.Errorf("cannot parse param %s to int value", cmd.Params["amount"])
+	}
+	payload, err := utils.DecodeContractCallWithTokenPayload(cmd.Payload)
+	//feeOpts, rbf, pkScript, err := encode.DecodeContractCallWithTokenPayload(cmd.Payload)
+	if err != nil {
+		return commandOutPoint, fmt.Errorf("failed to decode contract call with token payload: %w", err)
+	}
+	if payload.PayloadType == encode.ContractCallWithTokenPayloadType_CustodianOnly {
+		commandOutPoint = types.CommandOutPoint{
+			BTCFeeOpts: payload.CustodianOnly.FeeOptions,
+			RBF:        payload.CustodianOnly.RBF,
+			OutPoint: utiltypes.UnstakingOutput{
+				Amount:        amount,
+				LockingScript: payload.CustodianOnly.RecipientChainIdentifier,
+			},
+		}
+		return commandOutPoint, nil
+	} else {
+		return commandOutPoint, fmt.Errorf("unsupported payload type: %v", payload.PayloadType)
+	}
+}
 func (c *Client) processSignCommandTxs(ctx context.Context) {
 	for {
 		//Get map txHash and chain
@@ -198,7 +252,24 @@ func (c *Client) processBatchCommands(ctx context.Context) {
 		time.Sleep(c.getSleepInterval())
 	}
 }
-
+func (c *Client) appendPendingPsbt(chain string, psbts []covtypes.Psbt) {
+	pendingPsbt, ok := c.pendingPsbtCommands.Load(chain)
+	if ok {
+		newPsbts := append(pendingPsbt.([]covtypes.Psbt), psbts...)
+		c.pendingPsbtCommands.Store(chain, newPsbts)
+	} else {
+		c.pendingPsbtCommands.Store(chain, psbts)
+	}
+}
+func (c *Client) removePendingPsbt(chain string, psbt covtypes.Psbt) {
+	if value, ok := c.pendingPsbtCommands.Load(chain); ok && value != nil {
+		psbts := value.([]covtypes.Psbt)
+		if len(psbts) > 0 && bytes.Equal(psbts[0], psbt) {
+			psbts = psbts[1:]
+			c.pendingPsbtCommands.Store(chain, psbts)
+		}
+	}
+}
 func (c *Client) processPsbtCommands(ctx context.Context) {
 	for {
 		var hashes = map[string]covtypes.Psbt{}
@@ -219,7 +290,13 @@ func (c *Client) processPsbtCommands(ctx context.Context) {
 			}
 
 			log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] Send new sign psbt request")
-			signRes, err := c.network.SignBtcCommandsRequest(context.Background(), chain, psbt)
+			var signRes *sdk.TxResponse
+			var err error
+			if len(psbt) > 0 {
+				signRes, err = c.network.SignPsbtCommandsRequest(context.Background(), chain, psbt)
+			} else {
+				signRes, err = c.network.SignBtcCommandsRequest(context.Background(), chain)
+			}
 			if err != nil {
 				log.Error().Err(err).Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] failed to sign psbt request")
 			} else if signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") {
@@ -231,13 +308,7 @@ func (c *Client) processPsbtCommands(ctx context.Context) {
 				//Add the tx hash to the pending buffer
 				c.pendingSignCommandTxs.Store(chain, signRes.TxHash)
 				//Remove the psbt from the pending buffer
-				if value, ok := c.pendingPsbtCommands.Load(chain); ok && value != nil {
-					psbts := value.([]covtypes.Psbt)
-					if len(psbts) > 0 && bytes.Equal(psbts[0], psbt) {
-						psbts = psbts[1:]
-						c.pendingPsbtCommands.Store(chain, psbts)
-					}
-				}
+				c.removePendingPsbt(chain, psbt)
 			}
 		}
 		time.Sleep(time.Second * 3)
@@ -255,15 +326,51 @@ func (c *Client) StorePendingCommands(ctx context.Context, chain string, pending
 	return nil
 }
 func (c *Client) UpdateBatchCommandSigned(ctx context.Context, destChain string, batchCmds *chainstypes.BatchedCommandsResponse) error {
+	commandByType := map[string][]string{}
+	commands := []*scalarnet.Command{}
 	for _, cmdId := range batchCmds.CommandIDs {
 		cmdRes, err := c.queryClient.QueryCommand(ctx, destChain, cmdId)
-		if err != nil {
+		if err == nil {
+			log.Debug().Str("CommandId", cmdId).Any("Command", cmdRes).Msg("[ScalarClient] [UpdateBatchCommandSigned] found command")
+			cmds, ok := commandByType[cmdRes.Type]
+			if !ok {
+				commandByType[cmdRes.Type] = []string{cmdId}
+			} else {
+				commandByType[cmdRes.Type] = append(cmds, cmdId)
+			}
+			commands = append(commands, CommandResponse2Model(destChain, batchCmds.ID, cmdRes))
+		} else {
 			return fmt.Errorf("[ScalarClient] [UpdateBatchCommandSigned] failed to get command by ID: %w", err)
+
 		}
-		//Todo: Update command status to signed
 		log.Debug().Str("CommandId", cmdId).Any("Command", cmdRes).Msg("Command response")
 	}
+	for cmdType, cmdIds := range commandByType {
+		switch cmdType {
+		case "approveContractCallWithMint":
+			c.dbAdapter.UpdateContractCallWithMintsStatus(ctx, cmdIds, chains.TokenSentStatusExecuting)
+		case "mintToken":
+			c.dbAdapter.UpdateTokenSentsStatus(ctx, cmdIds, chains.TokenSentStatusExecuting)
+		}
+	}
+	c.dbAdapter.SaveCommands(commands)
 	return nil
+}
+
+func CommandResponse2Model(chainId string, batchCommandId string, command *chainstypes.CommandResponse) *scalarnet.Command {
+	params, err := json.Marshal(command.Params)
+	if err != nil {
+		log.Error().Err(err).Msg("[ScalarClient] [CommandResponse2Model] failed to marshal command params")
+	}
+	return &scalarnet.Command{
+		CommandID:      command.ID,
+		BatchCommandID: batchCommandId,
+		ChainID:        chainId,
+		Params:         string(params),
+		KeyID:          command.KeyID,
+		CommandType:    command.Type,
+		Status:         scalarnet.CommandPending,
+	}
 }
 
 // func (c *Client) processPendingCommandsForChain(ctx context.Context, destChain string) error {

@@ -45,7 +45,7 @@ func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
 	}
 
 	// Initialize BTC service
-	btcClients, err := btc.NewBtcClients(config, dbAdapter, eventBus)
+	btcClients, err := btc.NewBtcClients(config, dbAdapter, eventBus, scalarClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create btc clients: %w", err)
 	}

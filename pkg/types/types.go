@@ -6,7 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/scalarorg/bitcoin-vault/go-utils/btc"
 	"github.com/scalarorg/bitcoin-vault/go-utils/types"
-	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
 
@@ -103,8 +102,8 @@ type SignPsbtsRequest struct {
 	Psbts     []covtypes.Psbt
 }
 type CreatePsbtRequest struct {
-	Commands []chainstypes.QueryCommandResponse
-	Params   PsbtParams
+	Outpoints []CommandOutPoint
+	Params    PsbtParams
 }
 
 // Calculate taproot address from covenant pubkey and network
@@ -113,4 +112,7 @@ func (p *PsbtParams) GetTaprootAddress() (btcutil.Address, error) {
 }
 
 type UnstakedVaultTx struct {
+	BlockHeight uint64
+	TxHash      string
+	LogIndex    uint
 }

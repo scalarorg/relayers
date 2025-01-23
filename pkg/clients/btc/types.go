@@ -63,9 +63,3 @@ type Utxo struct {
 	} `json:"status"`
 	Value uint64 `json:"value"`
 }
-
-type CommandOutPoint struct {
-	BTCFeeOpts types.BTCFeeOpts
-	RBF        bool
-	OutPoint   types.UnstakingOutput
-}

@@ -51,6 +51,7 @@ func TestMain(m *testing.M) {
 		btcConfig,
 		dbAdapter,
 		eventBus,
+		nil,
 	)
 	os.Exit(m.Run())
 }
@@ -92,7 +93,7 @@ func TestCreatePsbts(t *testing.T) {
 
 	lockingScript, _ := hex.DecodeString("001450dceca158a9c872eb405d52293d351110572c9e")
 
-	outpoints := []btc.CommandOutPoint{
+	outpoints := []types.CommandOutPoint{
 		{
 			BTCFeeOpts: 0,
 			RBF:        false,

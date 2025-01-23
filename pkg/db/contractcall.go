@@ -1,11 +1,13 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"gorm.io/gorm"
 )
@@ -162,32 +164,9 @@ func (db *DatabaseAdapter) UpdateBatchContractCallStatus(data []ContractCallExec
 	})
 }
 
-// func (db *DatabaseAdapter) FindCosmosToEvmCallContractApproved(event *types.EvmEvent[*contracts.IScalarGatewayContractCallApproved]) ([]types.FindCosmosToEvmCallContractApproved, error) {
-// 	var datas []models.RelayData
-
-// 	result := db.PostgresClient.
-// 		Preload("CallContract").
-// 		Joins("JOIN call_contracts ON relay_data.id = call_contracts.relay_data_id").
-// 		Where("call_contracts.payload_hash = ? AND call_contracts.source_address = ? AND call_contracts.contract_address = ? AND relay_data.status IN ?",
-// 			strings.ToLower(hex.EncodeToString(event.Args.PayloadHash[:])),
-// 			strings.ToLower(event.Args.SourceAddress),
-// 			strings.ToLower(event.Args.ContractAddress.String()),
-// 			[]int{int(types.PENDING), int(types.APPROVED)}).
-// 		Order("relay_data.updated_at desc").
-// 		Find(&datas)
-
-// 	if result.Error != nil {
-// 		return nil, result.Error
-// 	}
-
-// 	mappedResult := make([]types.FindCosmosToEvmCallContractApproved, len(datas))
-
-// 	for i, data := range datas {
-// 		mappedResult[i] = types.FindCosmosToEvmCallContractApproved{
-// 			ID:      data.ID,
-// 			Payload: data.CallContract.Payload,
-// 		}
-// 	}
-
-// 	return mappedResult, nil
-// }
+func (db *DatabaseAdapter) UpdateContractCallWithMintsStatus(ctx context.Context, cmdIds []string, status chains.TokenSentStatus) error {
+	log.Debug().Any("cmdIds", cmdIds).Msg("UpdateContractCallWithMintsStatus")
+	eventIds := db.PostgresClient.Model(&scalarnet.ContractCallApprovedWithMint{}).Select("event_id").Where("command_id IN ?", cmdIds)
+	tx := db.PostgresClient.Model(&chains.ContractCallWithToken{}).Where("event_id IN ?", eventIds).Update("status", status)
+	return tx.Error
+}

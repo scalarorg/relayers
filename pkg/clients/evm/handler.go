@@ -253,7 +253,7 @@ func (ec *EvmClient) executeDestinationCall(event *contracts.IScalarGatewayContr
 		for _, contractCall := range contractCalls {
 			executeResults = append(executeResults, db.ContractCallExecuteResult{
 				Status:  chains.ContractCallStatusSuccess,
-				EventId: contractCall.EventId,
+				EventId: contractCall.EventID,
 			})
 		}
 		return executeResults, fmt.Errorf("destination contract call is already executed")
@@ -275,12 +275,12 @@ func (ec *EvmClient) executeDestinationCall(event *contracts.IScalarGatewayContr
 			if receipt.Hash() != (common.Hash{}) {
 				executeResults = append(executeResults, db.ContractCallExecuteResult{
 					Status:  chains.ContractCallStatusSuccess,
-					EventId: contractCall.EventId,
+					EventId: contractCall.EventID,
 				})
 			} else {
 				executeResults = append(executeResults, db.ContractCallExecuteResult{
 					Status:  chains.ContractCallStatusFailed,
-					EventId: contractCall.EventId,
+					EventId: contractCall.EventID,
 				})
 			}
 		}
@@ -328,13 +328,15 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecut
 			log.Warn().Err(err).Msgf("[EvmClient] [HandleCommandExecuted] failed to get commandId from scalarnet")
 		} else if command != nil {
 			log.Info().Any("command", command).Msg("[EvmClient] [HandleCommandExecuted] get command from scalarnet")
+			//err = ec.dbAdapter.SaveSingleValue(&cmdExecuted)
+			err = ec.dbAdapter.SaveCommandExecuted(&cmdExecuted, command.Type, cmdExecuted.CommandId)
+			if err != nil {
+				log.Error().Err(err).Msg("[EvmClient] [HandleCommandExecuted] failed to save evm executed to the db")
+				return fmt.Errorf("failed to create evm executed: %w", err)
+			}
 		}
 	}
-	err := ec.dbAdapter.SaveSingleValue(&cmdExecuted)
-	if err != nil {
-		log.Error().Err(err).Msg("[EvmClient] [HandleCommandExecuted] failed to save evm executed to the db")
-		return fmt.Errorf("failed to create evm executed: %w", err)
-	}
+
 	//Done; Don't need to send to the bus
 	return nil
 }

@@ -1,9 +1,15 @@
 package scalar_test
 
 import (
+	"encoding/base64"
+	"fmt"
+	"strconv"
 	"testing"
 
+	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/scalar-core/x/chains/types"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -26,4 +32,22 @@ func TestParseBatchCommandResponse(t *testing.T) {
 			Weights:    []string{"1000", "4000", "3000", "2000"},
 		},
 	}
+}
+
+func TestParseCommand(t *testing.T) {
+	payloadBase64 := "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAo5wc2J0/wEAawIAAAABnXmsN2JCjow3uMBIXpg/cFRe31PGKe+bPihO8j5PiqwAAAAAAP3///8CAAAAAAAAAAAQag5TQ0FMQVIBAUF0cmFuc+UCAAAAAAAAFgAUUNzsoVipyHLrQF1SKT01ERBXLJ4AAAAAAAEBK+gDAAAAAAAAIlEgnsjcFImQIAcFuX1u4gE2KTbX+c6Akmx6PhvbMzgq7aYBAwQAAAAAQRQq4x6ocJrtqBlLo+L35+leaA6LZRNciYPAopjRe8U1Crg1xtxKn6bpa69fUZIkTcDQy2EOb7g4xBn/3dAO/qt6QKiQtF02sgenz5bAkgecYaZnq7IXpXobTiBM0bBIwL+K7wg9SQ+eg80Ghb/JKk+Ux6caH8zH+6d7zsxe9aEuIYdCFcFQkpt0waBJVLeLS2A16XpeB4paDyjsltVHv+6azoA6wD+EUDDdqFbjF9sKDQ2ngAYKrc/7N26LJJGkq5CEKr82RSAq4x6ocJrtqBlLo+L35+leaA6LZRNciYPAopjRe8U1Cq0gqaPslqEFExCoDqnqrtVsxotdfb48qm8UUBTaiLiX6fqswCEWKuMeqHCa7agZS6Pi9+fpXmgOi2UTXImDwKKY0XvFNQolAbg1xtxKn6bpa69fUZIkTcDQy2EOb7g4xBn/3dAO/qt6AAAAACEWqaPslqEFExCoDqnqrtVsxotdfb48qm8UUBTaiLiX6folAbg1xtxKn6bpa69fUZIkTcDQy2EOb7g4xBn/3dAO/qt6AAAAAAEXIFCSm3TBoElUt4tLYDXpel4HiloPKOyW1Ue/7prOgDrAARggTmxauhABZ7E6eikbCa107OE6VK0/kg4EOPYVbEfkqGAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+	payload, err := base64.StdEncoding.DecodeString(payloadBase64)
+	assert.NoError(t, err)
+	amount, err := strconv.ParseUint("10000", 10, 64)
+	assert.NoError(t, err)
+	fmt.Printf("amount: %d\n", amount)
+	commandResponse := chainstypes.QueryCommandResponse{
+		Params: map[string]string{
+			"amount": "10000",
+		},
+		Payload: payload,
+	}
+	commandOutPoint, err := scalar.TryExtractCommandOutPoint(commandResponse)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(10000), commandOutPoint.OutPoint.Amount)
 }

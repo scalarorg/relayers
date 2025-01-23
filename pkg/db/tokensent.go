@@ -1,10 +1,12 @@
 package db
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"gorm.io/gorm"
 )
@@ -30,7 +32,7 @@ func (db *DatabaseAdapter) FindPendingBtcTokenSent(sourceChain string, height in
 	return tokenSents, nil
 }
 
-func (db *DatabaseAdapter) SaveTokenSents(tokenSents []chains.TokenSent) error {
+func (db *DatabaseAdapter) SaveTokenSents(tokenSents []*chains.TokenSent) error {
 	result := db.PostgresClient.Save(tokenSents)
 	if result.Error != nil {
 		return result.Error
@@ -55,7 +57,9 @@ func (db *DatabaseAdapter) SaveTokenSent(tokenSent chains.TokenSent, lastCheckpo
 	return nil
 }
 
-func (db *DatabaseAdapter) UpdateTokenSentsStatus(chain string, status chains.ContractCallStatus) error {
-	tx := db.PostgresClient.Model(&chains.TokenSent{}).Where("destination_chain = ?", chain).Update("status", status)
+func (db *DatabaseAdapter) UpdateTokenSentsStatus(ctx context.Context, cmdIds []string, status chains.TokenSentStatus) error {
+	log.Debug().Any("cmdIds", cmdIds).Msg("UpdateTokenSentsStatus")
+	eventIds := db.PostgresClient.Model(&scalarnet.TokenSentApproved{}).Select("event_id").Where("transfer_id IN ?", cmdIds)
+	tx := db.PostgresClient.Model(&chains.TokenSent{}).Where("event_id IN ?", eventIds).Update("status", status)
 	return tx.Error
 }
