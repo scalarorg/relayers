@@ -242,11 +242,17 @@ func (c *Client) processBatchCommands(ctx context.Context) {
 					Data:             res,
 				}
 				c.eventBus.BroadcastEvent(&eventEnvelope)
+			} else if res.Status == chainstypes.BatchAborted {
+				c.pendingBatchCommands.Delete(batchCommandId)
+				log.Debug().
+					Str("Chain", destChain).
+					Str("BatchCommandId", batchCommandId).
+					Msgf("[ScalarClient] [processBatchCommands] BatchCommand is aborted. Remove it from pending buffer")
 			} else {
 				log.Debug().
 					Str("Chain", destChain).
 					Str("BatchCommandId", batchCommandId).
-					Msgf("[ScalarClient] [processBatchCommands] BatchCommand is not signed. Current status %v: ", res.Status)
+					Msgf("[ScalarClient] [processBatchCommands] Current batch status %v: ", res.Status)
 			}
 		}
 		time.Sleep(c.getSleepInterval())

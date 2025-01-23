@@ -92,7 +92,7 @@ package db
 // 			strings.ToLower(contractCall.DestContractAddress),
 // 			strings.ToLower(contractCall.SourceAddress),
 // 			strings.ToLower(contractCall.PayloadHash)).
-// 		Where("status IN ?", []int{int(PENDING), int(APPROVED)}).
+// 		Where("status IN (?)", []int{int(PENDING), int(APPROVED)}).
 // 		Preload("CallContract").
 // 		Find(&relayDatas)
 
