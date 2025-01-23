@@ -139,7 +139,7 @@ func (c *Client) tryCreateCommandOutpoints(pendingCommands []chainstypes.QueryCo
 		commandOutPoint, err := TryExtractCommandOutPoint(cmd)
 		if err == nil {
 			outpoints = append(outpoints, commandOutPoint)
-		} else if err != nil {
+		} else {
 			log.Debug().Err(err).Msg("[BtcClient] [tryCreatePsbtRequest] failed to parse command to outpoint")
 		}
 	}
