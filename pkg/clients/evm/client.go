@@ -482,13 +482,13 @@ func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) error {
 	done := false
 	for !done {
 		select {
-		case err := <-subscription.Err():
-			log.Error().Err(err).Msg("[EvmClient] [watchContractCall] error with subscription, perform reconnect")
-			subscription, err = c.Gateway.WatchContractCall(watchOpts, sink, nil, nil)
-			if err != nil {
-				log.Error().Err(err).Msg("[EvmClient] [watchContractCall] Error with subscription, waiting for awhile before reconnect")
-				time.Sleep(5 * time.Second)
-			}
+		// case err := <-subscription.Err():
+		// 	log.Error().Err(err).Msg("[EvmClient] [watchContractCall] error with subscription, perform reconnect")
+		// 	subscription, err = c.Gateway.WatchContractCall(watchOpts, sink, nil, nil)
+		// 	if err != nil {
+		// 		log.Error().Err(err).Msg("[EvmClient] [watchContractCall] Error with subscription, waiting for awhile before reconnect")
+		// 		time.Sleep(5 * time.Second)
+		// 	}
 		case event := <-sink:
 			log.Info().Msg("[EvmClient] [watchContractCall] received event")
 			err := c.handleContractCall(event)
@@ -517,13 +517,13 @@ func (c *EvmClient) watchContractCallWithToken(watchOpts *bind.WatchOpts) error 
 	done := false
 	for !done {
 		select {
-		case err := <-subscription.Err():
-			log.Error().Err(err).Msg("[EvmClient] [watchContractCallWithToken] error with subscription, perform reconnect")
-			subscription, err = c.Gateway.WatchContractCallWithToken(watchOpts, sink, nil, nil)
-			if err != nil {
-				log.Error().Err(err).Msg("[EvmClient] [watchContractCallWithToken] Error with subscription, waiting for awhile before reconnect")
-				time.Sleep(5 * time.Second)
-			}
+		// case err := <-subscription.Err():
+		// 	log.Error().Err(err).Msg("[EvmClient] [watchContractCallWithToken] error with subscription, perform reconnect")
+		// 	subscription, err = c.Gateway.WatchContractCallWithToken(watchOpts, sink, nil, nil)
+		// 	if err != nil {
+		// 		log.Error().Err(err).Msg("[EvmClient] [watchContractCallWithToken] Error with subscription, waiting for awhile before reconnect")
+		// 		time.Sleep(5 * time.Second)
+		// 	}
 		case <-watchOpts.Context.Done():
 			log.Info().Msgf("[EvmClient] [watchContractCallWithToken] context done")
 			done = true
@@ -554,13 +554,13 @@ func (c *EvmClient) watchContractCallApproved(watchOpts *bind.WatchOpts) error {
 		// case <-timeout:
 		// 	log.Error().Msgf("[EvmClient] [watchContractCall] timeout")
 		// 	return
-		case err := <-subscription.Err():
-			log.Error().Err(err).Msg("[EvmClient] [watchContractCallApproved] error with subscription, perform reconnect")
-			subscription, err = c.Gateway.WatchContractCallApproved(watchOpts, sink, nil, nil, nil)
-			if err != nil {
-				log.Error().Err(err).Msg("[EvmClient] [watchContractCallApproved] Error with subscription, waiting for awhile before reconnect")
-				time.Sleep(5 * time.Second)
-			}
+		// case err := <-subscription.Err():
+		// 	log.Error().Err(err).Msg("[EvmClient] [watchContractCallApproved] error with subscription, perform reconnect")
+		// 	subscription, err = c.Gateway.WatchContractCallApproved(watchOpts, sink, nil, nil, nil)
+		// 	if err != nil {
+		// 		log.Error().Err(err).Msg("[EvmClient] [watchContractCallApproved] Error with subscription, waiting for awhile before reconnect")
+		// 		time.Sleep(5 * time.Second)
+		// 	}
 		case <-watchOpts.Context.Done():
 			log.Info().Msgf("[EvmClient] [watchContractCall] context done")
 			done = true
@@ -587,13 +587,13 @@ func (c *EvmClient) watchCommandExecuted(watchOpts *bind.WatchOpts) error {
 	done := false
 	for !done {
 		select {
-		case err := <-subscription.Err():
-			log.Error().Err(err).Msg("[EvmClient] [watchEVMExecuted] error with subscription, perform reconnect")
-			subscription, err = c.Gateway.WatchExecuted(watchOpts, sink, nil)
-			if err != nil {
-				log.Error().Err(err).Msg("[EvmClient] [watchEVMExecuted] Error with subscription, waiting for awhile before reconnect")
-				time.Sleep(5 * time.Second)
-			}
+		// case err := <-subscription.Err():
+		// 	log.Error().Err(err).Msg("[EvmClient] [watchEVMExecuted] error with subscription, perform reconnect")
+		// 	subscription, err = c.Gateway.WatchExecuted(watchOpts, sink, nil)
+		// 	if err != nil {
+		// 		log.Error().Err(err).Msg("[EvmClient] [watchEVMExecuted] Error with subscription, waiting for awhile before reconnect")
+		// 		time.Sleep(5 * time.Second)
+		// 	}
 		case <-watchOpts.Context.Done():
 			log.Info().Msgf("[EvmClient] [watchEVMExecuted] context done")
 			done = true
@@ -616,13 +616,13 @@ func (c *EvmClient) WatchEVMTokenSent(watchOpts *bind.WatchOpts) error {
 	done := false
 	for !done {
 		select {
-		case err := <-subscription.Err():
-			log.Error().Err(err).Msg("[EvmClient] [watchEVMTokenSent] error with subscription, perform reconnect")
-			subscription, err = c.Gateway.WatchTokenSent(watchOpts, sink, nil)
-			if err != nil {
-				log.Error().Err(err).Msg("[EvmClient] [watchEVMTokenSent] Error with subscription, waiting for awhile before reconnect")
-				time.Sleep(5 * time.Second)
-			}
+		// case err := <-subscription.Err():
+		// 	log.Error().Err(err).Msg("[EvmClient] [watchEVMTokenSent] error with subscription, perform reconnect")
+		// 	subscription, err = c.Gateway.WatchTokenSent(watchOpts, sink, nil)
+		// 	if err != nil {
+		// 		log.Error().Err(err).Msg("[EvmClient] [watchEVMTokenSent] Error with subscription, waiting for awhile before reconnect")
+		// 		time.Sleep(5 * time.Second)
+		// 	}
 		case <-watchOpts.Context.Done():
 			log.Info().Msgf("[EvmClient] [watchEVMTokenSent] context done")
 			done = true
