@@ -107,11 +107,9 @@ func (c *Client) handleMintCommandEvents(ctx context.Context, events []IBCEvent[
 }
 
 func (c *Client) handleContractCallApprovedEvents(ctx context.Context, events []IBCEvent[*chainstypes.ContractCallApproved]) error {
-	entities := make([]models.ContractCallApproved, len(events))
+	entities := make([]scalarnet.ContractCallApproved, len(events))
 	for i, event := range events {
-		model := models.ContractCallApproved{}
-		model.BindCallContractApprovedFromScalarEvent(event.Args)
-		entities[i] = model
+		entities[i] = CreateCallContractApprovedFromScalarEvent(event.Args)
 	}
 	return c.dbAdapter.CreateOrUpdateContractCallApproveds(entities)
 	// updates := make([]db.RelaydataExecuteResult, 0)
@@ -151,11 +149,9 @@ func (c *Client) handleContractCallApprovedEvents(ctx context.Context, events []
 
 func (c *Client) handleContractCallWithMintApprovedEvents(ctx context.Context, events []IBCEvent[*chainstypes.EventContractCallWithMintApproved]) error {
 	log.Debug().Msgf("[ScalarClient] [handleContractCallWithTokenApprovedEvents] update ContractCallWithToken status to Approved")
-	entities := make([]models.ContractCallApprovedWithMint, len(events))
+	entities := make([]scalarnet.ContractCallApprovedWithMint, len(events))
 	for i, event := range events {
-		model := models.ContractCallApprovedWithMint{}
-		model.BindCallContractApprovedWithMintFromScalarEvent(event.Args)
-		entities[i] = model
+		entities[i] = CreateCallContractApprovedWithMintFromScalarEvent(event.Args)
 	}
 	return c.dbAdapter.CreateOrUpdateContractCallApprovedWithMints(entities)
 	// updates := make([]db.RelaydataExecuteResult, 0)
@@ -338,15 +334,27 @@ func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string
 
 func (c *Client) handleCompletedEvents(ctx context.Context, events []IBCEvent[*chainstypes.ChainEventCompleted]) error {
 	for _, event := range events {
-		err := c.handleCompletedEvent(ctx, &event)
-		if err != nil {
-			return err
+		switch event.Args.Type {
+		case "Event_ContractCall":
+			err := c.handleContractCallCompletedEvent(ctx, &event)
+			if err != nil {
+				return err
+			}
+		case "Event_ContractCallWithToken":
+			err := c.handleContractCallWithTokenCompletedEvent(ctx, &event)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
-func (c *Client) handleCompletedEvent(ctx context.Context, event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
-	payload, err := c.preprocessEVMCompletedEvent(event)
+func (c *Client) handleContractCallCompletedEvent(ctx context.Context, event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
+	callConttract, err := c.dbAdapter.FindCallContractPayloadByEventId(string(event.Args.EventID))
+	if err != nil {
+		return fmt.Errorf("failed to get payload: %w", err)
+	}
+	payload := hex.EncodeToString(callConttract.Payload)
 	if err != nil {
 		return err
 	}
@@ -354,7 +362,7 @@ func (c *Client) handleCompletedEvent(ctx context.Context, event *IBCEvent[*chai
 	var sequence *int = nil
 	var eventId = string(event.Args.EventID)
 	//1. Sign and broadcast RouteMessageRequest
-	txRes, err := c.network.SendRouteMessageRequest(ctx, eventId, payload.(string))
+	txRes, err := c.network.SendRouteMessageRequest(ctx, eventId, payload)
 	if err != nil {
 		log.Error().Msgf("failed to send route message request: %+v", err)
 	}
@@ -378,15 +386,8 @@ func (c *Client) handleCompletedEvent(ctx context.Context, event *IBCEvent[*chai
 	}
 	return nil
 }
-
-func (c *Client) preprocessEVMCompletedEvent(event *IBCEvent[*chainstypes.ChainEventCompleted]) (any, error) {
-	log.Debug().Msgf("EVMCompletedEvent: %v", event)
-	callConttract, err := c.dbAdapter.FindCallContractPayloadByEventId(string(event.Args.EventID))
-	if err != nil {
-		return "", fmt.Errorf("failed to get payload: %w", err)
-	}
-	payload := hex.EncodeToString(callConttract.Payload)
-	return payload, nil
+func (c *Client) handleContractCallWithTokenCompletedEvent(ctx context.Context, event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
+	return nil
 }
 
 func findEventAttribute(events []sdk.StringEvent, eventType string, attrKey string) string {

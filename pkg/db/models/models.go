@@ -1,8 +1,6 @@
 package models
 
 import (
-	"time"
-
 	"gorm.io/gorm"
 )
 
@@ -91,27 +89,27 @@ type CommandExecuted struct {
 	Status           int `gorm:"default:0"`
 }
 
-type ContractCallApprovedWithMint struct {
-	ContractCallApproved
-	Symbol string `gorm:"type:varchar(255)"`
-	Amount uint64 `gorm:"type:bigint"`
-}
-type ContractCallApproved struct {
-	EventID          string    `gorm:"primaryKey"`
-	TxHash           string    `gorm:"type:varchar(255)"`
-	SourceChain      string    `gorm:"type:varchar(255)"`
-	DestinationChain string    `gorm:"type:varchar(255)"`
-	CommandID        string    `gorm:"type:varchar(255)"`
-	Sender           string    `gorm:"type:varchar(255)"`
-	ContractAddress  string    `gorm:"type:varchar(255)"`
-	PayloadHash      string    `gorm:"type:varchar(255)"`
-	Status           int       `gorm:"default:1"`
-	SourceTxHash     string    `gorm:"type:varchar(255)"`
-	SourceEventIndex uint64    `gorm:"type:bigint"`
-	CreatedAt        time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
-	UpdatedAt        time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
-	DeletedAt        gorm.DeletedAt
-}
+// type ContractCallApprovedWithMint struct {
+// 	ContractCallApproved
+// 	Symbol string `gorm:"type:varchar(255)"`
+// 	Amount uint64 `gorm:"type:bigint"`
+// }
+// type ContractCallApproved struct {
+// 	EventID          string    `gorm:"primaryKey"`
+// 	TxHash           string    `gorm:"type:varchar(255)"`
+// 	SourceChain      string    `gorm:"type:varchar(255)"`
+// 	DestinationChain string    `gorm:"type:varchar(255)"`
+// 	CommandID        string    `gorm:"type:varchar(255)"`
+// 	Sender           string    `gorm:"type:varchar(255)"`
+// 	ContractAddress  string    `gorm:"type:varchar(255)"`
+// 	PayloadHash      string    `gorm:"type:varchar(255)"`
+// 	Status           int       `gorm:"default:1"`
+// 	SourceTxHash     string    `gorm:"type:varchar(255)"`
+// 	SourceEventIndex uint64    `gorm:"type:bigint"`
+// 	CreatedAt        time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+// 	UpdatedAt        time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+// 	DeletedAt        gorm.DeletedAt
+// }
 
 // type TokenSent struct {
 // 	EventID              string `gorm:"primaryKey"`
@@ -134,24 +132,24 @@ type ContractCallApproved struct {
 // 	DeletedAt            gorm.DeletedAt
 // }
 
-type TokenSentApproved struct {
-	EventID            string `gorm:"primaryKey;type:varchar(255)"`
-	SourceChain        string `gorm:"type:varchar(255)"`
-	SourceAddress      string `gorm:"type:varchar(255)"`
-	DestinationChain   string `gorm:"type:varchar(255)"`
-	DestinationAddress string `gorm:"type:varchar(255)"`
-	TxHash             string `gorm:"type:varchar(255)"`
-	BlockNumber        uint64
-	LogIndex           uint
-	Amount             uint64 `gorm:"type:bigint"`
-	Symbol             string `gorm:"type:varchar(255)"`
-	Status             int    `gorm:"default:0"`
-	ContractAddress    string `gorm:"type:varchar(255)"`
-	SourceTxHash       string `gorm:"type:varchar(255)"`
-	SourceEventIndex   uint64
-	CommandId          string
-	TransferID         uint64    `gorm:"type:bigint"`
-	CreatedAt          time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
-	UpdatedAt          time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
-	DeletedAt          gorm.DeletedAt
-}
+// type TokenSentApproved struct {
+// 	EventID            string `gorm:"primaryKey;type:varchar(255)"`
+// 	SourceChain        string `gorm:"type:varchar(255)"`
+// 	SourceAddress      string `gorm:"type:varchar(255)"`
+// 	DestinationChain   string `gorm:"type:varchar(255)"`
+// 	DestinationAddress string `gorm:"type:varchar(255)"`
+// 	TxHash             string `gorm:"type:varchar(255)"`
+// 	BlockNumber        uint64
+// 	LogIndex           uint
+// 	Amount             uint64 `gorm:"type:bigint"`
+// 	Symbol             string `gorm:"type:varchar(255)"`
+// 	Status             int    `gorm:"default:0"`
+// 	ContractAddress    string `gorm:"type:varchar(255)"`
+// 	SourceTxHash       string `gorm:"type:varchar(255)"`
+// 	SourceEventIndex   uint64
+// 	CommandId          string
+// 	TransferID         uint64    `gorm:"type:bigint"`
+// 	CreatedAt          time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+// 	UpdatedAt          time.Time `gorm:"type:timestamp(6);default:current_timestamp(6)"`
+// 	DeletedAt          gorm.DeletedAt
+// }

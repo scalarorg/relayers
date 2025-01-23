@@ -97,6 +97,7 @@ func UnmarshalTokenSent(jsonData map[string]string, e *types.EventTokenSent) err
 	if ok {
 		e.TransferID = exported.TransferID(transferId.Uint64())
 	}
+	e.CommandID = removeQuote(jsonData["command_id"])
 	assetData, ok := jsonData["asset"]
 	if ok {
 		e.Asset, _ = UnamrshalAsset(assetData)

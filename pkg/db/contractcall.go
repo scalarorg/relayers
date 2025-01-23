@@ -64,7 +64,7 @@ func (db *DatabaseAdapter) FindContractCallByParams(sourceAddress string, destCo
 			strings.ToLower(destContractAddress),
 			strings.ToLower(sourceAddress),
 			strings.ToLower(payloadHash)).
-		Where("status IN ?", []chains.ContractCallStatus{chains.ContractCallStatusPending, chains.ContractCallStatusApproved}).
+		Where("status IN (?)", []chains.ContractCallStatus{chains.ContractCallStatusPending, chains.ContractCallStatusApproved}).
 		Preload("CallContract").
 		Find(&contractCalls)
 
@@ -166,7 +166,7 @@ func (db *DatabaseAdapter) UpdateBatchContractCallStatus(data []ContractCallExec
 
 func (db *DatabaseAdapter) UpdateContractCallWithMintsStatus(ctx context.Context, cmdIds []string, status chains.TokenSentStatus) error {
 	log.Debug().Any("cmdIds", cmdIds).Msg("UpdateContractCallWithMintsStatus")
-	eventIds := db.PostgresClient.Model(&scalarnet.ContractCallApprovedWithMint{}).Select("event_id").Where("command_id IN ?", cmdIds)
-	tx := db.PostgresClient.Model(&chains.ContractCallWithToken{}).Where("event_id IN ?", eventIds).Update("status", status)
+	eventIds := db.PostgresClient.Model(&scalarnet.ContractCallApprovedWithMint{}).Select("event_id").Where("command_id IN (?)", cmdIds)
+	tx := db.PostgresClient.Model(&chains.ContractCallWithToken{}).Where("event_id IN (?)", eventIds).Update("status", status)
 	return tx.Error
 }

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	chains "github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/scalarnet"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
-	"github.com/scalarorg/relayers/pkg/db/models"
 )
 
 func (c *EvmClient) ContractCallEvent2Model(event *contracts.IScalarGatewayContractCall) (chains.ContractCall, error) {
@@ -48,6 +48,7 @@ func (c *EvmClient) ContractCallEvent2Model(event *contracts.IScalarGatewayContr
 
 func (c *EvmClient) ContractCallWithToken2Model(event *contracts.IScalarGatewayContractCallWithToken) (chains.ContractCallWithToken, error) {
 	eventId := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
+	eventId = strings.TrimPrefix(eventId, "0x")
 	senderAddress := event.Sender.String()
 	callContract := chains.ContractCall{
 		EventID:     eventId,
@@ -102,14 +103,14 @@ func (c *EvmClient) GetTokenContractAddressFromSymbol(chainId string, symbol str
 	}
 	return ""
 }
-func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGatewayContractCallApproved) (models.ContractCallApproved, error) {
+func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGatewayContractCallApproved) (scalarnet.ContractCallApproved, error) {
 	txHash := event.Raw.TxHash.String()
 	eventId := strings.ToLower(fmt.Sprintf("%s-%d-%d", txHash, event.SourceEventIndex, event.Raw.Index))
 	sourceEventIndex := uint64(0)
 	if event.SourceEventIndex != nil && event.SourceEventIndex.IsUint64() {
 		sourceEventIndex = event.SourceEventIndex.Uint64()
 	}
-	record := models.ContractCallApproved{
+	record := scalarnet.ContractCallApproved{
 		EventID:          eventId,
 		SourceChain:      event.SourceChain,
 		DestinationChain: c.EvmConfig.GetId(),

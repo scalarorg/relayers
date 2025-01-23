@@ -59,7 +59,7 @@ func (db *DatabaseAdapter) SaveTokenSent(tokenSent chains.TokenSent, lastCheckpo
 
 func (db *DatabaseAdapter) UpdateTokenSentsStatus(ctx context.Context, cmdIds []string, status chains.TokenSentStatus) error {
 	log.Debug().Any("cmdIds", cmdIds).Msg("UpdateTokenSentsStatus")
-	eventIds := db.PostgresClient.Model(&scalarnet.TokenSentApproved{}).Select("event_id").Where("transfer_id IN ?", cmdIds)
-	tx := db.PostgresClient.Model(&chains.TokenSent{}).Where("event_id IN ?", eventIds).Update("status", status)
+	eventIds := db.PostgresClient.Model(&scalarnet.TokenSentApproved{}).Select("event_id").Where("command_id IN (?)", cmdIds)
+	tx := db.PostgresClient.Model(&chains.TokenSent{}).Where("event_id IN (?)", eventIds).Update("status", status)
 	return tx.Error
 }

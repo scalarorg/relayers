@@ -60,13 +60,13 @@ func (db *DatabaseAdapter) SaveTokenSentApproveds(approvals []scalarnet.TokenSen
 // -------------------------------------------------------------------------------------------------
 // Add methods to DBAdapter for ContractCallApprovedWithMint operations
 // -------------------------------------------------------------------------------------------------
-func (db *DatabaseAdapter) CreateOrUpdateContractCallApprovedWithMints(approvals []models.ContractCallApprovedWithMint) error {
+func (db *DatabaseAdapter) CreateOrUpdateContractCallApprovedWithMints(approvals []scalarnet.ContractCallApprovedWithMint) error {
 	return db.PostgresClient.Save(approvals).Error
 }
 
 // -------------------------------------------------------------------------------------------------
 // Add methods to DBAdapter for ContractCallApproved operations
 // -------------------------------------------------------------------------------------------------
-func (db *DatabaseAdapter) CreateOrUpdateContractCallApproveds(approvals []models.ContractCallApproved) error {
+func (db *DatabaseAdapter) CreateOrUpdateContractCallApproveds(approvals []scalarnet.ContractCallApproved) error {
 	return db.PostgresClient.Save(approvals).Error
 }
