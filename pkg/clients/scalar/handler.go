@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -335,60 +334,112 @@ func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string
 func (c *Client) handleCompletedEvents(ctx context.Context, events []IBCEvent[*chainstypes.ChainEventCompleted]) error {
 	for _, event := range events {
 		switch event.Args.Type {
-		case "Event_ContractCall":
-			err := c.handleContractCallCompletedEvent(ctx, &event)
-			if err != nil {
-				return err
-			}
+		// TODO: Currently, we only support contract call with token and token sent
+		// case "Event_ContractCall":
+		// 	err := c.handleContractCallCompletedEvent(ctx, &event)
+		// 	if err != nil {
+		// 		return err
+		// 	}
 		case "Event_ContractCallWithToken":
-			err := c.handleContractCallWithTokenCompletedEvent(ctx, &event)
+			err := c.handleContractCallWithTokenCompletedEvent(&event)
 			if err != nil {
 				return err
 			}
+		case "Event_TokenSent":
+			err := c.handleTokenSentCompletedEvent(&event)
+			if err != nil {
+				return err
+			}
+		default:
+			log.Warn().Msgf("[ScalarClient] [handleCompletedEvents] unsupported event type: %s", event.Args.Type)
 		}
+
 	}
 	return nil
 }
-func (c *Client) handleContractCallCompletedEvent(ctx context.Context, event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
-	callConttract, err := c.dbAdapter.FindCallContractPayloadByEventId(string(event.Args.EventID))
-	if err != nil {
-		return fmt.Errorf("failed to get payload: %w", err)
-	}
-	payload := hex.EncodeToString(callConttract.Payload)
-	if err != nil {
-		return err
-	}
-	status := chains.ContractCallStatusFailed
-	var sequence *int = nil
-	var eventId = string(event.Args.EventID)
-	//1. Sign and broadcast RouteMessageRequest
-	txRes, err := c.network.SendRouteMessageRequest(ctx, eventId, payload)
-	if err != nil {
-		log.Error().Msgf("failed to send route message request: %+v", err)
-	}
-	log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] txRes: %v", txRes)
-	if strings.Contains(txRes.RawLog, "already executed") {
-		log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] Already sent an executed tx for %s. Marked it as success.", eventId)
-		status = chains.ContractCallStatusSuccess
-	} else {
-		log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] Executed RouteMessageRequest %s.", txRes.TxHash)
-		attrValue := findEventAttribute(txRes.Logs[0].Events, "send_packet", "packet_sequence")
-		if attrValue != "" {
-			value, _ := strconv.Atoi(attrValue)
-			sequence = &value
-		}
-		status = chains.ContractCallStatusFailed
-	}
-	//2. Update the db
-	err = c.dbAdapter.UpdateEventStatusWithPacketSequence(eventId, status, sequence)
-	if err != nil {
-		return fmt.Errorf("failed to update Event status: %w", err)
-	}
+
+func (c *Client) handleContractCallWithTokenCompletedEvent(event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
+	c.dbAdapter.PostgresClient.Model(&chains.ContractCallWithToken{}).Where("event_id = ?", event.Args.EventID).Update("status", chains.ContractCallStatusSuccess)
 	return nil
 }
-func (c *Client) handleContractCallWithTokenCompletedEvent(ctx context.Context, event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
+
+func (c *Client) handleTokenSentCompletedEvent(event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
+	c.dbAdapter.PostgresClient.Model(&chains.TokenSent{}).Where("event_id = ?", event.Args.EventID).Update("status", chains.TokenSentStatusSuccess)
 	return nil
 }
+
+// func (c *Client) handleContractCallCompletedEvent(ctx context.Context, event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
+// 	callConttract, err := c.dbAdapter.FindContractCallWithTokenPayloadByEventId(string(event.Args.EventID))
+// 	if err != nil {
+// 		return fmt.Errorf("failed to get payload: %w", err)
+// 	}
+// 	payload := hex.EncodeToString(callConttract.Payload)
+// 	status := chains.ContractCallStatusFailed
+// 	var sequence *int = nil
+// 	var eventId = string(event.Args.EventID)
+// 	//1. Sign and broadcast RouteMessageRequest
+// 	txRes, err := c.network.SendRouteMessageRequest(ctx, eventId, payload)
+// 	if err != nil {
+// 		log.Error().Msgf("failed to send route message request: %+v", err)
+// 	}
+// 	log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] txRes: %v", txRes)
+// 	if strings.Contains(txRes.RawLog, "already executed") {
+// 		log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] Already sent an executed tx for %s. Marked it as success.", eventId)
+// 		status = chains.ContractCallStatusSuccess
+// 	} else {
+// 		log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] Executed RouteMessageRequest %s.", txRes.TxHash)
+// 		attrValue := findEventAttribute(txRes.Logs[0].Events, "send_packet", "packet_sequence")
+// 		if attrValue != "" {
+// 			value, _ := strconv.Atoi(attrValue)
+// 			sequence = &value
+// 		}
+// 		status = chains.ContractCallStatusFailed
+// 	}
+// 	//2. Update the db
+// 	err = c.dbAdapter.UpdateEventStatusWithPacketSequence(eventId, status, sequence)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to update Event status: %w", err)
+// 	}
+// 	return nil
+// }
+
+// func (c *Client) handleTokenSentCompletedEvent(ctx context.Context, event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
+// 	callConttract, err := c.dbAdapter.FindContractCallWithTokenPayloadByEventId(string(event.Args.EventID))
+// 	if err != nil {
+// 		return fmt.Errorf("failed to get payload: %w", err)
+// 	}
+// 	payload := hex.EncodeToString(callConttract.Payload)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	status := chains.ContractCallStatusFailed
+// 	var sequence *int = nil
+// 	var eventId = string(event.Args.EventID)
+// 	//1. Sign and broadcast RouteMessageRequest
+// 	txRes, err := c.network.SendRouteMessageRequest(ctx, eventId, payload)
+// 	if err != nil {
+// 		log.Error().Msgf("failed to send route message request: %+v", err)
+// 	}
+// 	log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] txRes: %v", txRes)
+// 	if strings.Contains(txRes.RawLog, "already executed") {
+// 		log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] Already sent an executed tx for %s. Marked it as success.", eventId)
+// 		status = chains.ContractCallStatusSuccess
+// 	} else {
+// 		log.Debug().Msgf("[ScalarClient] [handleEVMCompletedEvent] Executed RouteMessageRequest %s.", txRes.TxHash)
+// 		attrValue := findEventAttribute(txRes.Logs[0].Events, "send_packet", "packet_sequence")
+// 		if attrValue != "" {
+// 			value, _ := strconv.Atoi(attrValue)
+// 			sequence = &value
+// 		}
+// 		status = chains.ContractCallStatusFailed
+// 	}
+// 	//2. Update the db
+// 	err = c.dbAdapter.UpdateEventStatusWithPacketSequence(eventId, status, sequence)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to update Event status: %w", err)
+// 	}
+// 	return nil
+// }
 
 func findEventAttribute(events []sdk.StringEvent, eventType string, attrKey string) string {
 	for _, event := range events {

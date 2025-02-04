@@ -198,7 +198,7 @@ func (ec *EvmClient) handleScalarContractCallApproved(messageID string, executeD
 	//2. Add the transaction waiting to be mined
 	ec.pendingTxs.AddTx(txHash, time.Now())
 	//3. Update status of the event
-	err = ec.dbAdapter.UpdateCallContractWithExecuteHash(messageID, chains.ContractCallStatusSuccess, &txHash)
+	err = ec.dbAdapter.UpdateCallContractWithTokenExecuteHash(messageID, chains.ContractCallStatusSuccess, txHash)
 	if err != nil {
 		log.Error().Err(err).Str("txHash", txHash).Msg("[EvmClient] [handleScalarContractCallApproved]")
 		return err

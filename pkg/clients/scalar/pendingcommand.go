@@ -114,7 +114,7 @@ func (c *Client) checkChainPendingCommands(ctx context.Context, chain string) bo
 		// Otherwise, pending command contains a single command, which allready has psbt, we just need to sign it
 		commandOutpoints := c.tryCreateCommandOutpoints(pendingCommands)
 		if len(commandOutpoints) == 0 {
-			log.Error().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] psbt already formed. Just append empty psbt to pending commands and waiting to broadcast signing request")
+			log.Warn().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] psbt already formed. Just append empty psbt to pending commands and waiting to broadcast signing request")
 			emptyPsbt := covtypes.Psbt{}
 			c.appendPendingPsbt(chain, []covtypes.Psbt{emptyPsbt})
 
@@ -140,7 +140,7 @@ func (c *Client) tryCreateCommandOutpoints(pendingCommands []chainstypes.QueryCo
 		if err == nil {
 			outpoints = append(outpoints, commandOutPoint)
 		} else {
-			log.Debug().Err(err).Msg("[BtcClient] [tryCreatePsbtRequest] failed to parse command to outpoint")
+			log.Debug().Any("Command", cmd).Msg("[BtcClient] [tryCreatePsbtRequest] failed to parse command to outpoint")
 		}
 	}
 	return outpoints

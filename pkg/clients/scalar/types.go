@@ -4,12 +4,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/relayers/pkg/utils"
 	"github.com/scalarorg/scalar-core/x/chains/types"
 	"github.com/scalarorg/scalar-core/x/nexus/exported"
 )
@@ -91,7 +91,7 @@ func UnmarshalTokenSent(jsonData map[string]string, e *types.EventTokenSent) err
 	e.Sender = removeQuote(jsonData["sender"])
 	e.DestinationAddress = removeQuote(jsonData["destination_address"])
 	e.DestinationChain = exported.ChainName(removeQuote(jsonData["destination_chain"]))
-	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
+	eventId := utils.NormalizeHash(removeQuote(jsonData["event_id"]))
 	e.EventID = types.EventID(eventId)
 	transferId, ok := sdk.NewIntFromString(removeQuote(jsonData["transfer_id"]))
 	if ok {
@@ -109,7 +109,7 @@ func UnmarshalTokenSent(jsonData map[string]string, e *types.EventTokenSent) err
 
 func UnmarshalChainEventCompleted(jsonData map[string]string, e *types.ChainEventCompleted) error {
 	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
-	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
+	eventId := utils.NormalizeHash(removeQuote(jsonData["event_id"]))
 	e.EventID = types.EventID(eventId)
 	e.Type = removeQuote(jsonData["type"])
 	return nil
@@ -117,7 +117,7 @@ func UnmarshalChainEventCompleted(jsonData map[string]string, e *types.ChainEven
 
 func UnmarshalContractCallApproved(jsonData map[string]string, e *types.ContractCallApproved) error {
 	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
-	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
+	eventId := utils.NormalizeHash(removeQuote(jsonData["event_id"]))
 	e.EventID = types.EventID(eventId)
 	commandIDHex, err := DecodeIntArrayToHexString(jsonData["command_id"])
 	if err != nil {
@@ -140,7 +140,7 @@ func UnmarshalContractCallApproved(jsonData map[string]string, e *types.Contract
 
 func UnmarshalContractCallWithMintApproved(jsonData map[string]string, e *types.EventContractCallWithMintApproved) error {
 	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
-	eventId := strings.TrimPrefix(removeQuote(jsonData["event_id"]), "0x")
+	eventId := utils.NormalizeHash(removeQuote(jsonData["event_id"]))
 	e.EventID = types.EventID(eventId)
 	commandIDHex, err := DecodeIntArrayToHexString(jsonData["command_id"])
 	if err != nil {

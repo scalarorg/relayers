@@ -5,6 +5,7 @@ import (
 
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/db/models"
+	"github.com/scalarorg/relayers/pkg/utils"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -89,7 +90,7 @@ func UpdateLastEventCheckPoint(db *gorm.DB, value *models.EventCheckPoint) error
 			Columns: []clause.Column{{Name: "chain_name"}, {Name: "event_name"}},
 			DoUpdates: clause.Assignments(map[string]interface{}{
 				"block_number": value.BlockNumber,
-				"tx_hash":      value.TxHash,
+				"tx_hash":      utils.NormalizeHash(value.TxHash),
 				"log_index":    value.LogIndex,
 				"event_key":    value.EventKey,
 			}),

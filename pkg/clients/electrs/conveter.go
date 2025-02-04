@@ -1,16 +1,15 @@
 package electrs
 
 import (
-	"encoding/binary"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/go-electrum/electrum/types"
 	relaytypes "github.com/scalarorg/relayers/pkg/types"
+	"github.com/scalarorg/relayers/pkg/utils"
 )
 
 func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chains.TokenSent, []*relaytypes.UnstakedVaultTx) {
@@ -39,12 +38,15 @@ func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chain
 func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (chains.TokenSent, error) {
 	//For btc vault tx, the log index is tx position in the block
 	index := vaultTx.TxPosition
-	eventId := fmt.Sprintf("%s-%d", strings.ToLower(vaultTx.TxHash), index)
-	eventId = strings.TrimPrefix(eventId, "0x")
-	destAddress := strings.ToLower(vaultTx.DestRecipientAddress)
-	if !strings.HasPrefix(destAddress, "0x") {
-		destAddress = "0x" + destAddress
+	eventId := fmt.Sprintf("%s-%d", utils.NormalizeHash(vaultTx.TxHash), index)
+
+	chainInfo, err := utils.ConvertUint64ToChainInfo(vaultTx.DestChain)
+	if err != nil {
+		return chains.TokenSent{}, fmt.Errorf("failed to convert uint64 to chain info: %w", err)
 	}
+
+	destAddress := utils.NormalizeAddress(vaultTx.DestRecipientAddress, chainInfo.ChainType)
+
 	tokenSent := chains.TokenSent{
 		EventID:              eventId,
 		TxHash:               vaultTx.TxHash,
@@ -60,12 +62,7 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (chains.TokenSe
 		UpdatedAt:            time.Unix(int64(vaultTx.Timestamp), 0),
 	}
 	//parse chain id to chain name
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, vaultTx.DestChain)
-	chainInfo := chain.NewChainInfoFromBytes(buf)
-	if chainInfo == nil {
-		return tokenSent, fmt.Errorf("invalid destination chain: %d", vaultTx.DestChain)
-	}
+
 	destinationChainName, err := c.globalConfig.GetStringIdByChainId(chainInfo.ChainType.String(), chainInfo.ChainID)
 	if err != nil {
 		return tokenSent, fmt.Errorf("chain not found for input chainId: %v, %w	", chainInfo, err)
@@ -76,18 +73,6 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (chains.TokenSe
 		return tokenSent, fmt.Errorf("failed to get symbol: %w", err)
 	}
 	tokenSent.Symbol = symbol
-	// Convert VaultTxHex and Payload to byte slices
-	// txHexBytes, err := hex.DecodeString(strings.TrimPrefix(vaultTx.TxContent, "0x"))
-	// if err != nil {
-	// 	return relayData, fmt.Errorf("failed to decode VaultTxHex: %w", err)
-	// }
-	// relayData.CallContract.TxHex = txHexBytes
-	// payloadBytes, payloadHash, err := evm.CalculateStakingPayload(&vaultTx)
-	// if err != nil {
-	// 	return relayData, fmt.Errorf("failed to decode Payload: %w", err)
-	// }
-	// relayData.CallContract.Payload = payloadBytes
-	// relayData.CallContract.PayloadHash = strings.ToLower(payloadHash)
 	return tokenSent, nil
 }
 

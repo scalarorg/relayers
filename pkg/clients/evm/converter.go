@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"strings"
 
+	chainTypes "github.com/scalarorg/bitcoin-vault/go-utils/chain"
 	chains "github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
+	"github.com/scalarorg/relayers/pkg/utils"
 )
 
 func (c *EvmClient) ContractCallEvent2Model(event *contracts.IScalarGatewayContractCall) (chains.ContractCall, error) {
@@ -27,9 +29,14 @@ func (c *EvmClient) ContractCallEvent2Model(event *contracts.IScalarGatewayContr
 	// 		break
 	// 	}
 	// }
-	eventId := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
-	eventId = strings.TrimPrefix(eventId, "0x")
+	eventId := fmt.Sprintf("%s-%d", utils.NormalizeHash(event.Raw.TxHash.String()), event.Raw.Index)
 	senderAddress := event.Sender.String()
+
+	chainInfoBytes := chainTypes.ChainInfoBytes{}
+	err := chainInfoBytes.FromString(event.DestinationChain)
+	if err != nil {
+		return chains.ContractCall{}, fmt.Errorf("failed to convert destination chain: %w", err)
+	}
 	contractCall := chains.ContractCall{
 		EventID:     eventId,
 		TxHash:      event.Raw.TxHash.String(),
@@ -37,37 +44,45 @@ func (c *EvmClient) ContractCallEvent2Model(event *contracts.IScalarGatewayContr
 		LogIndex:    event.Raw.Index,
 		SourceChain: c.EvmConfig.GetId(),
 		//3 follows field are used for query to get back payload, so need to convert to lower case
-		DestinationChain:    event.DestinationChain,
-		DestContractAddress: strings.ToLower(event.DestinationContractAddress),
-		SourceAddress:       strings.ToLower(senderAddress),
-		PayloadHash:         strings.ToLower(hex.EncodeToString(event.PayloadHash[:])),
-		Payload:             event.Payload,
+		DestinationChain: event.DestinationChain,
+		SourceAddress:    utils.NormalizeAddress(senderAddress, chainInfoBytes.ChainType()),
+		PayloadHash:      utils.NormalizeHash(hex.EncodeToString(event.PayloadHash[:])),
+		Payload:          event.Payload,
 	}
 	return contractCall, nil
 }
 
 func (c *EvmClient) ContractCallWithToken2Model(event *contracts.IScalarGatewayContractCallWithToken) (chains.ContractCallWithToken, error) {
-	eventId := strings.ToLower(fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index))
-	eventId = strings.TrimPrefix(eventId, "0x")
+	eventId := fmt.Sprintf("%s-%d", utils.NormalizeHash(event.Raw.TxHash.String()), event.Raw.Index)
 	senderAddress := event.Sender.String()
+
+	chainInfoBytes := chainTypes.ChainInfoBytes{}
+	err := chainInfoBytes.FromString(event.DestinationChain)
+	if err != nil {
+		return chains.ContractCallWithToken{}, fmt.Errorf("failed to convert destination chain: %w", err)
+	}
+
+	destinationAddress, err := utils.CalculateDestinationAddress(event.Payload, &chainInfoBytes)
+	if err != nil {
+		return chains.ContractCallWithToken{}, fmt.Errorf("failed to calculate destination address: %w", err)
+	}
+
 	callContract := chains.ContractCall{
 		EventID:     eventId,
-		TxHash:      event.Raw.TxHash.String(),
+		TxHash:      utils.NormalizeHash(event.Raw.TxHash.String()),
 		BlockNumber: event.Raw.BlockNumber,
 		LogIndex:    event.Raw.Index,
 		SourceChain: c.EvmConfig.GetId(),
 		//3 follows field are used for query to get back payload, so need to convert to lower case
-		DestinationChain:    event.DestinationChain,
-		DestContractAddress: strings.ToLower(event.DestinationContractAddress),
-		SourceAddress:       strings.ToLower(senderAddress),
-		PayloadHash:         strings.ToLower(hex.EncodeToString(event.PayloadHash[:])),
-		Payload:             event.Payload,
-		//Use for bitcoin vault tx only
-		StakerPublicKey: nil,
+		DestinationChain:   event.DestinationChain,
+		DestinationAddress: utils.NormalizeAddress(destinationAddress, chainInfoBytes.ChainType()),
+		SourceAddress:      utils.NormalizeAddress(senderAddress, chainInfoBytes.ChainType()),
+		PayloadHash:        utils.NormalizeHash(hex.EncodeToString(event.PayloadHash[:])),
+		Payload:            event.Payload,
 	}
 	contractCallWithToken := chains.ContractCallWithToken{
 		ContractCall:         callContract,
-		TokenContractAddress: c.GetTokenContractAddressFromSymbol(c.EvmConfig.GetId(), event.Symbol),
+		TokenContractAddress: utils.NormalizeAddress(event.DestinationContractAddress, chainInfoBytes.ChainType()),
 		Symbol:               event.Symbol,
 		Amount:               event.Amount.Uint64(),
 	}
@@ -75,13 +90,13 @@ func (c *EvmClient) ContractCallWithToken2Model(event *contracts.IScalarGatewayC
 }
 
 func (c *EvmClient) TokenSentEvent2Model(event *contracts.IScalarGatewayTokenSent) (chains.TokenSent, error) {
-	eventId := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
-	eventId = strings.TrimPrefix(eventId, "0x")
+	normalizedTxHash := utils.NormalizeHash(event.Raw.TxHash.String())
+	eventId := fmt.Sprintf("%s-%d", normalizedTxHash, event.Raw.Index)
 	senderAddress := event.Sender.String()
 	tokenSent := chains.TokenSent{
 		EventID:     eventId,
 		SourceChain: c.EvmConfig.GetId(),
-		TxHash:      strings.TrimPrefix(event.Raw.TxHash.String(), "0x"),
+		TxHash:      normalizedTxHash,
 		BlockNumber: event.Raw.BlockNumber,
 		LogIndex:    event.Raw.Index,
 		//3 follows field are used for query to get back payload, so need to convert to lower case

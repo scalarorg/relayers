@@ -304,7 +304,9 @@ func (c *BtcClient) handleCustodialSignaturesConfirmed(messageID string, signedP
 	}
 	txHashStr := txHash.String()
 	log.Debug().Msgf("[BtcClient] [handleCustodialSignaturesConfirmed] broadcasted txHash: %s", txHash)
-	err = c.dbAdapter.UpdateCallContractWithExecuteHash(messageID, chains.ContractCallStatusSuccess, &txHashStr)
+	// TODO: distinguish between contract call and contract call with token
+	// call UpdateCallContractWithExecuteHash for contract call with token
+	err = c.dbAdapter.UpdateCallContractWithTokenExecuteHash(messageID, chains.ContractCallStatusSuccess, txHashStr)
 	if err != nil {
 		log.Error().Err(err).
 			Str("messageID", messageID).

@@ -436,8 +436,8 @@ func (c *EvmClient) handleEvent(event any) error {
 		return c.HandleTokenSent(e)
 	case *contracts.IScalarGatewayContractCallWithToken:
 		return c.handleContractCallWithToken(e)
-	case *contracts.IScalarGatewayContractCall:
-		return c.handleContractCall(e)
+	// case *contracts.IScalarGatewayContractCall:
+	// 	return c.handleContractCall(e)
 	case *contracts.IScalarGatewayContractCallApproved:
 		return c.HandleContractCallApproved(e)
 	case *contracts.IScalarGatewayExecuted:
@@ -460,8 +460,8 @@ func watchForEvent(c *EvmClient, ctx context.Context, eventName string) error {
 		return c.WatchEVMTokenSent(&watchOpts)
 	case events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN:
 		return c.watchContractCallWithToken(&watchOpts)
-	case events.EVENT_EVM_CONTRACT_CALL:
-		return c.watchContractCall(&watchOpts)
+	// case events.EVENT_EVM_CONTRACT_CALL:
+	// 	return c.watchContractCall(&watchOpts)
 	case events.EVENT_EVM_CONTRACT_CALL_APPROVED:
 		return c.watchContractCallApproved(&watchOpts)
 	case events.EVENT_EVM_COMMAND_EXECUTED:
@@ -470,41 +470,42 @@ func watchForEvent(c *EvmClient, ctx context.Context, eventName string) error {
 	}
 	return nil
 }
-func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) error {
-	sink := make(chan *contracts.IScalarGatewayContractCall)
-	subscription, err := c.Gateway.WatchContractCall(watchOpts, sink, nil, nil)
-	if err != nil {
-		return err
-	}
-	defer subscription.Unsubscribe()
-	log.Info().Msgf("[EvmClient] [watchContractCall] success. Listening to ContractCallEvent")
-	// timeout := time.After(30 * time.Minute)
-	done := false
-	for !done {
-		select {
-		// case err := <-subscription.Err():
-		// 	log.Error().Err(err).Msg("[EvmClient] [watchContractCall] error with subscription, perform reconnect")
-		// 	subscription, err = c.Gateway.WatchContractCall(watchOpts, sink, nil, nil)
-		// 	if err != nil {
-		// 		log.Error().Err(err).Msg("[EvmClient] [watchContractCall] Error with subscription, waiting for awhile before reconnect")
-		// 		time.Sleep(5 * time.Second)
-		// 	}
-		case event := <-sink:
-			log.Info().Msg("[EvmClient] [watchContractCall] received event")
-			err := c.handleContractCall(event)
-			if err != nil {
-				log.Error().Msgf("Failed to handle ContractCallEvent: %v", err)
-			}
-		// case <-timeout:
-		// 	log.Error().Msgf("[EvmClient] [watchContractCall] timeout")
-		// 	return
-		case <-watchOpts.Context.Done():
-			log.Info().Msgf("[EvmClient] [watchContractCall] context done")
-			done = true
-		}
-	}
-	return nil
-}
+
+//	func (c *EvmClient) watchContractCall(watchOpts *bind.WatchOpts) error {
+//		sink := make(chan *contracts.IScalarGatewayContractCall)
+//		subscription, err := c.Gateway.WatchContractCall(watchOpts, sink, nil, nil)
+//		if err != nil {
+//			return err
+//		}
+//		defer subscription.Unsubscribe()
+//		log.Info().Msgf("[EvmClient] [watchContractCall] success. Listening to ContractCallEvent")
+//		// timeout := time.After(30 * time.Minute)
+//		done := false
+//		for !done {
+//			select {
+//			// case err := <-subscription.Err():
+//			// 	log.Error().Err(err).Msg("[EvmClient] [watchContractCall] error with subscription, perform reconnect")
+//			// 	subscription, err = c.Gateway.WatchContractCall(watchOpts, sink, nil, nil)
+//			// 	if err != nil {
+//			// 		log.Error().Err(err).Msg("[EvmClient] [watchContractCall] Error with subscription, waiting for awhile before reconnect")
+//			// 		time.Sleep(5 * time.Second)
+//			// 	}
+//			case event := <-sink:
+//				log.Info().Msg("[EvmClient] [watchContractCall] received event")
+//				err := c.handleContractCall(event)
+//				if err != nil {
+//					log.Error().Msgf("Failed to handle ContractCallEvent: %v", err)
+//				}
+//			// case <-timeout:
+//			// 	log.Error().Msgf("[EvmClient] [watchContractCall] timeout")
+//			// 	return
+//			case <-watchOpts.Context.Done():
+//				log.Info().Msgf("[EvmClient] [watchContractCall] context done")
+//				done = true
+//			}
+//		}
+//		return nil
+//	}
 func (c *EvmClient) watchContractCallWithToken(watchOpts *bind.WatchOpts) error {
 	sink := make(chan *contracts.IScalarGatewayContractCallWithToken)
 	subscription, err := c.Gateway.WatchContractCallWithToken(watchOpts, sink, nil, nil)

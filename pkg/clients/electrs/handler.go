@@ -108,7 +108,7 @@ func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 func (c *Client) PreProcessVaultsMessages(vaultTxs []types.VaultTransaction) error {
 	log.Info().Msgf("Received %d vault transactions", len(vaultTxs))
 	for _, vaultTx := range vaultTxs {
-		log.Debug().Msgf("Received vaultTx with key=>%v; stakerAddress=>%v; stakerPubkey=>%v", vaultTx.Key, vaultTx.StakerAddress, vaultTx.StakerPubkey)
+		log.Debug().Msgf("Received vaultTx with key=>%v; stakerAddress=>%v; stakerPubkey=>%v, destChain=>%v; destTokenAddress=>%v, destRecipientAddress=>%v", vaultTx.Key, vaultTx.StakerAddress, vaultTx.StakerPubkey, vaultTx.DestChain, vaultTx.DestTokenAddress, vaultTx.DestRecipientAddress)
 	}
 	return nil
 }

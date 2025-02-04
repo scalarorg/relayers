@@ -32,15 +32,16 @@ func (db *DatabaseAdapter) FindContractCallByCommnadId(commandId string) (*chain
 	}
 	return &contractCall, nil
 }
-func (db *DatabaseAdapter) FindCallContractPayloadByEventId(eventId string) (*chains.ContractCall, error) {
-	var contractCall chains.ContractCall
-	result := db.PostgresClient.Where("event_id = ?", eventId).First(&contractCall)
+func (db *DatabaseAdapter) FindContractCallWithTokenPayloadByEventId(eventId string) (*chains.ContractCallWithToken, error) {
+	var contractCallWithToken chains.ContractCallWithToken
+	result := db.PostgresClient.Where("event_id = ?", eventId).First(&contractCallWithToken)
 	if result.Error != nil {
-		log.Error().Err(result.Error).Str("EventId", eventId).Msg("[DatabaseAdapter] [FindCallContractPayloadByEventId] failed to find contract call by event id")
+		log.Error().Err(result.Error).Str("EventId", eventId).Msg("[DatabaseAdapter] [FindContractCallWithTokenPayloadByEventId] failed to find contract call with token by event id")
 		return nil, result.Error
 	}
-	return &contractCall, nil
+	return &contractCallWithToken, nil
 }
+
 func (db *DatabaseAdapter) FindContractCallPayloadByHash(payloadHash string) ([]byte, error) {
 	var contractCall chains.ContractCall
 	log.Debug().Str("payloadHash", payloadHash).Msg("[DatabaseAdapter] [FindPayloadByHash] finding payload by hash")
@@ -78,17 +79,32 @@ func (db *DatabaseAdapter) FindContractCallByParams(sourceAddress string, destCo
 
 }
 
-func (db *DatabaseAdapter) UpdateCallContractWithExecuteHash(eventId string, status chains.ContractCallStatus, executeHash *string) error {
-	data := chains.ContractCall{
-		Status:      status,
-		ExecuteHash: executeHash,
+// func (db *DatabaseAdapter) UpdateCallContractWithExecuteHash(eventId string, status chains.ContractCallStatus, executeHash *string) error {
+// 	data := chains.ContractCall{
+// 		Status:      status,
+// 		ExecuteHash: executeHash,
+// 	}
+// 	updateResult := db.updateCallContract(eventId, data)
+// 	if updateResult.Error != nil {
+// 		return updateResult.Error
+// 	}
+// 	return nil
+// }
+
+func (db *DatabaseAdapter) UpdateCallContractWithTokenExecuteHash(eventId string, status chains.ContractCallStatus, executeHash string) error {
+	data := chains.ContractCallWithToken{
+		ContractCall: chains.ContractCall{
+			Status:      status,
+			ExecuteHash: executeHash,
+		},
 	}
-	updateResult := db.updateCallContract(eventId, data)
+	updateResult := db.updateCallContractWithToken(eventId, data)
 	if updateResult.Error != nil {
 		return updateResult.Error
 	}
 	return nil
 }
+
 func (db *DatabaseAdapter) CreateContractCall(contractCall chains.ContractCall, lastCheckpoint *models.EventCheckPoint) error {
 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
 		result := tx.Save(&contractCall)
@@ -121,12 +137,21 @@ func (db *DatabaseAdapter) CreateContractCallWithToken(contractCallWithToken cha
 	}
 	return nil
 }
+
 func (db *DatabaseAdapter) updateCallContract(eventId string, data interface{}) (tx *gorm.DB) {
 	result := db.PostgresClient.Model(&chains.ContractCall{}).Where("event_id = ?", eventId).Updates(data)
 	if result.Error != nil {
 		log.Error().Msgf("[DatabaseAdapter] [updateCallContract] %s: %v", eventId, result.Error)
 	}
 	log.Debug().Msgf("[DatabaseAdapter] [updateCallContract] %s: %v", eventId, data)
+	return result
+}
+
+func (db *DatabaseAdapter) updateCallContractWithToken(eventId string, data interface{}) (tx *gorm.DB) {
+	result := db.PostgresClient.Model(&chains.ContractCallWithToken{}).Where("event_id = ?", eventId).Updates(data)
+	if result.Error != nil {
+		log.Error().Msgf("[DatabaseAdapter] [updateCallContractWithToken] %s: %v", eventId, result.Error)
+	}
 	return result
 }
 

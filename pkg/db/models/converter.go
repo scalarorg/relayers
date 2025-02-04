@@ -2,15 +2,15 @@ package models
 
 import (
 	"encoding/hex"
-	"strings"
 
 	"github.com/scalarorg/data-models/scalarnet"
+	"github.com/scalarorg/relayers/pkg/utils"
 	"github.com/scalarorg/scalar-core/x/chains/types"
 )
 
 func EventTokenSent2Model(event *types.EventTokenSent) scalarnet.TokenSentApproved {
-	eventId := strings.TrimPrefix(string(event.EventID), "0x")
-	commandId := strings.TrimPrefix(string(event.CommandID), "0x")
+	eventId := utils.NormalizeHash(string(event.EventID))
+	commandId := utils.NormalizeHash(string(event.CommandID))
 	model := scalarnet.TokenSentApproved{
 		EventID:            eventId,
 		CommandId:          commandId,
