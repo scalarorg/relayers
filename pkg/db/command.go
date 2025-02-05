@@ -34,13 +34,20 @@ func (db *DatabaseAdapter) UpdateBroadcastedCommands(chainId string, batchedComm
 		return nil
 	})
 }
+
 func (db *DatabaseAdapter) UpdateBtcExecutedCommands(chainId string, txHashes []string) error {
-	return db.PostgresClient.Exec(`UPDATE contract_call_with_tokens as ccwt SET status = ? 
+	log.Info().Any("txHashes", txHashes).Msg("UpdateBtcExecutedCommands")
+	log.Info().Any("chainId", chainId).Msg("UpdateBtcExecutedCommands")
+
+	result := db.PostgresClient.Exec(`UPDATE contract_call_with_tokens as ccwt SET status = ? 
 						WHERE ccwt.event_id 
 						IN (SELECT ccawm.event_id FROM contract_call_approved_with_mints as ccawm 
 							JOIN commands as c ON ccawm.command_id = c.command_id 
 							WHERE c.chain_id = ? AND c.executed_tx_hash IN (?))`,
-		chains.ContractCallStatusSuccess, chainId, txHashes).Error
+		chains.ContractCallStatusSuccess, chainId, txHashes)
+
+	log.Info().Any("result", result.RowsAffected).Msg("UpdateBtcExecutedCommands")
+	return result.Error
 }
 func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecuted, commandType string, commandId string) error {
 	var eventId string
