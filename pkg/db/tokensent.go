@@ -32,6 +32,44 @@ func (db *DatabaseAdapter) FindPendingBtcTokenSent(sourceChain string, height in
 	return tokenSents, nil
 }
 
+func (db *DatabaseAdapter) SaveTokenSentsAndRemoveDupplicates(tokenSents []*chains.TokenSent) error {
+	tx := db.PostgresClient.Begin()
+	if tx == nil {
+		return fmt.Errorf("failed to begin transaction")
+	}
+	defer tx.Rollback() // Will be ignored if transaction is committed
+
+	// Delete existing verifying entries with matching tx_hashes
+	txHashes := make([]string, 0, len(tokenSents))
+	for _, tokenSent := range tokenSents {
+		txHashes = append(txHashes, tokenSent.TxHash)
+	}
+
+	// Currently too much places using of ChainToken without filtering delete_at != NULL => so we need to hard delete, consider using soft delete
+
+	// if err := tx.Where("tx_hash IN ? AND status = ?", txHashes, chains.TokenSentStatusPending).
+	// 	Updates(map[string]interface{}{"status": chains.TokenSentStatusDeleted, "deleted_at": time.Now()}).Error; err != nil {
+	// 	return fmt.Errorf("failed to remove duplicate token sents: %w", err)
+	// }
+
+	if err := tx.Where("tx_hash IN ? AND status = ?", txHashes, chains.TokenSentStatusPending).
+		Delete(&chains.TokenSent{}).Error; err != nil {
+		return fmt.Errorf("failed to remove duplicate token sents: %w", err)
+	}
+
+	// Save new token sents
+	if err := tx.Save(tokenSents).Error; err != nil {
+		return fmt.Errorf("failed to save new token sents: %w", err)
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
 func (db *DatabaseAdapter) SaveTokenSents(tokenSents []*chains.TokenSent) error {
 	result := db.PostgresClient.Save(tokenSents)
 	if result.Error != nil {

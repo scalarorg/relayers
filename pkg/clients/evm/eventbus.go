@@ -23,7 +23,7 @@ func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
 		if err != nil {
 			log.Error().
 				Err(err).
-				Str("eventData", event.Data.(string)).
+				Any("eventData", event.Data).
 				Msg("[EvmClient] [handleEventBusMessage]")
 			return err
 		}

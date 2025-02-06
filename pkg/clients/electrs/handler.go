@@ -128,7 +128,7 @@ func (c *Client) handleTokenSents(tokenSents []*chains.TokenSent) error {
 	}
 
 	//3. store relay data to the db, update last checkpoint
-	err := c.dbAdapter.SaveTokenSents(tokenSents)
+	err := c.dbAdapter.SaveTokenSentsAndRemoveDupplicates(tokenSents)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to store relay data to the db")
 		return fmt.Errorf("failed to store relay data to the db: %w", err)
