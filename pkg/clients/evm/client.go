@@ -3,6 +3,7 @@ package evm
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/big"
 	"math/rand"
 	"time"
@@ -453,7 +454,7 @@ type ValidWatchEvent interface {
 const (
 	baseDelay    = 5 * time.Second
 	maxDelay     = 2 * time.Minute
-	maxAttempts  = 10
+	maxAttempts  = math.MaxUint64
 	jitterFactor = 0.2 // 20% jitter
 )
 
@@ -483,44 +484,9 @@ func WatchForEvent[T ValidWatchEvent](c *EvmClient, ctx context.Context, eventNa
 		case err := <-subscription.Err():
 			log.Error().Err(err).Msgf("[EvmClient] [WatchForEvent] error with subscription for %s, attempting reconnect", eventName)
 
-			delay := baseDelay
-			for attempt := 1; attempt <= maxAttempts; attempt++ {
-				jitter := time.Duration(rand.Float64() * float64(delay) * jitterFactor)
-				retryDelay := delay + jitter
-
-				log.Info().
-					Int("attempt", attempt).
-					Dur("delay", retryDelay).
-					Msgf("[EvmClient] [WatchForEvent] attempting reconnection for %s", eventName)
-
-				select {
-				case <-watchOpts.Context.Done():
-					return nil
-				case <-time.After(retryDelay):
-					subscription, err = setupSubscription(c, &watchOpts, sink, eventName)
-					if err == nil {
-						log.Info().Msgf("[EvmClient] [WatchForEvent] successfully reconnected for %s", eventName)
-						break
-					}
-
-					log.Error().
-						Err(err).
-						Int("attempt", attempt).
-						Msgf("[EvmClient] [WatchForEvent] reconnection failed for %s", eventName)
-
-					delay = time.Duration(float64(delay) * 2)
-					if delay > maxDelay {
-						delay = maxDelay
-					}
-				}
-
-				if err == nil {
-					break
-				}
-
-				if attempt == maxAttempts {
-					return fmt.Errorf("failed to reconnect after %d attempts: %w", maxAttempts, err)
-				}
+			subscription, err = reconnectWithBackoff(c, &watchOpts, sink, eventName)
+			if err != nil {
+				return fmt.Errorf("failed to reconnect: %w", err)
 			}
 
 		case <-watchOpts.Context.Done():
@@ -535,6 +501,42 @@ func WatchForEvent[T ValidWatchEvent](c *EvmClient, ctx context.Context, eventNa
 			}
 		}
 	}
+}
+
+func reconnectWithBackoff[T ValidWatchEvent](c *EvmClient, watchOpts *bind.WatchOpts, sink chan T, eventName string) (ethereum.Subscription, error) {
+	delay := baseDelay
+	for attempt := uint64(1); attempt <= maxAttempts; attempt++ {
+		jitter := time.Duration(rand.Float64() * float64(delay) * jitterFactor)
+		retryDelay := delay + jitter
+
+		log.Info().
+			Uint64("attempt", attempt).
+			Dur("delay", retryDelay).
+			Msgf("[EvmClient] [WatchForEvent] attempting reconnection for %s", eventName)
+
+		select {
+		case <-watchOpts.Context.Done():
+			return nil, watchOpts.Context.Err()
+		case <-time.After(retryDelay):
+			subscription, err := setupSubscription(c, watchOpts, sink, eventName)
+			if err == nil {
+				log.Info().Msgf("[EvmClient] [WatchForEvent] successfully reconnected for %s", eventName)
+				return subscription, nil
+			}
+
+			log.Error().
+				Err(err).
+				Uint64("attempt", attempt).
+				Msgf("[EvmClient] [WatchForEvent] reconnection failed for %s", eventName)
+
+			delay = time.Duration(float64(delay) * 2)
+			if delay > maxDelay {
+				delay = maxDelay
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("failed to reconnect after %d attempts", uint64(maxAttempts))
 }
 
 func setupSubscription[T ValidWatchEvent](c *EvmClient, watchOpts *bind.WatchOpts, sink chan T, eventName string) (ethereum.Subscription, error) {
