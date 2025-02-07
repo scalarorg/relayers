@@ -75,7 +75,7 @@ import (
 // 	return nil
 // }
 
-func (ec *EvmClient) handleContractCallWithToken(event *contracts.IScalarGatewayContractCallWithToken) error {
+func (ec *EvmClient) HandleContractCallWithToken(event *contracts.IScalarGatewayContractCallWithToken) error {
 	//0. Preprocess the event
 	ec.preprocessContractCallWithToken(event)
 	//1. Convert into a RelayData instance then store to the db
