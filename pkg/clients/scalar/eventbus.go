@@ -1,8 +1,6 @@
 package scalar
 
 import (
-	"context"
-
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
@@ -25,13 +23,13 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 func (c *Client) requestConfirmBtcTxs(confirmRequest events.ConfirmTxsRequest) error {
 	sourceChain, txHashes := c.extractValidConfirmTxs(confirmRequest)
 	if len(txHashes) > 0 {
-		_, err := c.ConfirmBtcTxs(context.Background(), sourceChain, txHashes)
+		err := c.broadcaster.ConfirmBtcTxs(sourceChain, txHashes)
 		if err != nil {
-			log.Error().Err(err).Msg("[ScalarClient] [handleElectrsVaultTransaction] error confirming txs")
+			log.Error().Err(err).Msg("[ScalarClient] [requestConfirmBtcTxs] enqueue confirming bitcoin txs failed")
 			return err
 		}
 	} else {
-		log.Error().Msgf("[ScalarClient] [handleElectrsVaultTransaction] no valid txs to confirm")
+		log.Error().Msgf("[ScalarClient] [requestConfirmBtcTxs] no valid txs to confirm")
 	}
 	return nil
 }
@@ -39,12 +37,12 @@ func (c *Client) requestConfirmBtcTxs(confirmRequest events.ConfirmTxsRequest) e
 func (c *Client) requestConfirmEvmTxs(confirmRequest events.ConfirmTxsRequest) error {
 	sourceChain, txHashes := c.extractValidConfirmTxs(confirmRequest)
 	if len(txHashes) > 0 {
-		_, err := c.ConfirmEvmTxs(context.Background(), sourceChain, txHashes)
+		err := c.broadcaster.ConfirmEvmTxs(sourceChain, txHashes)
 		if err != nil {
-			log.Error().Err(err).Msg("[ScalarClient] [requestConfirmEvmTxs] error confirming txs")
+			log.Error().Err(err).Msg("[ScalarClient] [requestConfirmEvmTxs] enqueue confirm evm txs failed")
 			return err
 		} else {
-			log.Debug().Str("sourceChain", sourceChain).Msgf("[ScalarClient] [requestConfirmEvmTxs] successfully confirmed txs %v", txHashes)
+			log.Debug().Str("sourceChain", sourceChain).Msgf("[ScalarClient] [requestConfirmEvmTxs] successfully enqueue confirm txs %v", txHashes)
 		}
 	} else {
 		log.Debug().Str("sourceChain", sourceChain).Msg("[ScalarClient] [requestConfirmEvmTxs] no valid txs to confirm")
@@ -55,7 +53,7 @@ func (c *Client) requestConfirmEvmTxs(confirmRequest events.ConfirmTxsRequest) e
 // Add psbts to pendingChainPsbtCommands
 func (c *Client) requestPsbtSign(psbt types.SignPsbtsRequest) error {
 	log.Debug().Str("ChainName", psbt.ChainName).Int("psbtCount", len(psbt.Psbts)).Msgf("[ScalarClient] [requestPsbtSign] Set psbts to pendingChainPsbtCommands")
-	c.appendPendingPsbt(psbt.ChainName, psbt.Psbts)
+	c.pendingCommands.StorePsbts(psbt.ChainName, psbt.Psbts)
 	return nil
 }
 

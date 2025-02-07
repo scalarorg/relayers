@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -14,29 +13,26 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
-	"github.com/scalarorg/scalar-core/utils"
-	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
-	nexus "github.com/scalarorg/scalar-core/x/nexus/exported"
 
 	//tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 type Client struct {
-	globalConfig          *config.Config
-	networkConfig         *cosmos.CosmosNetworkConfig
-	txConfig              client.TxConfig
-	network               *cosmos.NetworkClient
-	queryClient           *cosmos.QueryClient
-	dbAdapter             *db.DatabaseAdapter
-	eventBus              *events.EventBus
-	subscriberName        string   //Use as subscriber for networkClient
-	pendingPsbtCommands   sync.Map //key: chain, value psbts
-	pendingSignCommandTxs sync.Map //Sign command request chain => tx hash, used for check if the tx is included in the block
-	pendingBatchCommands  sync.Map //Batched command id => chain, used for get batched command to get execute data
+	globalConfig    *config.Config
+	networkConfig   *cosmos.CosmosNetworkConfig
+	txConfig        client.TxConfig
+	broadcaster     *Broadcaster
+	network         *cosmos.NetworkClient
+	queryClient     *cosmos.QueryClient
+	dbAdapter       *db.DatabaseAdapter
+	eventBus        *events.EventBus
+	subscriberName  string //Use as subscriber for networkClient
+	pendingCommands *PendingCommands
+	// pendingPsbtCommands   sync.Map //key: chain, value psbts
+	// pendingSignCommandTxs sync.Map //Sign command request chain => tx hash, used for check if the tx is included in the block
+	// pendingBatchCommands  sync.Map //Batched command id => chain, used for get batched command to get execute data
 	// Add other necessary fields like chain ID, gas prices, etc.
 }
 
@@ -91,18 +87,19 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 	if err != nil {
 		return nil, err
 	}
+	pendingCommands := NewPendingCommands()
+	broadcaster := NewBroadcaster(networkClient, pendingCommands, time.Second, 10)
 	client := &Client{
-		globalConfig:          globalConfig,
-		networkConfig:         config,
-		txConfig:              txConfig,
-		network:               networkClient,
-		queryClient:           queryClient,
-		subscriberName:        subscriberName,
-		dbAdapter:             dbAdapter,
-		eventBus:              eventBus,
-		pendingSignCommandTxs: sync.Map{},
-		pendingPsbtCommands:   sync.Map{},
-		pendingBatchCommands:  sync.Map{},
+		globalConfig:    globalConfig,
+		networkConfig:   config,
+		txConfig:        txConfig,
+		broadcaster:     broadcaster,
+		network:         networkClient,
+		queryClient:     queryClient,
+		subscriberName:  subscriberName,
+		dbAdapter:       dbAdapter,
+		eventBus:        eventBus,
+		pendingCommands: pendingCommands,
 	}
 	return client, nil
 }
@@ -122,6 +119,12 @@ func (c *Client) Start(ctx context.Context) error {
 	go func() {
 		log.Info().Msg("[ScalarClient] Start ProcessPendingCommands process")
 		c.ProcessPendingCommands(ctx)
+	}()
+	go func() {
+		err := c.broadcaster.Start(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("[ScalarClient] Failed to start broadcaster")
+		}
 	}()
 	go func() {
 		err := c.subscribeAllBlockEventsWithHeatBeat(ctx)
@@ -180,6 +183,7 @@ func (c *Client) subscribeAllBlockEventsWithHeatBeat(ctx context.Context) error 
 		cancelFunc()
 	}
 }
+
 func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
 	retryInterval := time.Millisecond * time.Duration(c.networkConfig.RetryInterval)
 	deadCount := 0
@@ -344,69 +348,69 @@ func SubscribeWithTimeout[T proto.Message](ctx context.Context,
 	}
 }
 
-func (c *Client) ConfirmEvmTxs(ctx context.Context, chainName string, txIds []string) (*sdk.TxResponse, error) {
-	//1. Create Confirm message request
-	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
-	log.Debug().Msgf("[ScalarClient] [ConfirmEvmTxs] Broadcast for confirmation txs from chain %s: %v", nexusChain, txIds)
-	txHashs := make([]chainstypes.Hash, len(txIds))
-	for i, txId := range txIds {
-		txHashs[i] = chainstypes.Hash(common.HexToHash(txId))
-	}
-	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, txHashs)
-	//2. Sign and broadcast the payload using the network client, which has the private key
-	confirmTx, err := c.network.SignAndBroadcastMsgs(ctx, msg)
-	if err != nil {
-		log.Error().Msgf("[ScalarClient] [ConfirmEvmTxs] error from network client: %v", err)
-		return nil, err
-	}
-	if confirmTx != nil && confirmTx.Code != 0 {
-		log.Error().Msgf("[ScalarClient] [ConfirmEvmTxs] error from network client: %v", confirmTx.RawLog)
-		return nil, fmt.Errorf("error from network client: %v", confirmTx.RawLog)
-	} else {
-		log.Debug().Msgf("[ScalarClient] [ConfirmEvmTxs] success broadcast confirmation txs with tx hash: %s", confirmTx.TxHash)
-		return confirmTx, nil
-	}
-}
+// func (c *Client) ConfirmEvmTxs(ctx context.Context, chainName string, txIds []string) (*sdk.TxResponse, error) {
+// 	//1. Create Confirm message request
+// 	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
+// 	log.Debug().Msgf("[ScalarClient] [ConfirmEvmTxs] Broadcast for confirmation txs from chain %s: %v", nexusChain, txIds)
+// 	txHashs := make([]chainstypes.Hash, len(txIds))
+// 	for i, txId := range txIds {
+// 		txHashs[i] = chainstypes.Hash(common.HexToHash(txId))
+// 	}
+// 	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, txHashs)
+// 	//2. Sign and broadcast the payload using the network client, which has the private key
+// 	confirmTx, err := c.network.SignAndBroadcastMsgs(ctx, msg)
+// 	if err != nil {
+// 		log.Error().Msgf("[ScalarClient] [ConfirmEvmTxs] error from network client: %v", err)
+// 		return nil, err
+// 	}
+// 	if confirmTx != nil && confirmTx.Code != 0 {
+// 		log.Error().Msgf("[ScalarClient] [ConfirmEvmTxs] error from network client: %v", confirmTx.RawLog)
+// 		return nil, fmt.Errorf("error from network client: %v", confirmTx.RawLog)
+// 	} else {
+// 		log.Debug().Msgf("[ScalarClient] [ConfirmEvmTxs] success broadcast confirmation txs with tx hash: %s", confirmTx.TxHash)
+// 		return confirmTx, nil
+// 	}
+// }
 
-func (c *Client) ConfirmBtcTxs(ctx context.Context, chainName string, txIds []string) (*sdk.TxResponse, error) {
-	//1. Create Confirm message request
-	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
-	log.Debug().Msgf("[ScalarClient] [ConfirmBtcTxs] Broadcast for confirmation txs from chain %s: %v", nexusChain, txIds)
-	txHashs := make([]chainstypes.Hash, len(txIds))
-	for i, txId := range txIds {
-		txHashs[i] = chainstypes.Hash(common.HexToHash(txId))
-	}
-	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, txHashs)
-	//2. Sign and broadcast the payload using the network client, which has the private key
-	confirmTx, err := c.network.SignAndBroadcastMsgs(ctx, msg)
-	if err != nil {
-		log.Error().Msgf("[ScalarClient] [ConfirmBtcTxs] error from network client: %v", err)
-		return nil, err
-	}
-	if confirmTx != nil && confirmTx.Code != 0 {
-		log.Error().Msgf("[ScalarClient] [ConfirmBtcTxs] error from network client: %v", confirmTx.RawLog)
-		return nil, fmt.Errorf("error from network client: %v", confirmTx.RawLog)
-	} else {
-		log.Debug().Msgf("[ScalarClient] [ConfirmBtcTxs] success broadcast confirmation txs with tx hash: %s", confirmTx.TxHash)
-		return confirmTx, nil
-	}
-}
+// func (c *Client) ConfirmBtcTxs(ctx context.Context, chainName string, txIds []string) (*sdk.TxResponse, error) {
+// 	//1. Create Confirm message request
+// 	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
+// 	log.Debug().Msgf("[ScalarClient] [ConfirmBtcTxs] Broadcast for confirmation txs from chain %s: %v", nexusChain, txIds)
+// 	txHashs := make([]chainstypes.Hash, len(txIds))
+// 	for i, txId := range txIds {
+// 		txHashs[i] = chainstypes.Hash(common.HexToHash(txId))
+// 	}
+// 	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, txHashs)
+// 	//2. Sign and broadcast the payload using the network client, which has the private key
+// 	confirmTx, err := c.network.SignAndBroadcastMsgs(ctx, msg)
+// 	if err != nil {
+// 		log.Error().Msgf("[ScalarClient] [ConfirmBtcTxs] error from network client: %v", err)
+// 		return nil, err
+// 	}
+// 	if confirmTx != nil && confirmTx.Code != 0 {
+// 		log.Error().Msgf("[ScalarClient] [ConfirmBtcTxs] error from network client: %v", confirmTx.RawLog)
+// 		return nil, fmt.Errorf("error from network client: %v", confirmTx.RawLog)
+// 	} else {
+// 		log.Debug().Msgf("[ScalarClient] [ConfirmBtcTxs] success broadcast confirmation txs with tx hash: %s", confirmTx.TxHash)
+// 		return confirmTx, nil
+// 	}
+// }
 
-// Relayer call this function for request Scalar network to confirm the transaction on the source chain
-func (c *Client) ConfirmEvmTx(ctx context.Context, chainName string, txId string) (*sdk.TxResponse, error) {
-	//1. Create Confirm message request
-	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
-	txHash := chainstypes.Hash(common.HexToHash(txId))
-	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, []chainstypes.Hash{txHash})
+// // Relayer call this function for request Scalar network to confirm the transaction on the source chain
+// func (c *Client) ConfirmEvmTx(ctx context.Context, chainName string, txId string) (*sdk.TxResponse, error) {
+// 	//1. Create Confirm message request
+// 	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
+// 	txHash := chainstypes.Hash(common.HexToHash(txId))
+// 	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, []chainstypes.Hash{txHash})
 
-	//2. Sign and broadcast the payload using the network client, which has the private key
-	confirmTx, err := c.network.ConfirmEvmTx(ctx, msg)
-	if err != nil {
-		return nil, err
-	}
+// 	//2. Sign and broadcast the payload using the network client, which has the private key
+// 	confirmTx, err := c.network.ConfirmEvmTx(ctx, msg)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return confirmTx, nil
-}
+// 	return confirmTx, nil
+// }
 
 func (c *Client) GetQueryClient() *cosmos.QueryClient {
 	return c.queryClient

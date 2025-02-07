@@ -1,9 +1,11 @@
 package scalar
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -11,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/utils"
 	"github.com/scalarorg/scalar-core/x/chains/types"
+	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	"github.com/scalarorg/scalar-core/x/nexus/exported"
 )
 
@@ -268,3 +271,117 @@ var (
 	// 	Parser:  ParseExecuteMessageEvent,
 	// }
 )
+
+type PendingCommands struct {
+	SignRequestTxsMutex sync.Mutex
+	SignRequestTxs      sync.Map
+	PsbtsMutex          sync.Mutex
+	Psbts               sync.Map
+	BatchCommandsMutex  sync.Mutex
+	BatchCommands       sync.Map
+}
+
+func NewPendingCommands() *PendingCommands {
+	return &PendingCommands{
+		SignRequestTxs:      sync.Map{},
+		SignRequestTxsMutex: sync.Mutex{},
+		BatchCommands:       sync.Map{},
+		BatchCommandsMutex:  sync.Mutex{},
+		Psbts:               sync.Map{},
+		PsbtsMutex:          sync.Mutex{},
+	}
+}
+func (p *PendingCommands) LoadSignRequest(chain string) (value any, ok bool) {
+	p.SignRequestTxsMutex.Lock()
+	defer p.SignRequestTxsMutex.Unlock()
+	return p.SignRequestTxs.Load(chain)
+}
+func (p *PendingCommands) StoreSignRequest(chain string, txHash string) {
+	p.SignRequestTxsMutex.Lock()
+	defer p.SignRequestTxsMutex.Unlock()
+	p.SignRequestTxs.Store(chain, txHash)
+}
+func (p *PendingCommands) DeleteSignRequest(chain string) {
+	p.SignRequestTxsMutex.Lock()
+	defer p.SignRequestTxsMutex.Unlock()
+	p.SignRequestTxs.Delete(chain)
+}
+func (p *PendingCommands) GetAlllSignRequests() map[string]string {
+	p.SignRequestTxsMutex.Lock()
+	defer p.SignRequestTxsMutex.Unlock()
+	requests := make(map[string]string)
+	p.SignRequestTxs.Range(func(key, value any) bool {
+		requests[key.(string)] = value.(string)
+		return true
+	})
+	return requests
+}
+func (p *PendingCommands) StoreBatchCommand(batchCommandId string, chain string) {
+	p.BatchCommandsMutex.Lock()
+	defer p.BatchCommandsMutex.Unlock()
+	p.BatchCommands.Store(batchCommandId, chain)
+}
+func (p *PendingCommands) DeleteBatchCommand(batchCommandId string) {
+	p.BatchCommandsMutex.Lock()
+	defer p.BatchCommandsMutex.Unlock()
+	p.BatchCommands.Delete(batchCommandId)
+}
+func (p *PendingCommands) GetAlllBatchCommands() map[string]string {
+	p.BatchCommandsMutex.Lock()
+	defer p.BatchCommandsMutex.Unlock()
+	requests := make(map[string]string)
+	p.BatchCommands.Range(func(key, value any) bool {
+		requests[key.(string)] = value.(string)
+		return true
+	})
+	return requests
+}
+
+func (p *PendingCommands) StorePsbt(chain string, psbt covtypes.Psbt) {
+	p.PsbtsMutex.Lock()
+	defer p.PsbtsMutex.Unlock()
+	pendingPsbt, ok := p.Psbts.Load(chain)
+	if ok {
+		newPsbts := append(pendingPsbt.([]covtypes.Psbt), psbt)
+		p.Psbts.Store(chain, newPsbts)
+	} else {
+		p.Psbts.Store(chain, []covtypes.Psbt{psbt})
+	}
+}
+
+func (p *PendingCommands) StorePsbts(chain string, psbts []covtypes.Psbt) {
+	p.PsbtsMutex.Lock()
+	defer p.PsbtsMutex.Unlock()
+	pendingPsbt, ok := p.Psbts.Load(chain)
+	if ok {
+		newPsbts := append(pendingPsbt.([]covtypes.Psbt), psbts...)
+		p.Psbts.Store(chain, newPsbts)
+	} else {
+		p.Psbts.Store(chain, psbts)
+	}
+}
+func (p *PendingCommands) removePsbt(chain string, psbt covtypes.Psbt) {
+	p.PsbtsMutex.Lock()
+	defer p.PsbtsMutex.Unlock()
+	if value, ok := p.Psbts.Load(chain); ok && value != nil {
+		psbts := value.([]covtypes.Psbt)
+		if len(psbts) > 0 && bytes.Equal(psbts[0], psbt) {
+			p.Psbts.Store(chain, psbts[1:])
+		}
+	}
+}
+
+// Get first psbt for each chain
+func (p *PendingCommands) GetFirstPsbts() map[string]covtypes.Psbt {
+	p.PsbtsMutex.Lock()
+	defer p.PsbtsMutex.Unlock()
+	psbts := make(map[string]covtypes.Psbt)
+	p.Psbts.Range(func(key, value any) bool {
+		psbtList := value.([]covtypes.Psbt)
+		if len(psbtList) > 0 {
+			psbts[key.(string)] = psbtList[0]
+		}
+		return true
+	})
+	return psbts
+}

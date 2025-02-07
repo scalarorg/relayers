@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"strings"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -39,15 +38,14 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*c
 	for chain, counter := range mapChains {
 		log.Debug().Str("Chain", chain).
 			Int("EventCounter", counter).
-			Msg("[ScalarClient] [handleTokenSentEvents] create pending transfer request for chain")
-		txRes, err := c.network.CreatePendingTransfersRequest(ctx, chain)
-		if err != nil || txRes == nil || txRes.Code != 0 || strings.Contains(txRes.RawLog, "failed") || txRes.TxHash == "" {
+			Msg("[ScalarClient] [handleTokenSentEvents] enqueue PendingTransferRequest for chain")
+		err := c.broadcaster.CreatePendingTransfersRequest(chain)
+		if err != nil {
 			log.Error().Err(err).
 				Str("Chain", chain).
-				Any("TxResponse", txRes).
-				Msgf("[ScalarClient] [handleTokenSentEvents] failed to sign transfer request.")
+				Msgf("[ScalarClient] [handleTokenSentEvents] failed to enqueue PendingTransferRequest.")
 		} else {
-			log.Debug().Msgf("[ScalarClient] [handleTokenSentEvents] Successfully create pending transfer request for chain %s", chain)
+			log.Debug().Msgf("[ScalarClient] [handleTokenSentEvents] Successfully enqueue PendingTransferRequest for chain %s", chain)
 			//Todo: Update token sent status to signing
 			// err = c.dbAdapter.UpdateTokenSentsStatus(chain, chains.ContractCallStatusSigning)
 			// if err != nil {
