@@ -4,20 +4,9 @@ pipeline {
         skipStagesAfterUnstable()
     }
     stages {
-        stage('Preparation') {
-            steps {
-                echo "env:  ${env.getEnvironment()}"
-            }
-        }
-        stage('Clone') {
-            steps {
-                echo 'Cloning relayers'
-                sh 'git clone https://github.com/scalarorg/relayers.git'
-            }
-        }
         stage('Build') {
             steps {
-                sh 'make docker-image'
+                sh 'make test-image'
             }
         }
         stage('Start'){
