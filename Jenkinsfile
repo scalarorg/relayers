@@ -4,6 +4,17 @@ pipeline {
         skipStagesAfterUnstable()
     }
     stages {
+        stage('Preparation') {
+            steps {
+                echo "env:  ${env.getEnvironment()}"
+            }
+        }
+        stage('Clone') {
+            steps {
+                echo 'Cloning relayers'
+                sh 'git clone https://github.com/scalarorg/relayers.git'
+            }
+        }
         stage('Build') {
             steps {
                 sh 'make docker-image'
@@ -11,13 +22,13 @@ pipeline {
         }
         stage('Start'){
             steps {
-                task -t ~/tasks/e2e.yml relayer:up
+                sh 'task -t ~/tasks/e2e.yml relayer:up'
             }
         }
         stage('Bridging') {
             steps {
-                task -t ~/tasks/e2e.yml bridge:pooling
-                task -t ~/tasks/e2e.yml bridge:upc
+                sh 'task -t ~/tasks/e2e.yml bridge:pooling'
+                sh 'task -t ~/tasks/e2e.yml bridge:upc'
             }
         }
         stage('Bridging verification') {
