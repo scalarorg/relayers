@@ -1,25 +1,29 @@
-node {
-    def mvnHome
-    stage('Preparation') { // for display purposes
-        // Get some code from a GitHub repository
-        git 'https://github.com/scalarorg/relayers.git'
-        // Get the Maven tool.
-        // ** NOTE: This 'M3' Maven tool must be configured
-        // **       in the global configuration.
-        mvnHome = tool 'M3'
+pipeline {
+    agent any
+    options {
+        skipStagesAfterUnstable()
     }
-    stage('Build') {
-        // Run the maven build
-        withEnv(["MVN_HOME=$mvnHome"]) {
-            if (isUnix()) {
-                sh '"$MVN_HOME/bin/mvn" -Dmaven.test.failure.ignore clean package'
-            } else {
-                bat(/"%MVN_HOME%\bin\mvn" -Dmaven.test.failure.ignore clean package/)
+    stages {
+        stage('Build') {
+            steps {
+                sh 'make docker-image'
             }
         }
-    }
-    stage('Results') {
-        junit '**/target/surefire-reports/TEST-*.xml'
-        archiveArtifacts 'target/*.jar'
+        stage('Start'){
+            steps {
+                task -t ~/tasks/e2e.yml relayer:up
+            }
+        }
+        stage('Bridging') {
+            steps {
+                task -t ~/tasks/e2e.yml bridge:pooling
+                task -t ~/tasks/e2e.yml bridge:upc
+            }
+        }
+        stage('Bridging verification') {
+            steps {
+                echo 'Bridging verification'
+            }
+        }
     }
 }
