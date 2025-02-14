@@ -9,10 +9,17 @@ pipeline {
                 sh 'make docker-image-test'
             }
         }
-        stage('Start'){
+        stage('Start scalar network'){
             steps {
                 sh 'task -t ~/tasks/e2e.yml scalar:up'
-                sh "export IMAGE_TAG_RELAYER=$(git log -1 --format='%H') && task -t ~/tasks/e2e.yml relayer:up"
+                sh 'task -t ~/tasks/e2e.yml scalar:multisig'
+                sh 'task -t ~/tasks/e2e.yml scalar:token-deploy'
+            }
+        }
+         stage('Start relayer'){
+            steps {
+                // sh 'docker ps -a --format "{{.Names}}" | grep -w "scalar-relayer" && docker rm -f scalar-relayer'
+                sh 'export IMAGE_TAG_RELAYER=$(git log -1 --format="%H") && task -t ~/tasks/e2e.yml relayer:up'
             }
         }
         stage('Bridging') {
