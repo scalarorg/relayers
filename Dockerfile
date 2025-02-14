@@ -4,7 +4,7 @@ RUN apk add --no-cache git libc-dev
 # Todo: select a specific version
 RUN git clone https://github.com/scalarorg/bitcoin-vault.git
 WORKDIR /bitcoin-vault
-RUN cargo build --release
+RUN cargo build -p vault -p macros -p ffi --release
 
 # Build stage
 FROM golang:1.23.3-alpine3.20 AS builder
