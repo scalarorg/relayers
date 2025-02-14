@@ -16,10 +16,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	"github.com/rs/zerolog/log"
-	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
-	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
-	"github.com/scalarorg/scalar-core/x/nexus/exported"
-	scalarnettypes "github.com/scalarorg/scalar-core/x/scalarnet/types"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
@@ -182,89 +178,89 @@ func (c *NetworkClient) Start() (rpcclient.Client, error) {
 }
 
 // https://github.com/cosmos/cosmos-sdk/blob/main/client/tx/tx.go#L31
-func (c *NetworkClient) ConfirmEvmTx(ctx context.Context, msg *chainstypes.ConfirmSourceTxsRequest) (*sdk.TxResponse, error) {
-	return c.SignAndBroadcastMsgs(ctx, msg)
-}
+// func (c *NetworkClient) ConfirmEvmTx(ctx context.Context, msg *chainstypes.ConfirmSourceTxsRequest) (*sdk.TxResponse, error) {
+// 	return c.SignAndBroadcastMsgs(ctx, msg)
+// }
 
-func (c *NetworkClient) SignPsbtCommandsRequest(ctx context.Context, destinationChain string, psbt covtypes.Psbt) (*sdk.TxResponse, error) {
-	req := chainstypes.NewSignPsbtCommandRequest(
-		c.GetAddress(),
-		destinationChain,
-		psbt)
+// func (c *NetworkClient) SignPsbtCommandsRequest(ctx context.Context, destinationChain string, psbt covtypes.Psbt) (*sdk.TxResponse, error) {
+// 	req := chainstypes.NewSignPsbtCommandRequest(
+// 		c.GetAddress(),
+// 		destinationChain,
+// 		psbt)
 
-	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("[NetworkClient] [SignPsbtCommandsRequest] %w", err)
-	}
-	return txRes, nil
-}
+// 	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("[NetworkClient] [SignPsbtCommandsRequest] %w", err)
+// 	}
+// 	return txRes, nil
+// }
 
-func (c *NetworkClient) SignBtcCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
-	req := chainstypes.NewSignBtcCommandsRequest(
-		c.GetAddress(),
-		destinationChain)
+// func (c *NetworkClient) SignBtcCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
+// 	req := chainstypes.NewSignBtcCommandsRequest(
+// 		c.GetAddress(),
+// 		destinationChain)
 
-	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("[NetworkClient] [SignBtcCommandsRequest] %w", err)
-	}
-	return txRes, nil
-}
+// 	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("[NetworkClient] [SignBtcCommandsRequest] %w", err)
+// 	}
+// 	return txRes, nil
+// }
 
-func (c *NetworkClient) SignEvmCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
-	req := chainstypes.NewSignCommandsRequest(
-		c.GetAddress(),
-		destinationChain)
+// func (c *NetworkClient) SignEvmCommandsRequest(ctx context.Context, destinationChain string) (*sdk.TxResponse, error) {
+// 	req := chainstypes.NewSignCommandsRequest(
+// 		c.GetAddress(),
+// 		destinationChain)
 
-	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("[NetworkClient] [SignCommandsRequest] %w", err)
-	}
-	return txRes, nil
-}
-func (c *NetworkClient) SignCommandsRequests(ctx context.Context, destinationChains []string) (*sdk.TxResponse, error) {
-	requests := []sdk.Msg{}
-	for _, chain := range destinationChains {
-		chainName := exported.ChainName(chain)
-		if chainstypes.IsEvmChain(chainName) {
-			requests = append(requests, chainstypes.NewSignCommandsRequest(c.GetAddress(), chain))
-		} else if chainstypes.IsBitcoinChain(chainName) {
-			requests = append(requests, chainstypes.NewSignBtcCommandsRequest(c.GetAddress(), chain))
-		}
-	}
-	txRes, err := c.SignAndBroadcastMsgs(ctx, requests...)
-	if err != nil {
-		return nil, fmt.Errorf("[NetworkClient] [SignCommandsRequest] %w", err)
-	}
-	return txRes, nil
-}
+// 	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("[NetworkClient] [SignCommandsRequest] %w", err)
+// 	}
+// 	return txRes, nil
+// }
+// func (c *NetworkClient) SignCommandsRequests(ctx context.Context, destinationChains []string) (*sdk.TxResponse, error) {
+// 	requests := []sdk.Msg{}
+// 	for _, chain := range destinationChains {
+// 		chainName := exported.ChainName(chain)
+// 		if chainstypes.IsEvmChain(chainName) {
+// 			requests = append(requests, chainstypes.NewSignCommandsRequest(c.GetAddress(), chain))
+// 		} else if chainstypes.IsBitcoinChain(chainName) {
+// 			requests = append(requests, chainstypes.NewSignBtcCommandsRequest(c.GetAddress(), chain))
+// 		}
+// 	}
+// 	txRes, err := c.SignAndBroadcastMsgs(ctx, requests...)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("[NetworkClient] [SignCommandsRequest] %w", err)
+// 	}
+// 	return txRes, nil
+// }
 
-func (c *NetworkClient) CreatePendingTransfersRequest(ctx context.Context, chain string) (*sdk.TxResponse, error) {
-	req := chainstypes.CreatePendingTransfersRequest{
-		Sender: c.GetAddress(),
-		Chain:  exported.ChainName(chain),
-	}
-	txRes, err := c.SignAndBroadcastMsgs(ctx, &req)
-	if err != nil {
-		return nil, fmt.Errorf("[NetworkClient] [CreatePendingTransderRequest] %w", err)
-	}
-	return txRes, nil
-}
+// func (c *NetworkClient) CreatePendingTransfersRequest(ctx context.Context, chain string) (*sdk.TxResponse, error) {
+// 	req := chainstypes.CreatePendingTransfersRequest{
+// 		Sender: c.GetAddress(),
+// 		Chain:  exported.ChainName(chain),
+// 	}
+// 	txRes, err := c.SignAndBroadcastMsgs(ctx, &req)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("[NetworkClient] [CreatePendingTransderRequest] %w", err)
+// 	}
+// 	return txRes, nil
+// }
 
-func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, payload string) (*sdk.TxResponse, error) {
-	payloadBytes := []byte(payload)
-	req := scalarnettypes.NewRouteMessage(
-		c.GetAddress(),
-		c.getFeegranter(),
-		id,
-		payloadBytes,
-	)
-	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("[NetworkClient] [SendRouteMessageRequest] %w", err)
-	}
-	return txRes, nil
-}
+// func (c *NetworkClient) SendRouteMessageRequest(ctx context.Context, id string, payload string) (*sdk.TxResponse, error) {
+// 	payloadBytes := []byte(payload)
+// 	req := scalarnettypes.NewRouteMessage(
+// 		c.GetAddress(),
+// 		c.getFeegranter(),
+// 		id,
+// 		payloadBytes,
+// 	)
+// 	txRes, err := c.SignAndBroadcastMsgs(ctx, req)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("[NetworkClient] [SendRouteMessageRequest] %w", err)
+// 	}
+// 	return txRes, nil
+// }
 
 // Inject account number and sequence number into txFactory for signing
 func (c *NetworkClient) CreateTxFactory(ctx context.Context) tx.Factory {
@@ -315,6 +311,7 @@ func (c *NetworkClient) CreateTxBuilder(ctx context.Context, msgs ...sdk.Msg) (c
 	txBuilder.SetFeeGranter(c.addr)
 	return txBuilder, nil
 }
+
 func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 	txBuilder, err := c.CreateTxBuilder(ctx, msgs...)
 	if err != nil {
