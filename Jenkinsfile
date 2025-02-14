@@ -12,7 +12,7 @@ pipeline {
         stage('Start'){
             steps {
                 sh 'task -t ~/tasks/e2e.yml scalar:up'
-                sh 'task -t ~/tasks/e2e.yml relayer:up'
+                sh "export IMAGE_TAG_RELAYER=$(git log -1 --format='%H') && task -t ~/tasks/e2e.yml relayer:up"
             }
         }
         stage('Bridging') {
