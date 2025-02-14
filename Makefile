@@ -50,6 +50,13 @@ ifeq ($(shell uname -m), arm64)
 ARCH := aarch64
 endif
 
+ifndef $(VERSION)
+VERSION := v0.0.1
+IMAGE_TAG := ${COMMIT}
+else
+IMAGE_TAG := ${VERSION}
+endif
+
 ldflags = "-X github.com/cosmos/cosmos-sdk/version.Version=$(VERSION) \
 	-X "github.com/cosmos/cosmos-sdk/version.BuildTags=$(BUILD_TAGS)" \
 	-X github.com/cosmos/cosmos-sdk/version.Commit=$(COMMIT) \
@@ -104,6 +111,17 @@ build-binaries-in-docker:  guard-SEMVER
 .PHONY: debug
 debug:  go.sum
 		go build -o ./bin/relayer -mod=readonly $(BUILD_FLAGS) -gcflags="all=-N -l" ./main.go
+
+# Build a test image
+.PHONY: docker-image-test
+docker-image-test:
+	@DOCKER_BUILDKIT=1 docker build \
+		--build-arg WASM="${WASM}" \
+		--build-arg WASMVM_VERSION="${WASMVM_VERSION}" \
+		--build-arg IBC_WASM_HOOKS="${IBC_WASM_HOOKS}" \
+		--build-arg ARCH="${ARCH}" \
+		-t scalarorg/relayer:${IMAGE_TAG} .
+
 
 # Build a release image
 .PHONY: docker-image
