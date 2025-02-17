@@ -23,11 +23,12 @@ type Broadcaster struct {
 	network         *cosmos.NetworkClient
 	pendingCommands *PendingCommands
 	//queue          *queue.Queue
-	buffers   []sdk.Msg
-	mutex     sync.Mutex
-	isRunning bool
-	period    time.Duration
-	batchSize int //Number messages to broadcast in a transaction
+	buffers    []sdk.Msg
+	mutex      sync.Mutex
+	isRunning  bool
+	period     time.Duration
+	batchSize  int //Number messages to broadcast in a transaction
+	cycleCount int //Log message is printed every 1000 messages
 }
 
 func NewBroadcaster(network *cosmos.NetworkClient, pendingCommands *PendingCommands, broadcastPeriod time.Duration, batchSize int) *Broadcaster {
@@ -36,6 +37,7 @@ func NewBroadcaster(network *cosmos.NetworkClient, pendingCommands *PendingComma
 		pendingCommands: pendingCommands,
 		period:          broadcastPeriod,
 		batchSize:       batchSize,
+		cycleCount:      0,
 	}
 }
 
@@ -164,6 +166,13 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 		b.buffers = nil
 	}
 	b.mutex.Unlock()
+	if len(msgs) == 0 {
+		if b.cycleCount >= 1000 {
+			log.Debug().Msg("[Broadcaster] No messages to broadcast")
+			b.cycleCount = 0
+		}
+		return nil
+	}
 	resp, err := b.network.SignAndBroadcastMsgs(ctx, msgs...)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to broadcast messages")
