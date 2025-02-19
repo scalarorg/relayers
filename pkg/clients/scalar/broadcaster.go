@@ -187,7 +187,7 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 			Int("remain_buffer_size", len(b.buffers)).
 			Msg("[Broadcaster] Successfully broadcasted messages")
 		for _, msg := range msgs {
-			log.Debug().Msgf("[Broadcaster] [successfully broadcasted]: %v", msg)
+			log.Debug().Msgf("[Broadcaster] [successfully broadcasted]: %v of type %T", msg, msg)
 			switch value := msg.(type) {
 			case *chainstypes.SignCommandsRequest:
 				log.Debug().Str("TxHash", resp.TxHash).Msg("[Broadcaster] Store txHash into pending SignRequest")

@@ -25,13 +25,37 @@ pipeline {
         stage('Bridging') {
             steps {
                 echo 'Bridging task'
-                // sh 'task -t ~/tasks/e2e.yml bridge:pooling'
-                // sh 'task -t ~/tasks/e2e.yml bridge:upc'
+                sh 'task -t ~/tasks/e2e.yml bridge:pooling'
+                sh 'task -t ~/tasks/e2e.yml bridge:upc'
             }
         }
         stage('Bridging verification') {
             steps {
                 echo 'Bridging verification'
+                sh 'task -t ~/tasks/e2e.yml bridge:verify'
+            }
+        }
+        stage('Transfer') {
+            steps {
+                sh 'task -t ~/tasks/e2e.yml transfer'
+            }
+        }
+        stage('Transfer verification') {
+            steps {
+                echo 'Transfer verification'
+                sh 'task -t ~/tasks/e2e.yml transfer:verify'
+            }
+        }
+        stage('Redeem') {
+            steps {
+                sh 'task -t ~/tasks/e2e.yml redeem:pooling'
+                sh 'task -t ~/tasks/e2e.yml redeem:upc'
+            }
+        }
+        stage('Redeem verification') {
+            steps {
+                echo 'Redeem verification'
+                sh 'task -t ~/tasks/e2e.yml redeem:verify'
             }
         }
     }

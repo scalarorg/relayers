@@ -177,7 +177,7 @@ func (c *Client) processSignCommandTxs(ctx context.Context) {
 		for chain, txHash := range hashes {
 			txRes, err := c.queryClient.QueryTx(ctx, txHash)
 			if err != nil {
-				log.Debug().Err(err).Str("TxHash", txHash).Msgf("[ScalarClient] [processSignCommandTxs]")
+				log.Warn().Str("TxHash", txHash).Msgf("[ScalarClient] [processSignCommandTxs] Tx not found, will try later")
 			} else if txRes == nil || txRes.Code != 0 || txRes.Logs == nil || len(txRes.Logs) == 0 {
 				log.Debug().
 					Str("Chain", chain).
