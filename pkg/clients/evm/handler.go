@@ -334,6 +334,8 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecut
 				log.Error().Err(err).Msg("[EvmClient] [HandleCommandExecuted] failed to save evm executed to the db")
 				return fmt.Errorf("failed to create evm executed: %w", err)
 			}
+		} else {
+			log.Warn().Any("command", command).Msg("[EvmClient] [HandleCommandExecuted] command not found in scalarnet")
 		}
 	}
 

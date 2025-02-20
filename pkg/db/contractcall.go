@@ -189,9 +189,21 @@ func (db *DatabaseAdapter) UpdateBatchContractCallStatus(data []ContractCallExec
 	})
 }
 
-func (db *DatabaseAdapter) UpdateContractCallWithMintsStatus(ctx context.Context, cmdIds []string, status chains.TokenSentStatus) error {
-	log.Debug().Any("cmdIds", cmdIds).Msg("UpdateContractCallWithMintsStatus")
-	eventIds := db.PostgresClient.Model(&scalarnet.ContractCallApprovedWithMint{}).Select("event_id").Where("command_id IN (?)", cmdIds)
-	tx := db.PostgresClient.Model(&chains.ContractCallWithToken{}).Where("event_id IN (?)", eventIds).Update("status", status)
-	return tx.Error
+func (db *DatabaseAdapter) UpdateContractCallWithMintsStatus(ctx context.Context, cmdIds []string, status chains.ContractCallStatus) error {
+	log.Debug().Any("cmdIds", cmdIds).Msg("[DatabaseAdapter] UpdateContractCallWithMintsStatus")
+	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		eventIds := tx.Model(&scalarnet.ContractCallApprovedWithMint{}).Select("event_id").Where("command_id IN (?)", cmdIds)
+		entities := []*chains.ContractCallWithToken{}
+		//only update the token sent that is not success
+		result := tx.Model(&chains.ContractCallWithToken{}).Where("event_id IN (?) and status != ?", eventIds, chains.ContractCallStatusSuccess).Find(&entities)
+		if result.Error == nil {
+			ids := []string{}
+			for _, e := range entities {
+				ids = append(ids, e.EventID)
+			}
+			result = tx.Model(&chains.ContractCallWithToken{}).Where("event_id IN (?)", ids).Update("status", status)
+		}
+		return result.Error
+	})
+	return err
 }

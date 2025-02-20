@@ -96,8 +96,20 @@ func (db *DatabaseAdapter) SaveTokenSent(tokenSent chains.TokenSent, lastCheckpo
 }
 
 func (db *DatabaseAdapter) UpdateTokenSentsStatus(ctx context.Context, cmdIds []string, status chains.TokenSentStatus) error {
-	log.Debug().Any("cmdIds", cmdIds).Msg("UpdateTokenSentsStatus")
-	eventIds := db.PostgresClient.Model(&scalarnet.TokenSentApproved{}).Select("event_id").Where("command_id IN (?)", cmdIds)
-	tx := db.PostgresClient.Model(&chains.TokenSent{}).Where("event_id IN (?)", eventIds).Update("status", status)
-	return tx.Error
+	log.Debug().Any("cmdIds", cmdIds).Msg("[DatabaseAdapter] UpdateTokenSentsStatus")
+	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		eventIds := tx.Model(&scalarnet.TokenSentApproved{}).Select("event_id").Where("command_id IN (?)", cmdIds)
+		tokenSents := []*chains.TokenSent{}
+		//only update the token sent that is not success
+		result := tx.Model(&chains.TokenSent{}).Where("event_id IN (?) and status != ?", eventIds, chains.TokenSentStatusSuccess).Find(&tokenSents)
+		if result.Error == nil {
+			ids := []string{}
+			for _, tokenSent := range tokenSents {
+				ids = append(ids, tokenSent.EventID)
+			}
+			result = tx.Model(&chains.TokenSent{}).Where("event_id IN (?)", ids).Update("status", status)
+		}
+		return result.Error
+	})
+	return err
 }

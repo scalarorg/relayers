@@ -333,12 +333,12 @@ func (c *Client) UpdateBatchCommandSigned(ctx context.Context, destChain string,
 			return fmt.Errorf("[ScalarClient] [UpdateBatchCommandSigned] failed to get command by ID: %w", err)
 
 		}
-		log.Debug().Str("CommandId", cmdId).Any("Command", cmdRes).Msg("Command response")
+		log.Debug().Str("CommandId", cmdId).Any("Command", cmdRes).Msg("[ScalarClient] [UpdateBatchCommandSigned] Command response")
 	}
 	for cmdType, cmdIds := range commandByType {
 		switch cmdType {
 		case "approveContractCallWithMint":
-			c.dbAdapter.UpdateContractCallWithMintsStatus(ctx, cmdIds, chains.TokenSentStatusExecuting)
+			c.dbAdapter.UpdateContractCallWithMintsStatus(ctx, cmdIds, chains.ContractCallStatusExecuting)
 		case "mintToken":
 			c.dbAdapter.UpdateTokenSentsStatus(ctx, cmdIds, chains.TokenSentStatusExecuting)
 		}
