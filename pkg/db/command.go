@@ -16,7 +16,7 @@ func (db *DatabaseAdapter) UpdateBroadcastedCommands(chainId string, batchedComm
 	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
 		err := tx.Model(&scalarnet.Command{}).
 			Where("batch_command_id = ? AND command_id IN (?)", batchedCommandId, commandIds).
-			Updates(scalarnet.Command{ExecutedTxHash: txHash, Status: scalarnet.CommandBroadcasted}).Error
+			Updates(scalarnet.Command{ExecutedTxHash: txHash, Status: scalarnet.CommandStatusBroadcasted}).Error
 		if err != nil {
 			return fmt.Errorf("failed to update broadcasted commands: %w", err)
 		}

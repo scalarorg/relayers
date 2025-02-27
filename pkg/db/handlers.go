@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/scalarorg/data-models/chains"
-	"github.com/scalarorg/relayers/pkg/db/models"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/utils"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -14,7 +14,7 @@ import (
 // 	return db.SaveSingleValueWithCheckpoint(values, nil)
 // }
 
-func (db *DatabaseAdapter) SaveValuesWithCheckpoint(values any, lastCheckpoint *models.EventCheckPoint) error {
+func (db *DatabaseAdapter) SaveValuesWithCheckpoint(values any, lastCheckpoint *scalarnet.EventCheckPoint) error {
 	//Up date checkpoint and relayDatas in a transaction
 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
 		result := tx.Save(values)
@@ -66,9 +66,9 @@ func (db *DatabaseAdapter) CreateBatchValue(values any, batchSize int) error {
 	return nil
 }
 
-func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string) (*models.EventCheckPoint, error) {
+func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string) (*scalarnet.EventCheckPoint, error) {
 	//Default value
-	lastBlock := models.EventCheckPoint{
+	lastBlock := scalarnet.EventCheckPoint{
 		ChainName:   chainName,
 		EventName:   eventName,
 		BlockNumber: 0,
@@ -79,12 +79,12 @@ func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string) (
 	result := db.PostgresClient.Where("chain_name = ? AND event_name = ?", chainName, eventName).First(&lastBlock)
 	return &lastBlock, result.Error
 }
-func (db *DatabaseAdapter) UpdateLastEventCheckPoint(value *models.EventCheckPoint) error {
+func (db *DatabaseAdapter) UpdateLastEventCheckPoint(value *scalarnet.EventCheckPoint) error {
 	return UpdateLastEventCheckPoint(db.PostgresClient, value)
 }
 
 // For transactional update
-func UpdateLastEventCheckPoint(db *gorm.DB, value *models.EventCheckPoint) error {
+func UpdateLastEventCheckPoint(db *gorm.DB, value *scalarnet.EventCheckPoint) error {
 	result := db.Clauses(
 		clause.OnConflict{
 			Columns: []clause.Column{{Name: "chain_name"}, {Name: "event_name"}},

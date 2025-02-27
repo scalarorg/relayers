@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/scalar-core/x/chains/types"
@@ -57,5 +58,17 @@ func CreateCallContractApprovedWithMintFromEvmEvent(destinationChain string, eve
 	e.DestinationChain = string(destinationChain)
 	e.ContractAddress = string(event.SourceAddress)
 	e.PayloadHash = hex.EncodeToString(event.PayloadHash[:])
+	return e
+}
+
+func CreateMintCommandFromScalarEvent(event *types.MintCommand) chains.MintCommand {
+	e := chains.MintCommand{}
+	e.TransferID = uint64(event.TransferID)
+	e.CommandID = hex.EncodeToString(event.CommandID[:])
+	e.SourceChain = string(event.Chain)
+	e.DestinationChain = string(event.DestinationChain)
+	e.Recipient = event.DestinationAddress
+	e.Amount = event.Asset.Amount.Int64()
+	e.Symbol = event.Asset.Denom
 	return e
 }

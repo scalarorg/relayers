@@ -17,11 +17,11 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
-	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -246,7 +246,7 @@ func TestRecoverEventTokenSent(t *testing.T) {
 	//Get current block number
 	blockNumber, err := bnbClient.Client.BlockNumber(context.Background())
 	require.NoError(t, err)
-	lastCheckpoint := models.EventCheckPoint{
+	lastCheckpoint := scalarnet.EventCheckPoint{
 		ChainName:   bnbConfig.ID,
 		EventName:   events.EVENT_EVM_TOKEN_SENT,
 		BlockNumber: blockNumber - 10000,

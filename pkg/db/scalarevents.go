@@ -3,14 +3,13 @@ package db
 import (
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
-	"github.com/scalarorg/relayers/pkg/db/models"
 	"gorm.io/gorm"
 )
 
 // -------------------------------------------------------------------------------------------------
 // Add methods to DBAdapter for MintCommand operations
 // -------------------------------------------------------------------------------------------------
-func (d *DatabaseAdapter) CreateOrUpdateMintCommand(cmd *models.MintCommand) error {
+func (d *DatabaseAdapter) CreateOrUpdateMintCommand(cmd *chains.MintCommand) error {
 	return d.PostgresClient.Save(cmd).Error
 }
 
@@ -22,12 +21,12 @@ func (d *DatabaseAdapter) CreateOrUpdateMintCommand(cmd *models.MintCommand) err
 //				"tx_hash": txHash,
 //			}).Error
 //	}
-func (d *DatabaseAdapter) CreateOrUpdateMintCommands(cmdModels []models.MintCommand) error {
+func (d *DatabaseAdapter) CreateOrUpdateMintCommands(cmdModels []chains.MintCommand) error {
 	return d.PostgresClient.Save(cmdModels).Error
 }
 
-func (d *DatabaseAdapter) GetMintCommand(id string) (*models.MintCommand, error) {
-	var cmd models.MintCommand
+func (d *DatabaseAdapter) GetMintCommand(id string) (*chains.MintCommand, error) {
+	var cmd chains.MintCommand
 	err := d.PostgresClient.Where("id = ?", id).First(&cmd).Error
 	if err != nil {
 		return nil, err

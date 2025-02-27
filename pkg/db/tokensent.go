@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
-	"github.com/scalarorg/relayers/pkg/db/models"
 	"gorm.io/gorm"
 )
 
@@ -78,7 +77,7 @@ func (db *DatabaseAdapter) SaveTokenSents(tokenSents []*chains.TokenSent) error 
 	return nil
 }
 
-func (db *DatabaseAdapter) SaveTokenSent(tokenSent chains.TokenSent, lastCheckpoint *models.EventCheckPoint) error {
+func (db *DatabaseAdapter) SaveTokenSent(tokenSent chains.TokenSent, lastCheckpoint *scalarnet.EventCheckPoint) error {
 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
 		result := tx.Save(&tokenSent)
 		if result.Error != nil {

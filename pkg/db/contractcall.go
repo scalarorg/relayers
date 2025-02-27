@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
-	"github.com/scalarorg/relayers/pkg/db/models"
 	"gorm.io/gorm"
 )
 
@@ -105,7 +104,7 @@ func (db *DatabaseAdapter) UpdateCallContractWithTokenExecuteHash(eventId string
 	return nil
 }
 
-func (db *DatabaseAdapter) CreateContractCall(contractCall chains.ContractCall, lastCheckpoint *models.EventCheckPoint) error {
+func (db *DatabaseAdapter) CreateContractCall(contractCall chains.ContractCall, lastCheckpoint *scalarnet.EventCheckPoint) error {
 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
 		result := tx.Save(&contractCall)
 		if result.Error != nil {
@@ -121,7 +120,7 @@ func (db *DatabaseAdapter) CreateContractCall(contractCall chains.ContractCall, 
 	}
 	return nil
 }
-func (db *DatabaseAdapter) CreateContractCallWithToken(contractCallWithToken chains.ContractCallWithToken, lastCheckpoint *models.EventCheckPoint) error {
+func (db *DatabaseAdapter) CreateContractCallWithToken(contractCallWithToken chains.ContractCallWithToken, lastCheckpoint *scalarnet.EventCheckPoint) error {
 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
 		result := tx.Save(&contractCallWithToken)
 		if result.Error != nil {

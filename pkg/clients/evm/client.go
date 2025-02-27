@@ -16,13 +16,13 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/config"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/clients/evm/parser"
 	"github.com/scalarorg/relayers/pkg/clients/evm/pending"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
-	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
 )
 
@@ -354,7 +354,7 @@ func RecoverEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context, eventName 
 
 // Get missing events from the last checkpoint block number to the current block number
 // In query we filter out the event with index equal to the last checkpoint log index
-func GetMissingEvents[T ValidEvmEvent](c *EvmClient, eventName string, lastCheckpoint *models.EventCheckPoint, fnCreateEventData func(types.Log) T) ([]*parser.EvmEvent[T], error) {
+func GetMissingEvents[T ValidEvmEvent](c *EvmClient, eventName string, lastCheckpoint *scalarnet.EventCheckPoint, fnCreateEventData func(types.Log) T) ([]*parser.EvmEvent[T], error) {
 	event, ok := scalarGatewayAbi.Events[eventName]
 	if !ok {
 		return nil, fmt.Errorf("event %s not found", eventName)

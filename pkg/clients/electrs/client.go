@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/go-electrum/electrum"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
-	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
 )
 
@@ -112,7 +112,7 @@ func (c *Client) GetSymbol(chainId string, tokenAddress string) (string, error) 
 }
 
 // Get lastcheck point from db, return default value if not found
-func (c *Client) getLastCheckpoint() *models.EventCheckPoint {
+func (c *Client) getLastCheckpoint() *scalarnet.EventCheckPoint {
 	sourceChain := c.electrumConfig.SourceChain
 	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(sourceChain, events.EVENT_ELECTRS_VAULT_TRANSACTION)
 	if err != nil {

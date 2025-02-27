@@ -1,9 +1,5 @@
 package models
 
-import (
-	"gorm.io/gorm"
-)
-
 // // TokenSentStatus represents the status of a token transfer
 // type TokenSentStatus string
 
@@ -42,15 +38,15 @@ import (
 // }
 
 // Store last received events from external network
-type EventCheckPoint struct {
-	gorm.Model
-	ChainName   string `gorm:"uniqueIndex:idx_chain_event;type:varchar(255)"`
-	EventName   string `gorm:"uniqueIndex:idx_chain_event;type:varchar(255)"`
-	BlockNumber uint64 `gorm:"type:bigint"`
-	TxHash      string `gorm:"type:varchar(255)"`
-	LogIndex    uint
-	EventKey    string `gorm:"type:varchar(255)"`
-}
+// type EventCheckPoint struct {
+// 	gorm.Model
+// 	ChainName   string `gorm:"uniqueIndex:idx_chain_event;type:varchar(255)"`
+// 	EventName   string `gorm:"uniqueIndex:idx_chain_event;type:varchar(255)"`
+// 	BlockNumber uint64 `gorm:"type:bigint"`
+// 	TxHash      string `gorm:"type:varchar(255)"`
+// 	LogIndex    uint
+// 	EventKey    string `gorm:"type:varchar(255)"`
+// }
 
 // type RelayData struct {
 // 	gorm.Model
@@ -65,29 +61,29 @@ type EventCheckPoint struct {
 // 	//TokenSent             *TokenSent
 // }
 
-type MintCommand struct {
-	gorm.Model
-	TxHash           string `gorm:"type:varchar(64)"`
-	SourceChain      string `gorm:"type:varchar(20);not null"`
-	DestinationChain string `gorm:"type:varchar(20);not null"`
-	TransferID       uint64 `gorm:"type:varchar(50);not null"`
-	CommandID        string `gorm:"type:varchar(64);not null"`
-	Amount           int64
-	Symbol           string `gorm:"type:varchar(10);not null"`
-	Recipient        string `gorm:"type:varchar(64);not null"`
-}
+// type MintCommand struct {
+// 	gorm.Model
+// 	TxHash           string `gorm:"type:varchar(64)"`
+// 	SourceChain      string `gorm:"type:varchar(20);not null"`
+// 	DestinationChain string `gorm:"type:varchar(20);not null"`
+// 	TransferID       uint64 `gorm:"type:varchar(50);not null"`
+// 	CommandID        string `gorm:"type:varchar(64);not null"`
+// 	Amount           int64
+// 	Symbol           string `gorm:"type:varchar(10);not null"`
+// 	Recipient        string `gorm:"type:varchar(64);not null"`
+// }
 
-type CommandExecuted struct {
-	gorm.Model
-	ID               string `gorm:"primaryKey;type:varchar(255)"`
-	SourceChain      string `gorm:"type:varchar(255)"`
-	DestinationChain string `gorm:"type:varchar(255)"`
-	TxHash           string `gorm:"type:varchar(255)"`
-	BlockNumber      uint64
-	LogIndex         uint
-	CommandId        string
-	Status           int `gorm:"default:0"`
-}
+// type CommandExecuted struct {
+// 	gorm.Model
+// 	ID               string `gorm:"primaryKey;type:varchar(255)"`
+// 	SourceChain      string `gorm:"type:varchar(255)"`
+// 	DestinationChain string `gorm:"type:varchar(255)"`
+// 	TxHash           string `gorm:"type:varchar(255)"`
+// 	BlockNumber      uint64
+// 	LogIndex         uint
+// 	CommandId        string
+// 	Status           int `gorm:"default:0"`
+// }
 
 // type ContractCallApprovedWithMint struct {
 // 	ContractCallApproved

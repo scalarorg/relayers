@@ -166,7 +166,7 @@ func createMockData(db *gorm.DB) {
 		CommandID:      COMMAND_ID,
 		BatchCommandID: BATCH_COMMAND_ID,
 		ChainID:        "bitcoin|4",
-		Status:         scalarnet.CommandPending,
+		Status:         scalarnet.CommandStatusPending,
 	}
 	db.Save(&tokenSent)
 	db.Save(&tokenSentApproved)

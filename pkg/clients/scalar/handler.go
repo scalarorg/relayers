@@ -92,10 +92,9 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*c
 
 func (c *Client) handleMintCommandEvents(ctx context.Context, events []IBCEvent[*chainstypes.MintCommand]) error {
 	//Store the mint command to the db
-	cmdModels := make([]models.MintCommand, len(events))
+	cmdModels := make([]chains.MintCommand, len(events))
 	for i, event := range events {
-		var model models.MintCommand
-		model.BindMintCommandFromScalarEvent(event.Args)
+		model := CreateMintCommandFromScalarEvent(event.Args)
 		model.TxHash = event.Hash
 		cmdModels[i] = model
 	}

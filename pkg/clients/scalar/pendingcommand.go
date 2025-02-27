@@ -359,7 +359,7 @@ func CommandResponse2Model(chainId string, batchCommandId string, command *chain
 		Params:         string(params),
 		KeyID:          command.KeyID,
 		CommandType:    command.Type,
-		Status:         scalarnet.CommandPending,
+		Status:         scalarnet.CommandStatusPending,
 	}
 }
 
