@@ -6,12 +6,11 @@ import (
 	"sync"
 	"time"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/scalarorg/scalar-core/utils"
-
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	nexus "github.com/scalarorg/scalar-core/x/nexus/exported"
@@ -23,7 +22,7 @@ type Broadcaster struct {
 	network         *cosmos.NetworkClient
 	pendingCommands *PendingCommands
 	//queue          *queue.Queue
-	buffers    []sdk.Msg
+	buffers    []types.Msg
 	mutex      sync.Mutex
 	isRunning  bool
 	period     time.Duration
@@ -77,7 +76,7 @@ func (b *Broadcaster) Stop() {
 }
 
 // QueueMsg adds a message to the broadcasting queue
-func (b *Broadcaster) QueueMsg(msg sdk.Msg) error {
+func (b *Broadcaster) QueueMsg(msg types.Msg) error {
 	b.mutex.Lock()
 	if !b.isRunning {
 		b.mutex.Unlock()
@@ -144,7 +143,7 @@ func (c *Broadcaster) CreatePendingTransfersRequest(chain string) error {
 	}
 	return c.QueueMsg(&req)
 }
-func (b *Broadcaster) pushFailedMsgBackToBuffer(msgs []sdk.Msg) error {
+func (b *Broadcaster) pushFailedMsgBackToBuffer(msgs []types.Msg) error {
 	b.mutex.Lock()
 	b.buffers = append(msgs, b.buffers...)
 	b.mutex.Unlock()
@@ -156,7 +155,7 @@ func (b *Broadcaster) pushFailedMsgBackToBuffer(msgs []sdk.Msg) error {
 
 // try broadcast fist messages in the buffer
 func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
-	var msgs []sdk.Msg
+	var msgs []types.Msg
 	b.mutex.Lock()
 	if len(b.buffers) > b.batchSize {
 		msgs = b.buffers[:b.batchSize]
@@ -236,7 +235,7 @@ func (b *Broadcaster) broadcastLoop(ctx context.Context) {
 }
 
 // type queueMsg struct {
-// 	Msg sdk.Msg
+// 	Msg types.Msg
 // }
 
 // func (m *queueMsg) Bytes() []byte {
@@ -251,7 +250,7 @@ func (b *Broadcaster) broadcastLoop(ctx context.Context) {
 // 	sync.Mutex
 // 	network    *cosmos.NetworkClient
 // 	taskQueue  []core.TaskMessage
-// 	buffers    []sdk.Msg
+// 	buffers    []types.Msg
 // 	lastActive time.Time
 // 	capacity   int
 // 	period     time.Duration
