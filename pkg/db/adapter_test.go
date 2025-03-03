@@ -12,6 +12,7 @@ import (
 	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -184,7 +185,7 @@ func TestSaveMintTokenCommandExecuted(t *testing.T) {
 		BlockNumber: 66084,
 		LogIndex:    735,
 	}
-	err := dbAdapter.SaveCommandExecuted(&cmdExecuted, "mintToken", "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291")
+	err := dbAdapter.SaveCommandExecuted(&cmdExecuted, &chainstypes.CommandResponse{Type: "mintToken"}, "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291")
 	tokenSent := chains.TokenSent{}
 	dbAdapter.PostgresClient.Find(&chains.TokenSent{}).Where("event_id = ?", TOKEN_SENT_EVENT_ID).First(&tokenSent)
 	require.NoError(t, err)
@@ -201,7 +202,8 @@ func TestSaveContractCallApproved(t *testing.T) {
 		BlockNumber: 66084,
 		LogIndex:    735,
 	}
-	dbAdapter.SaveCommandExecuted(&cmdExecuted, "approveContractCallWithMint", "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291")
+	err := dbAdapter.SaveCommandExecuted(&cmdExecuted, &chainstypes.CommandResponse{Type: "approveContractCallWithMint"}, "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291")
+	require.NoError(t, err)
 	cleanup()
 }
 

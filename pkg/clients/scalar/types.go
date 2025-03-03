@@ -1,7 +1,6 @@
 package scalar
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -275,10 +274,15 @@ var (
 type PendingCommands struct {
 	SignRequestTxsMutex sync.Mutex
 	SignRequestTxs      sync.Map
-	PsbtsMutex          sync.Mutex
-	Psbts               sync.Map
-	BatchCommandsMutex  sync.Mutex
-	BatchCommands       sync.Map
+	//Store psbt for pooling model
+	PsbtsMutex sync.Mutex
+	Psbts      sync.Map
+	//Store batch commands
+	BatchCommandsMutex sync.Mutex
+	BatchCommands      sync.Map
+	//If a chain have pending commands, we need to store number of command in the map
+	UpcPendingCommands      sync.Map
+	UpcPendingCommandsMutex sync.Mutex
 }
 
 func NewPendingCommands() *PendingCommands {
@@ -360,12 +364,24 @@ func (p *PendingCommands) StorePsbts(chain string, psbts []covtypes.Psbt) {
 		p.Psbts.Store(chain, psbts)
 	}
 }
-func (p *PendingCommands) removePsbt(chain string, psbt covtypes.Psbt) {
+
+// func (p *PendingCommands) RemovePsbt(chain string, psbt covtypes.Psbt) {
+// 	p.PsbtsMutex.Lock()
+// 	defer p.PsbtsMutex.Unlock()
+// 	if value, ok := p.Psbts.Load(chain); ok && value != nil {
+// 		psbts := value.([]covtypes.Psbt)
+// 		if len(psbts) > 0 && bytes.Equal(psbts[0], psbt) {
+// 			p.Psbts.Store(chain, psbts[1:])
+// 		}
+// 	}
+// }
+
+func (p *PendingCommands) DeleteFirstPsbt(chain string) {
 	p.PsbtsMutex.Lock()
 	defer p.PsbtsMutex.Unlock()
 	if value, ok := p.Psbts.Load(chain); ok && value != nil {
 		psbts := value.([]covtypes.Psbt)
-		if len(psbts) > 0 && bytes.Equal(psbts[0], psbt) {
+		if len(psbts) > 0 {
 			p.Psbts.Store(chain, psbts[1:])
 		}
 	}
@@ -384,4 +400,26 @@ func (p *PendingCommands) GetFirstPsbts() map[string]covtypes.Psbt {
 		return true
 	})
 	return psbts
+}
+
+func (p *PendingCommands) GetUpcPendingCommands() map[string]int {
+	p.UpcPendingCommandsMutex.Lock()
+	defer p.UpcPendingCommandsMutex.Unlock()
+	count := make(map[string]int)
+	p.UpcPendingCommands.Range(func(key, value any) bool {
+		count[key.(string)] = value.(int)
+		return true
+	})
+	return count
+}
+
+func (p *PendingCommands) StoreUpcPendingCommands(chain string, count int) {
+	p.UpcPendingCommandsMutex.Lock()
+	defer p.UpcPendingCommandsMutex.Unlock()
+	p.UpcPendingCommands.Store(chain, count)
+}
+func (p *PendingCommands) DeleteUpcPendingCommands(chain string) {
+	p.UpcPendingCommandsMutex.Lock()
+	defer p.UpcPendingCommandsMutex.Unlock()
+	p.UpcPendingCommands.Delete(chain)
 }

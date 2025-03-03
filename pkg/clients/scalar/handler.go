@@ -14,6 +14,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/events"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	"github.com/scalarorg/scalar-core/x/nexus/exported"
+	protocol "github.com/scalarorg/scalar-core/x/protocol/exported"
 )
 
 func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*chainstypes.EventTokenSent]) error {
@@ -250,7 +251,18 @@ func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *IBCE
 				Data:             res,
 			})
 		} else if chainstypes.IsBitcoinChain(chainName) {
-
+			//Detect batch command is upc or pooling
+			liquidityModel, err := extractLiquidityModel(string(res.KeyID))
+			if err != nil {
+				log.Error().Err(err).Str("Chain", destinationChain).Msg("[ScalarClient] [handleCommantBatchSignedsEvent] failed to extract liquidity model")
+			}
+			c.pendingCommands.DeleteBatchCommand(hex.EncodeToString(event.Args.CommandBatchID))
+			if liquidityModel == protocol.LIQUIDITY_MODEL_UPC {
+				c.pendingCommands.DeleteUpcPendingCommands(destinationChain)
+			} else if liquidityModel == protocol.LIQUIDITY_MODEL_POOL {
+				//Todo: Handle batch command failed
+				c.pendingCommands.DeleteFirstPsbt(destinationChain)
+			}
 		}
 		//Find commands by ids for update db status
 		for _, cmdID := range res.CommandIDs {

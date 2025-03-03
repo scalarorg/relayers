@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	"gorm.io/gorm"
 )
 
@@ -49,30 +50,36 @@ func (db *DatabaseAdapter) UpdateBtcExecutedCommands(chainId string, txHashes []
 	log.Info().Any("result", result.RowsAffected).Msg("UpdateBtcExecutedCommands")
 	return result.Error
 }
-func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecuted, commandType string, commandId string) error {
+func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecuted, command *chainstypes.CommandResponse, commandId string) error {
 	var eventId string
 	var err error
 	//Find eventId by commandId
-	switch commandType {
-	case "approveContractCallWithMint":
-		err = db.PostgresClient.Select("event_id").Model(&scalarnet.ContractCallApprovedWithMint{}).Where("command_id = ?", commandId).Find(&eventId).Error
-	case "mintToken":
-		err = db.PostgresClient.Select("event_id").Model(&scalarnet.TokenSentApproved{}).Where("command_id = ?", commandId).First(&eventId).Error
+	if command != nil {
+		switch command.Type {
+		case "approveContractCallWithMint":
+			err = db.PostgresClient.Select("event_id").Model(&scalarnet.ContractCallApprovedWithMint{}).Where("command_id = ?", commandId).Find(&eventId).Error
+		case "mintToken":
+			err = db.PostgresClient.Select("event_id").Model(&scalarnet.TokenSentApproved{}).Where("command_id = ?", commandId).First(&eventId).Error
+		}
+		if err != nil {
+			return fmt.Errorf("failed to find eventId: %w", err)
+		}
+		log.Debug().Str("commandType", command.Type).Str("commandId", commandId).Msgf("[DatabaseAdapter] [SaveCommandExecuted] found eventId: %s", eventId)
+
 	}
-	if err != nil {
-		return fmt.Errorf("failed to find eventId: %w", err)
-	}
-	log.Debug().Str("commandType", commandType).Str("commandId", commandId).Msgf("[DatabaseAdapter] [SaveCommandExecuted] found eventId: %s", eventId)
 	err = db.PostgresClient.Transaction(func(tx *gorm.DB) error {
 		result := tx.Save(cmdExecuted)
 		if result.Error != nil {
 			return result.Error
 		}
-		switch commandType {
-		case "approveContractCallWithMint":
-			tx.Model(&chains.ContractCallWithToken{}).Where("event_id = ?", eventId).Update("status", chains.TokenSentStatusSuccess)
-		case "mintToken":
-			tx.Model(&chains.TokenSent{}).Where("event_id = ?", eventId).Update("status", chains.TokenSentStatusSuccess)
+		//The eventId is empty only when we restart whole system from beginning
+		if eventId != "" && command != nil {
+			switch command.Type {
+			case "approveContractCallWithMint":
+				tx.Model(&chains.ContractCallWithToken{}).Where("event_id = ?", eventId).Update("status", chains.TokenSentStatusSuccess)
+			case "mintToken":
+				tx.Model(&chains.TokenSent{}).Where("event_id = ?", eventId).Update("status", chains.TokenSentStatusSuccess)
+			}
 		}
 		return nil
 	})

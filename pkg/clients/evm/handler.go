@@ -328,18 +328,15 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecut
 			log.Warn().Err(err).Msgf("[EvmClient] [HandleCommandExecuted] failed to get commandId from scalarnet")
 		} else if command != nil {
 			log.Info().Any("command", command).Msg("[EvmClient] [HandleCommandExecuted] get command from scalarnet")
-			//err = ec.dbAdapter.SaveSingleValue(&cmdExecuted)
-			err = ec.dbAdapter.SaveCommandExecuted(&cmdExecuted, command.Type, cmdExecuted.CommandId)
-			if err != nil {
-				log.Error().Err(err).Msg("[EvmClient] [HandleCommandExecuted] failed to save evm executed to the db")
-				return fmt.Errorf("failed to create evm executed: %w", err)
-			}
 		} else {
 			log.Warn().Any("command", command).Msg("[EvmClient] [HandleCommandExecuted] command not found in scalarnet")
 		}
+		err = ec.dbAdapter.SaveCommandExecuted(&cmdExecuted, command, cmdExecuted.CommandId)
+		if err != nil {
+			log.Error().Err(err).Msg("[EvmClient] [HandleCommandExecuted] failed to save evm executed to the db")
+			return fmt.Errorf("failed to create evm executed: %w", err)
+		}
 	}
-
-	//Done; Don't need to send to the bus
 	return nil
 }
 
