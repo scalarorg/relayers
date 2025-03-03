@@ -2,6 +2,7 @@ package btc
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/rs/zerolog/log"
@@ -96,22 +97,31 @@ func (c *BtcClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRes
 		Any("CommandIDs", batchedCmdRes.CommandIDs).
 		Msgf("[BtcClient] [handleScalarBatchCommandSigned] broadcasting signed psbt")
 	//Broadcast to the network
-	txHash, err := c.BroadcastRawTx(batchedCmdRes.ExecuteData)
+	//try to parse batchedCmdRes.ExecuteData as psbt array
+	var psbts []string
+	err := json.Unmarshal([]byte(batchedCmdRes.ExecuteData), &psbts)
 	if err != nil {
-		log.Error().Err(err).
-			Str("signedPsbt", batchedCmdRes.ExecuteData).
-			Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to broadcast tx")
+		log.Error().Err(err).Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to unmarshal execute data")
 		return err
 	}
-	txHashStr := txHash.String()
-	log.Debug().Msgf("[BtcClient] [handleScalarBatchCommandSigned] broadcasted txHash: %s", txHashStr)
-	err = c.dbAdapter.UpdateBroadcastedCommands(chainId, batchedCmdRes.ID, batchedCmdRes.CommandIDs, txHashStr)
-	if err != nil {
-		log.Error().Err(err).
-			Str("TxHash", txHashStr).
-			Str("ChainId", chainId).
-			Str("BatchedCommandID", batchedCmdRes.ID).
-			Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to update source event status")
+	for _, psbt := range psbts {
+		txHash, err := c.BroadcastRawTx(psbt)
+		if err != nil {
+			log.Error().Err(err).
+				Str("signedPsbt", psbt).
+				Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to broadcast tx")
+			return err
+		}
+		txHashStr := txHash.String()
+		log.Debug().Msgf("[BtcClient] [handleScalarBatchCommandSigned] broadcasted txHash: %s", txHashStr)
+		err = c.dbAdapter.UpdateBroadcastedCommands(chainId, batchedCmdRes.ID, batchedCmdRes.CommandIDs, txHashStr)
+		if err != nil {
+			log.Error().Err(err).
+				Str("TxHash", txHashStr).
+				Str("ChainId", chainId).
+				Str("BatchedCommandID", batchedCmdRes.ID).
+				Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to update source event status")
+		}
 	}
 	return nil
 }
