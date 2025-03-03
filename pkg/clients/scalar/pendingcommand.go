@@ -2,6 +2,8 @@ package scalar
 
 import (
 	"context"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -20,6 +22,7 @@ import (
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	"github.com/scalarorg/scalar-core/x/nexus/exported"
+	protocol "github.com/scalarorg/scalar-core/x/protocol/exported"
 )
 
 // Todo: make it configurable
@@ -109,28 +112,53 @@ func (c *Client) checkChainPendingCommands(ctx context.Context, chain string) bo
 		// c.pendingCommands.StoreSignRequest(chain, signRes.TxHash)
 		// log.Debug().Msgf("[ScalarClient] [checkChainPendingCommands] Successfully broadcasted sign commands request with txHash: %s. Add it to pendingSignCommandTxs...", signRes.TxHash)
 	} else if chainstypes.IsBitcoinChain(nexusChain) {
-
-		// If pending commands is for pooling model then we need to create a single psbt for whole batch command
-		// Otherwise, pending command contains a single command, which allready has psbt, we just need to sign it
-		commandOutpoints := c.tryCreateCommandOutpoints(pendingCommands)
-		if len(commandOutpoints) == 0 {
-			log.Warn().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] psbt already formed. Just append empty psbt to pending commands and waiting to broadcast signing request")
+		// Find out the liquidity model by key_id of the first command
+		liquidityModel, err := extractLiquidityModel(pendingCommands[0].KeyID, pendingCommands[0])
+		if err != nil {
+			log.Error().Err(err).Msg("[ScalarClient] [checkChainPendingCommands] failed to extract liquidity model")
+			return true
+		}
+		if liquidityModel == protocol.LIQUIDITY_MODEL_UPC {
+			// If pending commands are in upc model, which allready have psbts, we just need to sign it
+			log.Debug().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] psbt already formed. Just append empty psbt to pending commands and waiting to broadcast signing request")
 			c.pendingCommands.StorePsbt(chain, covtypes.Psbt{})
-
-		} else {
-			psbtSigningRequest := types.CreatePsbtRequest{
-				Outpoints: commandOutpoints,
-				Params:    c.GetPsbtParams(chain),
+		} else if liquidityModel == protocol.LIQUIDITY_MODEL_POOL {
+			// If pending commands is for pooling model then we need to create a single psbt for whole batch command
+			commandOutpoints := c.tryCreateCommandOutpoints(pendingCommands)
+			if len(commandOutpoints) > 0 {
+				psbtSigningRequest := types.CreatePsbtRequest{
+					Outpoints: commandOutpoints,
+					Params:    c.GetPsbtParams(chain),
+				}
+				eventEnvelope := events.EventEnvelope{
+					EventType:        events.EVENT_SCALAR_CREATE_PSBT_REQUEST,
+					DestinationChain: chain,
+					Data:             psbtSigningRequest,
+				}
+				c.eventBus.BroadcastEvent(&eventEnvelope)
+			} else {
+				log.Warn().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] cannot extract outpoints from pending commands in pooling model. Something wrong!!!")
 			}
-			eventEnvelope := events.EventEnvelope{
-				EventType:        events.EVENT_SCALAR_CREATE_PSBT_REQUEST,
-				DestinationChain: chain,
-				Data:             psbtSigningRequest,
-			}
-			c.eventBus.BroadcastEvent(&eventEnvelope)
 		}
 	}
 	return true
+}
+func extractLiquidityModel(keyID string, command chainstypes.QueryCommandResponse) (protocol.LiquidityModel, error) {
+	parts := strings.Split(keyID, "|")
+	if len(parts) != 2 {
+		return protocol.LiquidityModel(0), fmt.Errorf("ParseContractCallWithTokenToBTCKeyID > invalid keyID")
+	}
+
+	modelBytes, err := hex.DecodeString(parts[0])
+	if err != nil {
+		return protocol.LiquidityModel(0), fmt.Errorf("ParseContractCallWithTokenToBTCKeyID > invalid model")
+	}
+
+	modelInt := binary.BigEndian.Uint32(modelBytes)
+	if _, ok := protocol.LiquidityModel_name[int32(modelInt)]; !ok {
+		return protocol.LiquidityModel(0), fmt.Errorf("ParseContractCallWithTokenToBTCKeyID > invalid model")
+	}
+	return protocol.LiquidityModel(modelInt), nil
 }
 func (c *Client) tryCreateCommandOutpoints(pendingCommands []chainstypes.QueryCommandResponse) []types.CommandOutPoint {
 	outpoints := []types.CommandOutPoint{}

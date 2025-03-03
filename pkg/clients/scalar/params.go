@@ -53,10 +53,10 @@ func (c *Client) GetPsbtParams(chainName string) types.PsbtParams {
 		protocol := protocols.Protocols[0]
 		params.CustodianPubKey = make([]utils.PublicKey, len(protocol.CustodianGroup.Custodians))
 		for i, custodian := range protocol.CustodianGroup.Custodians {
-			params.CustodianPubKey[i] = utils.PublicKey(custodian.BtcPubkey)
+			params.CustodianPubKey[i] = utils.PublicKey(custodian.BitcoinPubkey)
 		}
 		params.CustodianQuorum = uint8(protocol.CustodianGroup.Quorum)
-		params.CustodianScript = protocol.CustodianGroup.BtcPubkey
+		params.CustodianScript = protocol.CustodianGroup.BitcoinPubkey
 		params.ProtocolTag = protocol.Tag
 	}
 	return params
