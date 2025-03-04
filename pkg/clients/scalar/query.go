@@ -8,8 +8,15 @@ import (
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 )
 
+type TokenInfoResponse struct {
+	TokenAddress string
+	Asset        string
+	Response     *chainstypes.TokenInfoResponse
+	Error        error
+}
+
 var (
-	chainTokenInfos = map[string][]*chainstypes.TokenInfoResponse{}
+	chainTokenInfos = map[string][]*TokenInfoResponse{}
 )
 
 func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress string) (string, error) {
@@ -18,34 +25,42 @@ func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress str
 		tokenAddress = "0x" + tokenAddress
 	}
 	tokenInfos, ok := chainTokenInfos[chainId]
+	var tokenResponse *TokenInfoResponse = nil
 	if ok {
 		for _, info := range tokenInfos {
-			if strings.EqualFold(info.Address, tokenAddress) {
-				return info.Asset, nil
+			if info.TokenAddress == tokenAddress {
+				tokenResponse = info
+				break
 			}
 		}
-	} else {
-		tokenInfos = []*chainstypes.TokenInfoResponse{}
 	}
-	client, err := c.queryClient.GetChainQueryServiceClient()
-	if err != nil {
-		log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
-		return "", err
+	if tokenResponse == nil {
+		client, err := c.queryClient.GetChainQueryServiceClient()
+		if err != nil {
+			log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
+			return "", err
+		}
+		tokenRequest := chainstypes.TokenInfoRequest{
+			Chain: chainId,
+			FindBy: &chainstypes.TokenInfoRequest_Address{
+				Address: tokenAddress,
+			},
+		}
+		response, err := client.TokenInfo(ctx, &tokenRequest)
+		tokenResponse = &TokenInfoResponse{
+			TokenAddress: tokenAddress,
+			Response:     response,
+			Error:        err,
+		}
+		if response != nil {
+			tokenResponse.Asset = response.Asset
+		}
+		chainTokenInfos[chainId] = append(tokenInfos, tokenResponse)
 	}
-
-	tokenRequest := chainstypes.TokenInfoRequest{
-		Chain: chainId,
-		FindBy: &chainstypes.TokenInfoRequest_Address{
-			Address: tokenAddress,
-		},
+	if tokenResponse.Error != nil {
+		return "", tokenResponse.Error
 	}
-	response, err := client.TokenInfo(ctx, &tokenRequest)
-	if err != nil {
-		log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get token info from scalar-core")
-		return "", err
-	}
-	chainTokenInfos[chainId] = append(tokenInfos, response)
-	return response.Asset, nil
+	return tokenResponse.Response.Asset, nil
 }
 func (c *Client) GetTokenContractAddressFromSymbol(ctx context.Context, chainId, symbol string) string {
 	//Try get token info from cache
@@ -53,11 +68,9 @@ func (c *Client) GetTokenContractAddressFromSymbol(ctx context.Context, chainId,
 	if ok {
 		for _, info := range tokenInfos {
 			if strings.EqualFold(info.Asset, symbol) {
-				return info.Address
+				return info.Response.Address
 			}
 		}
-	} else {
-		tokenInfos = []*chainstypes.TokenInfoResponse{}
 	}
 	//If not found, query from scalar-core
 	client, err := c.queryClient.GetChainQueryServiceClient()
@@ -76,7 +89,12 @@ func (c *Client) GetTokenContractAddressFromSymbol(ctx context.Context, chainId,
 		log.Warn().Err(err).Msgf("[ScalarClient] [GetTokenContractAddressFromSymbol] cannot get token info from scalar-core")
 		return ""
 	}
-	chainTokenInfos[chainId] = append(tokenInfos, response)
+	chainTokenInfos[chainId] = append(tokenInfos, &TokenInfoResponse{
+		TokenAddress: response.Address,
+		Asset:        response.Asset,
+		Response:     response,
+		Error:        nil,
+	})
 	return response.Address
 }
 func (c *Client) GetCommand(chainName string, commandId string) (*chainstypes.CommandResponse, error) {

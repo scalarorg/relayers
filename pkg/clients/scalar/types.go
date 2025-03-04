@@ -271,18 +271,25 @@ var (
 	// }
 )
 
+type BatchedCommand struct {
+	BatchCommandId string
+	Chain          string
+	CommandIDs     []string
+}
 type PendingCommands struct {
+	//Store SignCommandRequest txHash: chain => txHash
+	//There case where multiple chains have the same txHash, so we need to store the txHash for each chain
 	SignRequestTxsMutex sync.Mutex
 	SignRequestTxs      sync.Map
 	//Store psbt for pooling model
 	PsbtsMutex sync.Mutex
 	Psbts      sync.Map
-	//Store batch commands
-	BatchCommandsMutex sync.Mutex
-	BatchCommands      sync.Map
 	//If a chain have pending commands, we need to store number of command in the map
 	UpcPendingCommands      sync.Map
 	UpcPendingCommandsMutex sync.Mutex
+	//Store batch commands
+	BatchCommandsMutex sync.Mutex
+	BatchCommands      sync.Map
 }
 
 func NewPendingCommands() *PendingCommands {
@@ -305,17 +312,32 @@ func (p *PendingCommands) StoreSignRequest(chain string, txHash string) {
 	defer p.SignRequestTxsMutex.Unlock()
 	p.SignRequestTxs.Store(chain, txHash)
 }
-func (p *PendingCommands) DeleteSignRequest(chain string) {
+
+func (p *PendingCommands) DeleteSignRequestTx(txHash string) {
 	p.SignRequestTxsMutex.Lock()
 	defer p.SignRequestTxsMutex.Unlock()
-	p.SignRequestTxs.Delete(chain)
-}
-func (p *PendingCommands) GetAlllSignRequests() map[string]string {
-	p.SignRequestTxsMutex.Lock()
-	defer p.SignRequestTxsMutex.Unlock()
-	requests := make(map[string]string)
+	chains := []string{}
 	p.SignRequestTxs.Range(func(key, value any) bool {
-		requests[key.(string)] = value.(string)
+		if value.(string) == txHash {
+			chains = append(chains, key.(string))
+		}
+		return true
+	})
+	for _, chain := range chains {
+		p.SignRequestTxs.Delete(chain)
+	}
+}
+
+// SignRequestTxs stores map chain=>txHash
+// Return map of txHash => []chain
+func (p *PendingCommands) GetAllSignRequestTxs() map[string][]string {
+	p.SignRequestTxsMutex.Lock()
+	defer p.SignRequestTxsMutex.Unlock()
+	requests := make(map[string][]string)
+	p.SignRequestTxs.Range(func(key, value any) bool {
+		txHash := value.(string)
+		chain := key.(string)
+		requests[txHash] = append(requests[txHash], chain)
 		return true
 	})
 	return requests
@@ -400,6 +422,29 @@ func (p *PendingCommands) GetFirstPsbts() map[string]covtypes.Psbt {
 		return true
 	})
 	return psbts
+}
+
+// Check if a chain has pending commands either psbt or upc
+func (p *PendingCommands) HasPendingCommands(chain string) bool {
+	p.UpcPendingCommandsMutex.Lock()
+	defer p.UpcPendingCommandsMutex.Unlock()
+	count, ok := p.UpcPendingCommands.Load(chain)
+	if ok && count.(int) > 0 {
+		log.Debug().Str("Chain", chain).Msg("[PendingCommands] There is a pending upc command")
+		return true
+	}
+	p.PsbtsMutex.Lock()
+	defer p.PsbtsMutex.Unlock()
+	value, ok := p.Psbts.Load(chain)
+	if !ok {
+		return false
+	}
+	psbts := value.([]covtypes.Psbt)
+	if len(psbts) > 0 {
+		log.Debug().Str("Chain", chain).Msg("[PendingCommands] There is a pending psbt command")
+		return true
+	}
+	return false
 }
 
 func (p *PendingCommands) GetUpcPendingCommands() map[string]int {

@@ -227,53 +227,88 @@ func (c *Client) handleCommandBatchSignedEvents(ctx context.Context, events []IB
 
 func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *IBCEvent[*chainstypes.CommandBatchSigned]) error {
 	destinationChain := string(event.Args.Chain)
+	batchedCmds, err := c.getBatchedCommands(ctx, destinationChain, event.Args.CommandBatchID)
+	if err != nil {
+		return err
+	}
+
+	if c.eventBus == nil || batchedCmds.Status != chainstypes.BatchSigned {
+		return nil
+	}
+
+	return c.processBatchedCommands(ctx, destinationChain, batchedCmds, event)
+}
+
+func (c *Client) getBatchedCommands(ctx context.Context, chain string, batchID []byte) (*chainstypes.BatchedCommandsResponse, error) {
+	client, err := c.GetQueryClient().GetChainQueryServiceClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service client: %w", err)
+	}
+
+	res, err := client.BatchedCommands(ctx, &chainstypes.BatchedCommandsRequest{
+		Chain: chain,
+		Id:    hex.EncodeToString(batchID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get execute data: %w", err)
+	}
+
+	log.Debug().Msgf("[ScalarClient] found executeData: %s", res.ExecuteData)
+	return res, nil
+}
+
+func (c *Client) processBatchedCommands(ctx context.Context, chain string, batchedCmds *chainstypes.BatchedCommandsResponse, event *IBCEvent[*chainstypes.CommandBatchSigned]) error {
+	chainName := exported.ChainName(event.Args.Chain)
+	batchID := hex.EncodeToString(event.Args.CommandBatchID)
+
+	if chainstypes.IsEvmChain(chainName) {
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
+			DestinationChain: chain,
+			Data:             batchedCmds,
+		})
+	} else if chainstypes.IsBitcoinChain(chainName) {
+		return c.handleBitcoinBatchCommands(chain, batchID, string(batchedCmds.KeyID))
+	}
+
+	return c.updateCommandStatuses(ctx, chain, batchedCmds.CommandIDs)
+}
+
+func (c *Client) handleBitcoinBatchCommands(chain, batchID, keyID string) error {
+	liquidityModel, err := extractLiquidityModel(keyID)
+	if err != nil {
+		log.Error().Err(err).Str("Chain", chain).Msg("failed to extract liquidity model")
+		return err
+	}
+	log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] Delete batch command %s.", batchID)
+	c.pendingCommands.DeleteBatchCommand(batchID)
+
+	if liquidityModel == protocol.LIQUIDITY_MODEL_UPC {
+		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] liquidityModel: %s. Delete upc pending commands.", liquidityModel)
+		c.pendingCommands.DeleteUpcPendingCommands(chain)
+	} else if liquidityModel == protocol.LIQUIDITY_MODEL_POOL {
+		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] liquidityModel: %s. Delete first psbt.", liquidityModel)
+		c.pendingCommands.DeleteFirstPsbt(chain)
+	}
+
+	return nil
+}
+
+func (c *Client) updateCommandStatuses(ctx context.Context, chain string, commandIDs []string) error {
 	client, err := c.GetQueryClient().GetChainQueryServiceClient()
 	if err != nil {
 		return fmt.Errorf("failed to create service client: %w", err)
 	}
-	res, err := client.BatchedCommands(ctx, &chainstypes.BatchedCommandsRequest{
-		Chain: destinationChain,
-		Id:    hex.EncodeToString(event.Args.CommandBatchID),
-	})
-	if err != nil {
-		return fmt.Errorf("[ScalarClient] [handleCommantBatchSignedsEvent] failed to get execute data: %w", err)
-	}
-	log.Debug().Msgf("[ScalarClient] [handleCommantBatchSignedsEvent] found executeData: %s", res.ExecuteData)
-	// Broadcast the execute data to the Event bus
-	// Todo:After the executeData is broadcasted,
-	// Update status of the RelayerData to Approved
-	if c.eventBus != nil && res.Status == chainstypes.BatchSigned {
-		chainName := exported.ChainName(event.Args.Chain)
-		if chainstypes.IsEvmChain(chainName) {
-			c.eventBus.BroadcastEvent(&events.EventEnvelope{
-				EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
-				DestinationChain: string(event.Args.Chain),
-				Data:             res,
-			})
-		} else if chainstypes.IsBitcoinChain(chainName) {
-			//Detect batch command is upc or pooling
-			liquidityModel, err := extractLiquidityModel(string(res.KeyID))
-			if err != nil {
-				log.Error().Err(err).Str("Chain", destinationChain).Msg("[ScalarClient] [handleCommantBatchSignedsEvent] failed to extract liquidity model")
-			}
-			c.pendingCommands.DeleteBatchCommand(hex.EncodeToString(event.Args.CommandBatchID))
-			if liquidityModel == protocol.LIQUIDITY_MODEL_UPC {
-				c.pendingCommands.DeleteUpcPendingCommands(destinationChain)
-			} else if liquidityModel == protocol.LIQUIDITY_MODEL_POOL {
-				//Todo: Handle batch command failed
-				c.pendingCommands.DeleteFirstPsbt(destinationChain)
-			}
+
+	for _, cmdID := range commandIDs {
+		cmdRes, err := client.Command(ctx, &chainstypes.CommandRequest{
+			Chain: chain,
+			ID:    cmdID,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get command by ID: %w", err)
 		}
-		//Find commands by ids for update db status
-		for _, cmdID := range res.CommandIDs {
-			cmdRes, err := client.Command(ctx, &chainstypes.CommandRequest{Chain: destinationChain, ID: cmdID})
-			if err != nil {
-				return fmt.Errorf("[ScalarClient] [handleCommantBatchSignedsEvent] failed to get command by ID: %w", err)
-			}
-			log.Debug().Str("CommandId", cmdID).Any("Command", cmdRes).Msg("Command response")
-		}
-	} else {
-		log.Warn().Msg("[ScalarClient] [handleSignCommandsEvent] event bus is undefined")
+		log.Debug().Str("CommandId", cmdID).Any("Command", cmdRes).Msg("Command response")
 	}
 	return nil
 }

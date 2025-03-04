@@ -20,7 +20,10 @@ import (
 
 type Broadcaster struct {
 	network         *cosmos.NetworkClient
-	pendingCommands *PendingCommands
+	pendingCommands *PendingCommands //Keep reference to the pending commands for store sign command request tx hash
+	//We keep unique sign pending commands for each chain in broadcaster's buffer
+	SignPendingCommandRequests      sync.Map
+	SignPendingCommandRequestsMutex sync.Mutex
 	//queue          *queue.Queue
 	buffers    []types.Msg
 	mutex      sync.Mutex
@@ -113,27 +116,65 @@ func (c *Broadcaster) ConfirmBtcTxs(chainName string, txIds []string) error {
 	return c.QueueMsg(msg)
 }
 
-func (c *Broadcaster) SignEvmCommandsRequest(destinationChain string) error {
+func (c *Broadcaster) AddSignEvmCommandsRequest(destinationChain string) error {
 	req := chainstypes.NewSignCommandsRequest(
 		c.network.GetAddress(),
 		destinationChain)
 	return c.QueueMsg(req)
 }
 
-func (c *Broadcaster) SignPsbtCommandsRequest(destinationChain string, psbt covtypes.Psbt) error {
-	req := chainstypes.NewSignPsbtCommandRequest(
-		c.network.GetAddress(),
-		destinationChain,
-		psbt)
-	return c.QueueMsg(req)
+// Add SignPsbtCommandsRequest to buffer
+// Return true if the request is added to buffer, false if the request is already in buffer
+func (c *Broadcaster) AddSignPsbtCommandsRequest(destinationChain string, psbt covtypes.Psbt) bool {
+	c.SignPendingCommandRequestsMutex.Lock()
+	defer c.SignPendingCommandRequestsMutex.Unlock()
+	_, loaded := c.SignPendingCommandRequests.Load(destinationChain)
+	if loaded {
+		log.Debug().Str("Chain", destinationChain).Msgf("[Broadcaster] [AddSignUpcCommandsRequest] SignCommandRequest is already in buffer. Skip adding new one")
+		return false
+	} else {
+		req := chainstypes.NewSignPsbtCommandRequest(
+			c.network.GetAddress(),
+			destinationChain,
+			psbt)
+		err := c.QueueMsg(req)
+		if err != nil {
+			log.Error().Err(err).Msgf("[Broadcaster] [AddSignPsbtCommandsRequest] Failed to add SignPsbtCommandRequest to buffer")
+			return false
+		}
+		c.SignPendingCommandRequests.Store(destinationChain, 1)
+		return true
+	}
 }
 
-func (c *Broadcaster) SignBtcCommandsRequest(destinationChain string) error {
-	req := chainstypes.NewSignBtcCommandsRequest(
-		c.network.GetAddress(),
-		destinationChain)
+// Add SignBtcCommandsRequest to buffer
+// Return true if the request is added to buffer, false if the request is already in buffer
+func (c *Broadcaster) AddSignUpcCommandsRequest(destinationChain string) bool {
+	c.SignPendingCommandRequestsMutex.Lock()
+	defer c.SignPendingCommandRequestsMutex.Unlock()
+	_, loaded := c.SignPendingCommandRequests.Load(destinationChain)
+	if loaded {
+		log.Debug().Str("Chain", destinationChain).Msgf("[Broadcaster] [AddSignUpcCommandsRequest] SignCommandRequest is already in buffer. Skip adding new one")
+		return false
+	} else {
+		req := chainstypes.NewSignBtcCommandsRequest(
+			c.network.GetAddress(),
+			destinationChain)
 
-	return c.QueueMsg(req)
+		err := c.QueueMsg(req)
+		if err != nil {
+			log.Error().Err(err).Msgf("[Broadcaster] [AddSignUpcCommandsRequest] Failed to add SignCommandRequest to buffer")
+			return false
+		}
+		c.SignPendingCommandRequests.Store(destinationChain, 1)
+		return true
+	}
+}
+
+func (c *Broadcaster) CleanPendingCommandRequests(chain string) {
+	c.SignPendingCommandRequestsMutex.Lock()
+	defer c.SignPendingCommandRequestsMutex.Unlock()
+	c.SignPendingCommandRequests.Delete(chain)
 }
 
 func (c *Broadcaster) CreatePendingTransfersRequest(chain string) error {
@@ -171,10 +212,12 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 			b.cycleCount = 0
 		}
 		return nil
+	} else {
+		log.Debug().Msgf("[Broadcaster] [broadcastMsgs] Broadcasting %d messages", len(msgs))
 	}
 	resp, err := b.network.SignAndBroadcastMsgs(ctx, msgs...)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to broadcast messages")
+		log.Error().Err(err).Msg("[Broadcaster] Failed to broadcast messages")
 		b.pushFailedMsgBackToBuffer(msgs)
 		return err
 	}
@@ -186,14 +229,21 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 			Int("remain_buffer_size", len(b.buffers)).
 			Msg("[Broadcaster] Successfully broadcasted messages")
 		for _, msg := range msgs {
-			log.Debug().Msgf("[Broadcaster] [successfully broadcasted]: %v of type %T", msg, msg)
 			switch value := msg.(type) {
 			case *chainstypes.SignCommandsRequest:
-				log.Debug().Str("TxHash", resp.TxHash).Msg("[Broadcaster] Store txHash into pending SignRequest")
+				log.Debug().Str("Chain", string(value.Chain)).Str("TxHash", resp.TxHash).Msg("[Broadcaster] Store txHash into pending SignEvmPendingCommandsRequest")
 				b.pendingCommands.StoreSignRequest(string(value.Chain), resp.TxHash)
+				b.CleanPendingCommandRequests(string(value.Chain))
+			case *chainstypes.SignPsbtCommandRequest:
+				log.Debug().Str("Chain", string(value.Chain)).Str("TxHash", resp.TxHash).Msg("[Broadcaster] Store txHash into pending SignPsbtCommandRequest")
+				b.pendingCommands.StoreSignRequest(string(value.Chain), resp.TxHash)
+				b.CleanPendingCommandRequests(string(value.Chain))
+			case *chainstypes.SignBtcCommandsRequest:
+				log.Debug().Str("Chain", string(value.Chain)).Str("TxHash", resp.TxHash).Msg("[Broadcaster] Store txHash into pending SignUpcCommandRequest")
+				b.pendingCommands.StoreSignRequest(string(value.Chain), resp.TxHash)
+				b.CleanPendingCommandRequests(string(value.Chain))
 			default:
-				// And here I'm feeling dumb. ;)
-				fmt.Printf("I don't know, ask stackoverflow.")
+				log.Debug().Msgf("[Broadcaster] [successfully broadcasted]: %v of type %T", msg, msg)
 			}
 		}
 		msgs = nil

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/bitcoin-vault/go-utils/encode"
 	utiltypes "github.com/scalarorg/bitcoin-vault/go-utils/types"
@@ -56,7 +57,7 @@ func (c *Client) ProcessPendingCommands(ctx context.Context) {
 		}
 		for _, chain := range activedChains {
 			go func() {
-				if c.checkChainPendingCommands(ctx, chain) {
+				if c.tryProcessPendingCommands(ctx, chain) {
 					log.Debug().Str("Chain", chain).Msg("[ScalarClient] [ProcessPendingCommands] Found new pending commands")
 				} else if counter >= 100 {
 					log.Debug().Str("Chain", chain).Msg("[ScalarClient] [ProcessPendingCommands] No pending command found. This message is printed one of 100")
@@ -72,16 +73,11 @@ func (c *Client) ProcessPendingCommands(ctx context.Context) {
 }
 
 // Return true if there is new pendingCommands
-func (c *Client) checkChainPendingCommands(ctx context.Context, chain string) bool {
-	//1. Check if there is a pending sign command request
-	if _, ok := c.pendingCommands.LoadSignRequest(chain); ok {
-		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] There is a pending sign command request, skip send new signing request")
-		return false
-	}
+func (c *Client) tryProcessPendingCommands(ctx context.Context, chain string) bool {
 	//1. Check if the latest batch command is in signing process
-	isInSigningProcess := c.checkLatestBatchCommandIsSigning(ctx, chain)
+	isInSigningProcess := c.isSigningProgress(ctx, chain)
 	if isInSigningProcess {
-		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] The latest batch command is in signing process, skip send new signing request")
+		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [tryProcessPendingCommands] The latest batch command is in signing process, skip send new signing request")
 		return false
 	}
 	//2. Get pending commands
@@ -91,15 +87,16 @@ func (c *Client) checkChainPendingCommands(ctx context.Context, chain string) bo
 		return false
 	}
 	if len(pendingCommands) == 0 {
+		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [tryProcessPendingCommands] No pending commands found")
 		return false
 	}
 	//Store pending commands to db
-	log.Debug().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] found pending commands")
-	//1. Sign the commands request
+
 	nexusChain := exported.ChainName(chain)
 	if chainstypes.IsEvmChain(nexusChain) {
+		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [tryProcessPendingCommands] add SignEvmCommandRequest to the broadcaster's buffer!")
 		//For evm chain, payload is already prepared in the scalar node, we just need to sign it before broadcast to evm node
-		err := c.broadcaster.SignEvmCommandsRequest(chain)
+		err := c.broadcaster.AddSignEvmCommandsRequest(chain)
 		if err != nil {
 			log.Error().Err(err).Msg("[ScalarClient] [checkChainPendingCommands] failed to enqueue evm commands request")
 			return true
@@ -112,34 +109,38 @@ func (c *Client) checkChainPendingCommands(ctx context.Context, chain string) bo
 		// c.pendingCommands.StoreSignRequest(chain, signRes.TxHash)
 		// log.Debug().Msgf("[ScalarClient] [checkChainPendingCommands] Successfully broadcasted sign commands request with txHash: %s. Add it to pendingSignCommandTxs...", signRes.TxHash)
 	} else if chainstypes.IsBitcoinChain(nexusChain) {
-		// Find out the liquidity model by key_id of the first command
-		liquidityModel, err := extractLiquidityModel(pendingCommands[0].KeyID)
-		if err != nil {
-			log.Error().Err(err).Msg("[ScalarClient] [checkChainPendingCommands] failed to extract liquidity model")
-			return true
-		}
-		if liquidityModel == protocol.LIQUIDITY_MODEL_UPC {
-			// If pending commands are in upc model, which allready have psbts, we just need to sign it
-			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [checkChainPendingCommands] found %d pending commands in upc model", len(pendingCommands))
-			c.pendingCommands.StoreUpcPendingCommands(chain, len(pendingCommands))
-		} else if liquidityModel == protocol.LIQUIDITY_MODEL_POOL {
-			// If pending commands is for pooling model then we need to create a single psbt for whole batch command
-			commandOutpoints := c.tryCreateCommandOutpoints(pendingCommands)
-			if len(commandOutpoints) > 0 {
-				log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [checkChainPendingCommands] found %d commands in pooling model. Sent create psbt request to the bitcoin client", len(pendingCommands))
-				psbtSigningRequest := types.CreatePsbtRequest{
-					Outpoints: commandOutpoints,
-					Params:    c.GetPsbtParams(chain),
-				}
-				eventEnvelope := events.EventEnvelope{
-					EventType:        events.EVENT_SCALAR_CREATE_PSBT_REQUEST,
-					DestinationChain: chain,
-					Data:             psbtSigningRequest,
-				}
-				c.eventBus.BroadcastEvent(&eventEnvelope)
-			} else {
-				log.Warn().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] cannot extract outpoints from pending commands in pooling model. Something wrong!!!")
+		return c.processBtcPendingCommands(ctx, chain, pendingCommands)
+	}
+	return true
+}
+func (c *Client) processBtcPendingCommands(ctx context.Context, chain string, pendingCommands []chainstypes.QueryCommandResponse) bool {
+	// Find out the liquidity model by key_id of the first command
+	liquidityModel, err := extractLiquidityModel(pendingCommands[0].KeyID)
+	if err != nil {
+		log.Error().Err(err).Str("Chain", chain).Str("FirstCommandKeyID", pendingCommands[0].KeyID).Msg("[ScalarClient] [processBtcPendingCommands] failed to extract liquidity model")
+		return false
+	}
+	if liquidityModel == protocol.LIQUIDITY_MODEL_UPC {
+		// If pending commands are in upc model, which allready have psbts, we just need to sign it
+		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [processBtcPendingCommands] found %d pending commands in upc model. Store them to the pending buffer", len(pendingCommands))
+		c.pendingCommands.StoreUpcPendingCommands(chain, len(pendingCommands))
+	} else if liquidityModel == protocol.LIQUIDITY_MODEL_POOL {
+		// If pending commands is for pooling model then we need to create a single psbt for whole batch command
+		commandOutpoints := c.tryCreateCommandOutpoints(pendingCommands)
+		if len(commandOutpoints) > 0 {
+			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [processBtcPendingCommands] found %d commands in pooling model. Sent create psbt request to the bitcoin client", len(commandOutpoints))
+			psbtSigningRequest := types.CreatePsbtRequest{
+				Outpoints: commandOutpoints,
+				Params:    c.GetPsbtParams(chain),
 			}
+			eventEnvelope := events.EventEnvelope{
+				EventType:        events.EVENT_SCALAR_CREATE_PSBT_REQUEST,
+				DestinationChain: chain,
+				Data:             psbtSigningRequest,
+			}
+			c.eventBus.BroadcastEvent(&eventEnvelope)
+		} else {
+			log.Warn().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] cannot extract outpoints from pending commands in pooling model. Something wrong!!!")
 		}
 	}
 	return true
@@ -202,40 +203,58 @@ func TryExtractCommandOutPoint(cmd chainstypes.QueryCommandResponse) (types.Comm
 func (c *Client) processSignCommandTxs(ctx context.Context) {
 	for {
 		//Get map txHash and chain
-		hashes := c.pendingCommands.GetAlllSignRequests()
+		hashes := c.pendingCommands.GetAllSignRequestTxs()
 
-		for chain, txHash := range hashes {
+		for txHash, chains := range hashes {
 			txRes, err := c.queryClient.QueryTx(ctx, txHash)
 			if err != nil {
 				log.Warn().Str("TxHash", txHash).Msgf("[ScalarClient] [processSignCommandTxs] Tx not found, will try later")
 			} else if txRes == nil || txRes.Code != 0 || txRes.Logs == nil || len(txRes.Logs) == 0 {
 				log.Debug().
-					Str("Chain", chain).
+					Strs("Chain", chains).
 					Str("TxHash", txHash).
 					Msg("[ScalarClient] [processSignCommandTxs] Sign command request not found remove it from pending buffer")
-				c.pendingCommands.DeleteSignRequest(chain)
+				c.pendingCommands.DeleteSignRequestTx(txHash)
 			} else if len(txRes.Logs) > 0 {
-				c.pendingCommands.DeleteSignRequest(chain)
-				batchCommandId := findEventAttribute(txRes.Logs[0].Events, "sign", "batchedCommandID")
-				//commandIDs = findEventAttribute(txRes.Logs[0].Events, "sign", "commandIDs")
-				if batchCommandId == "" {
-					log.Debug().
-						Str("Chain", chain).
-						Str("TxHash", txHash).
-						Any("Logs", txRes.Logs).
-						Msg("[ScalarClient] [processSignCommandTxs] Found transaction response but batchCommandId not found. Remove chain and txHash from pending buffer")
-				} else {
-					log.Debug().
-						Str("TxHash", txHash).
-						Str("Chain", chain).
-						Str("BatchCommandId", batchCommandId).
-						Msg("[ScalarClient] [processSignCommandTxs] BatchCommandId found, Set it  to the pending buffer for further processing.")
-					c.pendingCommands.StoreBatchCommand(batchCommandId, chain)
+				c.pendingCommands.DeleteSignRequestTx(txHash)
+				for _, txLog := range txRes.Logs {
+					batchedCommand := findBatchedCommand(txLog.Events)
+					if batchedCommand.BatchCommandId != "" {
+						log.Debug().
+							Str("TxHash", txHash).
+							Str("Chain", batchedCommand.Chain).
+							Str("BatchCommandId", batchedCommand.BatchCommandId).
+							Strs("CommandIDs", batchedCommand.CommandIDs).
+							Msg("[ScalarClient] [processSignCommandTxs] BatchCommandId found, Set it  to the pending buffer for further processing.")
+
+						c.pendingCommands.StoreBatchCommand(batchedCommand.BatchCommandId, batchedCommand.Chain)
+					}
 				}
 			}
 		}
 		time.Sleep(c.getSleepInterval())
 	}
+}
+
+// Find batchCommandId and corresponding chain in the events
+// Return error if no batchCommandId found
+func findBatchedCommand(events []sdk.StringEvent) BatchedCommand {
+	batchedCommand := BatchedCommand{}
+	for _, event := range events {
+		if event.Type == "sign" {
+			for _, attr := range event.Attributes {
+				if attr.Key == "batchedCommandID" {
+					batchedCommand.BatchCommandId = attr.Value
+				} else if attr.Key == "chain" {
+					batchedCommand.Chain = attr.Value
+				} else if attr.Key == "commandIDs" {
+					batchedCommand.CommandIDs = strings.Split(attr.Value, ",")
+				}
+			}
+			break
+		}
+	}
+	return batchedCommand
 }
 func (c *Client) processBatchCommands(ctx context.Context) {
 	for {
@@ -314,35 +333,17 @@ func (c *Client) processPsbtCommands(ctx context.Context) {
 		for chain, psbt := range hashes {
 			//Check if the latest batch command is not in signing process
 			//Query the latest batch command by set batchedCommandId to empty string
-			isInSigningProcess := c.checkLatestBatchCommandIsSigning(ctx, chain)
+			isInSigningProcess := c.hasSigningBatchCommandInNetwork(ctx, chain)
 			if isInSigningProcess {
 				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] The latest batch command is in signing process, skip send new sign command request")
 				continue
 			}
-
-			log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] Send new sign psbt request to the queue for broadcasting")
-			err := c.broadcaster.SignPsbtCommandsRequest(chain, psbt)
-			if err != nil {
-				log.Error().Err(err).Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] failed to sign psbt request")
+			added := c.broadcaster.AddSignPsbtCommandsRequest(chain, psbt)
+			if !added {
+				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] failed to add SignPsbtCommandRequest to the broadcaster's buffer")
+			} else {
+				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] Successfully added SignPsbtCommandRequest to the broadcaster's buffer")
 			}
-			// if len(psbt) > 0 {
-			// 	err = c.broadcaster.SignPsbtCommandsRequest(chain, psbt)
-			// } else {
-
-			// }
-			// if err != nil {
-			// 	log.Error().Err(err).Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] failed to sign psbt request")
-			// } else if signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") {
-			// 	log.Error().Str("Chain", chain).Any("SignResponse", signRes).Msg("[ScalarClient] [processPsbtCommands] failed to sign psbt request")
-			// } else if signRes.TxHash == "" {
-			// 	log.Error().Str("Chain", chain).Any("SignResponse", signRes).Msg("[ScalarClient] [processPsbtCommands] failed to sign psbt request (without tx hash)")
-			// } else {
-			// 	log.Debug().Str("Chain", chain).Str("TxHash", signRes.TxHash).Msg("[ScalarClient] [processPsbtCommands] Successfully signed psbt request")
-			// 	//Add the tx hash to the pending buffer
-			// 	c.pendingCommands.StoreSignRequest(chain, signRes.TxHash)
-			// 	//Remove the psbt from the pending buffer
-			// 	c.pendingCommands.RemovePsbt(chain, psbt)
-			// }
 		}
 		time.Sleep(time.Second * 3)
 	}
@@ -355,42 +356,59 @@ func (c *Client) processUpcCommands(ctx context.Context) {
 			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [processUpcCommands] found %d pending commands in upc model", count)
 			//Check if the latest batch command is not in signing process
 			//Query the latest batch command by set batchedCommandId to empty string
-			isInSigningProcess := c.checkLatestBatchCommandIsSigning(ctx, chain)
+			isInSigningProcess := c.hasSigningBatchCommandInNetwork(ctx, chain)
 			if isInSigningProcess {
-				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] The latest batch command is in signing process, skip send new sign command request")
+				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] The latest batch command is in signing process, skip send new sign command request")
 				continue
 			}
 
-			log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] Send new SignUpcCommandsRequest")
-			//var signRes *sdk.TxResponse
-			err := c.broadcaster.SignBtcCommandsRequest(chain)
-			if err != nil {
-				log.Error().Err(err).Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] failed to sign psbt request")
+			added := c.broadcaster.AddSignUpcCommandsRequest(chain)
+			if !added {
+				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] failed to add SignUpcCommandRequest to the broadcaster's buffer")
+			} else {
+				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] Successfully added SignUpcCommandsRequest to the broadcaster's buffer")
 			}
-			// if err != nil {
-			// 	log.Error().Err(err).Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] failed to sign psbt request")
-			// } else if signRes == nil || signRes.Code != 0 || strings.Contains(signRes.RawLog, "failed") {
-			// 	log.Error().Str("Chain", chain).Any("SignResponse", signRes).Msg("[ScalarClient] [processUpcCommands] failed to sign upc command request")
-			// } else if signRes.TxHash == "" {
-			// 	log.Error().Str("Chain", chain).Any("SignResponse", signRes).Msg("[ScalarClient] [processUpcCommands] failed to sign upc command request (without tx hash)")
-			// } else {
-			// 	log.Debug().Str("Chain", chain).Str("TxHash", signRes.TxHash).Msg("[ScalarClient] [processUpcCommands] Successfully signed upc command request")
-			// 	//Add the tx hash to the pending buffer
-			// 	c.pendingCommands.StoreSignRequest(chain, signRes.TxHash)
-			// 	//Remove the psbt from the pending buffer
-			// 	c.pendingCommands.DeleteUpcPendingCommands(chain)
-			// }
 		}
 		time.Sleep(time.Second * 3)
 	}
 }
 
-func (c *Client) checkLatestBatchCommandIsSigning(ctx context.Context, chain string) bool {
+// Check if there is a signing progress
+func (c *Client) isSigningProgress(ctx context.Context, chain string) bool {
+	//1. Check if there is a pending sign command request
+	if value, ok := c.pendingCommands.LoadSignRequest(chain); ok {
+		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [isSigningProgress] There is a pending sign command request with txHash: %v", value)
+		return true
+	}
+	nexusChain := exported.ChainName(chain)
+	if chainstypes.IsBitcoinChain(nexusChain) {
+		// Check if there is a upc pending batch command
+		hasPendingCmd := c.pendingCommands.HasPendingCommands(chain)
+		if hasPendingCmd {
+			log.Debug().Str("Chain", chain).Msg("[ScalarClient] [isSigningProgress] There is a pending batch command, skip send new signing request")
+			return true
+		}
+	}
+	return c.hasSigningBatchCommandInNetwork(ctx, chain)
+}
+
+// Check if there is signing batch command in the scalar network
+func (c *Client) hasSigningBatchCommandInNetwork(ctx context.Context, chain string) bool {
 	res, err := c.queryClient.QueryBatchedCommands(ctx, chain, "")
-	if err != nil || res == nil {
+	if err != nil {
+		log.Warn().Err(err).Str("Chain", chain).Msg("[ScalarClient] [hasSigningBatchCommandInNetwork] latest batch command not found")
+		return false
+	} else if res == nil {
+		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [hasSigningBatchCommandInNetwork] No batch command found")
 		return false
 	} else {
-		return res.Status == chainstypes.BatchSigning
+		if res.Status == chainstypes.BatchSigning {
+			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [hasSigningBatchCommandInNetwork] There is a signing batch in network with id: %v", res.ID)
+			return true
+		} else {
+			log.Debug().Str("Chain", chain).Str("LatestBatchCommandId", res.ID).Msgf("[ScalarClient] [hasSigningBatchCommandInNetwork] Batch command status %v", res.Status)
+			return false
+		}
 	}
 }
 
