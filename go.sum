@@ -1470,6 +1470,10 @@ github.com/scalarorg/scalar-core v0.0.1-staking.0.20250227103107-041fd3a847d9 h1
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250227103107-041fd3a847d9/go.mod h1:CbHTVVUqWZm2BnRUIsper+swpHUyhrbQGbQV2nTIXmg=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250303043930-0fc22221d800 h1:xzc8esDu5Hx5FnSHgXfUuyIJKvARn+wRG8B+WfcRkhw=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250303043930-0fc22221d800/go.mod h1:CbHTVVUqWZm2BnRUIsper+swpHUyhrbQGbQV2nTIXmg=
+github.com/scalarorg/scalar-core v0.0.1-staking.0.20250304101648-9c3f614fc3a0 h1:N4EBZ7PiouAmmzwcS/hK+CoQpSNIL6OstDAUlTh+Xps=
+github.com/scalarorg/scalar-core v0.0.1-staking.0.20250304101648-9c3f614fc3a0/go.mod h1:CbHTVVUqWZm2BnRUIsper+swpHUyhrbQGbQV2nTIXmg=
+github.com/scalarorg/scalar-core v0.0.1-staking.0.20250304110552-f6e1193bcc38 h1:QCr6tvCzADcLAkvYErAWEFxsq+avF0p8ah6ZFT0ytfU=
+github.com/scalarorg/scalar-core v0.0.1-staking.0.20250304110552-f6e1193bcc38/go.mod h1:CbHTVVUqWZm2BnRUIsper+swpHUyhrbQGbQV2nTIXmg=
 github.com/scalarorg/scalar-core v0.0.2-migrate-evm h1:b9CFjXy0MFS0cfqKLryy77imG24zfEqAZDSd+K/IaBE=
 github.com/scalarorg/scalar-core v0.0.2-migrate-evm/go.mod h1:3fYN3hE596f9yAHQiE1M2VEzJjqdODPtl2AO7IU+EVo=
 github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible h1:Bn1aCHHRnjv4Bl16T8rcaFjYSrGrIZvpiGO6P3Q4GpU=
