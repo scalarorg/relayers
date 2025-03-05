@@ -269,19 +269,26 @@ func (c *Client) processBatchCommands(ctx context.Context) {
 				continue
 			}
 			if res.Status == chainstypes.BatchSigned {
-				c.pendingCommands.DeleteBatchCommand(batchCommandId)
-				log.Debug().
-					Str("Chain", destChain).
-					Any("BatchCommandResponse", res).
-					Msg("[ScalarClient] [processBatchCommands] Found batchCommand response. Broadcast to eventBus")
-				c.UpdateBatchCommandSigned(ctx, destChain, res)
-				eventEnvelope := events.EventEnvelope{
-					EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
-					DestinationChain: destChain,
-					CommandIDs:       res.CommandIDs,
-					Data:             res,
+				err := c.processBatchedCommandSigned(ctx, destChain, res)
+				if err != nil {
+					log.Error().Err(err).
+						Str("Chain", destChain).
+						Str("BatchCommandId", batchCommandId).
+						Msgf("[ScalarClient] [processBatchCommands] failed to process batched command signed: %v", err)
 				}
-				c.eventBus.BroadcastEvent(&eventEnvelope)
+				// c.pendingCommands.DeleteBatchCommand(batchCommandId)
+				// log.Debug().
+				// 	Str("Chain", destChain).
+				// 	Any("BatchCommandResponse", res).
+				// 	Msg("[ScalarClient] [processBatchCommands] Found batchCommand response. Broadcast to eventBus")
+				// c.UpdateBatchCommandSigned(ctx, destChain, res)
+				// eventEnvelope := events.EventEnvelope{
+				// 	EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
+				// 	DestinationChain: destChain,
+				// 	CommandIDs:       res.CommandIDs,
+				// 	Data:             res,
+				// }
+				// c.eventBus.BroadcastEvent(&eventEnvelope)
 			} else if res.Status == chainstypes.BatchAborted {
 				c.pendingCommands.DeleteBatchCommand(batchCommandId)
 				log.Debug().
@@ -349,6 +356,11 @@ func (c *Client) processPsbtCommands(ctx context.Context) {
 	}
 }
 
+/*
+* Process pending commands in upc model
+* 1. Check if there are pending upc commands
+* 2. Add the pending upc commands to the broadcaster if there is no signing batch command in the network
+ */
 func (c *Client) processUpcCommands(ctx context.Context) {
 	for {
 		hashes := c.pendingCommands.GetUpcPendingCommands()

@@ -236,7 +236,7 @@ func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *IBCE
 		return nil
 	}
 
-	return c.processBatchedCommands(ctx, destinationChain, batchedCmds, event)
+	return c.processBatchedCommandSigned(ctx, destinationChain, batchedCmds)
 }
 
 func (c *Client) getBatchedCommands(ctx context.Context, chain string, batchID []byte) (*chainstypes.BatchedCommandsResponse, error) {
@@ -253,35 +253,38 @@ func (c *Client) getBatchedCommands(ctx context.Context, chain string, batchID [
 		return nil, fmt.Errorf("failed to get execute data: %w", err)
 	}
 
-	log.Debug().Msgf("[ScalarClient] found executeData: %s", res.ExecuteData)
+	log.Debug().Str("Chain", chain).Str("BatchID", hex.EncodeToString(batchID)).Msgf("[ScalarClient] found executeData: %s", res.ExecuteData)
 	return res, nil
 }
 
-func (c *Client) processBatchedCommands(ctx context.Context, chain string, batchedCmds *chainstypes.BatchedCommandsResponse, event *IBCEvent[*chainstypes.CommandBatchSigned]) error {
-	chainName := exported.ChainName(event.Args.Chain)
-	batchID := hex.EncodeToString(event.Args.CommandBatchID)
+func (c *Client) processBatchedCommandSigned(ctx context.Context, chain string, batchedCmds *chainstypes.BatchedCommandsResponse) error {
+	chainName := exported.ChainName(chain)
+	batchID := batchedCmds.ID
+	//batchID := hex.EncodeToString(event.Args.CommandBatchID)
 
-	if chainstypes.IsEvmChain(chainName) {
-		c.eventBus.BroadcastEvent(&events.EventEnvelope{
-			EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
-			DestinationChain: chain,
-			Data:             batchedCmds,
-		})
-	} else if chainstypes.IsBitcoinChain(chainName) {
-		return c.handleBitcoinBatchCommands(chain, batchID, string(batchedCmds.KeyID))
+	log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] Delete batch command %s.", batchID)
+	c.pendingCommands.DeleteBatchCommand(batchID)
+	eventEnvelope := events.EventEnvelope{
+		EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
+		DestinationChain: chain,
+		CommandIDs:       batchedCmds.CommandIDs,
+		Data:             batchedCmds,
+	}
+	c.eventBus.BroadcastEvent(&eventEnvelope)
+	c.UpdateBatchCommandSigned(ctx, chain, batchedCmds)
+	if chainstypes.IsBitcoinChain(chainName) {
+		return c.handleBitcoinBatchCommands(chain, batchedCmds)
 	}
 
 	return c.updateCommandStatuses(ctx, chain, batchedCmds.CommandIDs)
 }
 
-func (c *Client) handleBitcoinBatchCommands(chain, batchID, keyID string) error {
-	liquidityModel, err := extractLiquidityModel(keyID)
+func (c *Client) handleBitcoinBatchCommands(chain string, batchedCmds *chainstypes.BatchedCommandsResponse) error {
+	liquidityModel, err := extractLiquidityModel(string(batchedCmds.KeyID))
 	if err != nil {
 		log.Error().Err(err).Str("Chain", chain).Msg("failed to extract liquidity model")
 		return err
 	}
-	log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] Delete batch command %s.", batchID)
-	c.pendingCommands.DeleteBatchCommand(batchID)
 
 	if liquidityModel == protocol.LIQUIDITY_MODEL_UPC {
 		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] liquidityModel: %s. Delete upc pending commands.", liquidityModel)
@@ -290,7 +293,12 @@ func (c *Client) handleBitcoinBatchCommands(chain, batchID, keyID string) error 
 		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] liquidityModel: %s. Delete first psbt.", liquidityModel)
 		c.pendingCommands.DeleteFirstPsbt(chain)
 	}
-
+	//Send event to the event bus
+	c.eventBus.BroadcastEvent(&events.EventEnvelope{
+		EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
+		DestinationChain: chain,
+		Data:             batchedCmds,
+	})
 	return nil
 }
 
