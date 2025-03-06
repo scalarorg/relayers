@@ -269,6 +269,10 @@ func (c *Client) processBatchCommands(ctx context.Context) {
 				continue
 			}
 			if res.Status == chainstypes.BatchSigned {
+				log.Debug().
+					Str("Chain", destChain).
+					Str("BatchCommandId", batchCommandId).
+					Msgf("[ScalarClient] [processBatchCommands] found batched command signed")
 				err := c.processBatchedCommandSigned(ctx, destChain, res)
 				if err != nil {
 					log.Error().Err(err).

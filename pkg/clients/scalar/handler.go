@@ -235,7 +235,10 @@ func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *IBCE
 	if c.eventBus == nil || batchedCmds.Status != chainstypes.BatchSigned {
 		return nil
 	}
-
+	log.Debug().
+		Str("Chain", destinationChain).
+		Str("BatchCommandId", hex.EncodeToString(event.Args.CommandBatchID)).
+		Msgf("[ScalarClient] [handleCommantBatchSignedsEvent] found batched command signed")
 	return c.processBatchedCommandSigned(ctx, destinationChain, batchedCmds)
 }
 
@@ -261,22 +264,28 @@ func (c *Client) processBatchedCommandSigned(ctx context.Context, chain string, 
 	chainName := exported.ChainName(chain)
 	batchID := batchedCmds.ID
 	//batchID := hex.EncodeToString(event.Args.CommandBatchID)
-
 	log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] Delete batch command %s.", batchID)
-	c.pendingCommands.DeleteBatchCommand(batchID)
-	eventEnvelope := events.EventEnvelope{
-		EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
-		DestinationChain: chain,
-		CommandIDs:       batchedCmds.CommandIDs,
-		Data:             batchedCmds,
-	}
-	c.eventBus.BroadcastEvent(&eventEnvelope)
-	c.UpdateBatchCommandSigned(ctx, chain, batchedCmds)
-	if chainstypes.IsBitcoinChain(chainName) {
-		return c.handleBitcoinBatchCommands(chain, batchedCmds)
-	}
+	c.pendingCommands.BatchCommandsMutex.Lock()
+	defer c.pendingCommands.BatchCommandsMutex.Unlock()
+	_, ok := c.pendingCommands.BatchCommands.LoadAndDelete(batchID)
+	if ok {
+		eventEnvelope := events.EventEnvelope{
+			EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
+			DestinationChain: chain,
+			CommandIDs:       batchedCmds.CommandIDs,
+			Data:             batchedCmds,
+		}
+		c.eventBus.BroadcastEvent(&eventEnvelope)
+		c.UpdateBatchCommandSigned(ctx, chain, batchedCmds)
+		if chainstypes.IsBitcoinChain(chainName) {
+			return c.handleBitcoinBatchCommands(chain, batchedCmds)
+		}
 
-	return c.updateCommandStatuses(ctx, chain, batchedCmds.CommandIDs)
+		return c.updateCommandStatuses(ctx, chain, batchedCmds.CommandIDs)
+	} else {
+		log.Debug().Str("Chain", chain).Str("BatchCommandId", batchID).Msgf("[ScalarClient] [processBatchedCommandSigned] batch command not found or already processed")
+		return nil
+	}
 }
 
 func (c *Client) handleBitcoinBatchCommands(chain string, batchedCmds *chainstypes.BatchedCommandsResponse) error {
