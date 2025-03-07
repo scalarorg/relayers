@@ -302,11 +302,12 @@ func NewPendingCommands() *PendingCommands {
 		PsbtsMutex:          sync.Mutex{},
 	}
 }
-func (p *PendingCommands) LoadSignRequest(chain string) (value any, ok bool) {
-	p.SignRequestTxsMutex.Lock()
-	defer p.SignRequestTxsMutex.Unlock()
-	return p.SignRequestTxs.Load(chain)
-}
+
+//	func (p *PendingCommands) LoadSignRequest(chain string) (value any, ok bool) {
+//		p.SignRequestTxsMutex.Lock()
+//		defer p.SignRequestTxsMutex.Unlock()
+//		return p.SignRequestTxs.Load(chain)
+//	}
 func (p *PendingCommands) StoreSignRequest(chain string, txHash string) {
 	p.SignRequestTxsMutex.Lock()
 	defer p.SignRequestTxsMutex.Unlock()

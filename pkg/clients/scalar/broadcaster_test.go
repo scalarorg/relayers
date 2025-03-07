@@ -23,7 +23,7 @@ func TestEnqueueMessage(t *testing.T) {
 	)
 	err := broadcaster.Start(context.Background())
 	require.NoError(t, err)
-	err = broadcaster.QueueMsg(commandRequest)
+	err = broadcaster.QueueTxMsg(commandRequest)
 	require.NoError(t, err)
 	time.Sleep(10 * time.Second)
 }

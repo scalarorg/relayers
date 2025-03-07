@@ -60,6 +60,7 @@ func (c *Client) ProcessPendingCommands(ctx context.Context) {
 				if c.tryProcessPendingCommands(ctx, chain) {
 					log.Debug().Str("Chain", chain).Msg("[ScalarClient] [ProcessPendingCommands] Found new pending commands")
 				} else if counter >= 100 {
+					counter = 0
 					log.Debug().Str("Chain", chain).Msg("[ScalarClient] [ProcessPendingCommands] No pending command found. This message is printed one of 100")
 				}
 			}()
@@ -75,11 +76,13 @@ func (c *Client) ProcessPendingCommands(ctx context.Context) {
 // Return true if there is new pendingCommands
 func (c *Client) tryProcessPendingCommands(ctx context.Context, chain string) bool {
 	//1. Check if the latest batch command is in signing process
-	isInSigningProcess := c.isSigningProgress(ctx, chain)
-	if isInSigningProcess {
-		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [tryProcessPendingCommands] The latest batch command is in signing process, skip send new signing request")
-		return false
-	}
+	// deprecated
+	// We add all sign command requests to the broadcaster's map buffer, this ensures that we will not send duplicate sign command requests
+	// isInSigningProcess := c.isSigningProgress(ctx, chain)
+	// if isInSigningProcess {
+	// 	log.Debug().Str("Chain", chain).Msg("[ScalarClient] [tryProcessPendingCommands] The latest batch command is in signing process, skip send new signing request")
+	// 	return false
+	// }
 	//2. Get pending commands
 	pendingCommands, err := c.queryClient.QueryPendingCommands(ctx, chain)
 	if err != nil {
@@ -344,11 +347,11 @@ func (c *Client) processPsbtCommands(ctx context.Context) {
 		for chain, psbt := range hashes {
 			//Check if the latest batch command is not in signing process
 			//Query the latest batch command by set batchedCommandId to empty string
-			isInSigningProcess := c.hasSigningBatchCommandInNetwork(ctx, chain)
-			if isInSigningProcess {
-				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] The latest batch command is in signing process, skip send new sign command request")
-				continue
-			}
+			// isInSigningProcess := c.hasSigningBatchCommandInNetwork(ctx, chain)
+			// if isInSigningProcess {
+			// 	log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] The latest batch command is in signing process, skip send new sign command request")
+			// 	continue
+			// }
 			added := c.broadcaster.AddSignPsbtCommandsRequest(chain, psbt)
 			if !added {
 				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] failed to add SignPsbtCommandRequest to the broadcaster's buffer")
@@ -372,11 +375,11 @@ func (c *Client) processUpcCommands(ctx context.Context) {
 			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [processUpcCommands] found %d pending commands in upc model", count)
 			//Check if the latest batch command is not in signing process
 			//Query the latest batch command by set batchedCommandId to empty string
-			isInSigningProcess := c.hasSigningBatchCommandInNetwork(ctx, chain)
-			if isInSigningProcess {
-				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] The latest batch command is in signing process, skip send new sign command request")
-				continue
-			}
+			// isInSigningProcess := c.hasSigningBatchCommandInNetwork(ctx, chain)
+			// if isInSigningProcess {
+			// 	log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] The latest batch command is in signing process, skip send new sign command request")
+			// 	continue
+			// }
 
 			added := c.broadcaster.AddSignUpcCommandsRequest(chain)
 			if !added {
@@ -390,43 +393,43 @@ func (c *Client) processUpcCommands(ctx context.Context) {
 }
 
 // Check if there is a signing progress
-func (c *Client) isSigningProgress(ctx context.Context, chain string) bool {
-	//1. Check if there is a pending sign command request
-	if value, ok := c.pendingCommands.LoadSignRequest(chain); ok {
-		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [isSigningProgress] There is a pending sign command request with txHash: %v", value)
-		return true
-	}
-	nexusChain := exported.ChainName(chain)
-	if chainstypes.IsBitcoinChain(nexusChain) {
-		// Check if there is a upc pending batch command
-		hasPendingCmd := c.pendingCommands.HasPendingCommands(chain)
-		if hasPendingCmd {
-			log.Debug().Str("Chain", chain).Msg("[ScalarClient] [isSigningProgress] There is a pending batch command, skip send new signing request")
-			return true
-		}
-	}
-	return c.hasSigningBatchCommandInNetwork(ctx, chain)
-}
+// func (c *Client) isSigningProgress(ctx context.Context, chain string) bool {
+// 	//1. Check if there is a pending sign command request
+// 	if value, ok := c.pendingCommands.LoadSignRequest(chain); ok {
+// 		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [isSigningProgress] There is a pending sign command request with txHash: %v", value)
+// 		return true
+// 	}
+// 	nexusChain := exported.ChainName(chain)
+// 	if chainstypes.IsBitcoinChain(nexusChain) {
+// 		// Check if there is a upc pending batch command
+// 		hasPendingCmd := c.pendingCommands.HasPendingCommands(chain)
+// 		if hasPendingCmd {
+// 			log.Debug().Str("Chain", chain).Msg("[ScalarClient] [isSigningProgress] There is a pending batch command, skip send new signing request")
+// 			return true
+// 		}
+// 	}
+// 	return c.hasSigningBatchCommandInNetwork(ctx, chain)
+// }
 
 // Check if there is signing batch command in the scalar network
-func (c *Client) hasSigningBatchCommandInNetwork(ctx context.Context, chain string) bool {
-	res, err := c.queryClient.QueryBatchedCommands(ctx, chain, "")
-	if err != nil {
-		log.Warn().Err(err).Str("Chain", chain).Msg("[ScalarClient] [hasSigningBatchCommandInNetwork] latest batch command not found")
-		return false
-	} else if res == nil {
-		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [hasSigningBatchCommandInNetwork] No batch command found")
-		return false
-	} else {
-		if res.Status == chainstypes.BatchSigning {
-			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [hasSigningBatchCommandInNetwork] There is a signing batch in network with id: %v", res.ID)
-			return true
-		} else {
-			log.Debug().Str("Chain", chain).Str("LatestBatchCommandId", res.ID).Msgf("[ScalarClient] [hasSigningBatchCommandInNetwork] Batch command status %v", res.Status)
-			return false
-		}
-	}
-}
+// func (c *Client) hasSigningBatchCommandInNetwork(ctx context.Context, chain string) bool {
+// 	res, err := c.queryClient.QueryBatchedCommands(ctx, chain, "")
+// 	if err != nil {
+// 		log.Warn().Err(err).Str("Chain", chain).Msg("[ScalarClient] [hasSigningBatchCommandInNetwork] latest batch command not found")
+// 		return false
+// 	} else if res == nil {
+// 		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [hasSigningBatchCommandInNetwork] No batch command found")
+// 		return false
+// 	} else {
+// 		if res.Status == chainstypes.BatchSigning {
+// 			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [hasSigningBatchCommandInNetwork] There is a signing batch in network with id: %v", res.ID)
+// 			return true
+// 		} else {
+// 			log.Debug().Str("Chain", chain).Str("LatestBatchCommandId", res.ID).Msgf("[ScalarClient] [hasSigningBatchCommandInNetwork] Batch command status %v", res.Status)
+// 			return false
+// 		}
+// 	}
+// }
 
 func (c *Client) UpdateBatchCommandSigned(ctx context.Context, destChain string, batchCmds *chainstypes.BatchedCommandsResponse) error {
 	commandByType := map[string][]string{}

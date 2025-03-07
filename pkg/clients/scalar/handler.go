@@ -264,11 +264,11 @@ func (c *Client) processBatchedCommandSigned(ctx context.Context, chain string, 
 	chainName := exported.ChainName(chain)
 	batchID := batchedCmds.ID
 	//batchID := hex.EncodeToString(event.Args.CommandBatchID)
-	log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] Delete batch command %s.", batchID)
 	c.pendingCommands.BatchCommandsMutex.Lock()
 	defer c.pendingCommands.BatchCommandsMutex.Unlock()
-	_, ok := c.pendingCommands.BatchCommands.LoadAndDelete(batchID)
+	_, ok := c.pendingCommands.BatchCommands.Load(batchID)
 	if ok {
+		log.Debug().Str("Chain", chain).Str("BatchCommandId", batchID).Msg("[ScalarClient] [processBatchedCommandSigned] found batch command.")
 		eventEnvelope := events.EventEnvelope{
 			EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
 			DestinationChain: chain,
@@ -281,7 +281,9 @@ func (c *Client) processBatchedCommandSigned(ctx context.Context, chain string, 
 			return c.handleBitcoinBatchCommands(chain, batchedCmds)
 		}
 
-		return c.updateCommandStatuses(ctx, chain, batchedCmds.CommandIDs)
+		c.updateCommandStatuses(ctx, chain, batchedCmds.CommandIDs)
+		c.pendingCommands.BatchCommands.Delete(batchID)
+		return nil
 	} else {
 		log.Debug().Str("Chain", chain).Str("BatchCommandId", batchID).Msgf("[ScalarClient] [processBatchedCommandSigned] batch command not found or already processed")
 		return nil
@@ -302,12 +304,12 @@ func (c *Client) handleBitcoinBatchCommands(chain string, batchedCmds *chainstyp
 		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] liquidityModel: %s. Delete first psbt.", liquidityModel)
 		c.pendingCommands.DeleteFirstPsbt(chain)
 	}
-	//Send event to the event bus
-	c.eventBus.BroadcastEvent(&events.EventEnvelope{
-		EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
-		DestinationChain: chain,
-		Data:             batchedCmds,
-	})
+	// Send event to the event bus
+	// c.eventBus.BroadcastEvent(&events.EventEnvelope{
+	// 	EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
+	// 	DestinationChain: chain,
+	// 	Data:             batchedCmds,
+	// })
 	return nil
 }
 
