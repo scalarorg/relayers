@@ -41,13 +41,15 @@ func (c *Client) getSleepInterval() time.Duration {
 // Then request signCommand request
 func (c *Client) ProcessPendingCommands(ctx context.Context) {
 	//Start a goroutine to process sign command txs
-	go c.processSignCommandTxs(ctx)
-	//Start a goroutine to process batch commands
-	go c.processBatchCommands(ctx)
+	// For btc command, some how we cannot get the sign command request from the scalar node
+	// Process only in SignCommandSigned event
+	// go c.processSignCommandTxs(ctx)
+	// Start a goroutine to process batch commands
+	// go c.processBatchCommands(ctx)
 	//Start a goroutine to process pending commands in pooling model
 	go c.processPsbtCommands(ctx)
-	//Start a goroutine to process pending commands in upc model
-	go c.processUpcCommands(ctx)
+	// Start a goroutine to process pending commands in upc model
+	// go c.processUpcCommands(ctx)
 	counter := 0
 	for {
 		counter += 1
@@ -126,7 +128,14 @@ func (c *Client) processBtcPendingCommands(ctx context.Context, chain string, pe
 	if liquidityModel == protocol.LIQUIDITY_MODEL_UPC {
 		// If pending commands are in upc model, which allready have psbts, we just need to sign it
 		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [processBtcPendingCommands] found %d pending commands in upc model. Store them to the pending buffer", len(pendingCommands))
-		c.pendingCommands.StoreUpcPendingCommands(chain, len(pendingCommands))
+		// c.pendingCommands.StoreUpcPendingCommands(chain, len(pendingCommands))
+		err := c.broadcaster.AddSignUpcCommandsRequest(chain)
+		if err != nil {
+			log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] Failed to add SignUpcCommandRequest to the broadcaster's buffer")
+		} else {
+			log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] Successfully added SignUpcCommandsRequest to the broadcaster's buffer")
+		}
+
 	} else if liquidityModel == protocol.LIQUIDITY_MODEL_POOL {
 		// If pending commands is for pooling model then we need to create a single psbt for whole batch command
 		commandOutpoints := c.tryCreateCommandOutpoints(pendingCommands)
@@ -216,8 +225,8 @@ func (c *Client) processSignCommandTxs(ctx context.Context) {
 				log.Debug().
 					Strs("Chain", chains).
 					Str("TxHash", txHash).
-					Msg("[ScalarClient] [processSignCommandTxs] Sign command request not found remove it from pending buffer")
-				c.pendingCommands.DeleteSignRequestTx(txHash)
+					Msg("[ScalarClient] [processSignCommandTxs] Sign command request not found")
+				// c.pendingCommands.DeleteSignRequestTx(txHash)
 			} else if len(txRes.Logs) > 0 {
 				c.pendingCommands.DeleteSignRequestTx(txHash)
 				for _, txLog := range txRes.Logs {
@@ -352,11 +361,12 @@ func (c *Client) processPsbtCommands(ctx context.Context) {
 			// 	log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] The latest batch command is in signing process, skip send new sign command request")
 			// 	continue
 			// }
-			added := c.broadcaster.AddSignPsbtCommandsRequest(chain, psbt)
-			if !added {
+			err := c.broadcaster.AddSignPsbtCommandsRequest(chain, psbt)
+			if err != nil {
 				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] failed to add SignPsbtCommandRequest to the broadcaster's buffer")
 			} else {
-				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] Successfully added SignPsbtCommandRequest to the broadcaster's buffer")
+				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] Successfully added SignPsbtCommandRequest to the broadcaster's buffer. Remove it from pending buffer")
+				c.pendingCommands.RemovePsbt(chain, psbt)
 			}
 		}
 		time.Sleep(time.Second * 3)
@@ -368,29 +378,29 @@ func (c *Client) processPsbtCommands(ctx context.Context) {
 * 1. Check if there are pending upc commands
 * 2. Add the pending upc commands to the broadcaster if there is no signing batch command in the network
  */
-func (c *Client) processUpcCommands(ctx context.Context) {
-	for {
-		hashes := c.pendingCommands.GetUpcPendingCommands()
-		for chain, count := range hashes {
-			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [processUpcCommands] found %d pending commands in upc model", count)
-			//Check if the latest batch command is not in signing process
-			//Query the latest batch command by set batchedCommandId to empty string
-			// isInSigningProcess := c.hasSigningBatchCommandInNetwork(ctx, chain)
-			// if isInSigningProcess {
-			// 	log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] The latest batch command is in signing process, skip send new sign command request")
-			// 	continue
-			// }
+// func (c *Client) processUpcCommands(ctx context.Context) {
+// 	for {
+// 		hashes := c.pendingCommands.GetUpcPendingCommands()
+// 		for chain, count := range hashes {
+// 			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [processUpcCommands] found %d pending commands in upc model", count)
+// 			//Check if the latest batch command is not in signing process
+// 			//Query the latest batch command by set batchedCommandId to empty string
+// 			// isInSigningProcess := c.hasSigningBatchCommandInNetwork(ctx, chain)
+// 			// if isInSigningProcess {
+// 			// 	log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] The latest batch command is in signing process, skip send new sign command request")
+// 			// 	continue
+// 			// }
 
-			added := c.broadcaster.AddSignUpcCommandsRequest(chain)
-			if !added {
-				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] failed to add SignUpcCommandRequest to the broadcaster's buffer")
-			} else {
-				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] Successfully added SignUpcCommandsRequest to the broadcaster's buffer")
-			}
-		}
-		time.Sleep(time.Second * 3)
-	}
-}
+// 			added := c.broadcaster.AddSignUpcCommandsRequest(chain)
+// 			if !added {
+// 				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] failed to add SignUpcCommandRequest to the broadcaster's buffer")
+// 			} else {
+// 				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processUpcCommands] Successfully added SignUpcCommandsRequest to the broadcaster's buffer")
+// 			}
+// 		}
+// 		time.Sleep(time.Second * 3)
+// 	}
+// }
 
 // Check if there is a signing progress
 // func (c *Client) isSigningProgress(ctx context.Context, chain string) bool {

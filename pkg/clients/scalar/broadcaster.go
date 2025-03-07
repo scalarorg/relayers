@@ -23,7 +23,7 @@ type Broadcaster struct {
 	pendingCommands *PendingCommands //Keep reference to the pending commands for store sign command request tx hashå
 	//queue          *queue.Queue
 	txBuffers       []types.Msg
-	signCommandReqs map[string]types.Msg //Make sure each chain have unique signCommandRequest
+	signCommandReqs sync.Map //Make sure each chain have unique signCommandRequest
 	mutex           sync.Mutex
 	isRunning       bool
 	period          time.Duration
@@ -83,23 +83,22 @@ func (b *Broadcaster) QueueTxMsg(msg types.Msg) error {
 		b.mutex.Unlock()
 		return fmt.Errorf("broadcaster is not running")
 	}
-	b.mutex.Unlock()
 	log.Debug().Msgf("[Broadcaster] [QueueTxMsg] enqueue message %v", msg)
-	//b.queue.Queue(&queueMsg{Msg: msg})
 	b.txBuffers = append(b.txBuffers, msg)
+	b.mutex.Unlock()
 	return nil
 }
 func (b *Broadcaster) QueueSignCommandReq(chain string, msg types.Msg) error {
 	if !b.isRunning {
 		return fmt.Errorf("broadcaster is not running")
 	}
-	_, ok := b.signCommandReqs[chain]
+	_, ok := b.signCommandReqs.Load(chain)
 	if ok {
 		log.Debug().Msgf("[Broadcaster] [QueueSignCommandReq] signCommandReq %T for chain %s is already in buffer. Skip adding new one", msg, chain)
 		return fmt.Errorf("signCommandReq message %T for chain %s is already in buffer", msg, chain)
 	} else {
 		log.Debug().Msgf("[Broadcaster] [QueueSignCommandReq] enqueue signCommandReq message %T for chain %s", msg, chain)
-		b.signCommandReqs[chain] = msg
+		b.signCommandReqs.Store(chain, msg)
 		return nil
 	}
 }
@@ -138,34 +137,23 @@ func (c *Broadcaster) AddSignEvmCommandsRequest(destinationChain string) error {
 
 // Add SignPsbtCommandsRequest to buffer
 // Return true if the request is added to buffer, false if the request is already in buffer
-func (c *Broadcaster) AddSignPsbtCommandsRequest(destinationChain string, psbt covtypes.Psbt) bool {
+func (c *Broadcaster) AddSignPsbtCommandsRequest(destinationChain string, psbt covtypes.Psbt) error {
 	req := chainstypes.NewSignPsbtCommandRequest(
 		c.network.GetAddress(),
 		destinationChain,
 		psbt)
-	err := c.QueueSignCommandReq(destinationChain, req)
-	if err != nil {
-		log.Error().Err(err).Msgf("[Broadcaster] [AddSignPsbtCommandsRequest] Failed to add SignPsbtCommandRequest to buffer")
-		return false
-	}
-	return true
-
+	return c.QueueSignCommandReq(destinationChain, req)
 }
 
 // Add SignBtcCommandsRequest to buffer
 // Return true if the request is added to buffer, false if the request is already in buffer
-func (c *Broadcaster) AddSignUpcCommandsRequest(destinationChain string) bool {
+func (c *Broadcaster) AddSignUpcCommandsRequest(destinationChain string) error {
 	req := chainstypes.NewSignBtcCommandsRequest(
 		c.network.GetAddress(),
 		destinationChain)
 
 	err := c.QueueSignCommandReq(destinationChain, req)
-	if err != nil {
-		log.Error().Err(err).Msgf("[Broadcaster] [AddSignUpcCommandsRequest] Failed to add SignCommandRequest to buffer")
-		return false
-	}
-	return true
-
+	return err
 }
 
 func (c *Broadcaster) CreatePendingTransfersRequest(chain string) error {
@@ -188,7 +176,12 @@ func (b *Broadcaster) pushFailedMsgBackToBuffer(msgs []types.Msg) error {
 // try broadcast fist messages in the buffer
 func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 	var txMsgs []types.Msg
-	var signCommandReqs map[string]types.Msg
+	signCommandReqs := make(map[string]types.Msg)
+	b.signCommandReqs.Range(func(key, value any) bool {
+		signCommandReqs[key.(string)] = value.(types.Msg)
+		return true
+	})
+	b.signCommandReqs.Clear()
 	b.mutex.Lock()
 	if len(b.txBuffers) > b.batchSize {
 		txMsgs = b.txBuffers[:b.batchSize]
@@ -197,8 +190,6 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 		txMsgs = b.txBuffers
 		b.txBuffers = nil
 	}
-	signCommandReqs = b.signCommandReqs
-	b.signCommandReqs = make(map[string]types.Msg)
 	b.mutex.Unlock()
 	if len(txMsgs) == 0 && len(signCommandReqs) == 0 {
 		if b.cycleCount >= 1000 {
@@ -207,19 +198,21 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 		}
 		return nil
 	} else {
-		log.Debug().Msgf("[Broadcaster] [broadcastMsgs] Current buffer: %d txMsgs and %d signCommandReqs", len(b.txBuffers), len(b.signCommandReqs))
+		log.Debug().Int("txMsgs", len(txMsgs)).Int("signCommandReqs", len(signCommandReqs)).Msg("[Broadcaster] [broadcastMsgs] found pending commands in buffer")
 	}
 	//Broadcast txMsgs
-	resp, err := b.network.SignAndBroadcastMsgs(ctx, txMsgs...)
-	if err != nil {
-		log.Error().Err(err).Msgf("[Broadcaster] Failed to broadcast %d messages", len(txMsgs))
-		b.pushFailedMsgBackToBuffer(txMsgs)
-		return err
-	} else if resp.Code == 0 {
-		log.Debug().
-			Int("msg_count", len(txMsgs)).
-			Str("tx_hash", resp.TxHash).
-			Msgf("[Broadcaster] Successfully broadcasted %d messages", len(txMsgs))
+	if len(txMsgs) > 0 {
+		resp, err := b.network.SignAndBroadcastMsgs(ctx, txMsgs...)
+		if err != nil {
+			log.Error().Err(err).Msgf("[Broadcaster] Failed to broadcast %d messages", len(txMsgs))
+			b.pushFailedMsgBackToBuffer(txMsgs)
+			return err
+		} else if resp.Code == 0 {
+			log.Debug().
+				Int("msg_count", len(txMsgs)).
+				Str("tx_hash", resp.TxHash).
+				Msgf("[Broadcaster] Successfully broadcasted %d messages", len(txMsgs))
+		}
 	}
 	//Broadcast signCommandReqs
 	for chain, msg := range signCommandReqs {
@@ -288,7 +281,7 @@ func (b *Broadcaster) broadcastLoop(ctx context.Context) {
 				log.Error().Err(err).Msg("[Broadcaster] [broadcastLoop] Failed to broadcast messages")
 			}
 		default:
-			if len(b.txBuffers) > b.batchSize || len(b.signCommandReqs) > 0 {
+			if len(b.txBuffers) > b.batchSize {
 				err := b.broadcastMsgs(ctx)
 				if err != nil {
 					log.Error().Err(err).Msg("[Broadcaster] [broadcastLoop] Failed to broadcast messages")

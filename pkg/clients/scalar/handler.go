@@ -264,30 +264,30 @@ func (c *Client) processBatchedCommandSigned(ctx context.Context, chain string, 
 	chainName := exported.ChainName(chain)
 	batchID := batchedCmds.ID
 	//batchID := hex.EncodeToString(event.Args.CommandBatchID)
-	c.pendingCommands.BatchCommandsMutex.Lock()
-	defer c.pendingCommands.BatchCommandsMutex.Unlock()
-	_, ok := c.pendingCommands.BatchCommands.Load(batchID)
-	if ok {
-		log.Debug().Str("Chain", chain).Str("BatchCommandId", batchID).Msg("[ScalarClient] [processBatchedCommandSigned] found batch command.")
-		eventEnvelope := events.EventEnvelope{
-			EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
-			DestinationChain: chain,
-			CommandIDs:       batchedCmds.CommandIDs,
-			Data:             batchedCmds,
-		}
-		c.eventBus.BroadcastEvent(&eventEnvelope)
-		c.UpdateBatchCommandSigned(ctx, chain, batchedCmds)
-		if chainstypes.IsBitcoinChain(chainName) {
-			return c.handleBitcoinBatchCommands(chain, batchedCmds)
-		}
-
-		c.updateCommandStatuses(ctx, chain, batchedCmds.CommandIDs)
-		c.pendingCommands.BatchCommands.Delete(batchID)
-		return nil
-	} else {
-		log.Debug().Str("Chain", chain).Str("BatchCommandId", batchID).Msgf("[ScalarClient] [processBatchedCommandSigned] batch command not found or already processed")
-		return nil
+	// c.pendingCommands.BatchCommandsMutex.Lock()
+	// defer c.pendingCommands.BatchCommandsMutex.Unlock()
+	// _, ok := c.pendingCommands.BatchCommands.Load(batchID)
+	// if ok {
+	log.Debug().Str("Chain", chain).Str("BatchCommandId", batchID).Msg("[ScalarClient] [processBatchedCommandSigned] found batch command.")
+	eventEnvelope := events.EventEnvelope{
+		EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
+		DestinationChain: chain,
+		CommandIDs:       batchedCmds.CommandIDs,
+		Data:             batchedCmds,
 	}
+	c.eventBus.BroadcastEvent(&eventEnvelope)
+	c.UpdateBatchCommandSigned(ctx, chain, batchedCmds)
+	if chainstypes.IsBitcoinChain(chainName) {
+		return c.handleBitcoinBatchCommands(chain, batchedCmds)
+	}
+
+	c.updateCommandStatuses(ctx, chain, batchedCmds.CommandIDs)
+	//c.pendingCommands.BatchCommands.Delete(batchID)
+	return nil
+	// } else {
+	// 	log.Debug().Str("Chain", chain).Str("BatchCommandId", batchID).Msgf("[ScalarClient] [processBatchedCommandSigned] batch command not found or already processed")
+	// 	return nil
+	// }
 }
 
 func (c *Client) handleBitcoinBatchCommands(chain string, batchedCmds *chainstypes.BatchedCommandsResponse) error {
@@ -298,8 +298,8 @@ func (c *Client) handleBitcoinBatchCommands(chain string, batchedCmds *chainstyp
 	}
 
 	if liquidityModel == protocol.LIQUIDITY_MODEL_UPC {
-		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] liquidityModel: %s. Delete upc pending commands.", liquidityModel)
-		c.pendingCommands.DeleteUpcPendingCommands(chain)
+		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] liquidityModel: %s. Do nothing.", liquidityModel)
+		// c.pendingCommands.DeleteUpcPendingCommands(chain)
 	} else if liquidityModel == protocol.LIQUIDITY_MODEL_POOL {
 		log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [handleBitcoinBatchCommands] liquidityModel: %s. Delete first psbt.", liquidityModel)
 		c.pendingCommands.DeleteFirstPsbt(chain)
