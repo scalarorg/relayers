@@ -7,11 +7,11 @@ import (
 )
 
 func EventTokenSent2Model(event *types.EventTokenSent) scalarnet.TokenSentApproved {
-	eventId := utils.NormalizeHash(string(event.EventID))
-	commandId := utils.NormalizeHash(string(event.CommandID))
+	eventID := utils.NormalizeHash(string(event.EventID))
+	commandID := utils.NormalizeHash(string(event.CommandID))
 	model := scalarnet.TokenSentApproved{
-		EventID:            eventId,
-		CommandId:          commandId,
+		EventID:            eventID,
+		CommandID:          commandID,
 		TransferID:         uint64(event.TransferID),
 		SourceChain:        string(event.Chain),
 		SourceAddress:      event.Sender,

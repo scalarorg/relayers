@@ -192,16 +192,8 @@ func (db *DatabaseAdapter) UpdateContractCallWithMintsStatus(ctx context.Context
 	log.Debug().Any("cmdIds", cmdIds).Msg("[DatabaseAdapter] UpdateContractCallWithMintsStatus")
 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
 		eventIds := tx.Model(&scalarnet.ContractCallApprovedWithMint{}).Select("event_id").Where("command_id IN (?)", cmdIds)
-		entities := []*chains.ContractCallWithToken{}
 		//only update the token sent that is not success
-		result := tx.Model(&chains.ContractCallWithToken{}).Where("event_id IN (?) and status != ?", eventIds, chains.ContractCallStatusSuccess).Find(&entities)
-		if result.Error == nil {
-			ids := []string{}
-			for _, e := range entities {
-				ids = append(ids, e.EventID)
-			}
-			result = tx.Model(&chains.ContractCallWithToken{}).Where("event_id IN (?)", ids).Update("status", status)
-		}
+		result := tx.Model(&chains.ContractCallWithToken{}).Where("event_id IN (?) and status != ?", eventIds, chains.ContractCallStatusSuccess).Update("status", status)
 		return result.Error
 	})
 	return err

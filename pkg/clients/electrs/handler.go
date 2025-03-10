@@ -88,6 +88,7 @@ func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	} else {
 		log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [VaultTxMessageHandler] Received %d validvault transactions", len(tokenSents))
 	}
+	// Redeem transaction
 	if len(unstakedVaultTxs) > 0 {
 		err = c.UpdateUnstakedVaultTxs(unstakedVaultTxs)
 		if err != nil {

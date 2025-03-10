@@ -107,20 +107,23 @@ func (c *BtcClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRes
 	for _, psbt := range psbts {
 		txHash, err := c.BroadcastRawTx(psbt)
 		if err != nil {
+			txHash, _ = c.FindBroadcastedTx(psbt)
+		}
+		if txHash != nil {
+			txHashStr := txHash.String()
+			log.Debug().Msgf("[BtcClient] [handleScalarBatchCommandSigned] broadcasted txHash: %s", txHashStr)
+			err = c.dbAdapter.UpdateBroadcastedCommands(chainId, batchedCmdRes.ID, batchedCmdRes.CommandIDs, txHashStr)
+			if err != nil {
+				log.Error().Err(err).
+					Str("TxHash", txHashStr).
+					Str("ChainId", chainId).
+					Str("BatchedCommandID", batchedCmdRes.ID).
+					Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to update source event status")
+			}
+		} else if err != nil {
 			log.Error().Err(err).
 				Str("signedPsbt", psbt).
 				Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to broadcast tx")
-			return err
-		}
-		txHashStr := txHash.String()
-		log.Debug().Msgf("[BtcClient] [handleScalarBatchCommandSigned] broadcasted txHash: %s", txHashStr)
-		err = c.dbAdapter.UpdateBroadcastedCommands(chainId, batchedCmdRes.ID, batchedCmdRes.CommandIDs, txHashStr)
-		if err != nil {
-			log.Error().Err(err).
-				Str("TxHash", txHashStr).
-				Str("ChainId", chainId).
-				Str("BatchedCommandID", batchedCmdRes.ID).
-				Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to update source event status")
 		}
 	}
 	return nil

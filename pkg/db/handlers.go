@@ -66,12 +66,12 @@ func (db *DatabaseAdapter) CreateBatchValue(values any, batchSize int) error {
 	return nil
 }
 
-func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string) (*scalarnet.EventCheckPoint, error) {
+func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string, fromBlock uint64) (*scalarnet.EventCheckPoint, error) {
 	//Default value
 	lastBlock := scalarnet.EventCheckPoint{
 		ChainName:   chainName,
 		EventName:   eventName,
-		BlockNumber: 0,
+		BlockNumber: fromBlock,
 		TxHash:      "",
 		LogIndex:    0,
 		EventKey:    "",

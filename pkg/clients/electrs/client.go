@@ -114,7 +114,7 @@ func (c *Client) GetSymbol(chainId string, tokenAddress string) (string, error) 
 // Get lastcheck point from db, return default value if not found
 func (c *Client) getLastCheckpoint() *scalarnet.EventCheckPoint {
 	sourceChain := c.electrumConfig.SourceChain
-	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(sourceChain, events.EVENT_ELECTRS_VAULT_TRANSACTION)
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(sourceChain, events.EVENT_ELECTRS_VAULT_TRANSACTION, 0)
 	if err != nil {
 		log.Warn().Str("chainId", sourceChain).
 			Str("eventName", events.EVENT_ELECTRS_VAULT_TRANSACTION).

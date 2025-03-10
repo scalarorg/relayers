@@ -84,7 +84,7 @@ func (ec *EvmClient) HandleContractCallWithToken(event *contracts.IScalarGateway
 		return fmt.Errorf("failed to convert ContractCallEvent to RelayData: %w", err)
 	}
 	//2. update last checkpoint
-	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN)
+	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN, ec.EvmConfig.LastBlock)
 	if err != nil {
 		log.Debug().Str("chainId", ec.EvmConfig.GetId()).
 			Str("eventName", events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN).
@@ -147,7 +147,7 @@ func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) e
 	//For evm, the token sent is verified immediately by the scalarnet
 	tokenSent.Status = chains.TokenSentStatusVerifying
 	//2. update last checkpoint
-	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_TOKEN_SENT)
+	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_TOKEN_SENT, ec.EvmConfig.LastBlock)
 	if err != nil {
 		log.Debug().Str("chainId", ec.EvmConfig.GetId()).
 			Str("eventName", events.EVENT_EVM_TOKEN_SENT).
@@ -323,7 +323,7 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecut
 	cmdExecuted := ec.CommandExecutedEvent2Model(event)
 	//Get commandId from scalarnet
 	if ec.ScalarClient != nil {
-		command, err := ec.ScalarClient.GetCommand(cmdExecuted.SourceChain, cmdExecuted.CommandId)
+		command, err := ec.ScalarClient.GetCommand(cmdExecuted.SourceChain, cmdExecuted.CommandID)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[EvmClient] [HandleCommandExecuted] failed to get commandId from scalarnet")
 		} else if command != nil {
@@ -331,7 +331,7 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecut
 		} else {
 			log.Warn().Any("command", command).Msg("[EvmClient] [HandleCommandExecuted] command not found in scalarnet")
 		}
-		err = ec.dbAdapter.SaveCommandExecuted(&cmdExecuted, command, cmdExecuted.CommandId)
+		err = ec.dbAdapter.SaveCommandExecuted(&cmdExecuted, command, cmdExecuted.CommandID)
 		if err != nil {
 			log.Error().Err(err).Msg("[EvmClient] [HandleCommandExecuted] failed to save evm executed to the db")
 			return fmt.Errorf("failed to create evm executed: %w", err)

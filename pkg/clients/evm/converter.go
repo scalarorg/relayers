@@ -147,7 +147,7 @@ func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IScalarGatewayEx
 		TxHash:      strings.ToLower(event.Raw.TxHash.String()),
 		BlockNumber: uint64(event.Raw.BlockNumber),
 		LogIndex:    uint(event.Raw.Index),
-		CommandId:   hex.EncodeToString(event.CommandId[:]),
+		CommandID:   hex.EncodeToString(event.CommandId[:]),
 	}
 	return cmdExecuted
 }

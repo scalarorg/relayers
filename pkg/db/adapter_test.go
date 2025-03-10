@@ -132,7 +132,7 @@ func createMockData(db *gorm.DB) {
 		Amount:             1000,
 		Symbol:             "tBtc",
 		Status:             "approved",
-		CommandId:          "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291",
+		CommandID:          "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291",
 		TransferID:         1,
 	}
 	contractCallWithToken := chains.ContractCallWithToken{
@@ -179,7 +179,7 @@ func createMockData(db *gorm.DB) {
 func TestSaveMintTokenCommandExecuted(t *testing.T) {
 	cmdExecuted := chains.CommandExecuted{
 		SourceChain: "bitcoin|4",
-		CommandId:   "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291",
+		CommandID:   "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291",
 		Address:     "tb1q2rwweg2c48y8966qt4fzj0f4zyg9wty7tykzwg",
 		TxHash:      "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291",
 		BlockNumber: 66084,
@@ -196,7 +196,7 @@ func TestSaveMintTokenCommandExecuted(t *testing.T) {
 func TestSaveContractCallApproved(t *testing.T) {
 	cmdExecuted := chains.CommandExecuted{
 		SourceChain: "bitcoin|4",
-		CommandId:   "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291",
+		CommandID:   "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291",
 		Address:     "tb1q2rwweg2c48y8966qt4fzj0f4zyg9wty7tykzwg",
 		TxHash:      "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291",
 		BlockNumber: 66084,

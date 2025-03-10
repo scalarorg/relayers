@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rs/zerolog/log"
@@ -8,48 +9,30 @@ import (
 	"github.com/scalarorg/data-models/scalarnet"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func (db *DatabaseAdapter) SaveCommands(commands []*scalarnet.Command) error {
-	return db.PostgresClient.Save(commands).Error
-}
-func (db *DatabaseAdapter) UpdateBroadcastedCommands(chainId string, batchedCommandId string, commandIds []string, txHash string) error {
 	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
-		err := tx.Model(&scalarnet.Command{}).
-			Where("batch_command_id = ? AND command_id IN (?)", batchedCommandId, commandIds).
-			Updates(scalarnet.Command{ExecutedTxHash: txHash, Status: scalarnet.CommandStatusBroadcasted}).Error
-		if err != nil {
-			return fmt.Errorf("failed to update broadcasted commands: %w", err)
-		}
-		err = tx.Exec(`UPDATE contract_call_with_tokens as ccwt SET status = ? 
-						WHERE ccwt.event_id 
-						IN (SELECT ccawm.event_id FROM contract_call_approved_with_mints as ccawm WHERE ccawm.command_id IN (?))`,
-			chains.ContractCallStatusExecuting, commandIds).Error
-		// err = tx.Table("contract_call_with_tokens as ccwt").
-		// 	Joins("JOIN contract_call_approved_with_mints as ccawm ON ccwt.event_id = ccawm.event_id").
-		// 	Where("ccawm.command_id IN (?)", commandIds).
-		// 	Update("ccwt.status", chains.ContractCallStatusExecuting).Error
-		if err != nil {
-			return fmt.Errorf("failed to update contract call tokens status: %w", err)
+		for _, command := range commands {
+			err := tx.Clauses(clause.OnConflict{
+				Columns: []clause.Column{{Name: "command_id"}},
+				DoUpdates: clause.Assignments(map[string]interface{}{
+					"batch_command_id": command.BatchCommandID,
+					"command_type":     command.CommandType,
+					"key_id":           command.KeyID,
+					"params":           command.Params,
+					"chain_id":         command.ChainID,
+				}),
+			}).Create(command).Error
+			if err != nil {
+				return fmt.Errorf("[DatabaseAdapter] failed to save command: %w", err)
+			}
 		}
 		return nil
 	})
 }
 
-func (db *DatabaseAdapter) UpdateBtcExecutedCommands(chainId string, txHashes []string) error {
-	log.Info().Any("txHashes", txHashes).Msg("UpdateBtcExecutedCommands")
-	log.Info().Any("chainId", chainId).Msg("UpdateBtcExecutedCommands")
-
-	result := db.PostgresClient.Exec(`UPDATE contract_call_with_tokens as ccwt SET status = ? 
-						WHERE ccwt.event_id 
-						IN (SELECT ccawm.event_id FROM contract_call_approved_with_mints as ccawm 
-							JOIN commands as c ON ccawm.command_id = c.command_id 
-							WHERE c.chain_id = ? AND c.executed_tx_hash IN (?))`,
-		chains.ContractCallStatusSuccess, chainId, txHashes)
-
-	log.Info().Any("result", result.RowsAffected).Msg("UpdateBtcExecutedCommands")
-	return result.Error
-}
 func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecuted, command *chainstypes.CommandResponse, commandId string) error {
 	var eventId string
 	var err error
@@ -72,6 +55,26 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 		if result.Error != nil {
 			return result.Error
 		}
+		//Update or create Command record
+		commandModel := scalarnet.Command{
+			CommandID:      cmdExecuted.CommandID,
+			ChainID:        cmdExecuted.SourceChain,
+			ExecutedTxHash: cmdExecuted.TxHash,
+			Status:         scalarnet.CommandStatusExecuted,
+		}
+		result = tx.Clauses(
+			clause.OnConflict{
+				Columns: []clause.Column{{Name: "command_id"}},
+				DoUpdates: clause.Assignments(map[string]interface{}{
+					"executed_tx_hash": cmdExecuted.TxHash,
+					"status":           scalarnet.CommandStatusExecuted,
+				}),
+			},
+		).Create(&commandModel)
+		if result.Error != nil {
+			return fmt.Errorf("failed to update last event check point: %w", result.Error)
+		}
+
 		//The eventId is empty only when we restart whole system from beginning
 		if eventId != "" && command != nil {
 			switch command.Type {
@@ -87,4 +90,52 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 		return fmt.Errorf("failed to create Single value with checkpoint: %w", err)
 	}
 	return nil
+}
+
+func (db *DatabaseAdapter) UpdateBroadcastedCommands(chainId string, batchedCommandId string, commandIds []string, txHash string) error {
+	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		err := tx.Model(&scalarnet.Command{}).
+			Where("batch_command_id = ? AND command_id IN (?)", batchedCommandId, commandIds).
+			Updates(scalarnet.Command{ExecutedTxHash: txHash, Status: scalarnet.CommandStatusBroadcasted}).Error
+		if err != nil {
+			return fmt.Errorf("failed to update broadcasted commands: %w", err)
+		} else {
+			tx.Logger.Info(context.Background(),
+				fmt.Sprintf("[DatabaseAdapter] UpdateBroadcastedCommands successfully with chainId: %s, batchedCommandId: %s, commandIds: %v, txHash: %s",
+					chainId, batchedCommandId, commandIds, txHash))
+		}
+		err = tx.Exec(`UPDATE contract_call_with_tokens as ccwt SET status = ? 
+						WHERE ccwt.event_id 
+						IN (SELECT ccawm.event_id FROM contract_call_approved_with_mints as ccawm WHERE ccawm.command_id IN (?))`,
+			chains.ContractCallStatusExecuting, commandIds).Error
+		// err = tx.Table("contract_call_with_tokens as ccwt").
+		// 	Joins("JOIN contract_call_approved_with_mints as ccawm ON ccwt.event_id = ccawm.event_id").
+		// 	Where("ccawm.command_id IN (?)", commandIds).
+		// 	Update("ccwt.status", chains.ContractCallStatusExecuting).Error
+		if err != nil {
+			return fmt.Errorf("failed to update contract call tokens status: %w", err)
+		} else {
+			tx.Logger.Info(context.Background(),
+				fmt.Sprintf("[DatabaseAdapter] UpdateContractCallTokensStatus successfully with chainId: %s, batchedCommandId: %s, commandIds: %v, txHash: %s",
+					chainId, batchedCommandId, commandIds, txHash))
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update broadcasted commands: %w", err)
+	}
+	return nil
+}
+
+func (db *DatabaseAdapter) UpdateBtcExecutedCommands(chainId string, txHashes []string) error {
+	log.Info().Str("chainId", chainId).Any("txHashes", txHashes).Msg("[DatabaseAdapter] [UpdateBtcExecutedCommands]")
+
+	result := db.PostgresClient.Exec(`UPDATE contract_call_with_tokens as ccwt SET status = ? 
+						WHERE ccwt.event_id 
+						IN (SELECT ccawm.event_id FROM contract_call_approved_with_mints as ccawm 
+							JOIN commands as c ON ccawm.command_id = c.command_id 
+							WHERE c.chain_id = ? AND c.executed_tx_hash IN (?))`,
+		chains.ContractCallStatusSuccess, chainId, txHashes)
+	log.Info().Any("RowsAffected", result.RowsAffected).Msg("[DatabaseAdapter] [UpdateBtcExecutedCommands]")
+	return result.Error
 }

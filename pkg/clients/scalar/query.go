@@ -34,6 +34,7 @@ func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress str
 			}
 		}
 	}
+	//Response not found, make fist query to the node
 	if tokenResponse == nil {
 		client, err := c.queryClient.GetChainQueryServiceClient()
 		if err != nil {
