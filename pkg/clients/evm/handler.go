@@ -376,7 +376,7 @@ func (ec *EvmClient) ExecuteDestinationCall(
 		return nil, err
 	}
 	//Remove pending tx
-	ec.pendingTxs.RemoveTx(signedTx.Hash().Hex())
+	// ec.pendingTxs.RemoveTx(signedTx.Hash().Hex())
 	//Resubmit the transaction to the network
 	// receipt, err := ec.SubmitTx(signedTx, 0)
 	// if err != nil {

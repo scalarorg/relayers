@@ -1,9 +1,9 @@
 package evm
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
@@ -89,9 +89,8 @@ func (ec *EvmClient) handleScalarTokenSent(executeData string) error {
 		Int64("chainId", signedTx.ChainId().Int64()).
 		Str("signer", signedTx.To().Hex()).
 		Msg("[EvmClient] [handleScalarTokenSent]")
-	txHash := signedTx.Hash().String()
 	//2. Add the transaction waiting to be mined
-	ec.pendingTxs.AddTx(txHash, time.Now())
+	// ec.pendingTxs.AddTx(signedTx.Hash().String(), time.Now())
 	//3. Update status of the event
 	// err = ec.dbAdapter.UpdateRelayDataStatueWithExecuteHash(messageID, relaydata.SUCCESS, &txHash)
 	// if err != nil {
@@ -121,7 +120,11 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 		return fmt.Errorf("[EvmClient] [handleScalarBatchCommandSigned] auth is nil")
 	}
 	//Todo: check if token is not yet deployed on the chain
-	signedTx, err := ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
+	opts := *ec.auth
+	//Get signed tx only then try check if the tx is already mined, then get the receipt and process the event
+	//If signed tx is not mined, then send the tx to the network
+	opts.NoSend = true
+	signedTx, err := ec.Gateway.Execute(&opts, decodedExecuteData.Input)
 	if err != nil {
 		log.Error().Err(err).
 			Str("input", hex.EncodeToString(decodedExecuteData.Input)).
@@ -129,6 +132,28 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 			Str("signer", ec.auth.From.String()).
 			Msg("[EvmClient] [handleScalarBatchCommandSigned]")
 		return err
+	} else {
+		//Try find tx on the chain
+		_, isPending, err := ec.Client.TransactionByHash(context.Background(), signedTx.Hash())
+		if err != nil {
+			err = ec.Client.SendTransaction(context.Background(), signedTx)
+			if err != nil {
+				log.Error().Err(err).
+					Str("txHash", signedTx.Hash().String()).
+					Msg("[EvmClient] [handleScalarBatchCommandSigned] failed to send tx to the network")
+				return err
+			} else {
+				log.Info().Str("txHash", signedTx.Hash().String()).
+					Msg("[EvmClient] [handleScalarBatchCommandSigned] successfully sent tx to the network")
+			}
+		} else if isPending {
+			log.Info().Str("txHash", signedTx.Hash().String()).
+				Msg("[EvmClient] [handleScalarBatchCommandSigned] tx is pending")
+		} else {
+			log.Info().Str("txHash", signedTx.Hash().String()).
+				Msg("[EvmClient] [handleScalarBatchCommandSigned] tx is mined")
+		}
+
 	}
 	//Or send raw transaction to the network directly
 	// txRaw := types.NewTx()
@@ -141,9 +166,8 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 		Int64("chainId", signedTx.ChainId().Int64()).
 		Str("signer", signedTx.To().Hex()).
 		Msg("[EvmClient] [handleScalarBatchCommandSigned]")
-	txHash := signedTx.Hash().String()
 	//2. Add the transaction waiting to be mined
-	ec.pendingTxs.AddTx(txHash, time.Now())
+	// ec.pendingTxs.AddTx(signedTx.Hash().String(), time.Now())
 	//3. Todo: Clearify how to update status of the batchcommand
 	return nil
 }
@@ -196,7 +220,7 @@ func (ec *EvmClient) handleScalarContractCallApproved(messageID string, executeD
 		Msg("[EvmClient] [handleScalarContractCallApproved]")
 	txHash := signedTx.Hash().String()
 	//2. Add the transaction waiting to be mined
-	ec.pendingTxs.AddTx(txHash, time.Now())
+	// ec.pendingTxs.AddTx(txHash, time.Now())
 	//3. Update status of the event
 	err = ec.dbAdapter.UpdateCallContractWithTokenExecuteHash(messageID, chains.ContractCallStatusSuccess, txHash)
 	if err != nil {

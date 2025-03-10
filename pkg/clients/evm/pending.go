@@ -10,7 +10,7 @@ import (
 )
 
 func (c *EvmClient) AddPendingTx(txHash string, timestamp time.Time) {
-	c.pendingTxs.AddTx(txHash, timestamp)
+	// c.pendingTxs.AddTx(txHash, timestamp)
 }
 
 // Process pending transactions
