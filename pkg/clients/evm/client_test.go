@@ -63,7 +63,7 @@ var (
 		PrivateKey: "",
 		Finality:   1,
 		BlockTime:  time.Second * 12,
-		LastBlock:  7121800,
+		LastBlock:  47254017,
 		GasLimit:   300000,
 	}
 	evmClient *evm.EvmClient
@@ -78,6 +78,7 @@ func TestMain(m *testing.M) {
 	evmPrivateKey = os.Getenv("EVM_PRIVATE_KEY")
 	evmUserPrivKey = os.Getenv("EVM_USER_PRIVATE_KEY")
 	evmUserAddress = os.Getenv("EVM_USER_ADDRESS")
+	bnbConfig.RPCUrl = os.Getenv("URL_BNB_WSS")
 	sepoliaConfig.PrivateKey = evmPrivateKey
 	bnbConfig.PrivateKey = evmPrivateKey
 	sepoliaClient, _ = createEVMClient("RPC_SEPOLIA")
@@ -263,6 +264,50 @@ func TestRecoverEventTokenSent(t *testing.T) {
 	require.NoError(t, err)
 	fmt.Printf("missingEvents %v\n", missingEvents)
 }
+func TestRecoverEventContractCallWithToken(t *testing.T) {
+	bnbClient, err := evm.NewEvmClient(&globalConfig, bnbConfig, nil, nil, nil)
+	require.NoError(t, err)
+	//Get current block number
+	blockNumber, err := bnbClient.Client.BlockNumber(context.Background())
+	fmt.Printf("blockNumber %v\n", blockNumber)
+	require.NoError(t, err)
+	lastCheckpoint := scalarnet.EventCheckPoint{
+		ChainName:   bnbConfig.ID,
+		EventName:   events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN,
+		BlockNumber: bnbConfig.LastBlock,
+		TxHash:      "",
+		LogIndex:    0,
+		EventKey:    "",
+	}
+	missingEvents, err := evm.GetMissingEvents[*contracts.IScalarGatewayContractCallWithToken](bnbClient, events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN,
+		&lastCheckpoint, func(log types.Log) *contracts.IScalarGatewayContractCallWithToken {
+			return &contracts.IScalarGatewayContractCallWithToken{
+				Raw: log,
+			}
+		})
+	require.NoError(t, err)
+	fmt.Printf("%d missing events found\n", len(missingEvents))
+
+	txHash := "0xc7d4fac102169c129a4f04ccd4e3fa17fcd962f137e4928fb2462c52da039899"
+	tx, isPending, err := bnbClient.Client.TransactionByHash(context.Background(), common.HexToHash(txHash))
+	fmt.Printf("tx %v\n", tx)
+	fmt.Printf("isPending %v\n", isPending)
+	fmt.Printf("err %v\n", err)
+	txHash = "1c9623e21b55e9c4767a12b27f9f68578c167284651efb2b87a51ce438e9fa53"
+	tx, isPending, err = bnbClient.Client.TransactionByHash(context.Background(), common.HexToHash(txHash))
+	require.NoError(t, err)
+	fmt.Printf("tx %v\n", tx)
+	fmt.Printf("isPending %v\n", isPending)
+	fmt.Printf("err %v\n", err)
+
+	log.Info().Str("txHash", txHash).Any("tx", tx).Msgf("ContractCallWithToken")
+	for _, event := range missingEvents {
+		receipt, err := bnbClient.Client.TransactionReceipt(context.Background(), common.HexToHash(event.Hash))
+		require.NoError(t, err)
+		log.Info().Str("txHash", event.Hash).Any("receipt", receipt).Msgf("ContractCallWithToken")
+	}
+}
+
 func TestEvmClientWatchTokenSent(t *testing.T) {
 	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayTokenSent)

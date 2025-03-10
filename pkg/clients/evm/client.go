@@ -71,7 +71,7 @@ func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 			evmConfig.GasLimit = 3000000
 		}
 		if evmConfig.MaxRecoverRange == 0 {
-			evmConfig.MaxRecoverRange = 64000
+			evmConfig.MaxRecoverRange = math.MaxUint64
 		}
 		client, err := NewEvmClient(globalConfig, &evmConfig, dbAdapter, eventBus, scalarClient)
 		if err != nil {
@@ -372,6 +372,7 @@ func GetMissingEvents[T ValidEvmEvent](c *EvmClient, eventName string, lastCheck
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch logs: %w", err)
 	}
+	log.Debug().Int("logsCount", len(logs)).Any("logs", logs).Msg("[EvmClient] [GetMissingEvents] fetched logs")
 	result := []*parser.EvmEvent[T]{}
 	// Parse the logs
 	for _, receiptLog := range logs {
