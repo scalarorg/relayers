@@ -7,7 +7,6 @@ import (
 	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/utils"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // func (db *DatabaseAdapter) SaveValues(values any) error {
@@ -112,19 +111,33 @@ func (db *DatabaseAdapter) UpdateLastEventCheckPoint(value *scalarnet.EventCheck
 
 // For transactional update
 func UpdateLastEventCheckPoint(db *gorm.DB, value *scalarnet.EventCheckPoint) error {
-	result := db.Clauses(
-		clause.OnConflict{
-			Columns: []clause.Column{{Name: "chain_name"}, {Name: "event_name"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{
-				"block_number": value.BlockNumber,
-				"tx_hash":      utils.NormalizeHash(value.TxHash),
-				"log_index":    value.LogIndex,
-				"event_key":    value.EventKey,
-			}),
-		},
-	).Create(value)
-	if result.Error != nil {
-		return fmt.Errorf("failed to update last event check point: %w", result.Error)
+	//1. Get event check point from db
+	storedEventCheckPoint := scalarnet.EventCheckPoint{}
+	err := db.Where("chain_name = ? AND event_name = ?", value.ChainName, value.EventName).First(&storedEventCheckPoint).Error
+	if err != nil {
+		err = db.Create(value).Error
+	} else {
+		err = db.Model(&scalarnet.EventCheckPoint{}).Where("chain_name = ? AND event_name = ?", value.ChainName, value.EventName).Updates(map[string]interface{}{
+			"block_number": value.BlockNumber,
+			"tx_hash":      utils.NormalizeHash(value.TxHash),
+			"log_index":    value.LogIndex,
+			"event_key":    value.EventKey,
+		}).Error
+	}
+
+	// err := db.Clauses(
+	// 	clause.OnConflict{
+	// 		Columns: []clause.Column{{Name: "chain_name"}, {Name: "event_name"}},
+	// 		DoUpdates: clause.Assignments(map[string]interface{}{
+	// 			"block_number": value.BlockNumber,
+	// 			"tx_hash":      utils.NormalizeHash(value.TxHash),
+	// 			"log_index":    value.LogIndex,
+	// 			"event_key":    value.EventKey,
+	// 		}),
+	// 	},
+	// ).Create(value).Error
+	if err != nil {
+		return fmt.Errorf("failed to update last event check point: %w", err)
 	}
 
 	return nil

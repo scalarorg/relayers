@@ -69,7 +69,7 @@ func (ec *EvmClient) handleScalarTokenSent(executeData string) error {
 			Msg("[EvmClient] [handleScalarTokenSent] auth is nil")
 		return fmt.Errorf("[EvmClient] [handleScalarTokenSent] auth is nil")
 	}
-	signedTx, err := ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
+	signedTx, err := ec.gatewayExecute(decodedExecuteData.Input)
 	if err != nil {
 		log.Error().Err(err).
 			Str("input", hex.EncodeToString(decodedExecuteData.Input)).
@@ -77,6 +77,24 @@ func (ec *EvmClient) handleScalarTokenSent(executeData string) error {
 			Str("signer", ec.auth.From.String()).
 			Msg("[EvmClient] [handleScalarTokenSent]")
 		return err
+	} else {
+		if ec.auth.NoSend {
+			log.Debug().
+				Str("chainId", ec.EvmConfig.GetId()).
+				Str("contractAddress", ec.EvmConfig.Gateway).
+				Str("signer", ec.auth.From.String()).
+				Uint64("nonce", signedTx.Nonce()).
+				Str("txHash", signedTx.Hash().String()).
+				Msg("[EvmClient] [handleScalarTokenSent] successfully sent tx to the network")
+		} else {
+			log.Debug().
+				Str("chainId", ec.EvmConfig.GetId()).
+				Str("contractAddress", ec.EvmConfig.Gateway).
+				Str("signer", signedTx.To().Hex()).
+				Uint64("nonce", signedTx.Nonce()).
+				Str("txHash", signedTx.Hash().String()).
+				Msg("[EvmClient] [handleScalarTokenSent] successfully signed but not sent tx to the network due to NoSend flag")
+		}
 	}
 	//Or send raw transaction to the network directly
 	// txRaw := types.NewTx()
@@ -120,11 +138,11 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 		return fmt.Errorf("[EvmClient] [handleScalarBatchCommandSigned] auth is nil")
 	}
 	//Todo: check if token is not yet deployed on the chain
-	opts := *ec.auth
 	//Get signed tx only then try check if the tx is already mined, then get the receipt and process the event
 	//If signed tx is not mined, then send the tx to the network
-	opts.NoSend = true
-	signedTx, err := ec.Gateway.Execute(&opts, decodedExecuteData.Input)
+	ec.auth.NoSend = true
+	signedTx, err := ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
+	ec.auth.NoSend = false
 	if err != nil {
 		log.Error().Err(err).
 			Str("input", hex.EncodeToString(decodedExecuteData.Input)).
@@ -153,7 +171,6 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 			log.Info().Str("txHash", signedTx.Hash().String()).
 				Msg("[EvmClient] [handleScalarBatchCommandSigned] tx is mined")
 		}
-
 	}
 	//Or send raw transaction to the network directly
 	// txRaw := types.NewTx()
@@ -198,7 +215,7 @@ func (ec *EvmClient) handleScalarContractCallApproved(messageID string, executeD
 			Msg("[EvmClient] [handleScalarContractCallApproved] auth is nil")
 		return fmt.Errorf("[EvmClient] [handleScalarContractCallApproved] auth is nil")
 	}
-	signedTx, err := ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
+	signedTx, err := ec.gatewayExecute(decodedExecuteData.Input)
 	if err != nil {
 		log.Error().Err(err).
 			Str("input", hex.EncodeToString(decodedExecuteData.Input)).

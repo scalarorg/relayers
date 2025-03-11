@@ -9,24 +9,57 @@ import (
 	"github.com/scalarorg/data-models/scalarnet"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 func (db *DatabaseAdapter) SaveCommands(commands []*scalarnet.Command) error {
 	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		// for _, command := range commands {
+		// 	err := tx.Clauses(clause.OnConflict{
+		// 		Columns: []clause.Column{{Name: "command_id"}},
+		// 		DoUpdates: clause.Assignments(map[string]interface{}{
+		// 			"batch_command_id": command.BatchCommandID,
+		// 			"command_type":     command.CommandType,
+		// 			"key_id":           command.KeyID,
+		// 			"params":           command.Params,
+		// 			"chain_id":         command.ChainID,
+		// 		}),
+		// 	}).Create(command).Error
+		// 	if err != nil {
+		// 		return fmt.Errorf("[DatabaseAdapter] failed to save command: %w", err)
+		// 	}
+		// }
+		//1. Try get all stored command by commandIds
+		commandIds := make([]string, len(commands))
 		for _, command := range commands {
-			err := tx.Clauses(clause.OnConflict{
-				Columns: []clause.Column{{Name: "command_id"}},
-				DoUpdates: clause.Assignments(map[string]interface{}{
+			commandIds = append(commandIds, command.CommandID)
+		}
+		storedCommands := make([]*scalarnet.Command, len(commandIds))
+		err := tx.Where("command_id IN (?)", commandIds).Find(&storedCommands).Error
+		if err != nil {
+			return fmt.Errorf("[DatabaseAdapter] failed to get stored commands: %w", err)
+		}
+		storedCommandMap := make(map[string]*scalarnet.Command)
+		for _, command := range storedCommands {
+			storedCommandMap[command.CommandID] = command
+		}
+		for _, command := range commands {
+			_, ok := storedCommandMap[command.CommandID]
+			if !ok {
+				err := tx.Create(command).Error
+				if err != nil {
+					tx.Logger.Error(context.Background(), fmt.Sprintf("[DatabaseAdapter] failed to save command: %s", command.CommandID))
+				}
+			} else {
+				err := tx.Model(&scalarnet.Command{}).Where("command_id = ?", command.CommandID).Updates(map[string]interface{}{
 					"batch_command_id": command.BatchCommandID,
 					"command_type":     command.CommandType,
 					"key_id":           command.KeyID,
 					"params":           command.Params,
 					"chain_id":         command.ChainID,
-				}),
-			}).Create(command).Error
-			if err != nil {
-				return fmt.Errorf("[DatabaseAdapter] failed to save command: %w", err)
+				}).Error
+				if err != nil {
+					tx.Logger.Error(context.Background(), fmt.Sprintf("[DatabaseAdapter] failed to update command: %s", command.CommandID))
+				}
 			}
 		}
 		return nil
@@ -55,6 +88,7 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 		if result.Error != nil {
 			return result.Error
 		}
+
 		//Update or create Command record
 		commandModel := scalarnet.Command{
 			CommandID:      cmdExecuted.CommandID,
@@ -62,15 +96,28 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 			ExecutedTxHash: cmdExecuted.TxHash,
 			Status:         scalarnet.CommandStatusExecuted,
 		}
-		result = tx.Clauses(
-			clause.OnConflict{
-				Columns: []clause.Column{{Name: "command_id"}},
-				DoUpdates: clause.Assignments(map[string]interface{}{
-					"executed_tx_hash": cmdExecuted.TxHash,
-					"status":           scalarnet.CommandStatusExecuted,
-				}),
-			},
-		).Create(&commandModel)
+		// result = tx.Clauses(
+		// 	clause.OnConflict{
+		// 		Columns: []clause.Column{{Name: "command_id"}},
+		// 		DoUpdates: clause.Assignments(map[string]interface{}{
+		// 			"executed_tx_hash": cmdExecuted.TxHash,
+		// 			"status":           scalarnet.CommandStatusExecuted,
+		// 		}),
+		// 	},
+		// ).Create(&commandModel)
+
+		//1. Get command from db
+		storedCommand := scalarnet.Command{}
+		err = tx.Where("command_id = ?", cmdExecuted.CommandID).First(&storedCommand).Error
+		if err != nil {
+			tx.Create(&commandModel)
+		} else {
+			tx.Model(&scalarnet.Command{}).Where("command_id = ?", cmdExecuted.CommandID).Updates(map[string]interface{}{
+				"executed_tx_hash": cmdExecuted.TxHash,
+				"status":           scalarnet.CommandStatusExecuted,
+			})
+		}
+
 		if result.Error != nil {
 			return fmt.Errorf("failed to update last event check point: %w", result.Error)
 		}

@@ -149,7 +149,18 @@ func CreateEvmAuth(evmConfig *EvmNetworkConfig) (*bind.TransactOpts, error) {
 	auth.GasLimit = evmConfig.GasLimit
 	return auth, nil
 }
-
+func (ec *EvmClient) gatewayExecute(input []byte) (*types.Transaction, error) {
+	//ec.auth.NoSend = false
+	signedTx, err := ec.Gateway.Execute(ec.auth, input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send transaction: %w", err)
+	}
+	// err = ec.Client.SendTransaction(context.Background(), signedTx)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to send transaction: %w", err)
+	// }
+	return signedTx, nil
+}
 func preparePrivateKey(evmCfg *EvmNetworkConfig) error {
 	if evmCfg.PrivateKey == "" {
 		if config.GlobalConfig.EvmPrivateKey == "" {

@@ -27,10 +27,10 @@ func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chain
 				tokenSents = append(tokenSents, tokenSent)
 			}
 		} else if vaultTx.VaultTxType == 2 {
-			log.Info().Any("RedeemTx", vaultTx).Msg("[ElectrumClient] [CategorizeVaultTxs]")
 			//2.Unstaking
 			unstakedVaultTx := c.CreateUnstakedVaultTx(vaultTx)
 			unstakedVaultTxs = append(unstakedVaultTxs, unstakedVaultTx)
+			log.Info().Any("RedeemTx", unstakedVaultTx).Msg("[ElectrumClient] [CategorizeVaultTxs]")
 		}
 	}
 	return tokenSents, unstakedVaultTxs
