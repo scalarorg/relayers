@@ -21,9 +21,7 @@ import (
 type Broadcaster struct {
 	network         *cosmos.NetworkClient
 	pendingCommands *PendingCommands //Keep reference to the pending commands for store sign command request tx hashå
-	//queue          *queue.Queue
-	txBuffers       []types.Msg
-	signCommandReqs sync.Map //Make sure each chain have unique signCommandRequest
+	messageBuffer   *MessageBuffer
 	mutex           sync.Mutex
 	isRunning       bool
 	period          time.Duration
@@ -35,6 +33,7 @@ func NewBroadcaster(network *cosmos.NetworkClient, pendingCommands *PendingComma
 	return &Broadcaster{
 		network:         network,
 		pendingCommands: pendingCommands,
+		messageBuffer:   NewMessageBuffer(),
 		period:          broadcastPeriod,
 		batchSize:       batchSize,
 		cycleCount:      0,
@@ -78,29 +77,18 @@ func (b *Broadcaster) Stop() {
 
 // QueueMsg adds a message to the broadcasting queue
 func (b *Broadcaster) QueueTxMsg(msg types.Msg) error {
-	b.mutex.Lock()
 	if !b.isRunning {
-		b.mutex.Unlock()
 		return fmt.Errorf("broadcaster is not running")
 	}
 	log.Debug().Msgf("[Broadcaster] [QueueTxMsg] enqueue message %v", msg)
-	b.txBuffers = append(b.txBuffers, msg)
-	b.mutex.Unlock()
+	b.messageBuffer.AddNewMsg(msg)
 	return nil
 }
 func (b *Broadcaster) QueueSignCommandReq(chain string, msg types.Msg) error {
 	if !b.isRunning {
 		return fmt.Errorf("broadcaster is not running")
 	}
-	_, ok := b.signCommandReqs.Load(chain)
-	if ok {
-		log.Debug().Msgf("[Broadcaster] [QueueSignCommandReq] signCommandReq %T for chain %s is already in buffer. Skip adding new one", msg, chain)
-		return fmt.Errorf("signCommandReq message %T for chain %s is already in buffer", msg, chain)
-	} else {
-		log.Debug().Msgf("[Broadcaster] [QueueSignCommandReq] enqueue signCommandReq message %T for chain %s", msg, chain)
-		b.signCommandReqs.Store(chain, msg)
-		return nil
-	}
+	return b.messageBuffer.AddSignCommandReq(chain, msg)
 }
 
 func (c *Broadcaster) ConfirmEvmTxs(chainName string, txIds []string) error {
@@ -166,17 +154,10 @@ func (c *Broadcaster) CreatePendingTransfersRequest(chain string) error {
 
 // try broadcast fist messages in the buffer
 func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
-	var txMsgs []types.Msg
-	signCommandReqs := make(map[string]types.Msg)
-	b.signCommandReqs.Range(func(key, value any) bool {
-		signCommandReqs[key.(string)] = value.(types.Msg)
-		return true
-	})
-	b.signCommandReqs.Clear()
-	b.mutex.Lock()
-	txMsgs = b.txBuffers
-	b.mutex.Unlock()
-	if len(txMsgs) == 0 && len(signCommandReqs) == 0 {
+	txMsgs := b.messageBuffer.RetrieveNewMsgs(b.batchSize)
+	failedMsgs := b.messageBuffer.RetrieveFailedMsgs()
+	signCommandReqs := b.messageBuffer.RetrieveAllSignCommandReqs()
+	if len(txMsgs) == 0 && len(signCommandReqs) == 0 && len(failedMsgs) == 0 {
 		if b.cycleCount >= 1000 {
 			log.Debug().Msg("[Broadcaster] No messages to broadcast")
 			b.cycleCount = 0
@@ -188,14 +169,29 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 	//Broadcast txMsgs
 	if len(txMsgs) > 0 {
 		log.Debug().Msgf("[Broadcaster] [broadcastMsgs] broadcasting %d messages", len(txMsgs))
-		for _, msg := range txMsgs {
+		resp, err := b.network.SignAndBroadcastMsgs(ctx, txMsgs...)
+		if err != nil {
+			log.Error().Err(err).Msgf("[Broadcaster] Failed to broadcast message %++v", txMsgs)
+			b.messageBuffer.AddFailedMsg(txMsgs...)
+		} else if resp.Code == 0 {
+			log.Debug().
+				Str("tx_hash", resp.TxHash).
+				Msgf("[Broadcaster] Successfully broadcasted message %++v in single tx", txMsgs)
+		}
+	}
+	//Broadcast failedMsgs
+	if len(failedMsgs) > 0 {
+		log.Debug().Msgf("[Broadcaster] [broadcastMsgs] retry broadcasting %d failed messages", len(failedMsgs))
+		for _, msg := range failedMsgs {
 			resp, err := b.network.SignAndBroadcastMsgs(ctx, msg)
 			if err != nil {
-				log.Error().Err(err).Msgf("[Broadcaster] Failed to broadcast message %++v", msg)
-			} else if resp.Code == 0 {
+				log.Error().Err(err).Msgf("[Broadcaster] Failed to retry broadcast msg %++v", failedMsgs)
+				return err
+			}
+			if resp.Code == 0 {
 				log.Debug().
 					Str("tx_hash", resp.TxHash).
-					Msgf("[Broadcaster] Successfully broadcasted message %++v", msg)
+					Msgf("[Broadcaster] Successfully retry broadcast msg %++v", msg)
 			}
 		}
 	}
@@ -264,13 +260,6 @@ func (b *Broadcaster) broadcastLoop(ctx context.Context) {
 			err := b.broadcastMsgs(ctx)
 			if err != nil {
 				log.Error().Err(err).Msg("[Broadcaster] [broadcastLoop] Failed to broadcast messages")
-			}
-		default:
-			if len(b.txBuffers) > b.batchSize {
-				err := b.broadcastMsgs(ctx)
-				if err != nil {
-					log.Error().Err(err).Msg("[Broadcaster] [broadcastLoop] Failed to broadcast messages")
-				}
 			}
 		}
 	}

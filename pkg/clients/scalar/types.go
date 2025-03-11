@@ -470,3 +470,76 @@ func (p *PendingCommands) GetFirstPsbts() map[string]covtypes.Psbt {
 // 	defer p.UpcPendingCommandsMutex.Unlock()
 // 	p.UpcPendingCommands.Delete(chain)
 // }
+
+type MessageBuffer struct {
+	mutex           sync.Mutex
+	txBuffers       []sdk.Msg
+	failedMsgs      []sdk.Msg
+	signCommandReqs sync.Map
+}
+
+func NewMessageBuffer() *MessageBuffer {
+	return &MessageBuffer{
+		txBuffers:       []sdk.Msg{},
+		failedMsgs:      []sdk.Msg{},
+		signCommandReqs: sync.Map{},
+	}
+}
+
+func (b *MessageBuffer) AddNewMsg(msgs ...sdk.Msg) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.txBuffers = append(b.txBuffers, msgs...)
+}
+
+func (b *MessageBuffer) AddFailedMsg(msgs ...sdk.Msg) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.failedMsgs = append(b.failedMsgs, msgs...)
+}
+
+func (b *MessageBuffer) AddSignCommandReq(chain string, msg sdk.Msg) error {
+	_, ok := b.signCommandReqs.Load(chain)
+	if ok {
+		log.Debug().Msgf("[Broadcaster] [QueueSignCommandReq] signCommandReq %T for chain %s is already in buffer. Skip adding new one", msg, chain)
+		return fmt.Errorf("signCommandReq message %T for chain %s is already in buffer", msg, chain)
+	} else {
+		log.Debug().Msgf("[Broadcaster] [QueueSignCommandReq] enqueue signCommandReq message %T for chain %s", msg, chain)
+		b.signCommandReqs.Store(chain, msg)
+		return nil
+	}
+}
+
+func (b *MessageBuffer) RetrieveNewMsgs(batchSize int) []sdk.Msg {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	if len(b.txBuffers) > batchSize {
+		msgs := b.txBuffers[:batchSize]
+		b.txBuffers = b.txBuffers[batchSize:]
+		return msgs
+	} else {
+		msgs := b.txBuffers
+		b.txBuffers = []sdk.Msg{}
+		return msgs
+	}
+}
+
+func (b *MessageBuffer) RetrieveFailedMsgs() []sdk.Msg {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	msgs := b.failedMsgs
+	b.failedMsgs = []sdk.Msg{}
+	return msgs
+}
+
+func (b *MessageBuffer) RetrieveAllSignCommandReqs() map[string]sdk.Msg {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	requests := make(map[string]sdk.Msg)
+	b.signCommandReqs.Range(func(key, value any) bool {
+		requests[key.(string)] = value.(sdk.Msg)
+		return true
+	})
+	b.signCommandReqs.Clear()
+	return requests
+}
