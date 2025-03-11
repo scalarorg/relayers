@@ -84,6 +84,7 @@ func (s *Service) Start(ctx context.Context) error {
 	// 2025, March 10
 	for _, client := range s.EvmClients {
 		go func() {
+			//Todo: Handle the moment when recover just finished and listner has not started yet. It around 1 second
 			err := client.RecoverAllEvents(ctx)
 			if err != nil {
 				log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover events for evm client %s", client.EvmConfig.GetId())
