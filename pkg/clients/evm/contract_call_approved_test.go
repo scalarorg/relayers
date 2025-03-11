@@ -41,6 +41,6 @@ func TestContractCallApprovedEventHandler(t *testing.T) {
 		SourceEventIndex: big.NewInt(0),
 		Raw:              raw,
 	}
-	err := evmClient.HandleContractCallApproved(event)
+	err := sepoliaClient.HandleContractCallApproved(event)
 	require.NoError(t, err)
 }

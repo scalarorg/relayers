@@ -29,6 +29,6 @@ func TestEvmExecutedHandler(t *testing.T) {
 		CommandId: [32]byte{32, 242, 209, 237, 2, 88, 90, 168, 231, 249, 244, 150, 114, 201, 56, 24, 242, 205, 174, 14, 114, 68, 44, 214, 99, 164, 213, 221, 94, 200, 130, 19},
 		Raw:       raw,
 	}
-	err := evmClient.HandleCommandExecuted(event)
+	err := sepoliaClient.HandleCommandExecuted(event)
 	require.NoError(t, err)
 }

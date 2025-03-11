@@ -71,8 +71,8 @@ func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 		if evmConfig.GasLimit == 0 {
 			evmConfig.GasLimit = 3000000
 		}
-		if evmConfig.MaxRecoverRange == 0 {
-			evmConfig.MaxRecoverRange = 10000
+		if evmConfig.RecoverRange == 0 {
+			evmConfig.RecoverRange = 1000000
 		}
 		client, err := NewEvmClient(globalConfig, &evmConfig, dbAdapter, eventBus, scalarClient)
 		if err != nil {

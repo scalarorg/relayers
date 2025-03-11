@@ -14,8 +14,8 @@ func TestPollTxForEvents(t *testing.T) {
 		TxHash:    "0xd372c87a830857662a6fb37ee1bea1b8465cc5469e90d0ecee4020ff284bb149",
 		Timestamp: time.Now().Add(time.Minute * -1),
 	}
-	evmClient.AddPendingTx(pendingTx.TxHash, pendingTx.Timestamp)
-	events, err := evmClient.PollTxForEvents(pendingTx)
+	sepoliaClient.AddPendingTx(pendingTx.TxHash, pendingTx.Timestamp)
+	events, err := sepoliaClient.PollTxForEvents(pendingTx)
 	require.NoError(t, err)
 	require.NotNil(t, events)
 	require.NotNil(t, events.ContractCallApproved)

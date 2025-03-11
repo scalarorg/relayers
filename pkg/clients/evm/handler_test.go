@@ -23,7 +23,7 @@ func TestExecuteDestinationCall(t *testing.T) {
 	// evmClient.SetAuth(auth)
 	payload, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000003e8324e4d7268b0b65ba6fd71359b6460a82a9fae17af7434b48ad632e203156b750000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000001424a1db57fa3ecafcbad91d6ef068439aceeae090000000000000000000000000")
 	assert.NoError(t, err)
-	receipt, err := evmClient.ExecuteDestinationCall(event.ContractAddress, event.CommandId, event.SourceChain, event.SourceAddress, payload)
+	receipt, err := sepoliaClient.ExecuteDestinationCall(event.ContractAddress, event.CommandId, event.SourceChain, event.SourceAddress, payload)
 	assert.NoError(t, err)
 	fmt.Printf("Receipt %v", receipt)
 }

@@ -17,7 +17,7 @@ import (
 var (
 	ALL_EVENTS = []string{
 		events.EVENT_EVM_CONTRACT_CALL,
-		events.EVENT_EVM_CONTRACT_CALL_APPROVED,
+		events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN,
 		events.EVENT_EVM_TOKEN_SENT,
 		events.EVENT_EVM_CONTRACT_CALL_APPROVED,
 		events.EVENT_EVM_COMMAND_EXECUTED,
@@ -54,51 +54,84 @@ func (c *EvmClient) ProcessMissingLogs() {
 	}
 }
 func (c *EvmClient) RecoverAllEvents(ctx context.Context) error {
+	log.Info().Any("events", ALL_EVENTS).Msg("[EvmClient] [RecoverAllEvents] recovering all events")
 	return c.RecoverEvents(ctx, ALL_EVENTS)
 }
 func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string) error {
-	topics := [][]common.Hash{}
+	topics := []common.Hash{}
 	events := map[string]abi.Event{}
 	for _, eventName := range eventNames {
 		event, ok := scalarGatewayAbi.Events[eventName]
 		if ok {
-			topics = append(topics, []common.Hash{event.ID})
+			topics = append(topics, event.ID)
 			events[event.ID.String()] = event
 		}
 	}
-	lastCheckpoint, err := c.dbAdapter.GetLastCheckPoint(c.EvmConfig.GetId(), c.EvmConfig.LastBlock)
-	if err != nil {
-		return fmt.Errorf("failed to get last checkpoint: %w", err)
+	var lastCheckpoint *scalarnet.EventCheckPoint
+	var err error
+	if c.dbAdapter != nil {
+		lastCheckpoint, err = c.dbAdapter.GetLastCheckPoint(c.EvmConfig.GetId(), c.EvmConfig.LastBlock)
+		if err != nil {
+			return fmt.Errorf("failed to get last checkpoint: %w", err)
+		}
+	} else {
+		lastCheckpoint = &scalarnet.EventCheckPoint{
+			ChainName:   c.EvmConfig.ID,
+			EventName:   "",
+			BlockNumber: c.EvmConfig.LastBlock,
+		}
 	}
-	log.Info().Str("Chain", c.EvmConfig.ID).Any("LastCheckpoint", lastCheckpoint).Msg("[EvmClient] [RecoverEvent]")
+	log.Info().Str("Chain", c.EvmConfig.ID).
+		Any("Topics", topics).
+		Any("LastCheckpoint", lastCheckpoint).Msg("[EvmClient] [RecoverEvent]")
 	//Get current block number
 	blockNumber, err := c.Client.BlockNumber(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
 	log.Info().Str("Chain", c.EvmConfig.ID).Uint64("Current BlockNumber", blockNumber).Msg("[EvmClient] [RecoverThenWatchForEvent]")
-	if blockNumber-lastCheckpoint.BlockNumber > c.EvmConfig.MaxRecoverRange {
-		lastCheckpoint.BlockNumber = blockNumber - c.EvmConfig.MaxRecoverRange + 1 //We add extra 1 to make sure we don't cover over configured range
+	fromBlock := lastCheckpoint.BlockNumber
+	recoverRange := uint64(100000)
+	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < 100000 {
+		recoverRange = c.EvmConfig.RecoverRange
 	}
-	lastBlock := lastCheckpoint.BlockNumber + c.EvmConfig.MaxRecoverRange
-	for lastBlock < blockNumber {
+	for fromBlock < blockNumber {
 		query := ethereum.FilterQuery{
-			FromBlock: big.NewInt(int64(lastCheckpoint.BlockNumber)),
-			ToBlock:   big.NewInt(int64(lastBlock)),
+			FromBlock: big.NewInt(int64(fromBlock)),
 			Addresses: []common.Address{c.GatewayAddress},
-			Topics:    topics,
+			Topics:    [][]common.Hash{topics},
+		}
+		if fromBlock+recoverRange < blockNumber {
+			query.ToBlock = big.NewInt(int64(fromBlock + recoverRange))
 		}
 		logs, err := c.Client.FilterLogs(context.Background(), query)
 		if err != nil {
 			return fmt.Errorf("failed to get current block number: %w", err)
 		}
-		c.AppendLogs(logs)
-		c.UpdateLastCheckPoint(events, logs, lastBlock)
-		blockNumber, err = c.Client.BlockNumber(context.Background())
-		if err != nil {
-			return fmt.Errorf("failed to get current block number: %w", err)
+		//Set toBlock to the last block number for logging purpose
+		var toBlock uint64 = blockNumber
+		if query.ToBlock != nil {
+			toBlock = query.ToBlock.Uint64()
 		}
+		if len(logs) > 0 {
+			log.Info().Msgf("[EvmClient] [RecoverEvents] found %d logs, fromBlock: %d, toBlock: %d", len(logs), fromBlock, toBlock)
+			c.AppendLogs(logs)
+			if c.dbAdapter != nil {
+				c.UpdateLastCheckPoint(events, logs, query.ToBlock.Uint64())
+			}
+		} else {
+			log.Error().Msgf("[EvmClient] [RecoverEvents] no logs found, fromBlock: %d, toBlock: %d", fromBlock, toBlock)
+		}
+		if query.ToBlock != nil {
+			blockNumber, err = c.Client.BlockNumber(context.Background())
+			if err != nil {
+				log.Error().Err(err).Msgf("[EvmClient] [RecoverEvents] failed to get current block number, fromBlock: %d, toBlock: %d", fromBlock, toBlock)
+			}
+		}
+		//Set fromBlock to the next block number for next iteration
+		fromBlock = toBlock + 1
 	}
+	log.Info().Msgf("[EvmClient] [RecoverEvents] recovered all events toBlock: %d", blockNumber)
 	return nil
 }
 
