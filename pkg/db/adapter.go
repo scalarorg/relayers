@@ -82,6 +82,7 @@ func InitHyperTables(db *gorm.DB) error {
 		timeColumn string
 	}{
 		{"commands", "created_at"},
+		{"token_sents", "created_at"},
 		// Add other tables that need to be converted to hyper tables
 	}
 
