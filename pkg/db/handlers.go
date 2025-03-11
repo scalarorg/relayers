@@ -66,6 +66,21 @@ func (db *DatabaseAdapter) CreateBatchValue(values any, batchSize int) error {
 	return nil
 }
 
+// Get earliest event check point for all eventNames
+func (db *DatabaseAdapter) GetLastCheckPoint(chainName string, fromBlock uint64) (*scalarnet.EventCheckPoint, error) {
+	//Default value
+	lastBlock := scalarnet.EventCheckPoint{
+		ChainName:   chainName,
+		EventName:   "",
+		BlockNumber: fromBlock,
+		TxHash:      "",
+		LogIndex:    0,
+		EventKey:    "",
+	}
+	result := db.PostgresClient.Where("chain_name = ?", chainName).Order("block_number ASC").First(&lastBlock)
+	return &lastBlock, result.Error
+}
+
 func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string, fromBlock uint64) (*scalarnet.EventCheckPoint, error) {
 	//Default value
 	lastBlock := scalarnet.EventCheckPoint{
@@ -79,6 +94,18 @@ func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string, f
 	result := db.PostgresClient.Where("chain_name = ? AND event_name = ?", chainName, eventName).First(&lastBlock)
 	return &lastBlock, result.Error
 }
+func (db *DatabaseAdapter) UpdateLastEventCheckPoints(checkpoints map[string]scalarnet.EventCheckPoint) error {
+	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		for _, checkpoint := range checkpoints {
+			err := UpdateLastEventCheckPoint(tx, &checkpoint)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (db *DatabaseAdapter) UpdateLastEventCheckPoint(value *scalarnet.EventCheckPoint) error {
 	return UpdateLastEventCheckPoint(db.PostgresClient, value)
 }

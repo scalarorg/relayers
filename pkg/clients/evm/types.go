@@ -1,9 +1,12 @@
 package evm
 
 import (
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/scalarorg/bitcoin-vault/go-utils/types"
 )
 
@@ -26,7 +29,7 @@ type EvmNetworkConfig struct {
 	GasLimit        uint64        `mapstructure:"gas_limit"`
 	BlockTime       time.Duration `mapstructure:"blockTime"` //Timeout im ms for pending txs
 	MaxRetry        int
-	MaxRecoverRange uint64 `mapstructure:"max_recover_range"`
+	MaxRecoverRange uint64 `mapstructure:"max_recover_range"` //Max block range to recover events in single query
 	RetryDelay      time.Duration
 	TxTimeout       time.Duration `mapstructure:"tx_timeout"` //Timeout for send txs (~3s)
 }
@@ -84,4 +87,34 @@ type DeployToken struct {
 	Cap          uint64
 	TokenAddress common.Address
 	MintLimit    uint64
+}
+
+type MissingLogs struct {
+	mutex     sync.Mutex
+	logs      []ethTypes.Log
+	Recovered atomic.Bool //True if logs are recovered
+}
+
+func (m *MissingLogs) IsRecovered() bool {
+	return m.Recovered.Load()
+}
+func (m *MissingLogs) SetRecovered(recovered bool) {
+	m.Recovered.Store(recovered)
+}
+
+func (m *MissingLogs) AppendLogs(logs []ethTypes.Log) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.logs = append(m.logs, logs...)
+}
+
+func (m *MissingLogs) GetLogs(count int) []ethTypes.Log {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if len(m.logs) <= count {
+		logs := m.logs
+		m.logs = []ethTypes.Log{}
+		return logs
+	}
+	return m.logs[:count]
 }

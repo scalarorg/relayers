@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -20,7 +21,6 @@ import (
 	"github.com/scalarorg/relayers/config"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/clients/evm/parser"
-	"github.com/scalarorg/relayers/pkg/clients/evm/pending"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
@@ -37,8 +37,9 @@ type EvmClient struct {
 	auth           *bind.TransactOpts
 	dbAdapter      *db.DatabaseAdapter
 	eventBus       *events.EventBus
-	pendingTxs     pending.PendingTxs //Transactions sent to Gateway for approval, waiting for event from EVM chain.
-	retryInterval  time.Duration
+	missingLogs    MissingLogs
+	// pendingTxs     pending.PendingTxs //Transactions sent to Gateway for approval, waiting for event from EVM chain.
+	retryInterval time.Duration
 }
 
 // This function is used to adjust the rpc url to the ws prefix
@@ -71,7 +72,7 @@ func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, e
 			evmConfig.GasLimit = 3000000
 		}
 		if evmConfig.MaxRecoverRange == 0 {
-			evmConfig.MaxRecoverRange = math.MaxUint64
+			evmConfig.MaxRecoverRange = 10000
 		}
 		client, err := NewEvmClient(globalConfig, &evmConfig, dbAdapter, eventBus, scalarClient)
 		if err != nil {
@@ -115,8 +116,8 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		auth:           auth,
 		dbAdapter:      dbAdapter,
 		eventBus:       eventBus,
-		pendingTxs:     pending.PendingTxs{},
-		retryInterval:  RETRY_INTERVAL,
+		// pendingTxs:     pending.PendingTxs{},
+		retryInterval: RETRY_INTERVAL,
 	}
 
 	return evmClient, nil
@@ -308,9 +309,7 @@ func RecoverEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context, eventName 
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
 	log.Info().Str("Chain", c.EvmConfig.ID).Uint64("Current BlockNumber", blockNumber).Msg("[EvmClient] [RecoverThenWatchForEvent]")
-	if blockNumber-lastCheckpoint.BlockNumber > c.EvmConfig.MaxRecoverRange {
-		lastCheckpoint.BlockNumber = blockNumber - c.EvmConfig.MaxRecoverRange + 1 //We add extra 1 to make sure we don't cover over configured range
-	}
+
 	//recover missing events from the last checkpoint block number to the current block number
 	// We already filtered received event (defined by block and logIndex)
 	// So if no more missing events, then function GetMissionEvents returns an empty array
@@ -581,6 +580,52 @@ func handleEvent(c *EvmClient, eventName string, event any) error {
 		return fmt.Errorf("cannot parse event %s: %T to %T", eventName, event, (*contracts.IScalarGatewayExecuted)(nil))
 	}
 	return fmt.Errorf("invalid event type for %s: %T", eventName, event)
+}
+
+func (c *EvmClient) handleEventLog(event abi.Event, txLog types.Log) error {
+	switch event.Name {
+	case events.EVENT_EVM_TOKEN_SENT:
+		tokenSent := &contracts.IScalarGatewayTokenSent{
+			Raw: txLog,
+		}
+		err := parser.ParseEventData(&txLog, event.Name, tokenSent)
+		if err != nil {
+			return fmt.Errorf("failed to parse event %s: %w", event.Name, err)
+		}
+		return c.HandleTokenSent(tokenSent)
+	case events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN:
+		contractCallWithToken := &contracts.IScalarGatewayContractCallWithToken{
+			Raw: txLog,
+		}
+		err := parser.ParseEventData(&txLog, event.Name, contractCallWithToken)
+		if err != nil {
+			return fmt.Errorf("failed to parse event %s: %w", event.Name, err)
+		}
+		return c.HandleContractCallWithToken(contractCallWithToken)
+	case events.EVENT_EVM_CONTRACT_CALL:
+		//return c.HandleContractCall(txLog)
+		return fmt.Errorf("not implemented")
+	case events.EVENT_EVM_CONTRACT_CALL_APPROVED:
+		contractCallApproved := &contracts.IScalarGatewayContractCallApproved{
+			Raw: txLog,
+		}
+		err := parser.ParseEventData(&txLog, event.Name, contractCallApproved)
+		if err != nil {
+			return fmt.Errorf("failed to parse event %s: %w", event.Name, err)
+		}
+		return c.HandleContractCallApproved(contractCallApproved)
+	case events.EVENT_EVM_COMMAND_EXECUTED:
+		executed := &contracts.IScalarGatewayExecuted{
+			Raw: txLog,
+		}
+		err := parser.ParseEventData(&txLog, event.Name, executed)
+		if err != nil {
+			return fmt.Errorf("failed to parse event %s: %w", event.Name, err)
+		}
+		return c.HandleCommandExecuted(executed)
+	default:
+		return fmt.Errorf("invalid event type for %s: %T", event.Name, txLog)
+	}
 }
 
 func (c *EvmClient) subscribeEventBus() {

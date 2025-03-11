@@ -76,34 +76,47 @@ func (s *Service) Start(ctx context.Context) error {
 	for _, client := range s.BtcClient {
 		go client.Start(ctx)
 	}
-	//Recovery evm missing source events
-	for _, client := range s.EvmClients {
-		err := client.RecoverInitiatedEvents(ctx)
-		if err != nil {
-			log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover initiated events for evm client %s", client.EvmConfig.GetId())
-		}
-	}
 	//Start electrum clients. This client can get all vault transactions from last checkpoint of begining if no checkpoint is found
 	for _, client := range s.Electrs {
 		go client.Start(ctx)
 	}
+	// Improvement recovery evm missing source events
+	// 2025, March 10
+	for _, client := range s.EvmClients {
+		go func() {
+			err := client.RecoverAllEvents(ctx)
+			if err != nil {
+				log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover events for evm client %s", client.EvmConfig.GetId())
+			} else {
+				log.Info().Msgf("[Relayer] [Start] recovered missing events for evm client %s", client.EvmConfig.GetId())
+				client.Start(ctx)
+			}
+		}()
+	}
 
-	for _, client := range s.EvmClients {
-		err := client.RecoverApprovedEvents(ctx)
-		if err != nil {
-			log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover initiated events for evm client %s", client.EvmConfig.GetId())
-		}
-	}
-	for _, client := range s.EvmClients {
-		err := client.RecoverExecutedEvents(ctx)
-		if err != nil {
-			log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover initiated events for evm client %s", client.EvmConfig.GetId())
-		}
-	}
-	//Start evm clients
-	for _, client := range s.EvmClients {
-		go client.Start(ctx)
-	}
+	// Recovery evm missing source events
+	// for _, client := range s.EvmClients {
+	// 	err := client.RecoverInitiatedEvents(ctx)
+	// 	if err != nil {
+	// 		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover initiated events for evm client %s", client.EvmConfig.GetId())
+	// 	}
+	// }
+	// for _, client := range s.EvmClients {
+	// 	err := client.RecoverApprovedEvents(ctx)
+	// 	if err != nil {
+	// 		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover initiated events for evm client %s", client.EvmConfig.GetId())
+	// 	}
+	// }
+	// for _, client := range s.EvmClients {
+	// 	err := client.RecoverExecutedEvents(ctx)
+	// 	if err != nil {
+	// 		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover initiated events for evm client %s", client.EvmConfig.GetId())
+	// 	}
+	// }
+	// //Start evm clients
+	// for _, client := range s.EvmClients {
+	// 	go client.Start(ctx)
+	// }
 
 	return nil
 }

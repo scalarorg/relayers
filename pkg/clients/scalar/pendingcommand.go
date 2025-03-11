@@ -199,6 +199,7 @@ func TryExtractCommandOutPoint(cmd chainstypes.QueryCommandResponse) (types.Comm
 	}
 	if payload.PayloadType == encode.ContractCallWithTokenPayloadType_CustodianOnly {
 		commandOutPoint = types.CommandOutPoint{
+			CommandID:  cmd.ID,
 			BTCFeeOpts: payload.CustodianOnly.FeeOptions,
 			RBF:        payload.CustodianOnly.RBF,
 			OutPoint: utiltypes.UnstakingOutput{
