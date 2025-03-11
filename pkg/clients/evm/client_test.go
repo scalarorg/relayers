@@ -37,12 +37,12 @@ var (
 	globalConfig config.Config = config.Config{
 		ConnnectionString: "postgres://postgres:postgres@localhost:5432/relayer?sslmode=disable",
 	}
-	sepoliaClient  *ethclient.Client
-	bnbClient      *ethclient.Client
-	evmPrivateKey  string
-	evmUserPrivKey string
-	evmUserAddress string
-	sepoliaConfig  *evm.EvmNetworkConfig = &evm.EvmNetworkConfig{
+	sepoliaEthClient *ethclient.Client
+	bnbEthClient     *ethclient.Client
+	evmPrivateKey    string
+	evmUserPrivKey   string
+	evmUserAddress   string
+	sepoliaConfig    *evm.EvmNetworkConfig = &evm.EvmNetworkConfig{
 		ChainID:    11155111,
 		ID:         CHAIN_ID_SEPOLIA,
 		Name:       "Ethereum sepolia",
@@ -66,7 +66,8 @@ var (
 		LastBlock:  47254017,
 		GasLimit:   300000,
 	}
-	evmClient *evm.EvmClient
+	bnbClient     *evm.EvmClient
+	sepoliaClient *evm.EvmClient
 )
 
 func TestMain(m *testing.M) {
@@ -81,19 +82,27 @@ func TestMain(m *testing.M) {
 	bnbConfig.RPCUrl = os.Getenv("URL_BNB_WSS")
 	sepoliaConfig.PrivateKey = evmPrivateKey
 	bnbConfig.PrivateKey = evmPrivateKey
-	sepoliaClient, _ = createEVMClient("RPC_SEPOLIA")
-	bnbClient, _ = createEVMClient("RPC_BNB")
+	sepoliaEthClient, _ = createEVMClient("RPC_SEPOLIA")
+	bnbEthClient, _ = createEVMClient("RPC_BNB")
 
 	log.Info().Msgf("Creating evm client with config: %v", sepoliaConfig)
-	dbAdapter, err := db.NewDatabaseAdapter(&globalConfig)
+	dbAdapter, _ := createDbAdapter()
+	sepoliaClient, err = evm.NewEvmClient(&globalConfig, sepoliaConfig, dbAdapter, nil, nil)
 	if err != nil {
-		log.Error().Msgf("failed to create db adapter: %v", err)
+		log.Error().Msgf("failed to create evm client: %v", err)
 	}
-	evmClient, err = evm.NewEvmClient(&globalConfig, sepoliaConfig, dbAdapter, nil, nil)
+	bnbClient, err = evm.NewEvmClient(&globalConfig, bnbConfig, dbAdapter, nil, nil)
 	if err != nil {
 		log.Error().Msgf("failed to create evm client: %v", err)
 	}
 	os.Exit(m.Run())
+}
+func createDbAdapter() (*db.DatabaseAdapter, error) {
+	dbAdapter, err := db.NewDatabaseAdapter(&globalConfig)
+	if err != nil {
+		log.Error().Msgf("failed to create db adapter: %v", err)
+	}
+	return dbAdapter, nil
 }
 func createEVMClient(key string) (*ethclient.Client, error) {
 	rpcEndpoint := os.Getenv(key)
@@ -104,11 +113,21 @@ func createEVMClient(key string) (*ethclient.Client, error) {
 	}
 	return ethclient.NewClient(rpcSepolia), nil
 }
+
+func TestRecoverEvents(t *testing.T) {
+	bnbClient, err := evm.NewEvmClient(&globalConfig, bnbConfig, nil, nil, nil)
+	if err != nil {
+		log.Error().Msgf("failed to create evm client: %v", err)
+	}
+	err = bnbClient.RecoverAllEvents(context.Background())
+	require.NoError(t, err)
+}
+
 func TestEvmClientListenContractCallEvent(t *testing.T) {
 	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayContractCall)
 
-	subContractCall, err := evmClient.Gateway.WatchContractCall(&watchOpts, sink, nil, nil)
+	subContractCall, err := sepoliaClient.Gateway.WatchContractCall(&watchOpts, sink, nil, nil)
 	if err != nil {
 		log.Error().Err(err).Msg("ContractCallEvent")
 	}
@@ -134,7 +153,7 @@ func TestEvmClientListenContractCallApprovedEvent(t *testing.T) {
 	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayContractCallApproved)
 
-	subContractCallApproved, err := evmClient.Gateway.WatchContractCallApproved(&watchOpts, sink, nil, nil, nil)
+	subContractCallApproved, err := sepoliaClient.Gateway.WatchContractCallApproved(&watchOpts, sink, nil, nil, nil)
 	if err != nil {
 		log.Error().Err(err).Msg("ContractCallApprovedEvent")
 	}
@@ -160,7 +179,7 @@ func TestEvmClientListenEVMExecutedEvent(t *testing.T) {
 	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayExecuted)
 
-	subExecuted, err := evmClient.Gateway.WatchExecuted(&watchOpts, sink, nil)
+	subExecuted, err := sepoliaClient.Gateway.WatchExecuted(&watchOpts, sink, nil)
 	if err != nil {
 		log.Error().Err(err).Msg("ExecutedEvent")
 	}
@@ -186,7 +205,7 @@ func TestRecoverEvent(t *testing.T) {
 			Raw: log,
 		}
 	}
-	err := evm.RecoverEvent[*contracts.IScalarGatewayContractCall](evmClient, context.Background(), events.EVENT_EVM_CONTRACT_CALL, fnCreateEventData)
+	err := evm.RecoverEvent[*contracts.IScalarGatewayContractCall](sepoliaClient, context.Background(), events.EVENT_EVM_CONTRACT_CALL, fnCreateEventData)
 	require.NoError(t, err)
 }
 func TestEvmSubscribe(t *testing.T) {
@@ -335,7 +354,7 @@ func TestSendTokenFromSepoliaToBnb(t *testing.T) {
 	sepoliaGwAddr := "0x842C080EE1399addb76830CFe21D41e47aaaf57e"
 	amount := big.NewInt(10000)
 
-	sepoliaGateway, _, err := evm.CreateGateway("Sepolia", sepoliaGwAddr, sepoliaClient)
+	sepoliaGateway, _, err := evm.CreateGateway("Sepolia", sepoliaGwAddr, sepoliaEthClient)
 	assert.NoError(t, err)
 	sepoliaConfig.PrivateKey = evmUserPrivKey
 	fmt.Printf("SepoliaConfig %v\n", sepoliaConfig)
