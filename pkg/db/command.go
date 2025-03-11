@@ -11,56 +11,39 @@ import (
 	"gorm.io/gorm"
 )
 
-func (db *DatabaseAdapter) SaveCommands(commands []*scalarnet.Command) error {
+const (
+	defaultBatchSize = 1000
+	maxBatchSize     = 5000
+)
+
+type BatchOption struct {
+	BatchSize int
+}
+
+func (db *DatabaseAdapter) SaveCommands(commands []*scalarnet.Command, opts ...BatchOption) error {
+	// Determine batch size
+	batchSize := defaultBatchSize
+	if len(opts) > 0 && opts[0].BatchSize > 0 {
+		batchSize = opts[0].BatchSize
+		if batchSize > maxBatchSize {
+			batchSize = maxBatchSize
+		}
+	}
+
 	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
-		// for _, command := range commands {
-		// 	err := tx.Clauses(clause.OnConflict{
-		// 		Columns: []clause.Column{{Name: "command_id"}},
-		// 		DoUpdates: clause.Assignments(map[string]interface{}{
-		// 			"batch_command_id": command.BatchCommandID,
-		// 			"command_type":     command.CommandType,
-		// 			"key_id":           command.KeyID,
-		// 			"params":           command.Params,
-		// 			"chain_id":         command.ChainID,
-		// 		}),
-		// 	}).Create(command).Error
-		// 	if err != nil {
-		// 		return fmt.Errorf("[DatabaseAdapter] failed to save command: %w", err)
-		// 	}
-		// }
-		//1. Try get all stored command by commandIds
-		commandIds := make([]string, len(commands))
-		for _, command := range commands {
-			commandIds = append(commandIds, command.CommandID)
-		}
-		storedCommands := make([]*scalarnet.Command, len(commandIds))
-		err := tx.Where("command_id IN (?)", commandIds).Find(&storedCommands).Error
+		err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "command_id"}},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"batch_command_id": gorm.Expr("EXCLUDED.batch_command_id"),
+				"command_type":     gorm.Expr("EXCLUDED.command_type"),
+				"key_id":           gorm.Expr("EXCLUDED.key_id"),
+				"params":           gorm.Expr("EXCLUDED.params"),
+				"chain_id":         gorm.Expr("EXCLUDED.chain_id"),
+			}),
+		}).CreateInBatches(commands, batchSize).Error
+
 		if err != nil {
-			return fmt.Errorf("[DatabaseAdapter] failed to get stored commands: %w", err)
-		}
-		storedCommandMap := make(map[string]*scalarnet.Command)
-		for _, command := range storedCommands {
-			storedCommandMap[command.CommandID] = command
-		}
-		for _, command := range commands {
-			_, ok := storedCommandMap[command.CommandID]
-			if !ok {
-				err := tx.Create(command).Error
-				if err != nil {
-					tx.Logger.Error(context.Background(), fmt.Sprintf("[DatabaseAdapter] failed to save command: %s", command.CommandID))
-				}
-			} else {
-				err := tx.Model(&scalarnet.Command{}).Where("command_id = ?", command.CommandID).Updates(map[string]interface{}{
-					"batch_command_id": command.BatchCommandID,
-					"command_type":     command.CommandType,
-					"key_id":           command.KeyID,
-					"params":           command.Params,
-					"chain_id":         command.ChainID,
-				}).Error
-				if err != nil {
-					tx.Logger.Error(context.Background(), fmt.Sprintf("[DatabaseAdapter] failed to update command: %s", command.CommandID))
-				}
-			}
+			return fmt.Errorf("[DatabaseAdapter] failed to batch save commands: %w", err)
 		}
 		return nil
 	})
