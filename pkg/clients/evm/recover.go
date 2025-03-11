@@ -109,7 +109,6 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string) erro
 		if err != nil {
 			return fmt.Errorf("failed to filter logs: %w", err)
 		}
-
 		//Set toBlock to the last block number for logging purpose
 		var toBlock uint64 = blockNumber
 		if query.ToBlock != nil {

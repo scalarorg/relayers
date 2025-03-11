@@ -14,8 +14,9 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250205093245-57c4541ffbc7
 	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250205093245-57c4541ffbc7
-	github.com/scalarorg/data-models v0.0.0-20250310021952-d2ed8479e81e
+	github.com/scalarorg/data-models v0.0.0-20250311065615-47b0be84cb82
 	github.com/scalarorg/go-electrum v0.1.2-0.20250113074812-84502fb16a1a
+	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250304110552-f6e1193bcc38
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
@@ -44,7 +45,6 @@ require (
 	github.com/ethereum/go-verkle v0.1.1-0.20240829091221-dffa7562dbe9 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
-	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250304110552-f6e1193bcc38 // indirect
 	github.com/supranational/blst v0.3.13 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )

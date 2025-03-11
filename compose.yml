@@ -4,27 +4,16 @@ services:
   relayer-db:
     container_name: relayer-db
     hostname: relayer-db
-    image: postgres:14.9-alpine3.18
+    image: timescale/timescaledb:latest-pg17
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-relayer}
     volumes:
-      - ./runtime/db:/var/lib/postgresql/data
+      - relayer-db:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     restart: always
 
-  relayer-app:
-    container_name: relayer-app
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: "scalarorg/relayer"
-    env_file:
-      - .env
-    environment:
-      - APP_NAME=relayer
-    volumes:
-      - ./data/local:/app/data
-    restart: unless-stopped
+volumes:
+  relayer-db:

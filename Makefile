@@ -7,7 +7,7 @@ DOCKER := $(shell which docker)
 DOCKER_BUF := $(DOCKER) run --rm -v $(CURDIR):/workspace --workdir /workspace bufbuild/buf
 HTTPS_GIT := https://github.com/scalarorg/relayers.git
 PUSH_DOCKER_IMAGE := true
-#LIB_DIR := $(shell pwd)/lib
+LIB_DIR := $(shell pwd)/lib
 #LIBRARY_PATH := $(shell pwd)/../bitcoin-vault/target/release
 
 # Default values that can be overridden by the caller via `make VAR=value [target]`
@@ -110,7 +110,10 @@ build-binaries-in-docker:  guard-SEMVER
 # Build the project with debug flags
 .PHONY: debug
 debug:  go.sum
-		go build -o ./bin/relayer -mod=readonly $(BUILD_FLAGS) -gcflags="all=-N -l" ./main.go
+		CGO_LDFLAGS="-L$(LIB_DIR) -lbitcoin_vault_ffi" CGO_CFLAGS="-I$(LIB_DIR)" go build -o ./bin/relayer -mod=readonly $(BUILD_FLAGS) -gcflags="all=-N -l" ./main.go
+		./bin/relayer
+
+
 
 # Build a test image
 .PHONY: docker-image-test
@@ -182,9 +185,11 @@ test:
 		CGO_LDFLAGS="-L$(LIB_DIR) -lbitcoin_vault_ffi" CGO_CFLAGS="-I$(LIB_DIR)" go test ./... -v -cover -count=1; \
 	fi
 
+.PHONY: clean
 clean:
-	rm -rf $(LIB_DIR)/*
+	rm -rf ./lib
 
+.PHONY: lib
 lib:
-	@mkdir -p $(LIB_DIR)
-	@cp $(LIBRARY_PATH)/libbitcoin_vault_ffi.* $(LIB_DIR)
+	@mkdir -p lib 
+	@cp ../bitcoin-vault/target/release/libbitcoin_vault_ffi.* lib 
