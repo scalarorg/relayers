@@ -69,6 +69,7 @@ func DecodeInput(input []byte) (*DecodedExecuteData, error) {
 	log.Debug().
 		Uint64("chainId", dataDecoded[0].(*big.Int).Uint64()).
 		Strs("commands", dataDecoded[2].([]string)).
+		Int("NumberOfCommands", len(dataDecoded[2].([]string))).
 		Msg("[EvmClient] [DecodeInput]")
 	//Decode the proof
 	proofDecoded, err := AbiUnpack(args[1].([]byte), "address[]", "uint256[]", "uint256", "bytes[]")

@@ -163,15 +163,6 @@ func (c *Broadcaster) CreatePendingTransfersRequest(chain string) error {
 	}
 	return c.QueueTxMsg(&req)
 }
-func (b *Broadcaster) pushFailedMsgBackToBuffer(msgs []types.Msg) error {
-	b.mutex.Lock()
-	b.txBuffers = append(msgs, b.txBuffers...)
-	b.mutex.Unlock()
-	log.Info().
-		Int("remain_buffer_size", len(b.txBuffers)).
-		Msg("[Broadcaster] Waiting for next broadcasting")
-	return nil
-}
 
 // try broadcast fist messages in the buffer
 func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
@@ -183,13 +174,7 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 	})
 	b.signCommandReqs.Clear()
 	b.mutex.Lock()
-	if len(b.txBuffers) > b.batchSize {
-		txMsgs = b.txBuffers[:b.batchSize]
-		b.txBuffers = b.txBuffers[b.batchSize:]
-	} else {
-		txMsgs = b.txBuffers
-		b.txBuffers = nil
-	}
+	txMsgs = b.txBuffers
 	b.mutex.Unlock()
 	if len(txMsgs) == 0 && len(signCommandReqs) == 0 {
 		if b.cycleCount >= 1000 {
@@ -202,16 +187,16 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 	}
 	//Broadcast txMsgs
 	if len(txMsgs) > 0 {
-		resp, err := b.network.SignAndBroadcastMsgs(ctx, txMsgs...)
-		if err != nil {
-			log.Error().Err(err).Msgf("[Broadcaster] Failed to broadcast %d messages", len(txMsgs))
-			b.pushFailedMsgBackToBuffer(txMsgs)
-			return err
-		} else if resp.Code == 0 {
-			log.Debug().
-				Int("msg_count", len(txMsgs)).
-				Str("tx_hash", resp.TxHash).
-				Msgf("[Broadcaster] Successfully broadcasted %d messages", len(txMsgs))
+		log.Debug().Msgf("[Broadcaster] [broadcastMsgs] broadcasting %d messages", len(txMsgs))
+		for _, msg := range txMsgs {
+			resp, err := b.network.SignAndBroadcastMsgs(ctx, msg)
+			if err != nil {
+				log.Error().Err(err).Msgf("[Broadcaster] Failed to broadcast message %++v", msg)
+			} else if resp.Code == 0 {
+				log.Debug().
+					Str("tx_hash", resp.TxHash).
+					Msgf("[Broadcaster] Successfully broadcasted message %++v", msg)
+			}
 		}
 	}
 	//Broadcast signCommandReqs
