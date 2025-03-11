@@ -84,7 +84,7 @@ func SetupTestDB(busEventChan chan *events.EventEnvelope, receiverChanBufSize in
 	}
 
 	// Auto migrate the schema
-	err = db.AutoMigrate(postgresDb)
+	err = db.RunMigrations(postgresDb)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -61,6 +61,7 @@ func (c *BtcClient) CreatePsbts(psbtParams types.PsbtParams, outpoints []types.C
 			Script: psbtParams.CustodianScript,
 		})
 	}
+
 	mapUtxos[uint64(utils.MinimumFee)] = prevUtxos
 	for feeOpts, outpoints := range mapOutpoints {
 		psbt, err := vault.BuildCustodianOnlyUnstakingTx(
