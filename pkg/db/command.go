@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
@@ -11,57 +12,69 @@ import (
 	"gorm.io/gorm"
 )
 
-func (db *DatabaseAdapter) SaveCommands(commands []*scalarnet.Command) error {
+const (
+	defaultBatchSize = 1000
+	maxBatchSize     = 5000
+)
+
+type BatchOption struct {
+	BatchSize int
+}
+
+func (db *DatabaseAdapter) SaveCommands(commands []*scalarnet.Command, opts ...BatchOption) error {
+	batchSize := defaultBatchSize
+	if len(opts) > 0 && opts[0].BatchSize > 0 {
+		batchSize = opts[0].BatchSize
+		if batchSize > maxBatchSize {
+			batchSize = maxBatchSize
+		}
+	}
+
 	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
-		// for _, command := range commands {
-		// 	err := tx.Clauses(clause.OnConflict{
-		// 		Columns: []clause.Column{{Name: "command_id"}},
-		// 		DoUpdates: clause.Assignments(map[string]interface{}{
-		// 			"batch_command_id": command.BatchCommandID,
-		// 			"command_type":     command.CommandType,
-		// 			"key_id":           command.KeyID,
-		// 			"params":           command.Params,
-		// 			"chain_id":         command.ChainID,
-		// 		}),
-		// 	}).Create(command).Error
-		// 	if err != nil {
-		// 		return fmt.Errorf("[DatabaseAdapter] failed to save command: %w", err)
-		// 	}
-		// }
-		//1. Try get all stored command by commandIds
-		commandIds := make([]string, len(commands))
-		for _, command := range commands {
-			commandIds = append(commandIds, command.CommandID)
+		existingCmds := make(map[string]*scalarnet.Command)
+		var existingIDs []string
+
+		for _, cmd := range commands {
+			existingIDs = append(existingIDs, cmd.CommandID)
 		}
-		storedCommands := make([]*scalarnet.Command, len(commandIds))
-		err := tx.Where("command_id IN (?)", commandIds).Find(&storedCommands).Error
-		if err != nil {
-			return fmt.Errorf("[DatabaseAdapter] failed to get stored commands: %w", err)
+
+		if len(existingIDs) > 0 {
+			var found []*scalarnet.Command
+			if err := tx.Where("command_id IN ?", existingIDs).Find(&found).Error; err != nil {
+				return fmt.Errorf("[DatabaseAdapter] failed to query existing commands: %w", err)
+			}
+
+			for _, cmd := range found {
+				existingCmds[cmd.CommandID] = cmd
+			}
 		}
-		storedCommandMap := make(map[string]*scalarnet.Command)
-		for _, command := range storedCommands {
-			storedCommandMap[command.CommandID] = command
-		}
-		for _, command := range commands {
-			_, ok := storedCommandMap[command.CommandID]
-			if !ok {
-				err := tx.Create(command).Error
-				if err != nil {
-					tx.Logger.Error(context.Background(), fmt.Sprintf("[DatabaseAdapter] failed to save command: %s", command.CommandID))
+
+		for _, cmd := range commands {
+			if existing, exists := existingCmds[cmd.CommandID]; exists {
+				cmd.CreatedAt = existing.CreatedAt
+
+				if err := tx.Model(&scalarnet.Command{}).
+					Where("command_id = ?", cmd.CommandID).
+					Updates(map[string]interface{}{
+						"batch_command_id": cmd.BatchCommandID,
+						"command_type":     cmd.CommandType,
+						"key_id":           cmd.KeyID,
+						"params":           cmd.Params,
+						"chain_id":         cmd.ChainID,
+						"payload":          cmd.Payload,
+						"status":           cmd.Status,
+						"executed_tx_hash": cmd.ExecutedTxHash,
+						"updated_at":       time.Now(),
+					}).Error; err != nil {
+					return fmt.Errorf("[DatabaseAdapter] failed to update existing command: %w", err)
 				}
 			} else {
-				err := tx.Model(&scalarnet.Command{}).Where("command_id = ?", command.CommandID).Updates(map[string]interface{}{
-					"batch_command_id": command.BatchCommandID,
-					"command_type":     command.CommandType,
-					"key_id":           command.KeyID,
-					"params":           command.Params,
-					"chain_id":         command.ChainID,
-				}).Error
-				if err != nil {
-					tx.Logger.Error(context.Background(), fmt.Sprintf("[DatabaseAdapter] failed to update command: %s", command.CommandID))
+				if err := tx.Create(cmd).Error; err != nil {
+					return fmt.Errorf("[DatabaseAdapter] failed to create new command: %w", err)
 				}
 			}
 		}
+
 		return nil
 	})
 }
