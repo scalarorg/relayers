@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
@@ -21,7 +22,6 @@ type BatchOption struct {
 }
 
 func (db *DatabaseAdapter) SaveCommands(commands []*scalarnet.Command, opts ...BatchOption) error {
-	// Determine batch size
 	batchSize := defaultBatchSize
 	if len(opts) > 0 && opts[0].BatchSize > 0 {
 		batchSize = opts[0].BatchSize
@@ -31,20 +31,50 @@ func (db *DatabaseAdapter) SaveCommands(commands []*scalarnet.Command, opts ...B
 	}
 
 	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
-		err := tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "command_id"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{
-				"batch_command_id": gorm.Expr("EXCLUDED.batch_command_id"),
-				"command_type":     gorm.Expr("EXCLUDED.command_type"),
-				"key_id":           gorm.Expr("EXCLUDED.key_id"),
-				"params":           gorm.Expr("EXCLUDED.params"),
-				"chain_id":         gorm.Expr("EXCLUDED.chain_id"),
-			}),
-		}).CreateInBatches(commands, batchSize).Error
+		existingCmds := make(map[string]*scalarnet.Command)
+		var existingIDs []string
 
-		if err != nil {
-			return fmt.Errorf("[DatabaseAdapter] failed to batch save commands: %w", err)
+		for _, cmd := range commands {
+			existingIDs = append(existingIDs, cmd.CommandID)
 		}
+
+		if len(existingIDs) > 0 {
+			var found []*scalarnet.Command
+			if err := tx.Where("command_id IN ?", existingIDs).Find(&found).Error; err != nil {
+				return fmt.Errorf("[DatabaseAdapter] failed to query existing commands: %w", err)
+			}
+
+			for _, cmd := range found {
+				existingCmds[cmd.CommandID] = cmd
+			}
+		}
+
+		for _, cmd := range commands {
+			if existing, exists := existingCmds[cmd.CommandID]; exists {
+				cmd.CreatedAt = existing.CreatedAt
+
+				if err := tx.Model(&scalarnet.Command{}).
+					Where("command_id = ?", cmd.CommandID).
+					Updates(map[string]interface{}{
+						"batch_command_id": cmd.BatchCommandID,
+						"command_type":     cmd.CommandType,
+						"key_id":           cmd.KeyID,
+						"params":           cmd.Params,
+						"chain_id":         cmd.ChainID,
+						"payload":          cmd.Payload,
+						"status":           cmd.Status,
+						"executed_tx_hash": cmd.ExecutedTxHash,
+						"updated_at":       time.Now(),
+					}).Error; err != nil {
+					return fmt.Errorf("[DatabaseAdapter] failed to update existing command: %w", err)
+				}
+			} else {
+				if err := tx.Create(cmd).Error; err != nil {
+					return fmt.Errorf("[DatabaseAdapter] failed to create new command: %w", err)
+				}
+			}
+		}
+
 		return nil
 	})
 }
