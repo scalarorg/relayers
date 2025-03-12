@@ -27,6 +27,10 @@ var (
 func (c *EvmClient) AppendLogs(logs []types.Log) {
 	c.missingLogs.AppendLogs(logs)
 }
+func (c *EvmClient) FinishRecover(blockNumber uint64) {
+	c.missingLogs.SetRecovered(true)
+	log.Info().Str("Chain", c.EvmConfig.ID).Uint64("BlockNumber", blockNumber).Msg("[EvmClient] [FinishRecover] recovered all events")
+}
 
 // Go routine for process missing logs
 func (c *EvmClient) ProcessMissingLogs() {
@@ -35,7 +39,7 @@ func (c *EvmClient) ProcessMissingLogs() {
 		events[event.ID.String()] = event
 	}
 	for !c.missingLogs.IsRecovered() {
-		logs := c.missingLogs.GetLogs(100)
+		logs := c.missingLogs.GetLogs(10)
 		for _, txLog := range logs {
 			topic := txLog.Topics[0].String()
 			event, ok := events[topic]
@@ -52,6 +56,7 @@ func (c *EvmClient) ProcessMissingLogs() {
 			}
 		}
 	}
+	log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] finished processing all missing evm events")
 }
 func (c *EvmClient) RecoverAllEvents(ctx context.Context) error {
 	log.Info().Str("Chain", c.EvmConfig.ID).Any("events", ALL_EVENTS).Msg("[EvmClient] [RecoverAllEvents] recovering all events")
@@ -115,7 +120,7 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string) erro
 			toBlock = query.ToBlock.Uint64()
 		}
 		if len(logs) > 0 {
-			log.Info().Msgf("[EvmClient] [RecoverEvents] found %d logs, fromBlock: %d, toBlock: %d", len(logs), fromBlock, toBlock)
+			log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverEvents] found %d logs, fromBlock: %d, toBlock: %d", len(logs), fromBlock, toBlock)
 			c.AppendLogs(logs)
 			if c.dbAdapter != nil {
 				c.UpdateLastCheckPoint(events, logs, toBlock)
@@ -132,7 +137,7 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string) erro
 		//Set fromBlock to the next block number for next iteration
 		fromBlock = toBlock + 1
 	}
-	log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverEvents] recovered all events toBlock: %d", blockNumber)
+	c.FinishRecover(blockNumber)
 	return nil
 }
 

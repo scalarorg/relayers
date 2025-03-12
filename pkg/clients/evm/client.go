@@ -116,8 +116,8 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		auth:           auth,
 		dbAdapter:      dbAdapter,
 		eventBus:       eventBus,
-		// pendingTxs:     pending.PendingTxs{},
-		retryInterval: RETRY_INTERVAL,
+		missingLogs:    MissingLogs{},
+		retryInterval:  RETRY_INTERVAL,
 	}
 
 	return evmClient, nil
@@ -151,6 +151,7 @@ func CreateEvmAuth(evmConfig *EvmNetworkConfig) (*bind.TransactOpts, error) {
 }
 func (ec *EvmClient) gatewayExecute(input []byte) (*types.Transaction, error) {
 	//ec.auth.NoSend = false
+	log.Info().Bool("NoSend", ec.auth.NoSend).Msgf("[EvmClient] [gatewayExecute] sending transaction")
 	signedTx, err := ec.Gateway.Execute(ec.auth, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send transaction: %w", err)
