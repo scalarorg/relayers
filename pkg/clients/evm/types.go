@@ -115,6 +115,9 @@ func (m *MissingLogs) GetLogs(count int) []ethTypes.Log {
 		logs := m.logs
 		m.logs = []ethTypes.Log{}
 		return logs
+	} else {
+		logs := m.logs[:count]
+		m.logs = m.logs[count:]
+		return logs
 	}
-	return m.logs[:count]
 }

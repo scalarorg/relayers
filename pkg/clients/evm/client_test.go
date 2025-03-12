@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -44,15 +45,16 @@ var (
 	evmUserPrivKey   string
 	evmUserAddress   string
 	sepoliaConfig    *evm.EvmNetworkConfig = &evm.EvmNetworkConfig{
-		ChainID:    11155111,
-		ID:         CHAIN_ID_SEPOLIA,
-		Name:       "Ethereum sepolia",
-		RPCUrl:     "wss://eth-sepolia.g.alchemy.com/v2/nNbspp-yjKP9GtAcdKi8xcLnBTptR2Zx",
-		Gateway:    "0x842C080EE1399addb76830CFe21D41e47aaaf57e",
+		ChainID: 11155111,
+		ID:      CHAIN_ID_SEPOLIA,
+		Name:    "Ethereum sepolia",
+		RPCUrl:  "wss://eth-sepolia.g.alchemy.com/v2/nNbspp-yjKP9GtAcdKi8xcLnBTptR2Zx",
+		//Gateway:    "0x842C080EE1399addb76830CFe21D41e47aaaf57e",
+		Gateway:    "0xD8DE1B2e8EcC56Ed32CdcAcD088a28490BCA367C",
 		PrivateKey: "",
 		Finality:   1,
 		BlockTime:  time.Second * 12,
-		LastBlock:  7121800,
+		LastBlock:  7458561,
 		GasLimit:   300000,
 	}
 	bnbConfig *evm.EvmNetworkConfig = &evm.EvmNetworkConfig{
@@ -116,12 +118,39 @@ func createEVMClient(key string) (*ethclient.Client, error) {
 }
 
 func TestSepoliaRecoverEvents(t *testing.T) {
-	bnbClient, err := evm.NewEvmClient(&globalConfig, bnbConfig, nil, nil, nil)
+	sepoliaClient, err := evm.NewEvmClient(&globalConfig, sepoliaConfig, nil, nil, nil)
 	if err != nil {
 		log.Error().Msgf("failed to create evm client: %v", err)
 	}
-	err = bnbClient.RecoverAllEvents(context.Background())
+	//Log missing logs
+	go func() {
+		scalarGatewayAbi, _ := contracts.IScalarGatewayMetaData.GetAbi()
+		events := map[string]abi.Event{}
+		for _, event := range scalarGatewayAbi.Events {
+			events[event.ID.String()] = event
+		}
+		for !sepoliaClient.MissingLogs.IsRecovered() {
+			logs := sepoliaClient.MissingLogs.GetLogs(10)
+			for _, txLog := range logs {
+				topic := txLog.Topics[0].String()
+				event, ok := events[topic]
+				if !ok {
+					log.Error().Str("topic", topic).Any("txLog", txLog).Msg("[EvmClient] [ProcessMissingLogs] event not found")
+					continue
+				}
+				log.Debug().
+					Str("chainId", sepoliaClient.EvmConfig.GetId()).
+					Str("eventName", event.Name).
+					Str("txHash", txLog.TxHash.String()).
+					Msg("[EvmClient] [ProcessMissingLogs] processing missing event")
+			}
+		}
+		log.Info().Str("Chain", sepoliaClient.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] finished processing all missing evm events")
+
+	}()
+	err = sepoliaClient.RecoverAllEvents(context.Background())
 	require.NoError(t, err)
+	select {}
 }
 
 func TestBnbRecoverEvents(t *testing.T) {

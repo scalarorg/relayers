@@ -25,11 +25,7 @@ var (
 )
 
 func (c *EvmClient) AppendLogs(logs []types.Log) {
-	c.missingLogs.AppendLogs(logs)
-}
-func (c *EvmClient) FinishRecover(blockNumber uint64) {
-	c.missingLogs.SetRecovered(true)
-	log.Info().Str("Chain", c.EvmConfig.ID).Uint64("BlockNumber", blockNumber).Msg("[EvmClient] [FinishRecover] recovered all events")
+	c.MissingLogs.AppendLogs(logs)
 }
 
 // Go routine for process missing logs
@@ -38,8 +34,8 @@ func (c *EvmClient) ProcessMissingLogs() {
 	for _, event := range scalarGatewayAbi.Events {
 		events[event.ID.String()] = event
 	}
-	for !c.missingLogs.IsRecovered() {
-		logs := c.missingLogs.GetLogs(10)
+	for !c.MissingLogs.IsRecovered() {
+		logs := c.MissingLogs.GetLogs(10)
 		for _, txLog := range logs {
 			topic := txLog.Topics[0].String()
 			event, ok := events[topic]
@@ -47,9 +43,11 @@ func (c *EvmClient) ProcessMissingLogs() {
 				log.Error().Str("topic", topic).Any("txLog", txLog).Msg("[EvmClient] [ProcessMissingLogs] event not found")
 				continue
 			}
-			log.Debug().Str("eventName", event.Name).
+			log.Debug().
+				Str("chainId", c.EvmConfig.GetId()).
+				Str("eventName", event.Name).
 				Str("txHash", txLog.TxHash.String()).
-				Msg("[EvmClient] [RecoverEvent] start handling missing event")
+				Msg("[EvmClient] [ProcessMissingLogs] start processing missing event")
 			err := c.handleEventLog(event, txLog)
 			if err != nil {
 				log.Error().Err(err).Msg("[EvmClient] [ProcessMissingLogs] failed to handle event log")
@@ -101,6 +99,7 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string) erro
 	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < 100000 {
 		recoverRange = c.EvmConfig.RecoverRange
 	}
+	logCounter := 0
 	for fromBlock < blockNumber {
 		query := ethereum.FilterQuery{
 			FromBlock: big.NewInt(int64(fromBlock)),
@@ -122,6 +121,7 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string) erro
 		if len(logs) > 0 {
 			log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverEvents] found %d logs, fromBlock: %d, toBlock: %d", len(logs), fromBlock, toBlock)
 			c.AppendLogs(logs)
+			logCounter += len(logs)
 			if c.dbAdapter != nil {
 				c.UpdateLastCheckPoint(events, logs, toBlock)
 			}
@@ -137,7 +137,12 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string) erro
 		//Set fromBlock to the next block number for next iteration
 		fromBlock = toBlock + 1
 	}
-	c.FinishRecover(blockNumber)
+	c.MissingLogs.SetRecovered(true)
+	log.Info().
+		Str("Chain", c.EvmConfig.ID).
+		Uint64("BlockNumber", blockNumber).
+		Int("TotalLogs", logCounter).
+		Msg("[EvmClient] [FinishRecover] recovered all events")
 	return nil
 }
 

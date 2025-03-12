@@ -84,9 +84,13 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 
 	}
 	err = db.PostgresClient.Transaction(func(tx *gorm.DB) error {
-		result := tx.Save(cmdExecuted)
-		if result.Error != nil {
-			return result.Error
+		storedCmdExecuted := chains.CommandExecuted{}
+		err = tx.Where("command_id = ?", cmdExecuted.CommandID).First(&storedCmdExecuted).Error
+		if err != nil {
+			result := tx.Save(cmdExecuted)
+			if result.Error != nil {
+				return result.Error
+			}
 		}
 
 		//Update or create Command record
@@ -118,10 +122,6 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 			})
 		}
 
-		if result.Error != nil {
-			return fmt.Errorf("failed to update last event check point: %w", result.Error)
-		}
-
 		//The eventId is empty only when we restart whole system from beginning
 		if eventId != "" && command != nil {
 			switch command.Type {
@@ -134,7 +134,7 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create Single value with checkpoint: %w", err)
+		return fmt.Errorf("failed to save command executed: %w", err)
 	}
 	return nil
 }

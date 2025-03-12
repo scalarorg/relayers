@@ -37,7 +37,7 @@ type EvmClient struct {
 	auth           *bind.TransactOpts
 	dbAdapter      *db.DatabaseAdapter
 	eventBus       *events.EventBus
-	missingLogs    MissingLogs
+	MissingLogs    MissingLogs
 	// pendingTxs     pending.PendingTxs //Transactions sent to Gateway for approval, waiting for event from EVM chain.
 	retryInterval time.Duration
 }
@@ -116,7 +116,7 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		auth:           auth,
 		dbAdapter:      dbAdapter,
 		eventBus:       eventBus,
-		missingLogs:    MissingLogs{},
+		MissingLogs:    MissingLogs{},
 		retryInterval:  RETRY_INTERVAL,
 	}
 
@@ -337,7 +337,9 @@ func RecoverEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context, eventName 
 		}
 		//Process the missing events
 		for _, event := range missingEvents {
-			log.Debug().Str("eventName", eventName).
+			log.Debug().
+				Str("chainId", c.EvmConfig.GetId()).
+				Str("eventName", eventName).
 				Str("txHash", event.Hash).
 				Msg("[EvmClient] [RecoverEvent] start handling missing event")
 			err := handleEvent(c, eventName, event.Args)
