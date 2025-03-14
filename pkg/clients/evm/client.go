@@ -428,6 +428,9 @@ func (c *EvmClient) ListenToEvents(ctx context.Context) error {
 		name  string
 		watch func(context.Context) error
 	}{
+		// {events.EVENT_EVM_CONTRACT_CALL, func(ctx context.Context) error {
+		// 	return WatchForEvent[*contracts.IScalarGatewayContractCall](c, ctx, events.EVENT_EVM_CONTRACT_CALL)
+		// }},
 		{events.EVENT_EVM_TOKEN_SENT, func(ctx context.Context) error {
 			return WatchForEvent[*contracts.IScalarGatewayTokenSent](c, ctx, events.EVENT_EVM_TOKEN_SENT)
 		}},
@@ -439,6 +442,9 @@ func (c *EvmClient) ListenToEvents(ctx context.Context) error {
 		}},
 		{events.EVENT_EVM_COMMAND_EXECUTED, func(ctx context.Context) error {
 			return WatchForEvent[*contracts.IScalarGatewayExecuted](c, ctx, events.EVENT_EVM_COMMAND_EXECUTED)
+		}},
+		{events.EVENT_EVM_TOKEN_DEPLOYED, func(ctx context.Context) error {
+			return WatchForEvent[*contracts.IScalarGatewayTokenDeployed](c, ctx, events.EVENT_EVM_TOKEN_DEPLOYED)
 		}},
 	}
 
@@ -462,7 +468,8 @@ type ValidWatchEvent interface {
 		*contracts.IScalarGatewayContractCallWithToken |
 		// *contracts.IScalarGatewayContractCall |
 		*contracts.IScalarGatewayContractCallApproved |
-		*contracts.IScalarGatewayExecuted
+		*contracts.IScalarGatewayExecuted |
+		*contracts.IScalarGatewayTokenDeployed
 }
 
 const (
@@ -592,6 +599,11 @@ func handleEvent(c *EvmClient, eventName string, event any) error {
 			return c.HandleCommandExecuted(evt)
 		}
 		return fmt.Errorf("cannot parse event %s: %T to %T", eventName, event, (*contracts.IScalarGatewayExecuted)(nil))
+	case events.EVENT_EVM_TOKEN_DEPLOYED:
+		if evt, ok := event.(*contracts.IScalarGatewayTokenDeployed); ok {
+			return c.HandleTokenDeployed(evt)
+		}
+		return fmt.Errorf("cannot parse event %s: %T to %T", eventName, event, (*contracts.IScalarGatewayTokenDeployed)(nil))
 	}
 	return fmt.Errorf("invalid event type for %s: %T", eventName, event)
 }
@@ -637,6 +649,15 @@ func (c *EvmClient) handleEventLog(event abi.Event, txLog types.Log) error {
 			return fmt.Errorf("failed to parse event %s: %w", event.Name, err)
 		}
 		return c.HandleCommandExecuted(executed)
+	case events.EVENT_EVM_TOKEN_DEPLOYED:
+		tokenDeployed := &contracts.IScalarGatewayTokenDeployed{
+			Raw: txLog,
+		}
+		err := parser.ParseEventData(&txLog, event.Name, tokenDeployed)
+		if err != nil {
+			return fmt.Errorf("failed to parse event %s: %w", event.Name, err)
+		}
+		return c.HandleTokenDeployed(tokenDeployed)
 	default:
 		return fmt.Errorf("invalid event type for %s: %T", event.Name, txLog)
 	}

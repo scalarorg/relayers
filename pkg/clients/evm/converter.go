@@ -151,3 +151,14 @@ func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IScalarGatewayEx
 	}
 	return cmdExecuted
 }
+
+func (c *EvmClient) TokenDeployedEvent2Model(event *contracts.IScalarGatewayTokenDeployed) chains.TokenDeployed {
+	tokenDeployed := chains.TokenDeployed{
+		Chain:        c.EvmConfig.GetId(),
+		BlockNumber:  uint64(event.Raw.BlockNumber),
+		TxHash:       event.Raw.TxHash.String(),
+		Symbol:       event.Symbol,
+		TokenAddress: event.TokenAddresses.String(),
+	}
+	return tokenDeployed
+}

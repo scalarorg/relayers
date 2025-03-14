@@ -19,6 +19,7 @@ const (
 	EVENT_EVM_CONTRACT_CALL_WITH_TOKEN   = "ContractCallWithToken"
 	EVENT_EVM_TOKEN_SENT                 = "TokenSent"
 	EVENT_EVM_COMMAND_EXECUTED           = "Executed"
+	EVENT_EVM_TOKEN_DEPLOYED             = "TokenDeployed"
 )
 
 type EventEnvelope struct {
