@@ -112,3 +112,11 @@ func (db *DatabaseAdapter) UpdateTokenSentsStatus(ctx context.Context, cmdIds []
 	})
 	return err
 }
+
+func (db *DatabaseAdapter) SaveTokenDeployed(tokenDeployed *chains.TokenDeployed) error {
+	result := db.PostgresClient.Save(tokenDeployed)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}

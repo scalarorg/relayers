@@ -2,6 +2,7 @@ package scalar
 
 import (
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
 )
@@ -13,6 +14,8 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 		return c.requestConfirmBtcTxs(event.Data.(events.ConfirmTxsRequest))
 	case events.EVENT_EVM_TOKEN_SENT, events.EVENT_EVM_CONTRACT_CALL, events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN:
 		return c.requestConfirmEvmTxs(event.Data.(events.ConfirmTxsRequest))
+	case events.EVENT_EVM_TOKEN_DEPLOYED:
+		return c.requestConfirmTokenDeployed(event.Data.(*chains.TokenDeployed))
 	case events.EVENT_BTC_PSBT_SIGN_REQUEST:
 		return c.requestPsbtSign(event.Data.(types.SignPsbtsRequest))
 	}
@@ -72,4 +75,14 @@ func (c *Client) extractValidConfirmTxs(confirmRequest events.ConfirmTxsRequest)
 		// }
 	}
 	return confirmRequest.ChainName, txHashes
+}
+
+func (c *Client) requestConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed) error {
+	log.Debug().
+		Str("TxHash", tokenDeployed.TxHash).
+		Str("TokenAddress", tokenDeployed.TokenAddress).
+		Str("Symbol", tokenDeployed.Symbol).
+		Msgf("[ScalarClient] [requestConfirmTokenDeployed] Confirm token deployed")
+	c.broadcaster.ConfirmTokenDeployed(tokenDeployed)
+	return nil
 }

@@ -346,6 +346,28 @@ func (ec *EvmClient) preprocessCommandExecuted(event *contracts.IScalarGatewayEx
 	return nil
 }
 
+func (ec *EvmClient) HandleTokenDeployed(event *contracts.IScalarGatewayTokenDeployed) error {
+	//0. Preprocess the event
+	log.Info().Any("event", event).Msg("[EvmClient] [HandleTokenDeployed] Start processing evm token deployed")
+	//1. Convert into a RelayData instance then store to the db
+	tokenDeployed := ec.TokenDeployedEvent2Model(event)
+	err := ec.dbAdapter.SaveTokenDeployed(&tokenDeployed)
+	if err != nil {
+		return fmt.Errorf("failed to create evm token deployed: %w", err)
+	}
+	//2. Send to the bus
+	if ec.eventBus != nil {
+		ec.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_EVM_TOKEN_DEPLOYED,
+			DestinationChain: events.SCALAR_NETWORK_NAME,
+			Data:             &tokenDeployed,
+		})
+	} else {
+		log.Warn().Msg("[EvmClient] [HandleTokenDeployed] event bus is undefined")
+	}
+	return nil
+}
+
 func (ec *EvmClient) ExecuteDestinationCall(
 	contractAddress common.Address,
 	commandId [32]byte,

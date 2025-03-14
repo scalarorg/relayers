@@ -9,6 +9,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/scalarorg/scalar-core/utils"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
@@ -121,6 +122,19 @@ func (c *Broadcaster) AddSignEvmCommandsRequest(destinationChain string) error {
 		c.network.GetAddress(),
 		destinationChain)
 	return c.QueueSignCommandReq(destinationChain, req)
+}
+
+func (c *Broadcaster) ConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed) error {
+	log.Debug().Str("TxHash", tokenDeployed.TxHash).
+		Str("TokenAddress", tokenDeployed.TokenAddress).Msgf("[Broadcaster] [ConfirmTokenDeployed] Confirm token deployed")
+	msg := chainstypes.NewConfirmTokenRequest(c.network.GetAddress(),
+		tokenDeployed.TxHash,
+		chainstypes.Asset{
+			Chain:  nexus.ChainName(tokenDeployed.Chain),
+			Symbol: tokenDeployed.Symbol,
+		},
+		common.HexToHash(tokenDeployed.TxHash))
+	return c.QueueTxMsg(msg)
 }
 
 // Add SignPsbtCommandsRequest to buffer
