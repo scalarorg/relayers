@@ -12,10 +12,18 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 	case events.EVENT_ELECTRS_VAULT_TRANSACTION:
 		//Broadcast from electrs.handleVaultTransaction
 		return c.requestConfirmBtcTxs(event.Data.(events.ConfirmTxsRequest))
+	case events.EVENT_ELECTRS_REDEEM_TRANSACTION:
+		//Broadcast from electrs.handleRedeemTransaction
+		return c.broadcaster.NewRedeemTransaction(event.Data.(events.ConfirmRedeemTxRequest))
+	case events.EVENT_ELECTRS_NEW_BLOCK:
+		//Broadcast from electrs.handleNewBridgeTokenSent
+		return c.broadcaster.NewBtcBlock(event.Data.(events.ChainBlockHeight))
 	case events.EVENT_EVM_TOKEN_SENT, events.EVENT_EVM_CONTRACT_CALL, events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN:
 		return c.requestConfirmEvmTxs(event.Data.(events.ConfirmTxsRequest))
 	case events.EVENT_EVM_TOKEN_DEPLOYED:
 		return c.requestConfirmTokenDeployed(event.Data.(*chains.TokenDeployed))
+	case events.EVENT_EVM_SWITCHED_PHASE:
+		return c.requestConfirmSwitchedPhase(event.Data.(*chains.SwitchedPhase))
 	case events.EVENT_BTC_PSBT_SIGN_REQUEST:
 		return c.requestPsbtSign(event.Data.(types.SignPsbtsRequest))
 	}
@@ -84,5 +92,15 @@ func (c *Client) requestConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed
 		Str("Symbol", tokenDeployed.Symbol).
 		Msgf("[ScalarClient] [requestConfirmTokenDeployed] Confirm token deployed")
 	c.broadcaster.ConfirmTokenDeployed(tokenDeployed)
+	return nil
+}
+
+func (c *Client) requestConfirmSwitchedPhase(switchedPhase *chains.SwitchedPhase) error {
+	log.Debug().
+		Str("TxHash", switchedPhase.TxHash).
+		Uint64("SessionSequence", switchedPhase.SessionSequence).
+		Uint8("Phase", switchedPhase.Phase).
+		Msgf("[ScalarClient] [requestConfirmSwitchedPhase] Confirm switched phase")
+	c.broadcaster.ConfirmSwitchedPhase(switchedPhase)
 	return nil
 }

@@ -368,6 +368,28 @@ func (ec *EvmClient) HandleTokenDeployed(event *contracts.IScalarGatewayTokenDep
 	return nil
 }
 
+func (ec *EvmClient) HandleSwitchedPhase(event *contracts.IScalarGatewaySwitchedPhase) error {
+	//0. Preprocess the event
+	log.Info().Any("event", event).Msg("[EvmClient] [HandleSwitchedPhase] Start processing evm switched phase")
+	//1. Convert into a RelayData instance then store to the db
+	switchedPhase := ec.SwitchedPhaseEvent2Model(event)
+	err := ec.dbAdapter.SaveSingleValue(&switchedPhase)
+	if err != nil {
+		return fmt.Errorf("failed to create evm switched phase: %w", err)
+	}
+	//2. Send to the bus
+	if ec.eventBus != nil {
+		ec.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_EVM_SWITCHED_PHASE,
+			DestinationChain: events.SCALAR_NETWORK_NAME,
+			Data:             &switchedPhase,
+		})
+	} else {
+		log.Warn().Msg("[EvmClient] [HandleSwitchedPhase] event bus is undefined")
+	}
+	return nil
+}
+
 func (ec *EvmClient) ExecuteDestinationCall(
 	contractAddress common.Address,
 	commandId [32]byte,

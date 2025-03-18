@@ -142,3 +142,16 @@ func DecodeDeployToken(input []byte) (*DeployToken, error) {
 		Msg("[EvmClient] [DecodeDeployToken]")
 	return &deployToken, nil
 }
+
+func DecodeStartedSwitchPhase(input []byte) (*RedeemPhase, error) {
+	dataDecoded, err := AbiUnpack(input, "uint64", "uint8")
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack data: %w", err)
+	}
+	sessionSequence := dataDecoded[0].(*big.Int)
+	phase := dataDecoded[1].(uint8)
+	return &RedeemPhase{
+		Sequence: sessionSequence.Uint64(),
+		Phase:    phase,
+	}, nil
+}

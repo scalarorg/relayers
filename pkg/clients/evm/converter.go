@@ -162,3 +162,14 @@ func (c *EvmClient) TokenDeployedEvent2Model(event *contracts.IScalarGatewayToke
 	}
 	return tokenDeployed
 }
+
+func (c *EvmClient) SwitchedPhaseEvent2Model(event *contracts.IScalarGatewaySwitchedPhase) chains.SwitchedPhase {
+	switchedPhase := chains.SwitchedPhase{
+		Chain:           c.EvmConfig.GetId(),
+		BlockNumber:     uint64(event.Raw.BlockNumber),
+		TxHash:          event.Raw.TxHash.String(),
+		SessionSequence: event.Sequence,
+		Phase:           event.Phase,
+	}
+	return switchedPhase
+}

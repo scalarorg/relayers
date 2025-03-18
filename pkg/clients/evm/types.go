@@ -89,6 +89,11 @@ type DeployToken struct {
 	MintLimit    uint64
 }
 
+type RedeemPhase struct {
+	Sequence uint64
+	Phase    uint8
+}
+
 type MissingLogs struct {
 	mutex     sync.Mutex
 	logs      []ethTypes.Log

@@ -246,9 +246,9 @@ require (
 
 // replace github.com/scalarorg/bitcoin-vault/go-utils => ../bitcoin-vault/go-utils
 
-// replace github.com/scalarorg/scalar-core => ../scalar-core
+replace github.com/scalarorg/scalar-core => ../scalar-core
 
-// replace github.com/scalarorg/data-models => ../data-models
+replace github.com/scalarorg/data-models => ../data-models
 
 // Temporary replacement for rosetta support
 replace github.com/cosmos/cosmos-sdk => github.com/axelarnetwork/cosmos-sdk v0.45.17-0.20240321205000-47c0c80e20ca

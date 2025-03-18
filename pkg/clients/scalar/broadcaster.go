@@ -11,8 +11,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
+	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/scalar-core/utils"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	nexus "github.com/scalarorg/scalar-core/x/nexus/exported"
 )
@@ -116,6 +118,23 @@ func (c *Broadcaster) ConfirmBtcTxs(chainName string, txIds []string) error {
 	return c.QueueTxMsg(msg)
 }
 
+func (c *Broadcaster) NewRedeemTransaction(redeemRequest events.ConfirmRedeemTxRequest) error {
+	//Todo:
+	msg := covtypes.NewConfirmRedeemTxRequest(
+		c.network.GetAddress(),
+		redeemRequest.Chain,
+		redeemRequest.TxHash,
+	)
+	return c.QueueTxMsg(msg)
+}
+func (c *Broadcaster) NewBtcBlock(blockHeight events.ChainBlockHeight) error {
+	msg := covtypes.NewUpdateNewBtcBlockRequest(
+		c.network.GetAddress(),
+		blockHeight.Chain,
+		blockHeight.Height,
+	)
+	return c.QueueTxMsg(msg)
+}
 func (c *Broadcaster) AddSignEvmCommandsRequest(destinationChain string) error {
 	log.Debug().Str("Chain", destinationChain).Msg("[Broadcaster] [AddSignEvmCommandsRequest] Add SignEvmCommandsRequest to buffer")
 	req := chainstypes.NewSignCommandsRequest(
@@ -137,9 +156,21 @@ func (c *Broadcaster) ConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed) 
 	return c.QueueTxMsg(msg)
 }
 
+func (c *Broadcaster) ConfirmSwitchedPhase(switchedPhase *chains.SwitchedPhase) error {
+	log.Debug().Str("TxHash", switchedPhase.TxHash).
+		Uint64("SessionSequence", switchedPhase.SessionSequence).
+		Uint8("Phase", switchedPhase.Phase).Msgf("[Broadcaster] [ConfirmSwitchedPhase] Confirm switched phase")
+	msg := covtypes.NewConfirmSwitchedPhaseRequest(
+		c.network.GetAddress(),
+		switchedPhase.Chain,
+		switchedPhase.TxHash,
+	)
+	return c.QueueTxMsg(msg)
+}
+
 // Add SignPsbtCommandsRequest to buffer
 // Return true if the request is added to buffer, false if the request is already in buffer
-func (c *Broadcaster) AddSignPsbtCommandsRequest(destinationChain string, psbt covtypes.Psbt) error {
+func (c *Broadcaster) AddSignPsbtCommandsRequest(destinationChain string, psbt covExported.Psbt) error {
 	req := chainstypes.NewSignPsbtCommandRequest(
 		c.network.GetAddress(),
 		destinationChain,

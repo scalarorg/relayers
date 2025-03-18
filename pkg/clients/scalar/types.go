@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"sync"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -13,6 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/utils"
 	"github.com/scalarorg/scalar-core/x/chains/types"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	"github.com/scalarorg/scalar-core/x/nexus/exported"
 )
@@ -71,6 +73,8 @@ func UnmarshalJson(jsonData map[string]string, e proto.Message) error {
 		return UnmarshalCommandBatchSigned(jsonData, e)
 	case *types.ChainEventCompleted:
 		return UnmarshalChainEventCompleted(jsonData, e)
+	case *covtypes.SwitchPhaseStarted:
+		return UnmarshalSwitchPhaseStarted(jsonData, e)
 	default:
 		return fmt.Errorf("unsupport type %T", e)
 	}
@@ -115,6 +119,18 @@ func UnmarshalChainEventCompleted(jsonData map[string]string, e *types.ChainEven
 	eventId := utils.NormalizeHash(removeQuote(jsonData["event_id"]))
 	e.EventID = types.EventID(eventId)
 	e.Type = removeQuote(jsonData["type"])
+	return nil
+}
+
+func UnmarshalSwitchPhaseStarted(jsonData map[string]string, e *covtypes.SwitchPhaseStarted) error {
+	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
+	sequence, err := strconv.ParseUint(removeQuote(jsonData["sequence"]), 10, 64)
+	if err != nil {
+		log.Warn().Msgf("Failed to decode sequence: %v, error: %v", jsonData["sequence"], err)
+	}
+	e.Sequence = sequence
+	e.ExecuteData = removeQuote(jsonData["execute_data"])
+	e.Phase = covtypes.Phase(covtypes.Phase_value[removeQuote(jsonData["phase"])])
 	return nil
 }
 
@@ -365,35 +381,35 @@ func (p *PendingCommands) GetAlllBatchCommands() map[string]string {
 	return requests
 }
 
-func (p *PendingCommands) StorePsbt(chain string, psbt covtypes.Psbt) {
+func (p *PendingCommands) StorePsbt(chain string, psbt covExported.Psbt) {
 	p.PsbtsMutex.Lock()
 	defer p.PsbtsMutex.Unlock()
 	pendingPsbt, ok := p.Psbts.Load(chain)
 	if ok {
-		newPsbts := append(pendingPsbt.([]covtypes.Psbt), psbt)
+		newPsbts := append(pendingPsbt.([]covExported.Psbt), psbt)
 		p.Psbts.Store(chain, newPsbts)
 	} else {
-		p.Psbts.Store(chain, []covtypes.Psbt{psbt})
+		p.Psbts.Store(chain, []covExported.Psbt{psbt})
 	}
 }
 
-func (p *PendingCommands) StorePsbts(chain string, psbts []covtypes.Psbt) {
+func (p *PendingCommands) StorePsbts(chain string, psbts []covExported.Psbt) {
 	p.PsbtsMutex.Lock()
 	defer p.PsbtsMutex.Unlock()
 	pendingPsbt, ok := p.Psbts.Load(chain)
 	if ok {
-		newPsbts := append(pendingPsbt.([]covtypes.Psbt), psbts...)
+		newPsbts := append(pendingPsbt.([]covExported.Psbt), psbts...)
 		p.Psbts.Store(chain, newPsbts)
 	} else {
 		p.Psbts.Store(chain, psbts)
 	}
 }
 
-func (p *PendingCommands) RemovePsbt(chain string, psbt covtypes.Psbt) {
+func (p *PendingCommands) RemovePsbt(chain string, psbt covExported.Psbt) {
 	p.PsbtsMutex.Lock()
 	defer p.PsbtsMutex.Unlock()
 	if value, ok := p.Psbts.Load(chain); ok && value != nil {
-		psbts := value.([]covtypes.Psbt)
+		psbts := value.([]covExported.Psbt)
 		if len(psbts) > 0 && bytes.Equal(psbts[0], psbt) {
 			p.Psbts.Store(chain, psbts[1:])
 		}
@@ -404,7 +420,7 @@ func (p *PendingCommands) DeleteFirstPsbt(chain string) {
 	p.PsbtsMutex.Lock()
 	defer p.PsbtsMutex.Unlock()
 	if value, ok := p.Psbts.Load(chain); ok && value != nil {
-		psbts := value.([]covtypes.Psbt)
+		psbts := value.([]covExported.Psbt)
 		if len(psbts) > 0 {
 			p.Psbts.Store(chain, psbts[1:])
 		}
@@ -412,12 +428,12 @@ func (p *PendingCommands) DeleteFirstPsbt(chain string) {
 }
 
 // Get first psbt for each chain
-func (p *PendingCommands) GetFirstPsbts() map[string]covtypes.Psbt {
+func (p *PendingCommands) GetFirstPsbts() map[string]covExported.Psbt {
 	p.PsbtsMutex.Lock()
 	defer p.PsbtsMutex.Unlock()
-	psbts := make(map[string]covtypes.Psbt)
+	psbts := make(map[string]covExported.Psbt)
 	p.Psbts.Range(func(key, value any) bool {
-		psbtList := value.([]covtypes.Psbt)
+		psbtList := value.([]covExported.Psbt)
 		if len(psbtList) > 0 {
 			psbts[key.(string)] = psbtList[0]
 		}

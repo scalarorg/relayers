@@ -9,6 +9,7 @@ import (
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/events"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	covTypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
 
 func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
@@ -45,6 +46,16 @@ func (ec *EvmClient) handleEventBusMessage(event *events.EventEnvelope) error {
 				Err(err).
 				Str("messageId", event.MessageID).
 				Str("eventData", event.Data.(string)).
+				Msg("[EvmClient] [handleEventBusMessage]")
+			return err
+		}
+	case events.EVENT_SCALAR_SWITCH_PHASE_STARTED:
+		//Emitted from scalar.handleStartedSwitchPhaseEvents with event.Data as startedSwitchPhase
+		err := ec.handleStartedSwitchPhase(event.Data.(*covTypes.SwitchPhaseStarted))
+		if err != nil {
+			log.Error().
+				Err(err).
+				Any("eventData", event.Data).
 				Msg("[EvmClient] [handleEventBusMessage]")
 			return err
 		}
@@ -256,5 +267,60 @@ func (ec *EvmClient) observeScalarExecuteData(decodedExecuteData *DecodedExecute
 		Int("inputLength", len(decodedExecuteData.Input)).
 		Strs("commandIds", commandIds).
 		Msg("[EvmClient] [observeScalarExecuteData]")
+	return nil
+}
+
+func (ec *EvmClient) handleStartedSwitchPhase(event *covTypes.SwitchPhaseStarted) error {
+	log.Debug().
+		Str("chain", string(event.Chain)).
+		Uint64("sessionSequence", event.Sequence).
+		Uint8("phase", uint8(event.Phase)).
+		Msg("[EvmClient] [handleStartedSwitchPhase]")
+
+	decodedExecuteData, err := DecodeExecuteData(event.ExecuteData)
+	if err != nil {
+		return fmt.Errorf("failed to decode execute data: %w", err)
+	}
+	redeemPhase, err := DecodeStartedSwitchPhase(decodedExecuteData.Params[0])
+	if err != nil {
+		return fmt.Errorf("failed to decode redeem phase: %w", err)
+	}
+	//Get current phase before call evm tx
+	callOpt, err := ec.CreateCallOpts()
+	if err != nil {
+		return fmt.Errorf("failed to create call opts: %w", err)
+	}
+	currentPhase, err := ec.Gateway.GetSession(callOpt, event.Symbol)
+	if err != nil {
+		log.Error().Err(err).
+			Str("input", hex.EncodeToString(decodedExecuteData.Input)).
+			Str("contractAddress", ec.EvmConfig.Gateway).
+			Str("signer", ec.auth.From.String()).
+			Msg("[EvmClient] [handleStartedSwitchPhase]")
+		return err
+	}
+	if currentPhase.Sequence != redeemPhase.Sequence || currentPhase.Phase != redeemPhase.Phase {
+		log.Debug().
+			Str("chainId", string(event.Chain)).
+			Uint64("Current session sequence", currentPhase.Sequence).
+			Uint8("Current phase", currentPhase.Phase).
+			Msg("[EvmClient] [handleStartedSwitchPhase] current phase on the gatewayis not the same as the payload. Call transaction to update it")
+		signedTx, err := ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
+		if err != nil {
+			log.Error().Err(err).
+				Str("input", hex.EncodeToString(decodedExecuteData.Input)).
+				Str("contractAddress", ec.EvmConfig.Gateway).
+				Str("signer", ec.auth.From.String()).
+				Msg("[EvmClient] [handleStartedSwitchPhase]")
+			return err
+		} else {
+			log.Info().
+				Str("chainId", string(event.Chain)).
+				Uint64("Session sequence", redeemPhase.Sequence).
+				Uint8("phase", redeemPhase.Phase).
+				Str("txHash", signedTx.Hash().String()).
+				Msg("[EvmClient] [handleStartedSwitchPhase] successfully sent start switch phase tx to the network")
+		}
+	}
 	return nil
 }
