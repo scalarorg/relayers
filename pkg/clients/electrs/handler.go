@@ -7,7 +7,6 @@ import (
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/go-electrum/electrum/types"
 	"github.com/scalarorg/relayers/pkg/events"
-	pkgtypes "github.com/scalarorg/relayers/pkg/types"
 )
 
 func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err error) error {
@@ -20,15 +19,46 @@ func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err err
 		return nil
 	}
 	c.currentHeight = header.Height
+
+	err = c.tryConfirmTokenSents(header.Height)
+	if err != nil {
+		log.Error().Err(err).Msg("[ElectrumClient] [BlockchainHeaderHandler] Failed to handle token sents")
+		return fmt.Errorf("failed to handle token sents: %w", err)
+	}
+
+	err = c.tryHandleRedeemsTransaction(header.Height)
+	if err != nil {
+		log.Error().Err(err).Msg("[ElectrumClient] [BlockchainHeaderHandler] Failed to handle redeem transaction")
+		return fmt.Errorf("failed to handle redeem transaction: %w", err)
+	}
+	// if c.eventBus != nil {
+	// 	log.Debug().Msgf("[ElectrumClient] [BlockchainHeaderHandler] Broadcasting new block event: %v", header.Height)
+	// 	blockHeight := events.ChainBlockHeight{
+	// 		Chain:  c.electrumConfig.SourceChain,
+	// 		Height: uint64(header.Height),
+	// 	}
+	// 	c.eventBus.BroadcastEvent(&events.EventEnvelope{
+	// 		EventType:        events.EVENT_ELECTRS_NEW_BLOCK,
+	// 		DestinationChain: events.SCALAR_NETWORK_NAME,
+	// 		Data:             blockHeight,
+	// 	})
+	// } else {
+	// 	log.Warn().Msg("[ElectrumClient] [BlockchainHeaderHandler] event bus is undefined")
+	// }
+	return nil
+}
+
+func (c *Client) tryConfirmTokenSents(blockHeight int) error {
 	// Check pending vault transactions in the relayer db, if the confirmation is enough, send to the event bus
-	lastConfirmedBlockNumber := header.Height - c.electrumConfig.Confirmations + 1
+	lastConfirmedBlockNumber := blockHeight - c.electrumConfig.Confirmations + 1
+
 	tokenSents, err := c.dbAdapter.FindPendingBtcTokenSent(c.electrumConfig.SourceChain, lastConfirmedBlockNumber)
 	if err != nil {
-		log.Error().Err(err).Msg("[ElectrumClient] [BlockchainHeaderHandler] Failed to get pending vault transactions from db")
+		log.Error().Err(err).Msg("[ElectrumClient] [tryConfirmTokenSents] Failed to get pending vault transactions from db")
 		return fmt.Errorf("failed to get pending vault transactions from db: %w", err)
 	}
 	if len(tokenSents) == 0 {
-		log.Debug().Msgf("[ElectrumClient] [BlockchainHeaderHandler] No pending vault transactions with %d confirmations found", c.electrumConfig.Confirmations)
+		log.Debug().Msgf("[ElectrumClient] [tryConfirmTokenSents] No pending vault transactions with %d confirmations found", c.electrumConfig.Confirmations)
 		return nil
 	}
 	confirmTxs := events.ConfirmTxsRequest{
@@ -40,16 +70,58 @@ func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err err
 		tokenSent.Status = chains.TokenSentStatusVerifying
 		confirmTxs.TxHashs[tokenSent.TxHash] = tokenSent.DestinationChain
 	}
-	c.dbAdapter.SaveValuesWithCheckpoint(tokenSents, nil)
+	err = c.dbAdapter.SaveTokenSents(tokenSents)
+	if err != nil {
+		log.Error().Err(err).Msg("[ElectrumClient] [tryConfirmTokenSents] Failed to save token sents")
+		return fmt.Errorf("failed to save token sents: %w", err)
+	}
 	if c.eventBus != nil {
-		log.Debug().Msgf("[ElectrumClient] [BlockchainHeaderHandler] Broadcasting confirm tx request: %v", confirmTxs)
+		log.Debug().Msgf("[ElectrumClient] [tryConfirmTokenSents] Broadcasting confirm tx request: %v", confirmTxs)
 		c.eventBus.BroadcastEvent(&events.EventEnvelope{
 			EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
 			DestinationChain: events.SCALAR_NETWORK_NAME,
 			Data:             confirmTxs,
 		})
 	} else {
-		log.Warn().Msg("[ElectrumClient] [BlockchainHeaderHandler] event bus is undefined")
+		log.Warn().Msg("[ElectrumClient] [tryConfirmTokenSents] event bus is undefined")
+	}
+	return nil
+}
+func (c *Client) tryHandleRedeemsTransaction(blockHeight int) error {
+	// Check pending redeem transactions in the relayer db, if the confirmation is enough, send to the event bus
+	lastConfirmedBlockNumber := blockHeight - c.electrumConfig.Confirmations + 1
+	redeemTxs, err := c.dbAdapter.FindPendingRedeemsTransaction(c.electrumConfig.SourceChain, lastConfirmedBlockNumber)
+	if err != nil {
+		log.Error().Err(err).Msg("[ElectrumClient] [tryHandleRedeemTransaction] Failed to get pending redeem transactions from db")
+		return fmt.Errorf("failed to get pending redeem transactions from db: %w", err)
+	}
+	if len(redeemTxs) == 0 {
+		log.Debug().Msgf("[ElectrumClient] [tryHandleRedeemTransaction] No pending redeem transactions with %d confirmations found", c.electrumConfig.Confirmations)
+		return nil
+	}
+	txHashes := make([]string, len(redeemTxs))
+	for i, redeemTx := range redeemTxs {
+		txHashes[i] = redeemTx.TxHash
+		redeemTx.Status = string(chains.RedeemStatusVerifying)
+	}
+	confirmRedeemTx := events.ConfirmRedeemTxRequest{
+		Chain:   c.electrumConfig.SourceChain,
+		TxHashs: txHashes,
+	}
+	err = c.dbAdapter.SaveRedeemTxs(redeemTxs)
+	if err != nil {
+		log.Error().Err(err).Msg("[ElectrumClient] [tryHandleRedeemTransaction] Failed to save redeem transactions")
+		return fmt.Errorf("failed to save redeem transactions: %w", err)
+	}
+	if c.eventBus != nil {
+		log.Debug().Msgf("[ElectrumClient] [tryHandleRedeemTransaction] Broadcasting confirm redeem tx request: %v", confirmRedeemTx)
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_ELECTRS_REDEEM_TRANSACTION,
+			DestinationChain: events.SCALAR_NETWORK_NAME,
+			Data:             confirmRedeemTx,
+		})
+	} else {
+		log.Warn().Msg("[ElectrumClient] [tryHandleRedeemTransaction] event bus is undefined")
 	}
 	return nil
 }
@@ -67,7 +139,7 @@ func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 	}
 	c.PreProcessVaultsMessages(vaultTxs)
 	//1. parse vault transactions to token sent and unstaked vault txs
-	tokenSents, unstakedVaultTxs := c.CategorizeVaultTxs(vaultTxs)
+	tokenSents, redeemTxs := c.CategorizeVaultTxs(vaultTxs)
 	//2. update last checkpoint
 	lastCheckpoint := c.getLastCheckpoint()
 	for _, tx := range vaultTxs {
@@ -89,8 +161,8 @@ func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err er
 		log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [VaultTxMessageHandler] Received %d validvault transactions", len(tokenSents))
 	}
 	// Redeem transaction
-	if len(unstakedVaultTxs) > 0 {
-		err = c.UpdateUnstakedVaultTxs(unstakedVaultTxs)
+	if len(redeemTxs) > 0 {
+		err = c.handleRedeemTxs(redeemTxs)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to update unstaked vault transactions")
 		}
@@ -114,7 +186,7 @@ func (c *Client) PreProcessVaultsMessages(vaultTxs []types.VaultTransaction) err
 	return nil
 }
 func (c *Client) handleTokenSents(tokenSents []*chains.TokenSent) error {
-	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [handleTokenSents] Received %d validvault transactions", len(tokenSents))
+	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [handleTokenSents] Received %d token sent transactions", len(tokenSents))
 	confirmTxs := events.ConfirmTxsRequest{
 		ChainName: c.electrumConfig.SourceChain,
 		TxHashs:   make(map[string]string),
@@ -151,12 +223,46 @@ func (c *Client) handleTokenSents(tokenSents []*chains.TokenSent) error {
 }
 
 // Todo: update ContractCallWithToken status with execution confirmation from bitcoin network
-func (c *Client) UpdateUnstakedVaultTxs(unstakedVaultTxs []*pkgtypes.UnstakedVaultTx) error {
-	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [UpdateUnstakedVaultTxs] Received %d validvault transactions", len(unstakedVaultTxs))
-	txHashes := make([]string, len(unstakedVaultTxs))
-	for i, tx := range unstakedVaultTxs {
+func (c *Client) handleRedeemTxs(redeemTxs []*chains.RedeemTx) error {
+	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [handleRedeemTxs] Received %d redeem transactions", len(redeemTxs))
+	//1. Store redeem transactions to the db
+	err := c.dbAdapter.SaveRedeemTxs(redeemTxs)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to store redeem transactions to the db")
+		return fmt.Errorf("failed to store redeem transactions to the db: %w", err)
+	}
+	//2. Update ContractCallWithToken status with execution confirmation from bitcoin network
+	txHashes := make([]string, len(redeemTxs))
+	for i, tx := range redeemTxs {
 		txHashes[i] = tx.TxHash
 	}
-	c.dbAdapter.UpdateBtcExecutedCommands(c.electrumConfig.SourceChain, txHashes)
+	c.dbAdapter.UpdateRedeemExecutedCommands(c.electrumConfig.SourceChain, txHashes)
+	//3. Filter redeem with enough confirmations and group by custodian group id
+	mapTxHashs := make(map[string][]string)
+
+	//If confirmations is 1, send to the event bus with destination chain is scalar for confirmation
+	//If confirmations is greater than 1, wait for the next blocks to get more confirmations before broadcasting to the scalar network
+	for _, redeemTx := range redeemTxs {
+		if c.electrumConfig.Confirmations <= 1 || c.currentHeight-int(redeemTx.BlockNumber) >= c.electrumConfig.Confirmations {
+			mapTxHashs[redeemTx.CustodianGroupUid] = append(mapTxHashs[redeemTx.CustodianGroupUid], redeemTx.TxHash)
+		}
+	}
+	if c.eventBus != nil {
+		for _, txHashs := range mapTxHashs {
+			if len(txHashs) > 0 {
+				confirmRedeemTx := events.ConfirmRedeemTxRequest{
+					Chain:   c.electrumConfig.SourceChain,
+					TxHashs: txHashs,
+				}
+
+				log.Debug().Msgf("[ElectrumClient] [handleRedeemTxs] Broadcasting confirm redeem tx request: %v", confirmRedeemTx)
+				c.eventBus.BroadcastEvent(&events.EventEnvelope{
+					EventType:        events.EVENT_ELECTRS_REDEEM_TRANSACTION,
+					DestinationChain: events.SCALAR_NETWORK_NAME,
+					Data:             confirmRedeemTx,
+				})
+			}
+		}
+	}
 	return nil
 }

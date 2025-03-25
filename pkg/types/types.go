@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/scalarorg/bitcoin-vault/go-utils/btc"
 	"github.com/scalarorg/bitcoin-vault/go-utils/types"
-	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 )
 
 type ExecuteParams struct {
@@ -99,7 +99,7 @@ type PsbtParams struct {
 
 type SignPsbtsRequest struct {
 	ChainName string
-	Psbts     []covtypes.Psbt
+	Psbts     []covExported.Psbt
 }
 type CreatePsbtRequest struct {
 	Outpoints []CommandOutPoint
@@ -111,8 +111,8 @@ func (p *PsbtParams) GetTaprootAddress() (btcutil.Address, error) {
 	return btc.ScriptPubKeyToAddress(p.CustodianScript, p.NetworkType)
 }
 
-type UnstakedVaultTx struct {
-	BlockHeight uint64
-	TxHash      string
-	LogIndex    uint
-}
+// type RedeemTx struct {
+// 	BlockHeight uint64
+// 	TxHash      string
+// 	LogIndex    uint
+// }

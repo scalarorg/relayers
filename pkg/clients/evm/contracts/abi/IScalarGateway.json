@@ -3,12 +3,12 @@
     "type": "constructor",
     "inputs": [
       {
-        "name": "authModule_",
+        "name": "authModule",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "tokenDeployer_",
+        "name": "tokenDeployer",
         "type": "address",
         "internalType": "address"
       }
@@ -197,6 +197,19 @@
   },
   {
     "type": "function",
+    "name": "execute2",
+    "inputs": [
+      {
+        "name": "input",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "getAddress",
     "inputs": [
       {
@@ -267,6 +280,37 @@
         "name": "",
         "type": "int256",
         "internalType": "int256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getSession",
+    "inputs": [
+      {
+        "name": "symbol",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct ScalarGateway.Session",
+        "components": [
+          {
+            "name": "sequence",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "phase",
+            "type": "uint8",
+            "internalType": "enum ScalarGateway.Phase"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -500,6 +544,30 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "sessions",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "sequence",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "phase",
+        "type": "uint8",
+        "internalType": "enum ScalarGateway.Phase"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -1035,6 +1103,25 @@
         "type": "bytes",
         "indexed": false,
         "internalType": "bytes"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SwitchedPhase",
+    "inputs": [
+      {
+        "name": "sequence",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "uint64"
+      },
+      {
+        "name": "phase",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum ScalarGateway.Phase"
       }
     ],
     "anonymous": false

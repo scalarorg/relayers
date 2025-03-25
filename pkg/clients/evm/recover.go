@@ -22,6 +22,7 @@ var (
 		events.EVENT_EVM_CONTRACT_CALL_APPROVED,
 		events.EVENT_EVM_COMMAND_EXECUTED,
 		events.EVENT_EVM_TOKEN_DEPLOYED,
+		events.EVENT_EVM_SWITCHED_PHASE,
 	}
 )
 
@@ -31,15 +32,16 @@ func (c *EvmClient) AppendLogs(logs []types.Log) {
 
 // Go routine for process missing logs
 func (c *EvmClient) ProcessMissingLogs() {
-	events := map[string]abi.Event{}
+	mapEvents := map[string]abi.Event{}
+	var lastSwitchedPhaseEvent *types.Log
 	for _, event := range scalarGatewayAbi.Events {
-		events[event.ID.String()] = event
+		mapEvents[event.ID.String()] = event
 	}
 	for !c.MissingLogs.IsRecovered() {
 		logs := c.MissingLogs.GetLogs(10)
 		for _, txLog := range logs {
 			topic := txLog.Topics[0].String()
-			event, ok := events[topic]
+			event, ok := mapEvents[topic]
 			if !ok {
 				log.Error().Str("topic", topic).Any("txLog", txLog).Msg("[EvmClient] [ProcessMissingLogs] event not found")
 				continue
@@ -49,11 +51,18 @@ func (c *EvmClient) ProcessMissingLogs() {
 				Str("eventName", event.Name).
 				Str("txHash", txLog.TxHash.String()).
 				Msg("[EvmClient] [ProcessMissingLogs] start processing missing event")
-			err := c.handleEventLog(event, txLog)
-			if err != nil {
-				log.Error().Err(err).Msg("[EvmClient] [ProcessMissingLogs] failed to handle event log")
+			if event.Name == events.EVENT_EVM_SWITCHED_PHASE {
+				lastSwitchedPhaseEvent = &txLog
+			} else {
+				err := c.handleEventLog(event, txLog)
+				if err != nil {
+					log.Error().Err(err).Msg("[EvmClient] [ProcessMissingLogs] failed to handle event log")
+				}
 			}
 		}
+	}
+	if lastSwitchedPhaseEvent != nil {
+		c.handleEventLog(scalarGatewayAbi.Events[events.EVENT_EVM_SWITCHED_PHASE], *lastSwitchedPhaseEvent)
 	}
 	log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] finished processing all missing evm events")
 }

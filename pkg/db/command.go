@@ -174,7 +174,7 @@ func (db *DatabaseAdapter) UpdateBroadcastedCommands(chainId string, batchedComm
 	return nil
 }
 
-func (db *DatabaseAdapter) UpdateBtcExecutedCommands(chainId string, txHashes []string) error {
+func (db *DatabaseAdapter) UpdateRedeemExecutedCommands(chainId string, txHashes []string) error {
 	log.Info().Str("chainId", chainId).Any("txHashes", txHashes).Msg("[DatabaseAdapter] [UpdateBtcExecutedCommands]")
 
 	result := db.PostgresClient.Exec(`UPDATE contract_call_with_tokens as ccwt SET status = ? 

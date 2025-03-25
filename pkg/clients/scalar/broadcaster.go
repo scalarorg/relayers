@@ -11,8 +11,11 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
+	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/scalar-core/utils"
+	chainsExported "github.com/scalarorg/scalar-core/x/chains/exported"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	nexus "github.com/scalarorg/scalar-core/x/nexus/exported"
 )
@@ -96,9 +99,9 @@ func (c *Broadcaster) ConfirmEvmTxs(chainName string, txIds []string) error {
 	//1. Create Confirm message request
 	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
 	log.Debug().Msgf("[Broadcaster] [ConfirmEvmTxs] Enqueue for confirmation txs from chain %s: %v", nexusChain, txIds)
-	txHashs := make([]chainstypes.Hash, len(txIds))
+	txHashs := make([]chainsExported.Hash, len(txIds))
 	for i, txId := range txIds {
-		txHashs[i] = chainstypes.Hash(common.HexToHash(txId))
+		txHashs[i] = chainsExported.Hash(common.HexToHash(txId))
 	}
 	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, txHashs)
 	return c.QueueTxMsg(msg)
@@ -108,14 +111,35 @@ func (c *Broadcaster) ConfirmBtcTxs(chainName string, txIds []string) error {
 	//1. Create Confirm message request
 	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
 	log.Debug().Msgf("[Broadcaster] [ConfirmBtcTxs] Enqueue for confirmation txs from chain %s: %v", nexusChain, txIds)
-	txHashs := make([]chainstypes.Hash, len(txIds))
+	txHashs := make([]chainsExported.Hash, len(txIds))
 	for i, txId := range txIds {
-		txHashs[i] = chainstypes.Hash(common.HexToHash(txId))
+		txHashs[i] = chainsExported.Hash(common.HexToHash(txId))
 	}
 	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, txHashs)
 	return c.QueueTxMsg(msg)
 }
 
+func (c *Broadcaster) ConfirmRedeemTxRequest(redeemRequest events.ConfirmRedeemTxRequest) error {
+	txHashs := make([]chainsExported.Hash, len(redeemRequest.TxHashs))
+	for i, txId := range redeemRequest.TxHashs {
+		txHashs[i] = chainsExported.Hash(common.HexToHash(txId))
+	}
+	msg := covtypes.NewConfirmRedeemTxRequest(
+		c.network.GetAddress(),
+		redeemRequest.Chain,
+		txHashs,
+	)
+	return c.QueueTxMsg(msg)
+}
+
+//	func (c *Broadcaster) NewBtcBlock(blockHeight events.ChainBlockHeight) error {
+//		msg := covtypes.NewUpdateUtxoListsRequest(
+//			c.network.GetAddress(),
+//			blockHeight.Chain,
+//			blockHeight.Height,
+//		)
+//		return c.QueueTxMsg(msg)
+//	}
 func (c *Broadcaster) AddSignEvmCommandsRequest(destinationChain string) error {
 	log.Debug().Str("Chain", destinationChain).Msg("[Broadcaster] [AddSignEvmCommandsRequest] Add SignEvmCommandsRequest to buffer")
 	req := chainstypes.NewSignCommandsRequest(
@@ -137,9 +161,21 @@ func (c *Broadcaster) ConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed) 
 	return c.QueueTxMsg(msg)
 }
 
+func (c *Broadcaster) ConfirmSwitchedPhase(switchedPhase *chains.SwitchedPhase) error {
+	log.Debug().Str("TxHash", switchedPhase.TxHash).
+		Uint64("SessionSequence", switchedPhase.SessionSequence).
+		Uint8("Phase", switchedPhase.Phase).Msgf("[Broadcaster] [ConfirmSwitchedPhase] Confirm switched phase")
+	msg := covtypes.NewConfirmSwitchedPhaseRequest(
+		c.network.GetAddress(),
+		switchedPhase.Chain,
+		switchedPhase.TxHash,
+	)
+	return c.QueueTxMsg(msg)
+}
+
 // Add SignPsbtCommandsRequest to buffer
 // Return true if the request is added to buffer, false if the request is already in buffer
-func (c *Broadcaster) AddSignPsbtCommandsRequest(destinationChain string, psbt covtypes.Psbt) error {
+func (c *Broadcaster) AddSignPsbtCommandsRequest(destinationChain string, psbt covExported.Psbt) error {
 	req := chainstypes.NewSignPsbtCommandRequest(
 		c.network.GetAddress(),
 		destinationChain,

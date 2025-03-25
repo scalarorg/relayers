@@ -13,6 +13,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/db/models"
 	"github.com/scalarorg/relayers/pkg/events"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	covTypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	"github.com/scalarorg/scalar-core/x/nexus/exported"
 	protocol "github.com/scalarorg/scalar-core/x/protocol/exported"
 )
@@ -418,6 +419,25 @@ func (c *Client) handleCompletedEvents(ctx context.Context, events []IBCEvent[*c
 		}
 
 	}
+	return nil
+}
+
+func (c *Client) handleSwitchPhaseStartedEvents(ctx context.Context, switchPhaseEvents []IBCEvent[*covTypes.SwitchPhaseStarted]) error {
+	//Loop through all the evm chains and update the status
+	for _, event := range switchPhaseEvents {
+		eventEnvelope := events.EventEnvelope{
+			EventType:        events.EVENT_SCALAR_SWITCH_PHASE_STARTED,
+			DestinationChain: string(event.Args.Chain),
+			Data:             event.Args,
+		}
+		c.eventBus.BroadcastEvent(&eventEnvelope)
+	}
+	return nil
+}
+
+func (c *Client) handleSwitchPhaseCompletedEvents(ctx context.Context, switchPhaseEvents []IBCEvent[*covTypes.SwitchPhaseCompleted]) error {
+	//call sign pending command for each custodian pool
+
 	return nil
 }
 

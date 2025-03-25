@@ -227,7 +227,7 @@ func TestUpdateBtcExecutedCommands(t *testing.T) {
 		[]string{COMMAND_ID},
 		TX_HASH_BTC)
 	require.NoError(t, err)
-	err = dbAdapter.UpdateBtcExecutedCommands("bitcoin|4", []string{TX_HASH_BTC})
+	err = dbAdapter.UpdateRedeemExecutedCommands("bitcoin|4", []string{TX_HASH_BTC})
 	require.NoError(t, err)
 	contractCallWithToken := chains.ContractCallWithToken{}
 	dbAdapter.PostgresClient.Find(&chains.ContractCallWithToken{}).

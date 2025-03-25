@@ -8,13 +8,13 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/go-electrum/electrum/types"
-	relaytypes "github.com/scalarorg/relayers/pkg/types"
 	"github.com/scalarorg/relayers/pkg/utils"
+	"gorm.io/gorm"
 )
 
-func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chains.TokenSent, []*relaytypes.UnstakedVaultTx) {
+func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chains.TokenSent, []*chains.RedeemTx) {
 	tokenSents := []*chains.TokenSent{}
-	unstakedVaultTxs := []*relaytypes.UnstakedVaultTx{}
+	redeemTxs := []*chains.RedeemTx{}
 	for _, vaultTx := range vaultTxs {
 		if vaultTx.VaultTxType == 1 {
 			//1.Staking
@@ -28,12 +28,12 @@ func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chain
 			}
 		} else if vaultTx.VaultTxType == 2 {
 			//2.Unstaking
-			unstakedVaultTx := c.CreateUnstakedVaultTx(vaultTx)
-			unstakedVaultTxs = append(unstakedVaultTxs, unstakedVaultTx)
-			log.Info().Any("RedeemTx", unstakedVaultTx).Msg("[ElectrumClient] [CategorizeVaultTxs]")
+			redeemTx := c.CreateRedeemTx(vaultTx)
+			redeemTxs = append(redeemTxs, redeemTx)
+			log.Info().Any("RedeemTx", redeemTx).Msg("[ElectrumClient] [CategorizeVaultTxs]")
 		}
 	}
-	return tokenSents, unstakedVaultTxs
+	return tokenSents, redeemTxs
 }
 
 func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (*chains.TokenSent, error) {
@@ -76,10 +76,15 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (*chains.TokenS
 	return &tokenSent, nil
 }
 
-func (c *Client) CreateUnstakedVaultTx(vaultTx types.VaultTransaction) *relaytypes.UnstakedVaultTx {
-	return &relaytypes.UnstakedVaultTx{
-		BlockHeight: uint64(vaultTx.Height),
+func (c *Client) CreateRedeemTx(vaultTx types.VaultTransaction) *chains.RedeemTx {
+	return &chains.RedeemTx{
+		Model: gorm.Model{
+			CreatedAt: time.Unix(int64(vaultTx.Timestamp), 0),
+			UpdatedAt: time.Unix(int64(vaultTx.Timestamp), 0),
+		},
+		Chain:       c.electrumConfig.SourceChain,
+		BlockNumber: uint64(vaultTx.Height),
 		TxHash:      vaultTx.TxHash,
-		LogIndex:    uint(vaultTx.TxPosition),
+		Status:      string(chains.RedeemStatusVerifying),
 	}
 }

@@ -7,17 +7,17 @@ import (
 	vault "github.com/scalarorg/bitcoin-vault/ffi/go-vault"
 	utils "github.com/scalarorg/bitcoin-vault/go-utils/types"
 	"github.com/scalarorg/relayers/pkg/types"
-	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 )
 
 /*
 * Create psbt based on taproot address and query command response as utxo output
 * Todo: Seperate psbt by params: feeOpts, rbf
  */
-func (c *BtcClient) CreatePsbts(psbtParams types.PsbtParams, outpoints []types.CommandOutPoint) ([]covtypes.Psbt, error) {
+func (c *BtcClient) CreatePsbts(psbtParams types.PsbtParams, outpoints []types.CommandOutPoint) ([]covExported.Psbt, error) {
 	//Todo: handle custom replace by fee
 	replaceByFee := false
-	psbts := []covtypes.Psbt{}
+	psbts := []covExported.Psbt{}
 
 	taprootAddress, err := psbtParams.GetTaprootAddress()
 	if err != nil {

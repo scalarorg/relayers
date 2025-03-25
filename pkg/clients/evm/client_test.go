@@ -397,7 +397,7 @@ func TestSendTokenFromSepoliaToBnb(t *testing.T) {
 	assert.NoError(t, err)
 	sepoliaConfig.PrivateKey = evmUserPrivKey
 	fmt.Printf("SepoliaConfig %v\n", sepoliaConfig)
-	transOpts, err := evm.CreateEvmAuth(sepoliaConfig)
+	transOpts, err := evm.CreateTransactOpts(sepoliaConfig)
 	assert.NoError(t, err)
 	//Need to incrate allowance if need
 	// tokenAddress := "0x6e3B806C5F6413e0a0670666301ccB6b10628A52"

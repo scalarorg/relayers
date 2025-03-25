@@ -100,7 +100,7 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gateway for network %s: %w", evmConfig.Name, err)
 	}
-	auth, err := CreateEvmAuth(evmConfig)
+	auth, err := CreateTransactOpts(evmConfig)
 	if err != nil {
 		//Not fatal, we can still use the gateway without auth
 		//auth is only used for sending transaction
@@ -133,7 +133,7 @@ func CreateGateway(networName string, gwAddr string, client *ethclient.Client) (
 	}
 	return gateway, &gatewayAddress, nil
 }
-func CreateEvmAuth(evmConfig *EvmNetworkConfig) (*bind.TransactOpts, error) {
+func CreateTransactOpts(evmConfig *EvmNetworkConfig) (*bind.TransactOpts, error) {
 	if evmConfig.PrivateKey == "" {
 		return nil, fmt.Errorf("private key is not set for network %s", evmConfig.Name)
 	}
@@ -149,6 +149,15 @@ func CreateEvmAuth(evmConfig *EvmNetworkConfig) (*bind.TransactOpts, error) {
 	auth.GasLimit = evmConfig.GasLimit
 	return auth, nil
 }
+
+func (ec *EvmClient) CreateCallOpts() (*bind.CallOpts, error) {
+	callOpt := &bind.CallOpts{
+		From:    ec.auth.From,
+		Context: context.Background(),
+	}
+	return callOpt, nil
+}
+
 func (ec *EvmClient) gatewayExecute(input []byte) (*types.Transaction, error) {
 	//ec.auth.NoSend = false
 	log.Info().Bool("NoSend", ec.auth.NoSend).Msgf("[EvmClient] [gatewayExecute] sending transaction")
@@ -446,6 +455,9 @@ func (c *EvmClient) ListenToEvents(ctx context.Context) error {
 		{events.EVENT_EVM_TOKEN_DEPLOYED, func(ctx context.Context) error {
 			return WatchForEvent[*contracts.IScalarGatewayTokenDeployed](c, ctx, events.EVENT_EVM_TOKEN_DEPLOYED)
 		}},
+		{events.EVENT_EVM_SWITCHED_PHASE, func(ctx context.Context) error {
+			return WatchForEvent[*contracts.IScalarGatewaySwitchedPhase](c, ctx, events.EVENT_EVM_SWITCHED_PHASE)
+		}},
 	}
 
 	for _, event := range events {
@@ -469,7 +481,8 @@ type ValidWatchEvent interface {
 		// *contracts.IScalarGatewayContractCall |
 		*contracts.IScalarGatewayContractCallApproved |
 		*contracts.IScalarGatewayExecuted |
-		*contracts.IScalarGatewayTokenDeployed
+		*contracts.IScalarGatewayTokenDeployed |
+		*contracts.IScalarGatewaySwitchedPhase
 }
 
 const (
@@ -658,6 +671,15 @@ func (c *EvmClient) handleEventLog(event abi.Event, txLog types.Log) error {
 			return fmt.Errorf("failed to parse event %s: %w", event.Name, err)
 		}
 		return c.HandleTokenDeployed(tokenDeployed)
+	case events.EVENT_EVM_SWITCHED_PHASE:
+		switchedPhase := &contracts.IScalarGatewaySwitchedPhase{
+			Raw: txLog,
+		}
+		err := parser.ParseEventData(&txLog, event.Name, switchedPhase)
+		if err != nil {
+			return fmt.Errorf("failed to parse event %s: %w", event.Name, err)
+		}
+		return c.HandleSwitchedPhase(switchedPhase)
 	default:
 		return fmt.Errorf("invalid event type for %s: %T", event.Name, txLog)
 	}
