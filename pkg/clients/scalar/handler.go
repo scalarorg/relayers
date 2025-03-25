@@ -435,6 +435,12 @@ func (c *Client) handleSwitchPhaseStartedEvents(ctx context.Context, switchPhase
 	return nil
 }
 
+func (c *Client) handleSwitchPhaseCompletedEvents(ctx context.Context, switchPhaseEvents []IBCEvent[*covTypes.SwitchPhaseCompleted]) error {
+	//call sign pending command for each custodian pool
+
+	return nil
+}
+
 func (c *Client) handleContractCallWithTokenCompletedEvent(event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
 	c.dbAdapter.PostgresClient.Model(&chains.ContractCallWithToken{}).Where("event_id = ?", event.Args.EventID).Update("status", chains.ContractCallStatusSuccess)
 	return nil

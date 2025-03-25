@@ -13,6 +13,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/utils"
+	chainsExported "github.com/scalarorg/scalar-core/x/chains/exported"
 	"github.com/scalarorg/scalar-core/x/chains/types"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
@@ -151,7 +152,7 @@ func UnmarshalContractCallApproved(jsonData map[string]string, e *types.Contract
 	if err != nil {
 		log.Warn().Msgf("Failed to decode payload hash: %v, error: %v", jsonData["payload_hash"], err)
 	}
-	e.PayloadHash = types.Hash(common.HexToHash(payloadHex))
+	e.PayloadHash = chainsExported.Hash(common.HexToHash(payloadHex))
 	log.Debug().Any("JsonData", jsonData).Msg("Input data")
 	log.Debug().Any("result", e).Msg("Resut data")
 	return nil
@@ -174,7 +175,7 @@ func UnmarshalContractCallWithMintApproved(jsonData map[string]string, e *types.
 	if err != nil {
 		log.Warn().Msgf("Failed to decode payload hash: %v, error: %v", jsonData["payload_hash"], err)
 	}
-	e.PayloadHash = types.Hash(common.HexToHash(payloadHex))
+	e.PayloadHash = chainsExported.Hash(common.HexToHash(payloadHex))
 	assetData, ok := jsonData["asset"]
 	if ok {
 		e.Asset, _ = UnamrshalAsset(assetData)

@@ -174,7 +174,7 @@ func (db *DatabaseAdapter) UpdateBroadcastedCommands(chainId string, batchedComm
 	return nil
 }
 
-func (db *DatabaseAdapter) UpdateBtcExecutedCommands(chainId string, txHashes []string) error {
+func (db *DatabaseAdapter) UpdateRedeemExecutedCommands(chainId string, txHashes []string) error {
 	log.Info().Str("chainId", chainId).Any("txHashes", txHashes).Msg("[DatabaseAdapter] [UpdateBtcExecutedCommands]")
 
 	result := db.PostgresClient.Exec(`UPDATE contract_call_with_tokens as ccwt SET status = ? 
@@ -185,14 +185,4 @@ func (db *DatabaseAdapter) UpdateBtcExecutedCommands(chainId string, txHashes []
 		chains.ContractCallStatusSuccess, chainId, txHashes)
 	log.Info().Any("RowsAffected", result.RowsAffected).Msg("[DatabaseAdapter] [UpdateBtcExecutedCommands]")
 	return result.Error
-}
-
-// Get last pending redeem transaction by block height
-func (db *DatabaseAdapter) FindPendingRedeemTransaction(chainId string, blockHeight int) (*chains.RedeemTx, error) {
-	var redeemTx chains.RedeemTx
-	err := db.PostgresClient.Where("chain = ? AND block_number <= ?", chainId, blockHeight).Where("status = ?", chains.RedeemStatusExecuting).First(&redeemTx).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to find pending redeem transaction: %w", err)
-	}
-	return &redeemTx, nil
 }

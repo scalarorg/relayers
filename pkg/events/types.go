@@ -43,8 +43,8 @@ type ConfirmTxsRequest struct {
 }
 
 type ConfirmRedeemTxRequest struct {
-	Chain  string
-	TxHash string
+	Chain   string
+	TxHashs []string
 }
 type ChainBlockHeight struct {
 	Chain  string

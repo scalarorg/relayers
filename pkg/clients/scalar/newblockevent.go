@@ -39,6 +39,10 @@ func (c *Client) handleNewBlockEvents(ctx context.Context, events map[string][]s
 	if err != nil {
 		log.Error().Msgf("[ScalarClient] [handleNewBlockEvents] failed to handle btc block events: %v", err)
 	}
+	err = c.tryHandleSwitchPhaseCompletedEvents(ctx, events)
+	if err != nil {
+		log.Error().Msgf("[ScalarClient] [handleNewBlockEvents] failed to handle switch phase completed events: %v", err)
+	}
 	return nil
 }
 
@@ -111,10 +115,22 @@ func (c *Client) tryHandleEVMCompletedEvent(ctx context.Context, events map[stri
 func (c *Client) tryHandleSwitchPhaseStartedEvents(ctx context.Context, events map[string][]string) error {
 	switchPhaseStartedEvents, err := ParseIBCEvent[*covTypes.SwitchPhaseStarted](events)
 	if err == nil && len(switchPhaseStartedEvents) > 0 {
-		log.Debug().Any("StartedSwitchPhaseEvents", switchPhaseStartedEvents).Msg("[ScalarClient] [tryHandleSwitchPhaseStartedEvents]")
+		log.Debug().Any("SwitchPhaseStartedEvents", switchPhaseStartedEvents).Msg("[ScalarClient] [tryHandleSwitchPhaseStartedEvents]")
 		return c.handleSwitchPhaseStartedEvents(ctx, switchPhaseStartedEvents)
 	} else {
 		log.Debug().Msg("[ScalarClient] [handleNewBlockEvents] no started switch phase events")
+		return nil
+	}
+}
+
+// Parse the started switch phase event, each event is for a evm chain
+func (c *Client) tryHandleSwitchPhaseCompletedEvents(ctx context.Context, events map[string][]string) error {
+	switchPhaseCompletedEvents, err := ParseIBCEvent[*covTypes.SwitchPhaseCompleted](events)
+	if err == nil && len(switchPhaseCompletedEvents) > 0 {
+		log.Debug().Any("SwitchPhaseCompletedEvents", switchPhaseCompletedEvents).Msg("[ScalarClient] [tryHandleSwitchPhaseCompletedEvents]")
+		return c.handleSwitchPhaseCompletedEvents(ctx, switchPhaseCompletedEvents)
+	} else {
+		log.Debug().Msg("[ScalarClient] [handleNewBlockEvents] no switch phase completed events")
 		return nil
 	}
 }

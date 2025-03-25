@@ -111,8 +111,8 @@ func (p *PsbtParams) GetTaprootAddress() (btcutil.Address, error) {
 	return btc.ScriptPubKeyToAddress(p.CustodianScript, p.NetworkType)
 }
 
-type UnstakedVaultTx struct {
-	BlockHeight uint64
-	TxHash      string
-	LogIndex    uint
-}
+// type RedeemTx struct {
+// 	BlockHeight uint64
+// 	TxHash      string
+// 	LogIndex    uint
+// }

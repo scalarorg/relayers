@@ -24,6 +24,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/scalar-core/utils"
+	chainsExported "github.com/scalarorg/scalar-core/x/chains/exported"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	nexus "github.com/scalarorg/scalar-core/x/nexus/exported"
 	"github.com/stretchr/testify/require"
@@ -90,9 +91,9 @@ func TestSubscribeContractCallApprovedEvent(t *testing.T) {
 	nexusChain := nexus.ChainName(utils.NormalizeString(chainNameBtcTestnet4))
 	txIds := []string{"f0510bcacb2e428bd89e39e9708555265ed413b5320c5f920bf4becac9c53f56"}
 	log.Debug().Msgf("[ScalarClient] [ConfirmTxs] Broadcast for confirmation txs from chain %s: %v", nexusChain, txIds)
-	txHashs := make([]chainstypes.Hash, len(txIds))
+	txHashs := make([]chainsExported.Hash, len(txIds))
 	for i, txId := range txIds {
-		txHashs[i] = chainstypes.Hash(common.HexToHash(txId))
+		txHashs[i] = chainsExported.Hash(common.HexToHash(txId))
 	}
 	//msg := emvtypes.NewConfirmGatewayTxsRequest(networkClient.GetAddress(), nexusChain, txHashs)
 	//2. Sign and broadcast the payload using the network client, which has the private key

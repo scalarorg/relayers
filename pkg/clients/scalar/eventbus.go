@@ -14,10 +14,9 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 		return c.requestConfirmBtcTxs(event.Data.(events.ConfirmTxsRequest))
 	case events.EVENT_ELECTRS_REDEEM_TRANSACTION:
 		//Broadcast from electrs.handleRedeemTransaction
-		return c.broadcaster.NewRedeemTransaction(event.Data.(events.ConfirmRedeemTxRequest))
-	case events.EVENT_ELECTRS_NEW_BLOCK:
-		//Broadcast from electrs.handleNewBridgeTokenSent
-		return c.broadcaster.NewBtcBlock(event.Data.(events.ChainBlockHeight))
+		return c.broadcaster.ConfirmRedeemTxRequest(event.Data.(events.ConfirmRedeemTxRequest))
+	// case events.EVENT_ELECTRS_NEW_BLOCK:
+	// 	return c.broadcaster.NewBtcBlock(event.Data.(events.ChainBlockHeight))
 	case events.EVENT_EVM_TOKEN_SENT, events.EVENT_EVM_CONTRACT_CALL, events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN:
 		return c.requestConfirmEvmTxs(event.Data.(events.ConfirmTxsRequest))
 	case events.EVENT_EVM_TOKEN_DEPLOYED:
