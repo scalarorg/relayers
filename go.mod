@@ -16,7 +16,7 @@ require (
 	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250205093245-57c4541ffbc7
 	github.com/scalarorg/data-models v0.0.0-20250314091532-b6cb4eddd26b
 	github.com/scalarorg/go-electrum v0.1.2-0.20250113074812-84502fb16a1a
-	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250304110552-f6e1193bcc38
+	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250326023409-6ef86cca2106
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
