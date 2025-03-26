@@ -161,7 +161,7 @@ func (ec *EvmClient) CreateCallOpts() (*bind.CallOpts, error) {
 func (ec *EvmClient) gatewayExecute(input []byte) (*types.Transaction, error) {
 	//ec.auth.NoSend = false
 	log.Info().Bool("NoSend", ec.auth.NoSend).Msgf("[EvmClient] [gatewayExecute] sending transaction")
-	signedTx, err := ec.Gateway.Execute(ec.auth, input)
+	signedTx, err := ec.Gateway.Execute2(ec.auth, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send transaction: %w", err)
 	}
