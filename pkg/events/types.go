@@ -23,7 +23,7 @@ const (
 	EVENT_EVM_TOKEN_SENT                 = "TokenSent"
 	EVENT_EVM_COMMAND_EXECUTED           = "Executed"
 	EVENT_EVM_TOKEN_DEPLOYED             = "TokenDeployed"
-	EVENT_EVM_SWITCHED_PHASE             = "SwitchedPhase"
+	EVENT_EVM_SWITCHED_PHASE             = "SwitchPhase"
 )
 
 type EventEnvelope struct {

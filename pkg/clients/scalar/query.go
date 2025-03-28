@@ -63,6 +63,25 @@ func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress str
 	}
 	return tokenResponse.Response.Asset, nil
 }
+func (c *Client) GetTokenInfo(ctx context.Context, chainId, symbol string) (*chainstypes.TokenInfoResponse, error) {
+	client, err := c.queryClient.GetChainQueryServiceClient()
+	if err != nil {
+		log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
+		return nil, err
+	}
+	tokenRequest := chainstypes.TokenInfoRequest{
+		Chain: chainId,
+		FindBy: &chainstypes.TokenInfoRequest_Symbol{
+			Symbol: symbol,
+		},
+	}
+	response, err := client.TokenInfo(ctx, &tokenRequest)
+	if err != nil {
+		log.Warn().Err(err).Msgf("[ScalarClient] [GetTokenInfo] cannot get token info from scalar-core")
+		return nil, err
+	}
+	return response, nil
+}
 func (c *Client) GetTokenContractAddressFromSymbol(ctx context.Context, chainId, symbol string) string {
 	//Try get token info from cache
 	tokenInfos, ok := chainTokenInfos[chainId]

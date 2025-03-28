@@ -54,6 +54,9 @@ func LoadEnv(environment string) error {
 		}
 	}
 	viper.Unmarshal(&GlobalConfig)
+	if GlobalConfig.ScalarMnemonic == "" {
+		GlobalConfig.ScalarMnemonic = os.Getenv("SCALAR_MNEMONIC")
+	}
 	// Initialize an empty chain configs map
 	GlobalConfig.ChainConfigs = make(map[string]ChainFamily)
 	log.Info().Msgf("Loaded config: %+v", GlobalConfig)

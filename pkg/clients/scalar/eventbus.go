@@ -1,6 +1,9 @@
 package scalar
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/events"
@@ -85,12 +88,26 @@ func (c *Client) extractValidConfirmTxs(confirmRequest events.ConfirmTxsRequest)
 }
 
 func (c *Client) requestConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed) error {
-	log.Debug().
-		Str("TxHash", tokenDeployed.TxHash).
-		Str("TokenAddress", tokenDeployed.TokenAddress).
-		Str("Symbol", tokenDeployed.Symbol).
-		Msgf("[ScalarClient] [requestConfirmTokenDeployed] Confirm token deployed")
-	c.broadcaster.ConfirmTokenDeployed(tokenDeployed)
+	//Try to query to the scalar network, if token is not confirms then broadcast confirm request
+	tokenInfo, err := c.GetTokenInfo(context.Background(), tokenDeployed.Chain, tokenDeployed.Symbol)
+	if err != nil || tokenInfo == nil {
+		return fmt.Errorf("failed to get token info: %w", err)
+	}
+	if tokenInfo.Confirmed {
+		log.Debug().
+			Str("TxHash", tokenDeployed.TxHash).
+			Str("TokenAddress", tokenInfo.Address).
+			Str("Symbol", tokenDeployed.Symbol).
+			Msgf("[ScalarClient] [requestConfirmTokenDeployed] Token is confirmed")
+		tokenDeployed.TokenAddress = tokenInfo.Address
+	} else {
+		log.Debug().
+			Str("TxHash", tokenDeployed.TxHash).
+			Str("TokenAddress", tokenDeployed.TokenAddress).
+			Str("Symbol", tokenDeployed.Symbol).
+			Msgf("[ScalarClient] [requestConfirmTokenDeployed] Confirm token deployed")
+		c.broadcaster.ConfirmTokenDeployed(tokenDeployed)
+	}
 	return nil
 }
 

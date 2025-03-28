@@ -84,7 +84,7 @@ func (b *Broadcaster) QueueTxMsg(msg types.Msg) error {
 	if !b.isRunning {
 		return fmt.Errorf("broadcaster is not running")
 	}
-	log.Debug().Msgf("[Broadcaster] [QueueTxMsg] enqueue message %v", msg)
+	log.Debug().Msgf("[Broadcaster] [QueueTxMsg] enqueue message %T", msg)
 	b.messageBuffer.AddNewMsg(msg)
 	return nil
 }
@@ -152,7 +152,7 @@ func (c *Broadcaster) ConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed) 
 	log.Debug().Str("TxHash", tokenDeployed.TxHash).
 		Str("TokenAddress", tokenDeployed.TokenAddress).Msgf("[Broadcaster] [ConfirmTokenDeployed] Confirm token deployed")
 	msg := chainstypes.NewConfirmTokenRequest(c.network.GetAddress(),
-		tokenDeployed.TxHash,
+		tokenDeployed.Chain,
 		chainstypes.Asset{
 			Chain:  nexus.ChainName(tokenDeployed.Chain),
 			Symbol: tokenDeployed.Symbol,
@@ -221,12 +221,12 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 		log.Debug().Msgf("[Broadcaster] [broadcastMsgs] broadcasting %d messages", len(txMsgs))
 		resp, err := b.network.SignAndBroadcastMsgs(ctx, txMsgs...)
 		if err != nil {
-			log.Error().Err(err).Msgf("[Broadcaster] Failed to broadcast message %++v", txMsgs)
+			log.Error().Err(err).Msgf("[Broadcaster] Failed to broadcast %d messages", len(txMsgs))
 			b.messageBuffer.AddFailedMsg(txMsgs...)
 		} else if resp.Code == 0 {
 			log.Debug().
 				Str("tx_hash", resp.TxHash).
-				Msgf("[Broadcaster] Successfully broadcasted message %++v in single tx", txMsgs)
+				Msgf("[Broadcaster] Successfully broadcasted %d messages in single tx", len(txMsgs))
 		}
 	}
 	//Broadcast failedMsgs
@@ -235,13 +235,13 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 		for _, msg := range failedMsgs {
 			resp, err := b.network.SignAndBroadcastMsgs(ctx, msg)
 			if err != nil {
-				log.Error().Err(err).Msgf("[Broadcaster] Failed to retry broadcast msg %++v", failedMsgs)
+				log.Error().Err(err).Msgf("[Broadcaster] Failed to retry broadcast msg %T, %++v", msg, msg)
 				return err
 			}
 			if resp.Code == 0 {
 				log.Debug().
 					Str("tx_hash", resp.TxHash).
-					Msgf("[Broadcaster] Successfully retry broadcast msg %++v", msg)
+					Msgf("[Broadcaster] Successfully retry broadcast msg %T, %++v", msg, msg)
 			}
 		}
 	}

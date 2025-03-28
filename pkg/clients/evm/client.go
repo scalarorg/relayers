@@ -585,6 +585,10 @@ func setupSubscription[T ValidWatchEvent](c *EvmClient, watchOpts *bind.WatchOpt
 		return c.Gateway.WatchContractCallApproved(watchOpts, sinkInterface.(chan *contracts.IScalarGatewayContractCallApproved), nil, nil, nil)
 	case events.EVENT_EVM_COMMAND_EXECUTED:
 		return c.Gateway.WatchExecuted(watchOpts, sinkInterface.(chan *contracts.IScalarGatewayExecuted), nil)
+	case events.EVENT_EVM_SWITCHED_PHASE:
+		return c.Gateway.WatchSwitchedPhase(watchOpts, sinkInterface.(chan *contracts.IScalarGatewaySwitchedPhase), nil)
+	case events.EVENT_EVM_TOKEN_DEPLOYED:
+		return c.Gateway.WatchTokenDeployed(watchOpts, sinkInterface.(chan *contracts.IScalarGatewayTokenDeployed))
 	default:
 		return nil, fmt.Errorf("[EvmClient] [setupSubscription] unsupported event type for %s, event: %v", eventName, (*T)(nil))
 	}

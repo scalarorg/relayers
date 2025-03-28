@@ -67,6 +67,8 @@ func RunMigrations(db *gorm.DB) error {
 		&chains.CommandExecuted{},
 		&chains.ContractCall{},
 		&chains.ContractCallWithToken{},
+		&chains.TokenDeployed{},
+		&chains.RedeemTx{},
 		&scalarnet.Command{},
 		&scalarnet.CallContractWithToken{},
 		&scalarnet.TokenSentApproved{},
