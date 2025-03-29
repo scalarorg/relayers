@@ -456,7 +456,7 @@ func (c *EvmClient) ListenToEvents(ctx context.Context) error {
 			return WatchForEvent[*contracts.IScalarGatewayTokenDeployed](c, ctx, events.EVENT_EVM_TOKEN_DEPLOYED)
 		}},
 		{events.EVENT_EVM_SWITCHED_PHASE, func(ctx context.Context) error {
-			return WatchForEvent[*contracts.IScalarGatewaySwitchedPhase](c, ctx, events.EVENT_EVM_SWITCHED_PHASE)
+			return WatchForEvent[*contracts.IScalarGatewaySwitchPhase](c, ctx, events.EVENT_EVM_SWITCHED_PHASE)
 		}},
 	}
 
@@ -482,7 +482,7 @@ type ValidWatchEvent interface {
 		*contracts.IScalarGatewayContractCallApproved |
 		*contracts.IScalarGatewayExecuted |
 		*contracts.IScalarGatewayTokenDeployed |
-		*contracts.IScalarGatewaySwitchedPhase
+		*contracts.IScalarGatewaySwitchPhase
 }
 
 const (
@@ -586,7 +586,7 @@ func setupSubscription[T ValidWatchEvent](c *EvmClient, watchOpts *bind.WatchOpt
 	case events.EVENT_EVM_COMMAND_EXECUTED:
 		return c.Gateway.WatchExecuted(watchOpts, sinkInterface.(chan *contracts.IScalarGatewayExecuted), nil)
 	case events.EVENT_EVM_SWITCHED_PHASE:
-		return c.Gateway.WatchSwitchedPhase(watchOpts, sinkInterface.(chan *contracts.IScalarGatewaySwitchedPhase), nil)
+		return c.Gateway.WatchSwitchPhase(watchOpts, sinkInterface.(chan *contracts.IScalarGatewaySwitchPhase), nil, nil)
 	case events.EVENT_EVM_TOKEN_DEPLOYED:
 		return c.Gateway.WatchTokenDeployed(watchOpts, sinkInterface.(chan *contracts.IScalarGatewayTokenDeployed))
 	default:
@@ -676,14 +676,14 @@ func (c *EvmClient) handleEventLog(event abi.Event, txLog types.Log) error {
 		}
 		return c.HandleTokenDeployed(tokenDeployed)
 	case events.EVENT_EVM_SWITCHED_PHASE:
-		switchedPhase := &contracts.IScalarGatewaySwitchedPhase{
+		switchedPhase := &contracts.IScalarGatewaySwitchPhase{
 			Raw: txLog,
 		}
 		err := parser.ParseEventData(&txLog, event.Name, switchedPhase)
 		if err != nil {
 			return fmt.Errorf("failed to parse event %s: %w", event.Name, err)
 		}
-		return c.HandleSwitchedPhase(switchedPhase)
+		return c.HandleSwitchPhase(switchedPhase)
 	default:
 		return fmt.Errorf("invalid event type for %s: %T", event.Name, txLog)
 	}

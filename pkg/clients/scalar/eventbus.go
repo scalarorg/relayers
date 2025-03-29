@@ -115,7 +115,8 @@ func (c *Client) requestConfirmSwitchedPhase(switchedPhase *chains.SwitchedPhase
 	log.Debug().
 		Str("TxHash", switchedPhase.TxHash).
 		Uint64("SessionSequence", switchedPhase.SessionSequence).
-		Uint8("Phase", switchedPhase.Phase).
+		Uint8("From", switchedPhase.From).
+		Uint8("To", switchedPhase.To).
 		Msgf("[ScalarClient] [requestConfirmSwitchedPhase] Confirm switched phase")
 	c.broadcaster.ConfirmSwitchedPhase(switchedPhase)
 	return nil

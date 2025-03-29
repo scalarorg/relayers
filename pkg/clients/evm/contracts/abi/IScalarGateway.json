@@ -1109,8 +1109,14 @@
   },
   {
     "type": "event",
-    "name": "SwitchedPhase",
+    "name": "SwitchPhase",
     "inputs": [
+      {
+        "name": "custodianGroupId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
       {
         "name": "sequence",
         "type": "uint64",
@@ -1118,7 +1124,13 @@
         "internalType": "uint64"
       },
       {
-        "name": "phase",
+        "name": "from",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum ScalarGateway.Phase"
+      },
+      {
+        "name": "to",
         "type": "uint8",
         "indexed": false,
         "internalType": "enum ScalarGateway.Phase"
