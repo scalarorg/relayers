@@ -3,6 +3,7 @@ package evm_test
 import (
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/scalarorg/relayers/pkg/clients/evm"
@@ -53,7 +54,9 @@ func TestInput(t *testing.T) {
 	t.Logf("DecodedExecuteData: %+v", decodedExecuteData)
 }
 func TestDecodeExecuteDeployToken(t *testing.T) {
-	decodedExecuteData, err := evm.DecodeExecuteData(executeDeployToken)
+	executeData := strings.TrimPrefix(executeDeployToken, "0x")
+	//executeData = strings.TrimPrefix(BIG_EXECUTE_DATA, "0x")
+	decodedExecuteData, err := evm.DecodeExecuteData(executeData)
 	t.Logf("decodedExecuteData: %v", decodedExecuteData)
 	assert.Nil(t, err)
 	if len(decodedExecuteData.Params) > 0 {

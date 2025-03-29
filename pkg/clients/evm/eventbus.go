@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/events"
@@ -135,7 +136,16 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 		Str("BatchedCommandID", batchedCmdRes.ID).
 		Any("CommandIDs", batchedCmdRes.CommandIDs).
 		Msg("[EvmClient] [handleScalarBatchCommandSigned]")
-	decodedExecuteData, err := DecodeExecuteData(batchedCmdRes.ExecuteData)
+	executeDataBytes, err := hex.DecodeString(batchedCmdRes.ExecuteData)
+	if err != nil {
+		return fmt.Errorf("failed to decode execute data: %w", err)
+	}
+	input, err := AbiUnpack(executeDataBytes[4:], "bytes")
+	if err != nil {
+		log.Debug().Msgf("[EvmClient] [DecodeExecuteData] unpack executeData error: %v", err)
+	}
+	//decodedExecuteData, err := DecodeExecuteData(batchedCmdRes.ExecuteData)
+	decodedExecuteData, err := DecodeInput(input[0].([]byte))
 	if err != nil {
 		return fmt.Errorf("failed to decode execute data: %w", err)
 	}
@@ -148,7 +158,23 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 			Msg("[EvmClient] [handleScalarBatchCommandSigned] auth is nil")
 		return fmt.Errorf("[EvmClient] [handleScalarBatchCommandSigned] auth is nil")
 	}
-	//Todo: check if token is not yet deployed on the chain
+	//Estimate gas
+
+	gas, err := ec.Client.EstimateGas(context.Background(), ethereum.CallMsg{
+		From: ec.auth.From,
+		To:   &ec.GatewayAddress,
+		Data: executeDataBytes,
+	})
+	if gas > ec.auth.GasLimit {
+		ec.auth.GasLimit = gas
+	}
+	if err != nil {
+		log.Error().Err(err).
+			Msg("[EvmClient] [handleScalarBatchCommandSigned] failed to estimate gas")
+		return err
+	}
+
+	//Todo: check if input is not yet broadcasted to the chain
 	//Get signed tx only then try check if the tx is already mined, then get the receipt and process the event
 	//If signed tx is not mined, then send the tx to the network
 	ec.auth.NoSend = true
