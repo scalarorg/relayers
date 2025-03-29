@@ -197,6 +197,9 @@ func (c *Client) handleTokenSents(tokenSents []*chains.TokenSent) error {
 		if c.electrumConfig.Confirmations <= 1 || c.currentHeight-int(tokenSent.BlockNumber) >= c.electrumConfig.Confirmations {
 			tokenSent.Status = chains.TokenSentStatusVerifying
 			confirmTxs.TxHashs[tokenSent.TxHash] = tokenSent.DestinationChain
+		} else {
+			log.Debug().Msgf("[ElectrumClient] [handleTokenSents] BridgeTx %s does not have enough %d confirmed yet",
+				tokenSent.TxHash, c.electrumConfig.Confirmations)
 		}
 	}
 
@@ -218,6 +221,8 @@ func (c *Client) handleTokenSents(tokenSents []*chains.TokenSent) error {
 		} else {
 			log.Warn().Msg("[ElectrumClient] [vaultTxMessageHandler] event bus is undefined")
 		}
+	} else {
+		log.Debug().Msgf("[ElectrumClient] [handleTokenSents] No tokensent have enough %d confirmations to broadcast", c.electrumConfig.Confirmations)
 	}
 	return nil
 }
