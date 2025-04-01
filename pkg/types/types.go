@@ -6,7 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/scalarorg/bitcoin-vault/go-utils/btc"
 	"github.com/scalarorg/bitcoin-vault/go-utils/types"
-	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 )
 
 type ExecuteParams struct {
@@ -97,10 +96,10 @@ type PsbtParams struct {
 	CustodianScript []byte
 }
 
-type SignPsbtsRequest struct {
-	ChainName string
-	Psbts     []covExported.Psbt
-}
+//	type SignPsbtsRequest struct {
+//		ChainName string
+//		Psbts     []covExported.Psbt
+//	}
 type CreatePsbtRequest struct {
 	Outpoints []CommandOutPoint
 	Params    PsbtParams

@@ -3,10 +3,10 @@ package events
 import "github.com/scalarorg/relayers/pkg/types"
 
 const (
-	CUSTODIAL_NETWORK_NAME               = "Custodial.Network"
-	SCALAR_NETWORK_NAME                  = "Scalar.Network"
-	EVENT_BTC_SIGNATURE_REQUESTED        = "Btc.SignatureRequested"
-	EVENT_BTC_PSBT_SIGN_REQUEST          = "Btc.PsbtSignRequest"
+	CUSTODIAL_NETWORK_NAME        = "Custodial.Network"
+	SCALAR_NETWORK_NAME           = "Scalar.Network"
+	EVENT_BTC_SIGNATURE_REQUESTED = "Btc.SignatureRequested"
+	//EVENT_BTC_PSBT_SIGN_REQUEST          = "Btc.PsbtSignRequest"
 	EVENT_CUSTODIAL_SIGNATURES_CONFIRMED = "Custodial.SignaturesConfirmed"
 	EVENT_ELECTRS_VAULT_TRANSACTION      = "Electrs.VaultTransaction"
 	EVENT_ELECTRS_REDEEM_TRANSACTION     = "Electrs.RedeemTransaction"

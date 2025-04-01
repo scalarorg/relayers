@@ -47,7 +47,7 @@ func (c *Client) ProcessPendingCommands(ctx context.Context) {
 	// Start a goroutine to process batch commands
 	// go c.processBatchCommands(ctx)
 	//Start a goroutine to process pending commands in pooling model
-	go c.processPsbtCommands(ctx)
+	// go c.processPsbtCommands(ctx)
 	// Start a goroutine to process pending commands in upc model
 	// go c.processUpcCommands(ctx)
 	counter := 0
@@ -342,37 +342,37 @@ func (c *Client) processBatchCommands(ctx context.Context) {
 //			}
 //		}
 //	}
-/*
-* Process pending commands in pooling model
-* 1. Get the first psbt from the pending buffer
-* 2. Check if the latest batch command is not in signing process
-* 3. Send new sign psbt request
-* 4. Wait for the sign event
-* 5. Store the tx hash to the pending buffer
-* 6. Remove the psbt from the pending buffer
- */
-func (c *Client) processPsbtCommands(ctx context.Context) {
-	for {
-		hashes := c.pendingCommands.GetFirstPsbts()
-		for chain, psbt := range hashes {
-			//Check if the latest batch command is not in signing process
-			//Query the latest batch command by set batchedCommandId to empty string
-			// isInSigningProcess := c.hasSigningBatchCommandInNetwork(ctx, chain)
-			// if isInSigningProcess {
-			// 	log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] The latest batch command is in signing process, skip send new sign command request")
-			// 	continue
-			// }
-			err := c.broadcaster.AddSignPsbtCommandsRequest(chain, psbt)
-			if err != nil {
-				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] failed to add SignPsbtCommandRequest to the broadcaster's buffer")
-			} else {
-				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] Successfully added SignPsbtCommandRequest to the broadcaster's buffer. Remove it from pending buffer")
-				c.pendingCommands.RemovePsbt(chain, psbt)
-			}
-		}
-		time.Sleep(time.Second * 3)
-	}
-}
+// /*
+// * Process pending commands in pooling model
+// * 1. Get the first psbt from the pending buffer
+// * 2. Check if the latest batch command is not in signing process
+// * 3. Send new sign psbt request
+// * 4. Wait for the sign event
+// * 5. Store the tx hash to the pending buffer
+// * 6. Remove the psbt from the pending buffer
+//  */
+// func (c *Client) processPsbtCommands(ctx context.Context) {
+// 	for {
+// 		hashes := c.pendingCommands.GetFirstPsbts()
+// 		for chain, psbt := range hashes {
+// 			//Check if the latest batch command is not in signing process
+// 			//Query the latest batch command by set batchedCommandId to empty string
+// 			// isInSigningProcess := c.hasSigningBatchCommandInNetwork(ctx, chain)
+// 			// if isInSigningProcess {
+// 			// 	log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] The latest batch command is in signing process, skip send new sign command request")
+// 			// 	continue
+// 			// }
+// 			err := c.broadcaster.AddSignPsbtCommandsRequest(chain, psbt)
+// 			if err != nil {
+// 				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] failed to add SignPsbtCommandRequest to the broadcaster's buffer")
+// 			} else {
+// 				log.Debug().Str("Chain", chain).Msg("[ScalarClient] [processPsbtCommands] Successfully added SignPsbtCommandRequest to the broadcaster's buffer. Remove it from pending buffer")
+// 				c.pendingCommands.RemovePsbt(chain, psbt)
+// 			}
+// 		}
+// 		time.Sleep(time.Second * 3)
+// 	}
+// }
 
 /*
 * Process pending commands in upc model

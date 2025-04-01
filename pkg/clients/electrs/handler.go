@@ -18,6 +18,7 @@ func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err err
 		log.Debug().Msg("[ElectrumClient] [BlockchainHeaderHandler] No blockchain header received")
 		return nil
 	}
+
 	c.currentHeight = header.Height
 
 	err = c.tryConfirmTokenSents(header.Height)
@@ -31,20 +32,20 @@ func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err err
 		log.Error().Err(err).Msg("[ElectrumClient] [BlockchainHeaderHandler] Failed to handle redeem transaction")
 		return fmt.Errorf("failed to handle redeem transaction: %w", err)
 	}
-	// if c.eventBus != nil {
-	// 	log.Debug().Msgf("[ElectrumClient] [BlockchainHeaderHandler] Broadcasting new block event: %v", header.Height)
-	// 	blockHeight := events.ChainBlockHeight{
-	// 		Chain:  c.electrumConfig.SourceChain,
-	// 		Height: uint64(header.Height),
-	// 	}
-	// 	c.eventBus.BroadcastEvent(&events.EventEnvelope{
-	// 		EventType:        events.EVENT_ELECTRS_NEW_BLOCK,
-	// 		DestinationChain: events.SCALAR_NETWORK_NAME,
-	// 		Data:             blockHeight,
-	// 	})
-	// } else {
-	// 	log.Warn().Msg("[ElectrumClient] [BlockchainHeaderHandler] event bus is undefined")
-	// }
+	if c.eventBus != nil {
+		log.Debug().Msgf("[ElectrumClient] [BlockchainHeaderHandler] Broadcasting new block event: %v", header.Height)
+		blockHeight := events.ChainBlockHeight{
+			Chain:  c.electrumConfig.SourceChain,
+			Height: uint64(header.Height),
+		}
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_ELECTRS_NEW_BLOCK,
+			DestinationChain: events.SCALAR_NETWORK_NAME,
+			Data:             blockHeight,
+		})
+	} else {
+		log.Warn().Msg("[ElectrumClient] [BlockchainHeaderHandler] event bus is undefined")
+	}
 	return nil
 }
 

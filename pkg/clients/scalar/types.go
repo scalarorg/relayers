@@ -131,7 +131,7 @@ func UnmarshalSwitchPhaseStarted(jsonData map[string]string, e *covtypes.SwitchP
 	}
 	e.Sequence = sequence
 	e.ExecuteData = removeQuote(jsonData["execute_data"])
-	e.Phase = covtypes.Phase(covtypes.Phase_value[removeQuote(jsonData["phase"])])
+	e.Phase = covExported.Phase(covExported.Phase_value[removeQuote(jsonData["phase"])])
 	return nil
 }
 

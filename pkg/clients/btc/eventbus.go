@@ -24,9 +24,9 @@ func (c *BtcClient) handleEventBusMessage(event *events.EventEnvelope) error {
 	case events.EVENT_SCALAR_DEST_CALL_APPROVED:
 		//Broadcast from scalar.handleContractCallApprovedEvent
 		return c.handleScalarContractCallApproved(event.MessageID, event.Data.(string))
-	case events.EVENT_SCALAR_CREATE_PSBT_REQUEST:
-		//Broadcast from scalar.handleContractCallApprovedEvent
-		return c.handleScalarCreatePsbtRequest(event.MessageID, event.Data.(types.CreatePsbtRequest))
+	// case events.EVENT_SCALAR_CREATE_PSBT_REQUEST:
+	// 	//Broadcast from scalar.handleContractCallApprovedEvent
+	// 	return c.handleScalarCreatePsbtRequest(event.MessageID, event.Data.(types.CreatePsbtRequest))
 	case events.EVENT_SCALAR_BATCHCOMMAND_SIGNED:
 		return c.handleScalarBatchCommandSigned(event.DestinationChain, event.Data.(*chainstypes.BatchedCommandsResponse))
 	case events.EVENT_CUSTODIAL_SIGNATURES_CONFIRMED:
@@ -62,32 +62,32 @@ func (c *BtcClient) handleScalarContractCallApproved(messageID string, executeDa
 }
 
 // Todo: form psbt for triangle model
-func (c *BtcClient) handleScalarCreatePsbtRequest(messageId string, psbtSigningRequest types.CreatePsbtRequest) error {
-	// outpoints := []CommandOutPoint{}
-	// for _, cmd := range psbtSigningRequest.Commands {
-	// 	commandOutPoint, err := ParseCommand(cmd)
-	// 	if err != nil {
-	// 		log.Error().Err(err).Msg("[BtcClient] [handleScalarCreatePsbtRequest] failed to parse command")
-	// 	}
-	// 	outpoints = append(outpoints, commandOutPoint)
-	// }
-	psbts, err := c.CreatePsbts(psbtSigningRequest.Params, psbtSigningRequest.Outpoints)
-	if err != nil {
-		return fmt.Errorf("failed to create psbts: %w", err)
-	}
+// func (c *BtcClient) handleScalarCreatePsbtRequest(messageId string, psbtSigningRequest types.CreatePsbtRequest) error {
+// 	// outpoints := []CommandOutPoint{}
+// 	// for _, cmd := range psbtSigningRequest.Commands {
+// 	// 	commandOutPoint, err := ParseCommand(cmd)
+// 	// 	if err != nil {
+// 	// 		log.Error().Err(err).Msg("[BtcClient] [handleScalarCreatePsbtRequest] failed to parse command")
+// 	// 	}
+// 	// 	outpoints = append(outpoints, commandOutPoint)
+// 	// }
+// 	psbts, err := c.CreatePsbts(psbtSigningRequest.Params, psbtSigningRequest.Outpoints)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to create psbts: %w", err)
+// 	}
 
-	// 2. Send unsigned finalized psbt to scalar client for broadcasting to scalar node to get signed pbst
-	c.eventBus.BroadcastEvent(&events.EventEnvelope{
-		EventType:        events.EVENT_BTC_PSBT_SIGN_REQUEST,
-		DestinationChain: events.SCALAR_NETWORK_NAME,
-		MessageID:        messageId,
-		Data: types.SignPsbtsRequest{
-			ChainName: c.btcConfig.ID,
-			Psbts:     psbts,
-		},
-	})
-	return nil
-}
+// 	// 2. Send unsigned finalized psbt to scalar client for broadcasting to scalar node to get signed pbst
+// 	c.eventBus.BroadcastEvent(&events.EventEnvelope{
+// 		EventType:        events.EVENT_BTC_PSBT_SIGN_REQUEST,
+// 		DestinationChain: events.SCALAR_NETWORK_NAME,
+// 		MessageID:        messageId,
+// 		Data: types.SignPsbtsRequest{
+// 			ChainName: c.btcConfig.ID,
+// 			Psbts:     psbts,
+// 		},
+// 	})
+// 	return nil
+// }
 
 // Broadcast signed psbt to the bitcoin network
 func (c *BtcClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRes *chainstypes.BatchedCommandsResponse) error {

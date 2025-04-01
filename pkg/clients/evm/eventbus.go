@@ -170,7 +170,8 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 	}
 	if err != nil {
 		log.Error().Err(err).
-			Msg("[EvmClient] [handleScalarBatchCommandSigned] failed to estimate gas")
+			Str("BatchedCommandID", batchedCmdRes.ID).
+			Msg("[EvmClient] [handleScalarBatchCommandSigned] failed to estimate gas of the batched command ")
 		return err
 	}
 

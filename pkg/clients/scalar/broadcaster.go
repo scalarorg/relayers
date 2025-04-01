@@ -15,7 +15,6 @@ import (
 	"github.com/scalarorg/scalar-core/utils"
 	chainsExported "github.com/scalarorg/scalar-core/x/chains/exported"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
-	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	nexus "github.com/scalarorg/scalar-core/x/nexus/exported"
 )
@@ -132,6 +131,16 @@ func (c *Broadcaster) ConfirmRedeemTxRequest(redeemRequest events.ConfirmRedeemT
 	return c.QueueTxMsg(msg)
 }
 
+func (c *Broadcaster) InitializeUtxoRequest(chain string, height uint64) error {
+	log.Debug().Str("Chain", chain).Uint64("Height", height).Msg("[Broadcaster] [InitializeUtxoRequest] Initialize utxo request")
+	msg := covtypes.NewInitializeUtxoRequest(
+		c.network.GetAddress(),
+		nexus.ChainName(chain),
+		height,
+	)
+	return c.QueueTxMsg(msg)
+}
+
 //	func (c *Broadcaster) NewBtcBlock(blockHeight events.ChainBlockHeight) error {
 //		msg := covtypes.NewUpdateUtxoListsRequest(
 //			c.network.GetAddress(),
@@ -172,16 +181,6 @@ func (c *Broadcaster) ConfirmSwitchedPhase(switchedPhase *chains.SwitchedPhase) 
 		switchedPhase.TxHash,
 	)
 	return c.QueueTxMsg(msg)
-}
-
-// Add SignPsbtCommandsRequest to buffer
-// Return true if the request is added to buffer, false if the request is already in buffer
-func (c *Broadcaster) AddSignPsbtCommandsRequest(destinationChain string, psbt covExported.Psbt) error {
-	req := chainstypes.NewSignPsbtCommandRequest(
-		c.network.GetAddress(),
-		destinationChain,
-		psbt)
-	return c.QueueSignCommandReq(destinationChain, req)
 }
 
 // Add SignBtcCommandsRequest to buffer

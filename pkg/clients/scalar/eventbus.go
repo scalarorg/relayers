@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/events"
-	"github.com/scalarorg/relayers/pkg/types"
 )
 
 func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
@@ -18,16 +17,16 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 	case events.EVENT_ELECTRS_REDEEM_TRANSACTION:
 		//Broadcast from electrs.handleRedeemTransaction
 		return c.broadcaster.ConfirmRedeemTxRequest(event.Data.(events.ConfirmRedeemTxRequest))
-	// case events.EVENT_ELECTRS_NEW_BLOCK:
-	// 	return c.broadcaster.NewBtcBlock(event.Data.(events.ChainBlockHeight))
+	case events.EVENT_ELECTRS_NEW_BLOCK:
+		return c.handleElectrsEventNewBlock(event.Data.(events.ChainBlockHeight))
 	case events.EVENT_EVM_TOKEN_SENT, events.EVENT_EVM_CONTRACT_CALL, events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN:
 		return c.requestConfirmEvmTxs(event.Data.(events.ConfirmTxsRequest))
 	case events.EVENT_EVM_TOKEN_DEPLOYED:
 		return c.requestConfirmTokenDeployed(event.Data.(*chains.TokenDeployed))
 	case events.EVENT_EVM_SWITCHED_PHASE:
 		return c.requestConfirmSwitchedPhase(event.Data.(*chains.SwitchedPhase))
-	case events.EVENT_BTC_PSBT_SIGN_REQUEST:
-		return c.requestPsbtSign(event.Data.(types.SignPsbtsRequest))
+		// case events.EVENT_BTC_PSBT_SIGN_REQUEST:
+		// 	return c.requestPsbtSign(event.Data.(types.SignPsbtsRequest))
 	}
 
 	return nil
@@ -62,13 +61,22 @@ func (c *Client) requestConfirmEvmTxs(confirmRequest events.ConfirmTxsRequest) e
 	}
 	return nil
 }
-
-// Add psbts to pendingChainPsbtCommands
-func (c *Client) requestPsbtSign(psbt types.SignPsbtsRequest) error {
-	log.Debug().Str("ChainName", psbt.ChainName).Int("psbtCount", len(psbt.Psbts)).Msgf("[ScalarClient] [requestPsbtSign] Set psbts to pendingChainPsbtCommands")
-	c.pendingCommands.StorePsbts(psbt.ChainName, psbt.Psbts)
+func (c *Client) handleElectrsEventNewBlock(blockHeight events.ChainBlockHeight) error {
+	log.Debug().Uint64("blockHeight", blockHeight.Height).Msg("[ScalarClient] [handleElectrsEventNewBlock] Received new block event")
+	// Todo: init utxo for first time
+	if !c.initUtxo {
+		c.broadcaster.InitializeUtxoRequest(blockHeight.Chain, blockHeight.Height)
+		c.initUtxo = true
+	}
 	return nil
 }
+
+// Add psbts to pendingChainPsbtCommands
+// func (c *Client) requestPsbtSign(psbt types.SignPsbtsRequest) error {
+// 	log.Debug().Str("ChainName", psbt.ChainName).Int("psbtCount", len(psbt.Psbts)).Msgf("[ScalarClient] [requestPsbtSign] Set psbts to pendingChainPsbtCommands")
+// 	c.pendingCommands.StorePsbts(psbt.ChainName, psbt.Psbts)
+// 	return nil
+// }
 
 func (c *Client) extractValidConfirmTxs(confirmRequest events.ConfirmTxsRequest) (string, []string) {
 	txHashes := make([]string, 0)
