@@ -77,12 +77,12 @@ func (c *BtcClient) GetAddressTxsUtxo(taprootAddress string, totalAmount uint64)
 		return nil, fmt.Errorf("total amount must be greater than 0")
 	}
 
-	utxos, err := c.getListOfUTXOs(taprootAddress)
+	utxos, err := c.GetListOfUTXOs(taprootAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 
-	utxos = sortUTXOsByValue(utxos)
+	utxos = SortUTXOsByBlockHeight(utxos)
 
 	selectedUTXOs := make([]Utxo, 0, len(utxos))
 	totalValue := uint64(0)
@@ -103,7 +103,7 @@ func (c *BtcClient) GetAddressTxsUtxo(taprootAddress string, totalAmount uint64)
 	return selectedUTXOs, nil
 }
 
-func (c BtcClient) getListOfUTXOs(taprootAddress string) ([]Utxo, error) {
+func (c BtcClient) GetListOfUTXOs(taprootAddress string) ([]Utxo, error) {
 	url := fmt.Sprintf("%s/address/%s/utxo", c.btcConfig.MempoolUrl, taprootAddress)
 
 	resp, err := http.Get(url)
@@ -127,9 +127,10 @@ func (c BtcClient) getListOfUTXOs(taprootAddress string) ([]Utxo, error) {
 
 }
 
-func sortUTXOsByValue(utxos []Utxo) []Utxo {
+func SortUTXOsByBlockHeight(utxos []Utxo) []Utxo {
 	sort.Slice(utxos, func(i, j int) bool {
-		return utxos[i].Value > utxos[j].Value
+		return (utxos[i].Status.BlockHeight < utxos[j].Status.BlockHeight) ||
+			(utxos[i].Status.BlockHeight == utxos[j].Status.BlockHeight && utxos[i].Txid < utxos[j].Txid)
 	})
 	return utxos
 }

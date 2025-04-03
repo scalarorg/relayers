@@ -56,6 +56,26 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// CGO_LDFLAGS="-L./lib -lbitcoin_vault_ffi" CGO_CFLAGS="-I./lib" go test -timeout 10m -run ^TestGetUtxtSnapshot$ github.com/scalarorg/relayers/pkg/clients/btc -v -count=1
+func TestGetUtxtSnapshot(t *testing.T) {
+	taprootAddress := "tb1p4r79pkrlzmvf9dx56zraykwq4dqhuyrtq39jjxnh9rf2uy6rmelspm6j23"
+	utxos, err := btcClient.GetListOfUTXOs(taprootAddress)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, utxos)
+	utxos = btc.SortUTXOsByBlockHeight(utxos)
+	for _, utxo := range utxos {
+		fmt.Println(utxo.Status.BlockHeight, utxo.Txid, utxo.Vout, utxo.Value)
+	}
+	fmt.Println("--------------------------------")
+	utxos, err = btcClient.GetListOfUTXOs(taprootAddress)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, utxos)
+	utxos = btc.SortUTXOsByBlockHeight(utxos)
+	for _, utxo := range utxos {
+		fmt.Println(utxo.Status.BlockHeight, utxo.Txid, utxo.Vout, utxo.Value)
+	}
+}
+
 // CGO_LDFLAGS="-L./lib -lbitcoin_vault_ffi" CGO_CFLAGS="-I./lib" go test -timeout 10m -run ^TestGetAddressTxsUtxo$ github.com/scalarorg/relayers/pkg/clients/btc -v -count=1
 func TestGetAddressTxsUtxo(t *testing.T) {
 	utxos, err := btcClient.GetAddressTxsUtxo(TAPROOT_ADDRESS, 200000)

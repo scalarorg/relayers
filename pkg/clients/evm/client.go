@@ -621,6 +621,11 @@ func handleEvent(c *EvmClient, eventName string, event any) error {
 			return c.HandleTokenDeployed(evt)
 		}
 		return fmt.Errorf("cannot parse event %s: %T to %T", eventName, event, (*contracts.IScalarGatewayTokenDeployed)(nil))
+	case events.EVENT_EVM_SWITCHED_PHASE:
+		if evt, ok := event.(*contracts.IScalarGatewaySwitchPhase); ok {
+			return c.HandleSwitchPhase(evt)
+		}
+		return fmt.Errorf("cannot parse event %s: %T to %T", eventName, event, (*contracts.IScalarGatewaySwitchPhase)(nil))
 	}
 	return fmt.Errorf("invalid event type for %s: %T", eventName, event)
 }
