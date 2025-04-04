@@ -172,12 +172,15 @@ func (c *Broadcaster) ConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed) 
 
 func (c *Broadcaster) ConfirmSwitchedPhase(switchedPhase *chains.SwitchedPhase) error {
 	log.Debug().Str("TxHash", switchedPhase.TxHash).
+		Str("Chain", switchedPhase.Chain).
+		Str("CustodianGroupUid", switchedPhase.CustodianGroupUid).
 		Uint64("SessionSequence", switchedPhase.SessionSequence).
 		Uint8("From", switchedPhase.From).
 		Uint8("To", switchedPhase.To).Msgf("[Broadcaster] [ConfirmSwitchedPhase] Confirm switched phase")
 	msg := covtypes.NewConfirmSwitchedPhaseRequest(
 		c.network.GetAddress(),
 		switchedPhase.Chain,
+		switchedPhase.CustodianGroupUid,
 		switchedPhase.TxHash,
 	)
 	return c.QueueTxMsg(msg)
