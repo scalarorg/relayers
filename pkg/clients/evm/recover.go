@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -37,8 +38,16 @@ func (c *EvmClient) ProcessMissingLogs() {
 	for _, event := range scalarGatewayAbi.Events {
 		mapEvents[event.ID.String()] = event
 	}
-	for !c.MissingLogs.IsRecovered() {
+	for {
 		logs := c.MissingLogs.GetLogs(10)
+		if len(logs) == 0 {
+			//We recovered all logs, and no more logs to process
+			if c.MissingLogs.IsRecovered() {
+				break
+			}
+			time.Sleep(time.Second)
+			continue
+		}
 		for _, txLog := range logs {
 			topic := txLog.Topics[0].String()
 			event, ok := mapEvents[topic]
@@ -52,7 +61,13 @@ func (c *EvmClient) ProcessMissingLogs() {
 				Str("txHash", txLog.TxHash.String()).
 				Msg("[EvmClient] [ProcessMissingLogs] start processing missing event")
 			if event.Name == events.EVENT_EVM_SWITCHED_PHASE {
-				lastSwitchedPhaseEvent = &txLog
+				if lastSwitchedPhaseEvent == nil {
+					lastSwitchedPhaseEvent = &txLog
+				} else {
+					if lastSwitchedPhaseEvent.BlockNumber < txLog.BlockNumber || (lastSwitchedPhaseEvent.BlockNumber == txLog.BlockNumber && lastSwitchedPhaseEvent.TxIndex < txLog.TxIndex) {
+						lastSwitchedPhaseEvent = &txLog
+					}
+				}
 			} else {
 				err := c.handleEventLog(event, txLog)
 				if err != nil {
@@ -62,6 +77,9 @@ func (c *EvmClient) ProcessMissingLogs() {
 		}
 	}
 	if lastSwitchedPhaseEvent != nil {
+		log.Info().Str("Chain", c.EvmConfig.ID).
+			Any("LastSwitchedPhaseEvent", lastSwitchedPhaseEvent).
+			Msg("[EvmClient] [ProcessMissingLogs] processing last switched phase event")
 		c.handleEventLog(scalarGatewayAbi.Events[events.EVENT_EVM_SWITCHED_PHASE], *lastSwitchedPhaseEvent)
 	}
 	log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] finished processing all missing evm events")

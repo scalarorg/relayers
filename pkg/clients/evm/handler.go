@@ -331,10 +331,12 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecut
 		} else {
 			log.Warn().Any("command", command).Msg("[EvmClient] [HandleCommandExecuted] command not found in scalarnet")
 		}
-		err = ec.dbAdapter.SaveCommandExecuted(&cmdExecuted, command, cmdExecuted.CommandID)
-		if err != nil {
-			log.Error().Err(err).Msg("[EvmClient] [HandleCommandExecuted] failed to save evm executed to the db")
-			return fmt.Errorf("failed to create evm executed: %w", err)
+		if ec.dbAdapter != nil {
+			err = ec.dbAdapter.SaveCommandExecuted(&cmdExecuted, command, cmdExecuted.CommandID)
+			if err != nil {
+				log.Error().Err(err).Msg("[EvmClient] [HandleCommandExecuted] failed to save evm executed to the db")
+				return fmt.Errorf("failed to create evm executed: %w", err)
+			}
 		}
 	}
 	return nil
@@ -351,9 +353,11 @@ func (ec *EvmClient) HandleTokenDeployed(event *contracts.IScalarGatewayTokenDep
 	log.Info().Any("event", event).Msg("[EvmClient] [HandleTokenDeployed] Start processing evm token deployed")
 	//1. Convert into a RelayData instance then store to the db
 	tokenDeployed := ec.TokenDeployedEvent2Model(event)
-	err := ec.dbAdapter.SaveTokenDeployed(&tokenDeployed)
-	if err != nil {
-		return fmt.Errorf("failed to create evm token deployed: %w", err)
+	if ec.dbAdapter != nil {
+		err := ec.dbAdapter.SaveTokenDeployed(&tokenDeployed)
+		if err != nil {
+			return fmt.Errorf("failed to create evm token deployed: %w", err)
+		}
 	}
 	//2. Send to the bus
 	if ec.eventBus != nil {
@@ -373,9 +377,11 @@ func (ec *EvmClient) HandleSwitchPhase(event *contracts.IScalarGatewaySwitchPhas
 	log.Info().Any("event", event).Msg("[EvmClient] [HandleSwitchPhase] Start processing evm switch phase")
 	//1. Convert into a RelayData instance then store to the db
 	switchPhase := ec.SwitchPhaseEvent2Model(event)
-	err := ec.dbAdapter.SaveSingleValue(&switchPhase)
-	if err != nil {
-		return fmt.Errorf("failed to create evm switch phase: %w", err)
+	if ec.dbAdapter != nil {
+		err := ec.dbAdapter.SaveSingleValue(&switchPhase)
+		if err != nil {
+			return fmt.Errorf("failed to create evm switch phase: %w", err)
+		}
 	}
 	//2. Send to the bus
 	if ec.eventBus != nil {
