@@ -81,7 +81,7 @@ func (ec *EvmClient) HandleContractCallWithToken(event *contracts.IScalarGateway
 	//1. Convert into a RelayData instance then store to the db
 	contractCallWithToken, err := ec.ContractCallWithToken2Model(event)
 	if err != nil {
-		return fmt.Errorf("failed to convert ContractCallEvent to RelayData: %w", err)
+		return fmt.Errorf("failed to convert ContractCallEvent to ContractCallWithToken: %w", err)
 	}
 	//2. update last checkpoint
 	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN, ec.EvmConfig.LastBlock)

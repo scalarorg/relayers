@@ -84,6 +84,7 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 
 	}
 	err = db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		//TODO: use original postgres for upsert command instead of timescaledb
 		storedCmdExecuted := chains.CommandExecuted{}
 		err = tx.Where("command_id = ?", cmdExecuted.CommandID).First(&storedCmdExecuted).Error
 		if err != nil {

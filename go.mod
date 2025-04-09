@@ -7,16 +7,16 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/cosmos/cosmos-sdk v0.45.16
 	github.com/cosmos/go-bip39 v1.0.0
-	github.com/ethereum/go-ethereum v1.14.12
+	github.com/ethereum/go-ethereum v1.14.13
 	github.com/go-playground/validator/v10 v10.22.1
 	github.com/gogo/protobuf v1.3.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/rs/zerolog v1.33.0
-	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250205093245-57c4541ffbc7
-	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250205093245-57c4541ffbc7
+	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250409030013-d7efef3d2c9d
+	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250409030013-d7efef3d2c9d
 	github.com/scalarorg/data-models v0.0.0-20250404024033-244a2fd7189e
 	github.com/scalarorg/go-electrum v0.1.2-0.20250113074812-84502fb16a1a
-	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250404032327-b430bf426653
+	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250409030932-b8b87e228e7b
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
