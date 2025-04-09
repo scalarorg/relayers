@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -57,10 +58,10 @@ func CalculateDestinationAddress(payload []byte, chainInfoBytes *chain.ChainInfo
 
 	if decodedPayload.CustodianOnly != nil {
 		identifier := decodedPayload.CustodianOnly.RecipientChainIdentifier
-
 		address, err := btc.ScriptPubKeyToAddress(identifier, params.Name)
 		if err != nil {
-			return "", fmt.Errorf("failed to convert script pubkey to address: %w", err)
+			return "", fmt.Errorf("failed to convert script pubkey %s to address with params name %s: %w",
+				hex.EncodeToString(identifier), params.Name, err)
 		}
 		return address.EncodeAddress(), nil
 	} else if decodedPayload.UPC != nil && decodedPayload.UPC.Psbt != nil {
@@ -73,7 +74,6 @@ func CalculateDestinationAddress(payload []byte, chainInfoBytes *chain.ChainInfo
 		}
 
 		identifier := packet.UnsignedTx.TxOut[1].PkScript
-
 		address, err := btc.ScriptPubKeyToAddress(identifier, params.Name)
 		if err != nil {
 			return "", fmt.Errorf("failed to convert script pubkey to address: %w", err)

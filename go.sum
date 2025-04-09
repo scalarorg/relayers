@@ -1458,8 +1458,10 @@ github.com/sasha-s/go-deadlock v0.3.5 h1:tNCOEEDG6tBqrNDOX35j/7hL5FcFViG6awUGROb
 github.com/sasha-s/go-deadlock v0.3.5/go.mod h1:bugP6EGbdGYObIlx7pUZtWqlvo8k9H6vCBBsiChJQ5U=
 github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250409030013-d7efef3d2c9d h1:bxYvH4Oeu8fs/A3tso5n7/xuSgZQD/YnRloO3Fn7WVI=
 github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250409030013-d7efef3d2c9d/go.mod h1:H0rK2XTVslkhUnzYxsEi/JU2GPW8ZXsMMMlWZGLEjBI=
-github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250409030013-d7efef3d2c9d h1:4EdT1UYEreZTLe8ClqBSgkM3mQhOmlSHMe8yLHKkvIU=
-github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250409030013-d7efef3d2c9d/go.mod h1:NaEUh4Mv/4YaPfSFLQpzSiYKYzha6R3RNFKFXfxrQB8=
+github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250409073524-71ae05950abd h1:jd2OAkXI+ujRh9FEudOJjw9CwyoYRIIO50fydPuEFOc=
+github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250409073524-71ae05950abd/go.mod h1:NaEUh4Mv/4YaPfSFLQpzSiYKYzha6R3RNFKFXfxrQB8=
+github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250409074352-eec5b904014f h1:ak+Iq+QJdUHpW4lNv9QRdaHIpJWlPDAZ0AwUikrnh/4=
+github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250409074352-eec5b904014f/go.mod h1:NaEUh4Mv/4YaPfSFLQpzSiYKYzha6R3RNFKFXfxrQB8=
 github.com/scalarorg/data-models v0.0.0-20250404024033-244a2fd7189e h1:ESRTxmKxJ3w/EhFxSTujGhvQJn63cTGEly2XZNv7QAs=
 github.com/scalarorg/data-models v0.0.0-20250404024033-244a2fd7189e/go.mod h1:kztLaPfTTMOCRcLqNZTCRw0dTJOw8GIB1wI4UhFh57o=
 github.com/scalarorg/go-electrum v0.1.2-0.20250113074812-84502fb16a1a h1:nChfsP2X/lIEK4wNk/z8dcE9JrRdMYt0ydsr+dlV5Zw=
