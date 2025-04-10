@@ -23,8 +23,10 @@ type ValidEvmEvent interface {
 	*contracts.IScalarGatewayContractCallApproved |
 		*contracts.IScalarGatewayContractCall |
 		*contracts.IScalarGatewayContractCallWithToken |
+		*contracts.IScalarGatewayRedeemToken |
 		*contracts.IScalarGatewayExecuted |
-		*contracts.IScalarGatewayTokenSent
+		*contracts.IScalarGatewayTokenSent |
+		*contracts.IScalarGatewaySwitchPhase
 }
 
 func getScalarGatewayAbi() (*abi.ABI, error) {

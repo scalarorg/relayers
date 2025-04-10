@@ -13,8 +13,10 @@ type ValidEvmEvent interface {
 	*contracts.IScalarGatewayContractCallApproved |
 		*contracts.IScalarGatewayContractCall |
 		*contracts.IScalarGatewayContractCallWithToken |
+		*contracts.IScalarGatewayRedeemToken |
 		*contracts.IScalarGatewayExecuted |
-		*contracts.IScalarGatewayTokenSent
+		*contracts.IScalarGatewayTokenSent |
+		*contracts.IScalarGatewaySwitchPhase
 }
 
 var (
@@ -50,6 +52,7 @@ func getEventIndexedArguments(eventName string) abi.Arguments {
 	return args
 }
 
+// TODO: change argument eventName to event
 func ParseEventData(receiptLog *eth_types.Log, eventName string, eventData any) error {
 	gatewayAbi := GetScalarGatewayAbi()
 	if gatewayAbi.Events[eventName].ID != receiptLog.Topics[0] {

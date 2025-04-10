@@ -16,7 +16,6 @@ import (
 	utiltypes "github.com/scalarorg/bitcoin-vault/go-utils/types"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
-	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
 	"github.com/scalarorg/relayers/pkg/utils"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
@@ -114,11 +113,11 @@ func (c *Client) tryProcessPendingCommands(ctx context.Context, chain string) bo
 		// c.pendingCommands.StoreSignRequest(chain, signRes.TxHash)
 		// log.Debug().Msgf("[ScalarClient] [checkChainPendingCommands] Successfully broadcasted sign commands request with txHash: %s. Add it to pendingSignCommandTxs...", signRes.TxHash)
 	} else if chainstypes.IsBitcoinChain(nexusChain) {
-		return c.processBtcPendingCommands(ctx, chain, pendingCommands)
+		return c.processBtcPendingCommands(chain, pendingCommands)
 	}
 	return true
 }
-func (c *Client) processBtcPendingCommands(ctx context.Context, chain string, pendingCommands []chainstypes.QueryCommandResponse) bool {
+func (c *Client) processBtcPendingCommands(chain string, pendingCommands []chainstypes.QueryCommandResponse) bool {
 	// Find out the liquidity model by key_id of the first command
 	liquidityModel, err := extractLiquidityModel(pendingCommands[0].KeyID)
 	if err != nil {
@@ -137,23 +136,25 @@ func (c *Client) processBtcPendingCommands(ctx context.Context, chain string, pe
 		}
 
 	} else if liquidityModel == protocol.LIQUIDITY_MODEL_POOL {
-		// If pending commands is for pooling model then we need to create a single psbt for whole batch command
-		commandOutpoints := c.tryCreateCommandOutpoints(pendingCommands)
-		if len(commandOutpoints) > 0 {
-			log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [processBtcPendingCommands] found %d commands in pooling model. Sent create psbt request to the bitcoin client", len(commandOutpoints))
-			psbtSigningRequest := types.CreatePsbtRequest{
-				Outpoints: commandOutpoints,
-				Params:    c.GetPsbtParams(chain),
-			}
-			eventEnvelope := events.EventEnvelope{
-				EventType:        events.EVENT_SCALAR_CREATE_PSBT_REQUEST,
-				DestinationChain: chain,
-				Data:             psbtSigningRequest,
-			}
-			c.eventBus.BroadcastEvent(&eventEnvelope)
-		} else {
-			log.Warn().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] cannot extract outpoints from pending commands in pooling model. Something wrong!!!")
-		}
+		// We do not need to create psbt for pooling model
+		// Scalar core will create psbt on timeout when finish preparing phase
+
+		// commandOutpoints := c.tryCreateCommandOutpoints(pendingCommands)
+		// if len(commandOutpoints) > 0 {
+		// 	log.Debug().Str("Chain", chain).Msgf("[ScalarClient] [processBtcPendingCommands] found %d commands in pooling model. Sent create psbt request to the bitcoin client", len(commandOutpoints))
+		// 	psbtSigningRequest := types.CreatePsbtRequest{
+		// 		Outpoints: commandOutpoints,
+		// 		Params:    c.GetPsbtParams(chain),
+		// 	}
+		// 	eventEnvelope := events.EventEnvelope{
+		// 		EventType:        events.EVENT_SCALAR_CREATE_PSBT_REQUEST,
+		// 		DestinationChain: chain,
+		// 		Data:             psbtSigningRequest,
+		// 	}
+		// 	c.eventBus.BroadcastEvent(&eventEnvelope)
+		// } else {
+		// 	log.Warn().Str("Chain", chain).Msg("[ScalarClient] [checkChainPendingCommands] cannot extract outpoints from pending commands in pooling model. Something wrong!!!")
+		// }
 	}
 	return true
 }

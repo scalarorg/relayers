@@ -19,7 +19,10 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 		return c.broadcaster.ConfirmRedeemTxRequest(event.Data.(events.ConfirmRedeemTxRequest))
 	case events.EVENT_ELECTRS_NEW_BLOCK:
 		return c.handleElectrsEventNewBlock(event.Data.(events.ChainBlockHeight))
-	case events.EVENT_EVM_TOKEN_SENT, events.EVENT_EVM_CONTRACT_CALL, events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN:
+	case events.EVENT_EVM_TOKEN_SENT,
+		events.EVENT_EVM_CONTRACT_CALL,
+		events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN,
+		events.EVENT_EVM_REDEEM_TOKEN:
 		return c.requestConfirmEvmTxs(event.Data.(events.ConfirmTxsRequest))
 	case events.EVENT_EVM_TOKEN_DEPLOYED:
 		return c.requestConfirmTokenDeployed(event.Data.(*chains.TokenDeployed))

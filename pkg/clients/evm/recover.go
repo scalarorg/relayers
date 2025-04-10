@@ -2,6 +2,7 @@ package evm
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"time"
@@ -12,7 +13,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/scalarnet"
+	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
+	"github.com/scalarorg/relayers/pkg/clients/evm/parser"
 	"github.com/scalarorg/relayers/pkg/events"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 )
 
 var (
@@ -23,28 +27,18 @@ var (
 		events.EVENT_EVM_CONTRACT_CALL_APPROVED,
 		events.EVENT_EVM_COMMAND_EXECUTED,
 		events.EVENT_EVM_TOKEN_DEPLOYED,
-		events.EVENT_EVM_SWITCHED_PHASE,
 	}
 )
-
-func (c *EvmClient) AppendLogs(logs []types.Log) {
-	c.MissingLogs.AppendLogs(logs)
-}
 
 // Go routine for process missing logs
 func (c *EvmClient) ProcessMissingLogs() {
 	mapEvents := map[string]abi.Event{}
-	var lastSwitchedPhaseEvent *types.Log
 	for _, event := range scalarGatewayAbi.Events {
 		mapEvents[event.ID.String()] = event
 	}
-	for {
+	for !c.MissingLogs.IsRecovered() {
 		logs := c.MissingLogs.GetLogs(10)
 		if len(logs) == 0 {
-			//We recovered all logs, and no more logs to process
-			if c.MissingLogs.IsRecovered() {
-				break
-			}
 			time.Sleep(time.Second)
 			continue
 		}
@@ -60,48 +54,123 @@ func (c *EvmClient) ProcessMissingLogs() {
 				Str("eventName", event.Name).
 				Str("txHash", txLog.TxHash.String()).
 				Msg("[EvmClient] [ProcessMissingLogs] start processing missing event")
-			if event.Name == events.EVENT_EVM_SWITCHED_PHASE {
-				if lastSwitchedPhaseEvent == nil {
-					lastSwitchedPhaseEvent = &txLog
-				} else {
-					if lastSwitchedPhaseEvent.BlockNumber < txLog.BlockNumber || (lastSwitchedPhaseEvent.BlockNumber == txLog.BlockNumber && lastSwitchedPhaseEvent.TxIndex < txLog.TxIndex) {
-						lastSwitchedPhaseEvent = &txLog
-					}
-				}
-			} else {
-				err := c.handleEventLog(event, txLog)
-				if err != nil {
-					log.Error().Err(err).Msg("[EvmClient] [ProcessMissingLogs] failed to handle event log")
-				}
+
+			err := c.handleEventLog(event, txLog)
+			if err != nil {
+				log.Error().Err(err).Msg("[EvmClient] [ProcessMissingLogs] failed to handle event log")
 			}
+
 		}
-	}
-	if lastSwitchedPhaseEvent != nil {
-		log.Info().Str("Chain", c.EvmConfig.ID).
-			Any("LastSwitchedPhaseEvent", lastSwitchedPhaseEvent).
-			Msg("[EvmClient] [ProcessMissingLogs] processing last switched phase event")
-		c.handleEventLog(scalarGatewayAbi.Events[events.EVENT_EVM_SWITCHED_PHASE], *lastSwitchedPhaseEvent)
 	}
 	log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] finished processing all missing evm events")
 }
-func (c *EvmClient) RecoverAllEvents(ctx context.Context) error {
-	log.Info().Str("Chain", c.EvmConfig.ID).Any("events", ALL_EVENTS).Msg("[EvmClient] [RecoverAllEvents] recovering all events")
-	return c.RecoverEvents(ctx, ALL_EVENTS)
+
+func (c *EvmClient) RecoverAllEvents(ctx context.Context, groups []*covExported.CustodianGroup) error {
+	currentBlockNumber, err := c.Client.BlockNumber(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get current block number: %w", err)
+	}
+	log.Info().Str("Chain", c.EvmConfig.ID).Uint64("Current BlockNumber", currentBlockNumber).
+		Msg("[EvmClient] [RecoverAllEvents] recovering all events")
+
+	//Recover switched phase event
+	mapSwitchedPhaseEvents, err := c.RecoverSwitchedPhaseEvent(ctx, currentBlockNumber, groups)
+	if err != nil {
+		return err
+	}
+	for _, switchedPhaseEvent := range mapSwitchedPhaseEvents {
+		c.HandleSwitchPhase(switchedPhaseEvent)
+	}
+	c.MissingLogs.SetLastSwitchedPhaseEvents(mapSwitchedPhaseEvents)
+	//Recover all other events
+	err = c.RecoverEvents(ctx, ALL_EVENTS, currentBlockNumber)
+	if err != nil {
+		return err
+	}
+	c.MissingLogs.SetRecovered(true)
+	return nil
 }
-func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string) error {
+func (c *EvmClient) RecoverSwitchedPhaseEvent(ctx context.Context, blockNumber uint64, groups []*covExported.CustodianGroup) (map[string]*contracts.IScalarGatewaySwitchPhase, error) {
+	expectingGroups := map[string]*covExported.CustodianGroup{}
+	for _, group := range groups {
+		expectingGroups[group.UID.Hex()] = group
+	}
+	groupSwitchPhases := map[string]*contracts.IScalarGatewaySwitchPhase{}
+	event, ok := scalarGatewayAbi.Events[events.EVENT_EVM_SWITCHED_PHASE]
+	if !ok {
+		return nil, fmt.Errorf("switched phase event not found")
+	}
+	recoverRange := uint64(100000)
+	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < 100000 {
+		recoverRange = c.EvmConfig.RecoverRange
+	}
+	var fromBlock uint64
+	if blockNumber < recoverRange {
+		fromBlock = 0
+	} else {
+		fromBlock = blockNumber - recoverRange
+	}
+	toBlock := blockNumber
+	for len(expectingGroups) > 0 {
+		query := ethereum.FilterQuery{
+			FromBlock: big.NewInt(int64(fromBlock)),
+			ToBlock:   big.NewInt(int64(toBlock)),
+			Addresses: []common.Address{c.GatewayAddress},
+			Topics:    [][]common.Hash{{event.ID}},
+		}
+		logs, err := c.Client.FilterLogs(context.Background(), query)
+		if err != nil {
+			return nil, fmt.Errorf("failed to filter logs: %w", err)
+		}
+		for i := len(logs) - 1; i >= 0; i-- {
+			switchedPhase := &contracts.IScalarGatewaySwitchPhase{
+				Raw: logs[i],
+			}
+			err := parser.ParseEventData(&logs[i], event.Name, switchedPhase)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse event %s: %w", event.Name, err)
+			}
+			groupUid := hex.EncodeToString(switchedPhase.CustodianGroupId[:])
+			_, ok := groupSwitchPhases[groupUid]
+			if !ok {
+				log.Info().Str("groupUid", groupUid).Msg("[EvmClient] [RecoverSwitchedPhaseEvent] event log not found, set new one")
+				groupSwitchPhases[groupUid] = switchedPhase
+				delete(expectingGroups, groupUid)
+			}
+		}
+		if fromBlock <= c.EvmConfig.StartBlock {
+			break
+		}
+		toBlock = fromBlock - 1
+		if fromBlock < recoverRange+c.EvmConfig.StartBlock {
+			fromBlock = c.EvmConfig.StartBlock
+		} else {
+			fromBlock = fromBlock - recoverRange
+		}
+	}
+	if len(expectingGroups) > 0 {
+		return nil, fmt.Errorf("some groups are not found: %v", expectingGroups)
+	}
+	return groupSwitchPhases, nil
+}
+func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string, currentBlockNumber uint64) error {
 	topics := []common.Hash{}
-	events := map[string]abi.Event{}
+	mapEvents := map[string]abi.Event{}
 	for _, eventName := range eventNames {
+		//We recover switched phase event in separate function
+		if eventName == events.EVENT_EVM_SWITCHED_PHASE {
+			continue
+		}
 		event, ok := scalarGatewayAbi.Events[eventName]
 		if ok {
 			topics = append(topics, event.ID)
-			events[event.ID.String()] = event
+			mapEvents[event.ID.String()] = event
 		}
 	}
 	var lastCheckpoint *scalarnet.EventCheckPoint
 	var err error
 	if c.dbAdapter != nil {
-		lastCheckpoint, err = c.dbAdapter.GetLastCheckPoint(c.EvmConfig.GetId(), c.EvmConfig.LastBlock)
+		lastCheckpoint, err = c.dbAdapter.GetLastCheckPoint(c.EvmConfig.GetId(), c.EvmConfig.StartBlock)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[EvmClient] [RecoverEvents] failed to get last checkpoint use default value")
 		}
@@ -110,31 +179,25 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string) erro
 		lastCheckpoint = &scalarnet.EventCheckPoint{
 			ChainName:   c.EvmConfig.ID,
 			EventName:   "",
-			BlockNumber: c.EvmConfig.LastBlock,
+			BlockNumber: c.EvmConfig.StartBlock,
 		}
 	}
 	log.Info().Str("Chain", c.EvmConfig.ID).
 		Any("Topics", topics).
 		Any("LastCheckpoint", lastCheckpoint).Msg("[EvmClient] [RecoverEvents] start recovering events")
-	//Get current block number
-	blockNumber, err := c.Client.BlockNumber(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to get current block number: %w", err)
-	}
-	log.Info().Str("Chain", c.EvmConfig.ID).Uint64("Current BlockNumber", blockNumber).Msg("[EvmClient] [RecoverEvents]")
-	fromBlock := lastCheckpoint.BlockNumber
 	recoverRange := uint64(100000)
 	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < 100000 {
 		recoverRange = c.EvmConfig.RecoverRange
 	}
+	fromBlock := lastCheckpoint.BlockNumber
 	logCounter := 0
-	for fromBlock < blockNumber {
+	for fromBlock < currentBlockNumber {
 		query := ethereum.FilterQuery{
 			FromBlock: big.NewInt(int64(fromBlock)),
 			Addresses: []common.Address{c.GatewayAddress},
 			Topics:    [][]common.Hash{topics},
 		}
-		if fromBlock+recoverRange < blockNumber {
+		if fromBlock+recoverRange < currentBlockNumber {
 			query.ToBlock = big.NewInt(int64(fromBlock + recoverRange))
 		}
 		logs, err := c.Client.FilterLogs(context.Background(), query)
@@ -142,22 +205,22 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string) erro
 			return fmt.Errorf("failed to filter logs: %w", err)
 		}
 		//Set toBlock to the last block number for logging purpose
-		var toBlock uint64 = blockNumber
+		var toBlock uint64 = currentBlockNumber
 		if query.ToBlock != nil {
 			toBlock = query.ToBlock.Uint64()
 		}
 		if len(logs) > 0 {
 			log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverEvents] found %d logs, fromBlock: %d, toBlock: %d", len(logs), fromBlock, toBlock)
-			c.AppendLogs(logs)
+			c.MissingLogs.AppendLogs(logs)
 			logCounter += len(logs)
 			if c.dbAdapter != nil {
-				c.UpdateLastCheckPoint(events, logs, toBlock)
+				c.UpdateLastCheckPoint(mapEvents, logs, toBlock)
 			}
 		} else {
 			log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverEvents] no logs found, fromBlock: %d, toBlock: %d", fromBlock, toBlock)
 		}
 		if query.ToBlock != nil {
-			blockNumber, err = c.Client.BlockNumber(context.Background())
+			currentBlockNumber, err = c.Client.BlockNumber(context.Background())
 			if err != nil {
 				log.Error().Err(err).Msgf("[EvmClient] [RecoverEvents] failed to get current block number, fromBlock: %d, toBlock: %d", fromBlock, toBlock)
 			}
@@ -165,10 +228,9 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string) erro
 		//Set fromBlock to the next block number for next iteration
 		fromBlock = toBlock + 1
 	}
-	c.MissingLogs.SetRecovered(true)
 	log.Info().
 		Str("Chain", c.EvmConfig.ID).
-		Uint64("BlockNumber", blockNumber).
+		Uint64("CurrentBlockNumber", currentBlockNumber).
 		Int("TotalLogs", logCounter).
 		Msg("[EvmClient] [FinishRecover] recovered all events")
 	return nil

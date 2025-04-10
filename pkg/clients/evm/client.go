@@ -47,6 +47,13 @@ type EvmClient struct {
 // format: wss:// -> https://
 // Todo: Improve this implementation
 
+func GetMapEvents() map[string]abi.Event {
+	mapEvents := map[string]abi.Event{}
+	for _, event := range scalarGatewayAbi.Events {
+		mapEvents[event.ID.String()] = event
+	}
+	return mapEvents
+}
 func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus, scalarClient *scalar.Client) ([]*EvmClient, error) {
 	if globalConfig == nil || globalConfig.ConfigPath == "" {
 		return nil, fmt.Errorf("config path is not set")
@@ -116,8 +123,10 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		auth:           auth,
 		dbAdapter:      dbAdapter,
 		eventBus:       eventBus,
-		MissingLogs:    MissingLogs{},
-		retryInterval:  RETRY_INTERVAL,
+		MissingLogs: MissingLogs{
+			MapEvents: GetMapEvents(),
+		},
+		retryInterval: RETRY_INTERVAL,
 	}
 
 	return evmClient, nil
@@ -318,7 +327,7 @@ func (c *EvmClient) RecoverExecutedEvents(ctx context.Context) error {
 
 // Try to recover missing events from the last checkpoint block number to the current block number
 func RecoverEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context, eventName string, fnCreateEventData func(types.Log) T) error {
-	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.EvmConfig.GetId(), eventName, c.EvmConfig.LastBlock)
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.EvmConfig.GetId(), eventName, c.EvmConfig.StartBlock)
 	if err != nil {
 		log.Warn().Str("chainId", c.EvmConfig.GetId()).
 			Str("eventName", eventName).
@@ -494,7 +503,7 @@ const (
 
 func WatchForEvent[T ValidWatchEvent](c *EvmClient, ctx context.Context, eventName string) error {
 
-	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.EvmConfig.GetId(), eventName, c.EvmConfig.LastBlock)
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.EvmConfig.GetId(), eventName, c.EvmConfig.StartBlock)
 	if err != nil {
 		log.Warn().Str("chainId", c.EvmConfig.GetId()).
 			Str("eventName", eventName).
@@ -650,6 +659,15 @@ func (c *EvmClient) handleEventLog(event abi.Event, txLog types.Log) error {
 			return fmt.Errorf("failed to parse event %s: %w", event.Name, err)
 		}
 		return c.HandleContractCallWithToken(contractCallWithToken)
+	case events.EVENT_EVM_REDEEM_TOKEN:
+		redeemToken := &contracts.IScalarGatewayRedeemToken{
+			Raw: txLog,
+		}
+		err := parser.ParseEventData(&txLog, event.Name, redeemToken)
+		if err != nil {
+			return fmt.Errorf("failed to parse event %s: %w", event.Name, err)
+		}
+		return c.HandleRedeemToken(redeemToken)
 	case events.EVENT_EVM_CONTRACT_CALL:
 		//return c.HandleContractCall(txLog)
 		return fmt.Errorf("not implemented")

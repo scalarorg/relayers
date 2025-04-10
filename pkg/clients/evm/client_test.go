@@ -25,6 +25,7 @@ import (
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -60,7 +61,7 @@ var (
 		PrivateKey:   "",
 		Finality:     1,
 		BlockTime:    time.Second * 12,
-		LastBlock:    8017920,
+		StartBlock:   8017920,
 		RecoverRange: 1000000,
 		GasLimit:     300000,
 	}
@@ -73,7 +74,7 @@ var (
 		PrivateKey: "",
 		Finality:   1,
 		BlockTime:  time.Second * 12,
-		LastBlock:  47254017,
+		StartBlock: 47254017,
 		GasLimit:   300000,
 	}
 	bnbClient     *evm.EvmClient
@@ -164,12 +165,13 @@ func TestBnbRecoverEvents(t *testing.T) {
 	if err != nil {
 		log.Error().Msgf("failed to create evm client: %v", err)
 	}
-	err = bnbClient.RecoverAllEvents(context.Background())
+	groups := []*covExported.CustodianGroup{}
+	err = bnbClient.RecoverAllEvents(context.Background(), groups)
 	require.NoError(t, err)
 }
 
 func TestEvmClientListenContractCallEvent(t *testing.T) {
-	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
+	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.StartBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayContractCall)
 
 	subContractCall, err := sepoliaClient.Gateway.WatchContractCall(&watchOpts, sink, nil, nil)
@@ -195,7 +197,7 @@ func TestEvmClientListenContractCallEvent(t *testing.T) {
 }
 
 func TestEvmClientListenContractCallApprovedEvent(t *testing.T) {
-	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
+	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.StartBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayContractCallApproved)
 
 	subContractCallApproved, err := sepoliaClient.Gateway.WatchContractCallApproved(&watchOpts, sink, nil, nil, nil)
@@ -221,7 +223,7 @@ func TestEvmClientListenContractCallApprovedEvent(t *testing.T) {
 	select {}
 }
 func TestEvmClientListenEVMExecutedEvent(t *testing.T) {
-	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
+	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.StartBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayExecuted)
 
 	subExecuted, err := sepoliaClient.Gateway.WatchExecuted(&watchOpts, sink, nil)
@@ -338,7 +340,7 @@ func TestRecoverEventContractCallWithToken(t *testing.T) {
 	lastCheckpoint := scalarnet.EventCheckPoint{
 		ChainName:   bnbConfig.ID,
 		EventName:   events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN,
-		BlockNumber: bnbConfig.LastBlock,
+		BlockNumber: bnbConfig.StartBlock,
 		TxHash:      "",
 		LogIndex:    0,
 		EventKey:    "",
@@ -373,7 +375,7 @@ func TestRecoverEventContractCallWithToken(t *testing.T) {
 }
 
 func TestEvmClientWatchTokenSent(t *testing.T) {
-	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
+	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.StartBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayTokenSent)
 	bnbClient, err := evm.NewEvmClient(&globalConfig, bnbConfig, nil, nil, nil)
 	if err != nil {
@@ -420,7 +422,7 @@ func TestSendTokenFromSepoliaToBnb(t *testing.T) {
 	fmt.Printf("SendToken tx %v\n", tx)
 }
 func TestReconnectWithWatchTokenSent(t *testing.T) {
-	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.LastBlock, Context: context.Background()}
+	watchOpts := bind.WatchOpts{Start: &sepoliaConfig.StartBlock, Context: context.Background()}
 	sink := make(chan *contracts.IScalarGatewayTokenSent)
 	bnbClient, err := evm.NewEvmClient(&globalConfig, bnbConfig, nil, nil, nil)
 	if err != nil {

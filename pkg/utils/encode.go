@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"encoding/hex"
+
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/bitcoin-vault/go-utils/encode"
 )
@@ -9,7 +11,9 @@ func DecodeContractCallWithTokenPayload(payload []byte) (*encode.ContractCallWit
 	// the DecodeContractCallWithTokenPayload also detect the payload type, the reason we decode again when failed is to ensure compatibility with old payloads
 	decodedPayload, err := encode.DecodeContractCallWithTokenPayload(payload)
 	if err == nil {
-		log.Info().Any("DecodeContractCallWithTokenPayload", decodedPayload).Msg("decodedPayload")
+		log.Info().Any("DecodeContractCallWithTokenPayload", decodedPayload).
+			Str("Redeem Address", hex.EncodeToString(decodedPayload.CustodianOnly.RecipientChainIdentifier)).
+			Msg("decodedPayload")
 		return decodedPayload, nil
 	}
 	decodedPayload, err = encode.DecodeCustodianOnly(payload)

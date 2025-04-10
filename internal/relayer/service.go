@@ -82,11 +82,18 @@ func (s *Service) Start(ctx context.Context) error {
 	}
 	// Improvement recovery evm missing source events
 	// 2025, March 10
+	// Recover all swiched phase events from evm networks
+	groups, err := s.ScalarClient.GetCovenantGroups(ctx)
+	if err != nil {
+		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot get covenant groups")
+		panic(err)
+	}
+
 	for _, client := range s.EvmClients {
 		go client.ProcessMissingLogs()
 		go func() {
 			//Todo: Handle the moment when recover just finished and listner has not started yet. It around 1 second
-			err := client.RecoverAllEvents(ctx)
+			err := client.RecoverAllEvents(ctx, groups)
 			if err != nil {
 				log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover events for evm client %s", client.EvmConfig.GetId())
 			} else {

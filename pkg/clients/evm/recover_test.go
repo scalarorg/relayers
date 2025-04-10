@@ -9,8 +9,17 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
-	"github.com/scalarorg/relayers/pkg/events"
+	chainExported "github.com/scalarorg/scalar-core/x/chains/exported"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/sha3"
+)
+
+var (
+	mockCustodianGroupUid = sha3.Sum256([]byte("scalarv32"))
+	mockCustodianGroup    = &covExported.CustodianGroup{
+		UID: chainExported.Hash(mockCustodianGroupUid[:]),
+	}
 )
 
 func TestSepoliaRecoverEvents(t *testing.T) {
@@ -47,7 +56,8 @@ func TestSepoliaRecoverEvents(t *testing.T) {
 		log.Info().Str("Chain", sepoliaClient.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] finished processing all missing evm events")
 
 	}()
-	err = sepoliaClient.RecoverEvents(context.Background(), []string{events.EVENT_EVM_SWITCHED_PHASE})
+
+	err = sepoliaClient.RecoverAllEvents(context.Background(), []*covExported.CustodianGroup{mockCustodianGroup})
 	require.NoError(t, err)
 	wg.Wait()
 }
@@ -65,7 +75,7 @@ func TestSepoliaProcessMissingLogs(t *testing.T) {
 		sepoliaClient.ProcessMissingLogs()
 	}()
 	//err = sepoliaClient.RecoverEvents(context.Background(), []string{events.EVENT_EVM_SWITCHED_PHASE})
-	err = sepoliaClient.RecoverAllEvents(context.Background())
+	err = sepoliaClient.RecoverAllEvents(context.Background(), []*covExported.CustodianGroup{mockCustodianGroup})
 	require.NoError(t, err)
 	wg.Wait()
 }

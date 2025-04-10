@@ -2,10 +2,13 @@ package scalar
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/rs/zerolog/log"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
+	covenanttypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
 
 type TokenInfoResponse struct {
@@ -19,6 +22,21 @@ var (
 	chainTokenInfos = map[string][]*TokenInfoResponse{}
 )
 
+func (c *Client) GetChainQueryServiceClient() (chainstypes.QueryServiceClient, error) {
+	clientCtx, err := c.queryClient.GetClientCtx()
+	if err != nil {
+		return nil, err
+	}
+	return chainstypes.NewQueryServiceClient(clientCtx), nil
+}
+
+func (c *Client) GetCovenantQueryClient() covenanttypes.QueryServiceClient {
+	clientCtx, err := c.queryClient.GetClientCtx()
+	if err != nil {
+		return nil
+	}
+	return covenanttypes.NewQueryServiceClient(clientCtx)
+}
 func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress string) (string, error) {
 	//Try get token info from cache
 	if !strings.HasPrefix(tokenAddress, "0x") {
@@ -36,7 +54,7 @@ func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress str
 	}
 	//Response not found, make fist query to the node
 	if tokenResponse == nil {
-		client, err := c.queryClient.GetChainQueryServiceClient()
+		client, err := c.GetChainQueryServiceClient()
 		if err != nil {
 			log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
 			return "", err
@@ -64,7 +82,7 @@ func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress str
 	return tokenResponse.Response.Asset, nil
 }
 func (c *Client) GetTokenInfo(ctx context.Context, chainId, symbol string) (*chainstypes.TokenInfoResponse, error) {
-	client, err := c.queryClient.GetChainQueryServiceClient()
+	client, err := c.GetChainQueryServiceClient()
 	if err != nil {
 		log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
 		return nil, err
@@ -93,7 +111,7 @@ func (c *Client) GetTokenContractAddressFromSymbol(ctx context.Context, chainId,
 		}
 	}
 	//If not found, query from scalar-core
-	client, err := c.queryClient.GetChainQueryServiceClient()
+	client, err := c.GetChainQueryServiceClient()
 	if err != nil {
 		log.Warn().Err(err).Msgf("[ScalarClient] [GetTokenContractAddressFromSymbol] cannot get chain query client")
 		return ""
@@ -118,7 +136,7 @@ func (c *Client) GetTokenContractAddressFromSymbol(ctx context.Context, chainId,
 	return response.Address
 }
 func (c *Client) GetCommand(chainName string, commandId string) (*chainstypes.CommandResponse, error) {
-	client, err := c.queryClient.GetChainQueryServiceClient()
+	client, err := c.GetChainQueryServiceClient()
 	if err != nil {
 		log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
 		return nil, err
@@ -133,4 +151,16 @@ func (c *Client) GetCommand(chainName string, commandId string) (*chainstypes.Co
 		return nil, err
 	}
 	return response, nil
+}
+
+func (c *Client) GetCovenantGroups(ctx context.Context) ([]*covExported.CustodianGroup, error) {
+	client := c.GetCovenantQueryClient()
+	if client == nil {
+		return nil, errors.New("covenant query client is nil")
+	}
+	response, err := client.Groups(ctx, &covenanttypes.GroupsRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return response.Groups, nil
 }
