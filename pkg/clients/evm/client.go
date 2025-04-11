@@ -47,13 +47,6 @@ type EvmClient struct {
 // format: wss:// -> https://
 // Todo: Improve this implementation
 
-func GetMapEvents() map[string]abi.Event {
-	mapEvents := map[string]abi.Event{}
-	for _, event := range scalarGatewayAbi.Events {
-		mapEvents[event.ID.String()] = event
-	}
-	return mapEvents
-}
 func NewEvmClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus, scalarClient *scalar.Client) ([]*EvmClient, error) {
 	if globalConfig == nil || globalConfig.ConfigPath == "" {
 		return nil, fmt.Errorf("config path is not set")
@@ -123,10 +116,8 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		auth:           auth,
 		dbAdapter:      dbAdapter,
 		eventBus:       eventBus,
-		MissingLogs: MissingLogs{
-			MapEvents: GetMapEvents(),
-		},
-		retryInterval: RETRY_INTERVAL,
+		MissingLogs:    MissingLogs{},
+		retryInterval:  RETRY_INTERVAL,
 	}
 
 	return evmClient, nil
@@ -170,7 +161,7 @@ func (ec *EvmClient) CreateCallOpts() (*bind.CallOpts, error) {
 func (ec *EvmClient) gatewayExecute(input []byte) (*types.Transaction, error) {
 	//ec.auth.NoSend = false
 	log.Info().Bool("NoSend", ec.auth.NoSend).Msgf("[EvmClient] [gatewayExecute] sending transaction")
-	signedTx, err := ec.Gateway.Execute2(ec.auth, input)
+	signedTx, err := ec.Gateway.Execute(ec.auth, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send transaction: %w", err)
 	}

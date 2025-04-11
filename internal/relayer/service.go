@@ -12,6 +12,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 )
 
 type Service struct {
@@ -83,12 +84,18 @@ func (s *Service) Start(ctx context.Context) error {
 	// Improvement recovery evm missing source events
 	// 2025, March 10
 	// Recover all swiched phase events from evm networks
-	groups, err := s.ScalarClient.GetCovenantGroups(ctx)
-	if err != nil {
-		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot get covenant groups")
-		panic(err)
+	// groups, err := s.ScalarClient.GetCovenantGroups(ctx)
+	// if err != nil {
+	// 	log.Warn().Err(err).Msgf("[Relayer] [Start] cannot get covenant groups")
+	// 	panic(err)
+	// }
+	//Hard code groups for now
+	groups := []*covExported.CustodianGroup{
+		{
+			UID:  covExported.CalculateUID(covExported.DefaultCustodianName),
+			Name: covExported.DefaultCustodianName,
+		},
 	}
-
 	for _, client := range s.EvmClients {
 		go client.ProcessMissingLogs()
 		go func() {

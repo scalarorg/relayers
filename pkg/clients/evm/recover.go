@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -91,9 +92,10 @@ func (c *EvmClient) RecoverAllEvents(ctx context.Context, groups []*covExported.
 	return nil
 }
 func (c *EvmClient) RecoverSwitchedPhaseEvent(ctx context.Context, blockNumber uint64, groups []*covExported.CustodianGroup) (map[string]*contracts.IScalarGatewaySwitchPhase, error) {
-	expectingGroups := map[string]*covExported.CustodianGroup{}
+	expectingGroups := map[string]string{}
 	for _, group := range groups {
-		expectingGroups[group.UID.Hex()] = group
+		groupUid := strings.TrimPrefix(group.UID.Hex(), "0x")
+		expectingGroups[groupUid] = group.Name
 	}
 	groupSwitchPhases := map[string]*contracts.IScalarGatewaySwitchPhase{}
 	event, ok := scalarGatewayAbi.Events[events.EVENT_EVM_SWITCHED_PHASE]
@@ -131,6 +133,7 @@ func (c *EvmClient) RecoverSwitchedPhaseEvent(ctx context.Context, blockNumber u
 				return nil, fmt.Errorf("failed to parse event %s: %w", event.Name, err)
 			}
 			groupUid := hex.EncodeToString(switchedPhase.CustodianGroupId[:])
+			groupUid = strings.TrimPrefix(groupUid, "0x")
 			_, ok := groupSwitchPhases[groupUid]
 			if !ok {
 				log.Info().Str("groupUid", groupUid).Msg("[EvmClient] [RecoverSwitchedPhaseEvent] event log not found, set new one")

@@ -6,18 +6,11 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	eth_types "github.com/ethereum/go-ethereum/core/types"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/clients/evm/parser"
 )
-
-var scalarGatewayAbi *abi.ABI
-
-func init() {
-	scalarGatewayAbi, _ = contracts.IScalarGatewayMetaData.GetAbi()
-}
 
 type ValidEvmEvent interface {
 	*contracts.IScalarGatewayContractCallApproved |
@@ -27,17 +20,6 @@ type ValidEvmEvent interface {
 		*contracts.IScalarGatewayExecuted |
 		*contracts.IScalarGatewayTokenSent |
 		*contracts.IScalarGatewaySwitchPhase
-}
-
-func getScalarGatewayAbi() (*abi.ABI, error) {
-	if scalarGatewayAbi == nil {
-		var err error
-		scalarGatewayAbi, err = contracts.IScalarGatewayMetaData.GetAbi()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return scalarGatewayAbi, nil
 }
 
 // Todo: Check if this is the correct way to extract the destination chain

@@ -179,7 +179,7 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 	//Get signed tx only then try check if the tx is already mined, then get the receipt and process the event
 	//If signed tx is not mined, then send the tx to the network
 	ec.auth.NoSend = true
-	signedTx, err := ec.Gateway.Execute2(ec.auth, decodedExecuteData.Input)
+	signedTx, err := ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
 	ec.auth.NoSend = false
 	if err != nil {
 		log.Error().Err(err).
@@ -336,7 +336,7 @@ func (ec *EvmClient) handleStartedSwitchPhase(event *covTypes.SwitchPhaseStarted
 	// 	Uint64("Current session sequence", currentPhase.Sequence).
 	// 	Uint8("Current phase", currentPhase.Phase).
 	// 	Msg("[EvmClient] [handleStartedSwitchPhase] current phase on the gatewayis not the same as the payload. Call transaction to update it")
-	signedTx, err := ec.Gateway.Execute2(ec.auth, decodedExecuteData.Input)
+	signedTx, err := ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
 	if err != nil {
 		log.Error().Err(err).
 			Str("input", hex.EncodeToString(decodedExecuteData.Input)).

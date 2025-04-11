@@ -104,9 +104,7 @@ type MissingLogs struct {
 	mutex                   sync.Mutex
 	logs                    []ethTypes.Log
 	lastSwitchedPhaseEvents map[string]*contracts.IScalarGatewaySwitchPhase //Map each custodian group to the last switched phase event
-	lastPhases              map[string]RedeemPhase                          //Map each custodian group to the last redeem phase
-	MapEvents               map[string]abi.Event
-	Recovered               atomic.Bool //True if logs are recovered
+	Recovered               atomic.Bool                                     //True if logs are recovered
 }
 
 func (m *MissingLogs) IsRecovered() bool {
@@ -119,12 +117,12 @@ func (m *MissingLogs) SetRecovered(recovered bool) {
 func (m *MissingLogs) AppendLogs(logs []ethTypes.Log) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	redeemTokenEvent, ok := m.MapEvents[events.EVENT_EVM_REDEEM_TOKEN]
+	redeemTokenEvent, ok := GetEventByName(events.EVENT_EVM_REDEEM_TOKEN)
 	if !ok {
 		log.Error().Msgf("RedeemToken event not found")
 		return
 	}
-	switchedPhaseEvent, ok := m.MapEvents[events.EVENT_EVM_SWITCHED_PHASE]
+	switchedPhaseEvent, ok := GetEventByName(events.EVENT_EVM_SWITCHED_PHASE)
 	if !ok {
 		log.Error().Msgf("SwitchedPhase event not found")
 		return
@@ -140,13 +138,13 @@ func (m *MissingLogs) AppendLogs(logs []ethTypes.Log) {
 		}
 	}
 }
-func (m *MissingLogs) isRedeemLogInLastPhase(redeemTokenEvent abi.Event, eventLog ethTypes.Log) bool {
+func (m *MissingLogs) isRedeemLogInLastPhase(redeemTokenEvent *abi.Event, eventLog ethTypes.Log) bool {
 	redeemToken := &contracts.IScalarGatewayRedeemToken{
 		Raw: eventLog,
 	}
 	err := parser.ParseEventData(&eventLog, redeemTokenEvent.Name, redeemToken)
 	if err != nil {
-		log.Error().Msgf("failed to parse event %s: %w", redeemTokenEvent.Name, err)
+		log.Error().Err(err).Msgf("failed to parse event %s", redeemTokenEvent.Name)
 		return false
 	}
 	groupUid := hex.EncodeToString(redeemToken.CustodianGroupUID[:])
@@ -165,7 +163,7 @@ func (m *MissingLogs) SetLastSwitchedPhaseEvents(mapSwitchedPhaseEvents map[stri
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.lastSwitchedPhaseEvents = mapSwitchedPhaseEvents
-	_, ok := m.MapEvents[events.EVENT_EVM_SWITCHED_PHASE]
+	_, ok := GetEventByName(events.EVENT_EVM_SWITCHED_PHASE)
 	if !ok {
 		log.Error().Msgf("SwitchedPhase event not found")
 		return
