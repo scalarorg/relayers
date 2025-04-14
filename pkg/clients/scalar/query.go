@@ -158,9 +158,25 @@ func (c *Client) GetCovenantGroups(ctx context.Context) ([]*covExported.Custodia
 	if client == nil {
 		return nil, errors.New("covenant query client is nil")
 	}
-	response, err := client.Groups(ctx, &covenanttypes.GroupsRequest{})
+	response, err := client.Groups(ctx, &covenanttypes.GroupsRequest{
+		UID: nil,
+	})
 	if err != nil {
 		return nil, err
 	}
 	return response.Groups, nil
+}
+
+func (c *Client) GetRedeemSession(custodianGroupUid [32]byte) (*covenanttypes.RedeemSessionResponse, error) {
+	client := c.GetCovenantQueryClient()
+	if client == nil {
+		return nil, errors.New("covenant query client is nil")
+	}
+	response, err := client.RedeemSession(context.Background(), &covenanttypes.RedeemSessionRequest{
+		UID: custodianGroupUid[:],
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
 }

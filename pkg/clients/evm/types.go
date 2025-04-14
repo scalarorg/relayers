@@ -101,6 +101,7 @@ type RedeemPhase struct {
 }
 
 type MissingLogs struct {
+	chainId                 string
 	mutex                   sync.Mutex
 	logs                    []ethTypes.Log
 	lastSwitchedPhaseEvents map[string]*contracts.IScalarGatewaySwitchPhase //Map each custodian group to the last switched phase event
@@ -117,6 +118,7 @@ func (m *MissingLogs) SetRecovered(recovered bool) {
 func (m *MissingLogs) AppendLogs(logs []ethTypes.Log) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	log.Info().Str("Chain", m.chainId).Int("Number of event logs", len(logs)).Msgf("[EvmClient] [AppendLogs] appending logs")
 	redeemTokenEvent, ok := GetEventByName(events.EVENT_EVM_REDEEM_TOKEN)
 	if !ok {
 		log.Error().Msgf("RedeemToken event not found")
@@ -127,14 +129,17 @@ func (m *MissingLogs) AppendLogs(logs []ethTypes.Log) {
 		log.Error().Msgf("SwitchedPhase event not found")
 		return
 	}
-	for _, log := range logs {
-		if log.Topics[0] == redeemTokenEvent.ID {
+	for _, eventLog := range logs {
+		if eventLog.Topics[0] == redeemTokenEvent.ID {
 			//Check if the redeem event is in the last phase
-			if m.isRedeemLogInLastPhase(redeemTokenEvent, log) {
-				m.logs = append(m.logs, log)
+			if m.isRedeemLogInLastPhase(redeemTokenEvent, eventLog) {
+				log.Info().Str("Chain", m.chainId).Any("eventLog", eventLog).Msgf("[EvmClient] [AppendLogs] appending redeem log")
+				m.logs = append(m.logs, eventLog)
+			} else {
+				log.Info().Str("Chain", m.chainId).Any("eventLog", eventLog).Msgf("[EvmClient] [AppendLogs] skipping redeem log due to not in last phase")
 			}
-		} else if log.Topics[0] != switchedPhaseEvent.ID {
-			m.logs = append(m.logs, log)
+		} else if eventLog.Topics[0] != switchedPhaseEvent.ID {
+			m.logs = append(m.logs, eventLog)
 		}
 	}
 }

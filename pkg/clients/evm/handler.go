@@ -15,6 +15,7 @@ import (
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	"github.com/scalarorg/scalar-core/x/covenant/exported"
 )
 
 // func (ec *EvmClient) handleContractCall(event *contracts.IScalarGatewayContractCall) error {
@@ -435,6 +436,23 @@ func (ec *EvmClient) HandleSwitchPhase(event *contracts.IScalarGatewaySwitchPhas
 			DestinationChain: events.SCALAR_NETWORK_NAME,
 			Data:             &switchPhase,
 		})
+		//Loop until the scalar network finishes the switch phase
+		for {
+			time.Sleep(1 * time.Second)
+			redeemSession, err := ec.ScalarClient.GetRedeemSession(event.CustodianGroupId)
+			if err != nil {
+				log.Warn().Err(err).Msgf("[EvmClient] [HandleSwitchPhase] failed to get current redeem session from scalarnet")
+			}
+			if redeemSession.Session == nil {
+				log.Warn().Msgf("[EvmClient] [HandleSwitchPhase] redeem session not found in scalarnet")
+			}
+			if redeemSession.Session.Sequence == event.Sequence && redeemSession.Session.CurrentPhase == exported.Phase(event.To) {
+				log.Info().Msgf("[EvmClient] [HandleSwitchPhase] successfully switched phase to sequence %d and phase %v", event.Sequence, exported.Phase(event.To))
+				break
+			} else {
+				log.Info().Msgf("[EvmClient] [HandleSwitchPhase] waiting for phase switch to sequence %d and phase %v", event.Sequence, exported.Phase(event.To))
+			}
+		}
 	} else {
 		log.Warn().Msg("[EvmClient] [HandleSwitchPhase] event bus is undefined")
 	}

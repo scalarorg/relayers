@@ -79,7 +79,9 @@ func (c *EvmClient) RecoverAllEvents(ctx context.Context, groups []*covExported.
 	if err != nil {
 		return err
 	}
-	for _, switchedPhaseEvent := range mapSwitchedPhaseEvents {
+	log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverAllEvents] recovered %d switched phase events", len(mapSwitchedPhaseEvents))
+	for groupUid, switchedPhaseEvent := range mapSwitchedPhaseEvents {
+		log.Info().Str("Chain", c.EvmConfig.ID).Str("GroupUid", groupUid).Msgf("[EvmClient] [RecoverAllEvents] handle switched phase event")
 		c.HandleSwitchPhase(switchedPhaseEvent)
 	}
 	c.MissingLogs.SetLastSwitchedPhaseEvents(mapSwitchedPhaseEvents)

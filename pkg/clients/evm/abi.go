@@ -35,7 +35,6 @@ func GetMapEvents() map[string]*abi.Event {
 }
 
 func GetEventByName(name string) (*abi.Event, bool) {
-	log.Info().Msgf("Getting event by name: %s", name)
 	event, ok := mapEvents[name]
 	return event, ok
 }

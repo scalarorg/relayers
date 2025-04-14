@@ -116,8 +116,10 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		auth:           auth,
 		dbAdapter:      dbAdapter,
 		eventBus:       eventBus,
-		MissingLogs:    MissingLogs{},
-		retryInterval:  RETRY_INTERVAL,
+		MissingLogs: MissingLogs{
+			chainId: evmConfig.GetId(),
+		},
+		retryInterval: RETRY_INTERVAL,
 	}
 
 	return evmClient, nil

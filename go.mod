@@ -16,7 +16,7 @@ require (
 	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250409074352-eec5b904014f
 	github.com/scalarorg/data-models v0.0.0-20250404024033-244a2fd7189e
 	github.com/scalarorg/go-electrum v0.1.2-0.20250113074812-84502fb16a1a
-	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250411073719-5c969a2dfd5c
+	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250414035021-86b008550984
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
@@ -223,7 +223,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.31.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/crypto v0.31.0
 	golang.org/x/exp v0.0.0-20240404231335-c0f41cb1a7a0 // indirect
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
