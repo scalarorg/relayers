@@ -57,11 +57,11 @@ var (
 		//Gateway:    "0x842C080EE1399addb76830CFe21D41e47aaaf57e",
 		//Gateway:    "0x78eE3111ab44078FB32D7E7A7bCf99cf3664415B", //Version Mar 27, 2025
 		//Gateway:      "0xD2B76Ce7Bf49c8C0965e25B9d76c9cb0c550D7a7", //Version Mar 31, 2025
-		Gateway:      "0x320B307AF11918C752F5ddF415679499BC880F74", //Version Apr 8, 2025
+		Gateway:      "0x531EA035B359aceE7a3B727d5204d25989ab5510", //Version Apr 8, 2025
 		PrivateKey:   "",
 		Finality:     1,
 		BlockTime:    time.Second * 12,
-		StartBlock:   8017920,
+		StartBlock:   8095740,
 		RecoverRange: 1000000,
 		GasLimit:     300000,
 	}

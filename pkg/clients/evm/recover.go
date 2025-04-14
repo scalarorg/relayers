@@ -26,8 +26,9 @@ var (
 		events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN,
 		events.EVENT_EVM_TOKEN_SENT,
 		events.EVENT_EVM_CONTRACT_CALL_APPROVED,
-		events.EVENT_EVM_COMMAND_EXECUTED,
-		events.EVENT_EVM_TOKEN_DEPLOYED,
+		//events.EVENT_EVM_COMMAND_EXECUTED,
+		//events.EVENT_EVM_TOKEN_DEPLOYED,
+		events.EVENT_EVM_REDEEM_TOKEN,
 	}
 )
 
@@ -37,12 +38,19 @@ func (c *EvmClient) ProcessMissingLogs() {
 	for _, event := range scalarGatewayAbi.Events {
 		mapEvents[event.ID.String()] = event
 	}
-	for !c.MissingLogs.IsRecovered() {
+	for {
 		logs := c.MissingLogs.GetLogs(10)
 		if len(logs) == 0 {
-			time.Sleep(time.Second)
-			continue
+			if c.MissingLogs.IsRecovered() {
+				log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] no logs to process, recovered flag is true, exit")
+				break
+			} else {
+				log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] no logs to process, recover is in progress, sleep 1 second then continue")
+				time.Sleep(time.Second)
+				continue
+			}
 		}
+		log.Info().Str("Chain", c.EvmConfig.ID).Int("Number of logs", len(logs)).Msg("[EvmClient] [ProcessMissingLogs] processing logs")
 		for _, txLog := range logs {
 			topic := txLog.Topics[0].String()
 			event, ok := mapEvents[topic]
@@ -90,6 +98,7 @@ func (c *EvmClient) RecoverAllEvents(ctx context.Context, groups []*covExported.
 	if err != nil {
 		return err
 	}
+	log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [RecoverAllEvents] recovered all events set recovered flag to true")
 	c.MissingLogs.SetRecovered(true)
 	return nil
 }
@@ -188,7 +197,8 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string, curr
 		}
 	}
 	log.Info().Str("Chain", c.EvmConfig.ID).
-		Any("Topics", topics).
+		Str("GatewayAddress", c.GatewayAddress.String()).
+		Str("EventNames", strings.Join(eventNames, ",")).
 		Any("LastCheckpoint", lastCheckpoint).Msg("[EvmClient] [RecoverEvents] start recovering events")
 	recoverRange := uint64(100000)
 	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < 100000 {
@@ -204,34 +214,26 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string, curr
 		}
 		if fromBlock+recoverRange < currentBlockNumber {
 			query.ToBlock = big.NewInt(int64(fromBlock + recoverRange))
+		} else {
+			query.ToBlock = big.NewInt(int64(currentBlockNumber))
 		}
+		log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverEvents] querying logs fromBlock: %d, toBlock: %d", fromBlock, query.ToBlock.Uint64())
 		logs, err := c.Client.FilterLogs(context.Background(), query)
 		if err != nil {
 			return fmt.Errorf("failed to filter logs: %w", err)
 		}
-		//Set toBlock to the last block number for logging purpose
-		var toBlock uint64 = currentBlockNumber
-		if query.ToBlock != nil {
-			toBlock = query.ToBlock.Uint64()
-		}
 		if len(logs) > 0 {
-			log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverEvents] found %d logs, fromBlock: %d, toBlock: %d", len(logs), fromBlock, toBlock)
+			log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverEvents] found %d logs, fromBlock: %d, toBlock: %d", len(logs), fromBlock, query.ToBlock)
 			c.MissingLogs.AppendLogs(logs)
 			logCounter += len(logs)
 			if c.dbAdapter != nil {
-				c.UpdateLastCheckPoint(mapEvents, logs, toBlock)
+				c.UpdateLastCheckPoint(mapEvents, logs, query.ToBlock.Uint64())
 			}
 		} else {
-			log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverEvents] no logs found, fromBlock: %d, toBlock: %d", fromBlock, toBlock)
-		}
-		if query.ToBlock != nil {
-			currentBlockNumber, err = c.Client.BlockNumber(context.Background())
-			if err != nil {
-				log.Error().Err(err).Msgf("[EvmClient] [RecoverEvents] failed to get current block number, fromBlock: %d, toBlock: %d", fromBlock, toBlock)
-			}
+			log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverEvents] no logs found, fromBlock: %d, toBlock: %d", fromBlock, query.ToBlock)
 		}
 		//Set fromBlock to the next block number for next iteration
-		fromBlock = toBlock + 1
+		fromBlock = query.ToBlock.Uint64() + 1
 	}
 	log.Info().
 		Str("Chain", c.EvmConfig.ID).

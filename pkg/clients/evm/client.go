@@ -460,6 +460,9 @@ func (c *EvmClient) ListenToEvents(ctx context.Context) error {
 		{events.EVENT_EVM_SWITCHED_PHASE, func(ctx context.Context) error {
 			return WatchForEvent[*contracts.IScalarGatewaySwitchPhase](c, ctx, events.EVENT_EVM_SWITCHED_PHASE)
 		}},
+		{events.EVENT_EVM_REDEEM_TOKEN, func(ctx context.Context) error {
+			return WatchForEvent[*contracts.IScalarGatewayRedeemToken](c, ctx, events.EVENT_EVM_REDEEM_TOKEN)
+		}},
 	}
 
 	for _, event := range events {
@@ -484,7 +487,8 @@ type ValidWatchEvent interface {
 		*contracts.IScalarGatewayContractCallApproved |
 		*contracts.IScalarGatewayExecuted |
 		*contracts.IScalarGatewayTokenDeployed |
-		*contracts.IScalarGatewaySwitchPhase
+		*contracts.IScalarGatewaySwitchPhase |
+		*contracts.IScalarGatewayRedeemToken
 }
 
 const (
@@ -591,6 +595,8 @@ func setupSubscription[T ValidWatchEvent](c *EvmClient, watchOpts *bind.WatchOpt
 		return c.Gateway.WatchSwitchPhase(watchOpts, sinkInterface.(chan *contracts.IScalarGatewaySwitchPhase), nil, nil)
 	case events.EVENT_EVM_TOKEN_DEPLOYED:
 		return c.Gateway.WatchTokenDeployed(watchOpts, sinkInterface.(chan *contracts.IScalarGatewayTokenDeployed))
+	case events.EVENT_EVM_REDEEM_TOKEN:
+		return c.Gateway.WatchRedeemToken(watchOpts, sinkInterface.(chan *contracts.IScalarGatewayRedeemToken), nil, nil, nil)
 	default:
 		return nil, fmt.Errorf("[EvmClient] [setupSubscription] unsupported event type for %s, event: %v", eventName, (*T)(nil))
 	}

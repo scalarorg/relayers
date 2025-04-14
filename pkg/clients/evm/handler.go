@@ -122,7 +122,7 @@ func (ec *EvmClient) HandleContractCallWithToken(event *contracts.IScalarGateway
 
 func (ec *EvmClient) HandleRedeemToken(event *contracts.IScalarGatewayRedeemToken) error {
 	//0. Preprocess the event
-	log.Info().Any("event", event).Msg("[EvmClient] [HandleRedeemToken] Start processing evm redeem token")
+	log.Info().Str("Chain", ec.EvmConfig.ID).Any("event", event).Msg("[EvmClient] [HandleRedeemToken] Start processing evm redeem token")
 	//1. Convert into a RelayData instance then store to the db
 	redeemToken, err := ec.RedeemTokenEvent2Model(event)
 	if err != nil {
@@ -420,7 +420,7 @@ func (ec *EvmClient) HandleTokenDeployed(event *contracts.IScalarGatewayTokenDep
 
 func (ec *EvmClient) HandleSwitchPhase(event *contracts.IScalarGatewaySwitchPhase) error {
 	//0. Preprocess the event
-	log.Info().Any("event", event).Msg("[EvmClient] [HandleSwitchPhase] Start processing evm switch phase")
+	log.Info().Str("Chain", ec.EvmConfig.ID).Any("event", event).Msg("[EvmClient] [HandleSwitchPhase] Start processing evm switch phase")
 	//1. Convert into a RelayData instance then store to the db
 	switchPhase := ec.SwitchPhaseEvent2Model(event)
 	if ec.dbAdapter != nil {
@@ -438,7 +438,7 @@ func (ec *EvmClient) HandleSwitchPhase(event *contracts.IScalarGatewaySwitchPhas
 		})
 		//Loop until the scalar network finishes the switch phase
 		for {
-			time.Sleep(1 * time.Second)
+			time.Sleep(2 * time.Second)
 			redeemSession, err := ec.ScalarClient.GetRedeemSession(event.CustodianGroupId)
 			if err != nil {
 				log.Warn().Err(err).Msgf("[EvmClient] [HandleSwitchPhase] failed to get current redeem session from scalarnet")
@@ -446,11 +446,16 @@ func (ec *EvmClient) HandleSwitchPhase(event *contracts.IScalarGatewaySwitchPhas
 			if redeemSession.Session == nil {
 				log.Warn().Msgf("[EvmClient] [HandleSwitchPhase] redeem session not found in scalarnet")
 			}
+			log.Info().Str("Chain", ec.EvmConfig.ID).
+				Uint64("Sequence", redeemSession.Session.Sequence).
+				Any("CurrentPhase", redeemSession.Session.CurrentPhase).
+				Hex("CustodianGroupId", event.CustodianGroupId[:]).
+				Msg("[EvmClient] [HandleSwitchPhase] redeem session")
 			if redeemSession.Session.Sequence == event.Sequence && redeemSession.Session.CurrentPhase == exported.Phase(event.To) {
-				log.Info().Msgf("[EvmClient] [HandleSwitchPhase] successfully switched phase to sequence %d and phase %v", event.Sequence, exported.Phase(event.To))
+				log.Info().Str("Chain", ec.EvmConfig.ID).Msgf("[EvmClient] [HandleSwitchPhase] successfully switched phase to sequence %d and phase %v", event.Sequence, exported.Phase(event.To))
 				break
 			} else {
-				log.Info().Msgf("[EvmClient] [HandleSwitchPhase] waiting for phase switch to sequence %d and phase %v", event.Sequence, exported.Phase(event.To))
+				log.Info().Str("Chain", ec.EvmConfig.ID).Msgf("[EvmClient] [HandleSwitchPhase] waiting for phase switch to sequence %d and phase %v", event.Sequence, exported.Phase(event.To))
 			}
 		}
 	} else {

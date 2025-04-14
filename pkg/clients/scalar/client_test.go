@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	auth "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 
 	"github.com/scalarorg/relayers/config"
@@ -46,7 +48,8 @@ var (
 		WSUrl:         "ws://localhost:26657/websocket",
 		MaxRetries:    3,
 		RetryInterval: int64(1000),
-		Mnemonic:      "latin total dream gesture brain bunker truly stove left video cost transfer guide occur bicycle oxygen world ready witness exhibit federal salute half day",
+		BroadcastMode: "sync",
+		Mnemonic:      "",
 	}
 	err           error
 	clientCtx     *client.Context
@@ -56,7 +59,12 @@ var (
 
 func TestMain(m *testing.M) {
 	config := types.GetConfig()
-	config.SetBech32PrefixForAccount("axelar", "axelarvaloper")
+	err := godotenv.Load("../../../.env.test")
+	if err != nil {
+		log.Error().Err(err).Msg("Error loading .env.test file: %v")
+	}
+	ScalarNetworkConfig.Mnemonic = os.Getenv("SCALAR_MNEMONIC")
+	config.SetBech32PrefixForAccount("scalar", "scalarvaloper")
 	clientCtx, err = cosmos.CreateClientContext(&ScalarNetworkConfig)
 	if err != nil {
 		log.Error().Msgf("failed to create client context: %+v", err)
@@ -68,6 +76,17 @@ func TestMain(m *testing.M) {
 		log.Error().Msgf("failed to create network client: %+v", err)
 	}
 	m.Run()
+}
+func TestConfirmRedeemTx(t *testing.T) {
+	broadcaster := scalar.NewBroadcaster(networkClient,
+		scalar.NewPendingCommands(),
+		time.Second*10,
+		10)
+	broadcaster.Start(context.Background())
+	redeemTxs := []string{"0x8d9eb539206db1e3f4dc4c26419616fb90723a667d5b1c126e2fc4f9c4a6fc98"}
+	broadcaster.ConfirmEvmTxs("evm|11155111", redeemTxs)
+	select {}
+
 }
 func TestAccountAddress(t *testing.T) {
 	accAddress, err := sdk.AccAddressFromBech32(cosmosAddress)

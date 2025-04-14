@@ -142,6 +142,7 @@ func (m *MissingLogs) AppendLogs(logs []ethTypes.Log) {
 			m.logs = append(m.logs, eventLog)
 		}
 	}
+	log.Info().Str("Chain", m.chainId).Int("Number of logs", len(m.logs)).Msgf("[EvmClient] [AppendLogs] appended logs")
 }
 func (m *MissingLogs) isRedeemLogInLastPhase(redeemTokenEvent *abi.Event, eventLog ethTypes.Log) bool {
 	redeemToken := &contracts.IScalarGatewayRedeemToken{
@@ -194,13 +195,16 @@ func (m *MissingLogs) GetLastSwitchedPhaseEvent(groupUid string) (*contracts.ISc
 func (m *MissingLogs) GetLogs(count int) []ethTypes.Log {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	var logs []ethTypes.Log
 	if len(m.logs) <= count {
-		logs := m.logs
+		logs = m.logs
 		m.logs = []ethTypes.Log{}
-		return logs
 	} else {
-		logs := m.logs[:count]
+		logs = m.logs[:count]
 		m.logs = m.logs[count:]
-		return logs
 	}
+	log.Info().Str("Chain", m.chainId).Int("Number of logs", len(logs)).
+		Int("Remaining logs", len(m.logs)).
+		Msgf("[MissingLogs] [GetLogs] returned logs")
+	return logs
 }

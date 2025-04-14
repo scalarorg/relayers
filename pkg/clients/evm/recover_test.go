@@ -2,8 +2,10 @@ package evm_test
 
 import (
 	"context"
+	"encoding/hex"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/rs/zerolog/log"
@@ -22,6 +24,10 @@ var (
 	}
 )
 
+func TestCustodianGroup(t *testing.T) {
+	guidHex := hex.EncodeToString(mockCustodianGroupUid[:])
+	require.Equal(t, "3e79326a9493896e13af62194e694dff4c9300700407449363564b0eaeaf07e8", guidHex)
+}
 func TestSepoliaRecoverEvents(t *testing.T) {
 	sepoliaClient, err := evm.NewEvmClient(&globalConfig, sepoliaConfig, nil, nil, nil)
 	if err != nil {
@@ -37,8 +43,18 @@ func TestSepoliaRecoverEvents(t *testing.T) {
 		for _, event := range scalarGatewayAbi.Events {
 			events[event.ID.String()] = event
 		}
-		for !sepoliaClient.MissingLogs.IsRecovered() {
+		for {
 			logs := sepoliaClient.MissingLogs.GetLogs(10)
+			if len(logs) == 0 {
+				if sepoliaClient.MissingLogs.IsRecovered() {
+					log.Info().Str("Chain", sepoliaClient.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] no logs to process, recovered flag is true, exit")
+					break
+				} else {
+					log.Info().Str("Chain", sepoliaClient.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] no logs to process, recover is in progress, sleep 1 second then continue")
+					time.Sleep(time.Second)
+					continue
+				}
+			}
 			for _, txLog := range logs {
 				topic := txLog.Topics[0].String()
 				event, ok := events[topic]
