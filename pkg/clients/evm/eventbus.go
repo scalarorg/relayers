@@ -171,6 +171,7 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 	if err != nil {
 		log.Error().Err(err).
 			Str("BatchedCommandID", batchedCmdRes.ID).
+			Str("GatewayAddress", ec.GatewayAddress.Hex()).
 			Msg("[EvmClient] [handleScalarBatchCommandSigned] failed to estimate gas of the batched command ")
 		return err
 	}

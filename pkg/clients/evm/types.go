@@ -28,6 +28,7 @@ type EvmNetworkConfig struct {
 	ID           string        `mapstructure:"id"`
 	Name         string        `mapstructure:"name"`
 	RPCUrl       string        `mapstructure:"rpc_url"`
+	AuthWeighted string        `mapstructure:"auth_weighted"`
 	Gateway      string        `mapstructure:"gateway"`
 	Finality     int           `mapstructure:"finality"`
 	StartBlock   uint64        `mapstructure:"start_block"`

@@ -22,12 +22,12 @@ var (
 	chainTokenInfos = map[string][]*TokenInfoResponse{}
 )
 
-func (c *Client) GetChainQueryServiceClient() (chainstypes.QueryServiceClient, error) {
+func (c *Client) GetChainQueryServiceClient() chainstypes.QueryServiceClient {
 	clientCtx, err := c.queryClient.GetClientCtx()
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	return chainstypes.NewQueryServiceClient(clientCtx), nil
+	return chainstypes.NewQueryServiceClient(clientCtx)
 }
 
 func (c *Client) GetCovenantQueryClient() covenanttypes.QueryServiceClient {
@@ -54,11 +54,7 @@ func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress str
 	}
 	//Response not found, make fist query to the node
 	if tokenResponse == nil {
-		client, err := c.GetChainQueryServiceClient()
-		if err != nil {
-			log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
-			return "", err
-		}
+		client := c.GetChainQueryServiceClient()
 		tokenRequest := chainstypes.TokenInfoRequest{
 			Chain: chainId,
 			FindBy: &chainstypes.TokenInfoRequest_Address{
@@ -82,11 +78,7 @@ func (c *Client) GetSymbol(ctx context.Context, chainId string, tokenAddress str
 	return tokenResponse.Response.Asset, nil
 }
 func (c *Client) GetTokenInfo(ctx context.Context, chainId, symbol string) (*chainstypes.TokenInfoResponse, error) {
-	client, err := c.GetChainQueryServiceClient()
-	if err != nil {
-		log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
-		return nil, err
-	}
+	client := c.GetChainQueryServiceClient()
 	tokenRequest := chainstypes.TokenInfoRequest{
 		Chain: chainId,
 		FindBy: &chainstypes.TokenInfoRequest_Symbol{
@@ -111,11 +103,7 @@ func (c *Client) GetTokenContractAddressFromSymbol(ctx context.Context, chainId,
 		}
 	}
 	//If not found, query from scalar-core
-	client, err := c.GetChainQueryServiceClient()
-	if err != nil {
-		log.Warn().Err(err).Msgf("[ScalarClient] [GetTokenContractAddressFromSymbol] cannot get chain query client")
-		return ""
-	}
+	client := c.GetChainQueryServiceClient()
 	tokenRequest := chainstypes.TokenInfoRequest{
 		Chain: chainId,
 		FindBy: &chainstypes.TokenInfoRequest_Symbol{
@@ -136,11 +124,7 @@ func (c *Client) GetTokenContractAddressFromSymbol(ctx context.Context, chainId,
 	return response.Address
 }
 func (c *Client) GetCommand(chainName string, commandId string) (*chainstypes.CommandResponse, error) {
-	client, err := c.GetChainQueryServiceClient()
-	if err != nil {
-		log.Warn().Err(err).Msgf("[ScalarClient] [GetSymbol] cannot get chain query client")
-		return nil, err
-	}
+	client := c.GetChainQueryServiceClient()
 	commandRequest := chainstypes.CommandRequest{
 		Chain: chainName,
 		ID:    commandId,
@@ -179,4 +163,23 @@ func (c *Client) GetRedeemSession(custodianGroupUid [32]byte) (*covenanttypes.Re
 		return nil, err
 	}
 	return response, nil
+}
+
+func (c *Client) GetChainRedeemSession(chainId string, custodianGroupUid [32]byte) (*chainstypes.RedeemSession, error) {
+	client := c.GetChainQueryServiceClient()
+	if client == nil {
+		return nil, errors.New("chain query client is nil")
+	}
+	response, err := client.RedeemSession(context.Background(), &chainstypes.RedeemSessionRequest{
+		Chain: chainId,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, session := range response.RedeemSession {
+		if session.CustodianGroupUID == custodianGroupUid {
+			return &session, nil
+		}
+	}
+	return nil, errors.New("redeem session not found")
 }

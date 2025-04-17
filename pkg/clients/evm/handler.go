@@ -439,19 +439,20 @@ func (ec *EvmClient) HandleSwitchPhase(event *contracts.IScalarGatewaySwitchPhas
 		//Loop until the scalar network finishes the switch phase
 		for {
 			time.Sleep(2 * time.Second)
-			redeemSession, err := ec.ScalarClient.GetRedeemSession(event.CustodianGroupId)
+			redeemSession, err := ec.ScalarClient.GetChainRedeemSession(ec.EvmConfig.ID, event.CustodianGroupId)
 			if err != nil {
 				log.Warn().Err(err).Msgf("[EvmClient] [HandleSwitchPhase] failed to get current redeem session from scalarnet")
 			}
-			if redeemSession.Session == nil {
-				log.Warn().Msgf("[EvmClient] [HandleSwitchPhase] redeem session not found in scalarnet")
+			if redeemSession == nil {
+				log.Warn().Msgf("[EvmClient] [HandleSwitchPhase] redeem session not found in scalarnet continue waiting")
+				continue
 			}
 			log.Info().Str("Chain", ec.EvmConfig.ID).
-				Uint64("Sequence", redeemSession.Session.Sequence).
-				Any("CurrentPhase", redeemSession.Session.CurrentPhase).
+				Uint64("Sequence", redeemSession.Sequence).
+				Any("CurrentPhase", redeemSession.CurrentPhase).
 				Hex("CustodianGroupId", event.CustodianGroupId[:]).
 				Msg("[EvmClient] [HandleSwitchPhase] redeem session")
-			if redeemSession.Session.Sequence == event.Sequence && redeemSession.Session.CurrentPhase == exported.Phase(event.To) {
+			if redeemSession.Sequence == event.Sequence && redeemSession.CurrentPhase == exported.Phase(event.To) {
 				log.Info().Str("Chain", ec.EvmConfig.ID).Msgf("[EvmClient] [HandleSwitchPhase] successfully switched phase to sequence %d and phase %v", event.Sequence, exported.Phase(event.To))
 				break
 			} else {
