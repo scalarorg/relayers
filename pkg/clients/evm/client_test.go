@@ -50,14 +50,15 @@ var (
 	evmUserPrivKey   string
 	evmUserAddress   string
 	sepoliaConfig    *evm.EvmNetworkConfig = &evm.EvmNetworkConfig{
-		ChainID: 11155111,
-		ID:      CHAIN_ID_SEPOLIA,
-		Name:    "Ethereum sepolia",
-		RPCUrl:  "wss://eth-sepolia.g.alchemy.com/v2/nNbspp-yjKP9GtAcdKi8xcLnBTptR2Zx",
+		ChainID:      11155111,
+		ID:           CHAIN_ID_SEPOLIA,
+		Name:         "Ethereum sepolia",
+		RPCUrl:       "wss://eth-sepolia.g.alchemy.com/v2/nNbspp-yjKP9GtAcdKi8xcLnBTptR2Zx",
+		AuthWeighted: "0xE3ff6841C7B9a9b540eD7207b2B88D65A138FB4a",
 		//Gateway:    "0x842C080EE1399addb76830CFe21D41e47aaaf57e",
 		//Gateway:    "0x78eE3111ab44078FB32D7E7A7bCf99cf3664415B", //Version Mar 27, 2025
 		//Gateway:      "0xD2B76Ce7Bf49c8C0965e25B9d76c9cb0c550D7a7", //Version Mar 31, 2025
-		Gateway:      "0x531EA035B359aceE7a3B727d5204d25989ab5510", //Version Apr 8, 2025
+		Gateway:      "0xCd60852A48fc101304C603A9b1Bbd1E40d35E8c8", //Version Apr 15, 2025
 		PrivateKey:   "",
 		Finality:     1,
 		BlockTime:    time.Second * 12,
@@ -66,16 +67,17 @@ var (
 		GasLimit:     300000,
 	}
 	bnbConfig *evm.EvmNetworkConfig = &evm.EvmNetworkConfig{
-		ChainID:    97,
-		ID:         CHAIN_ID_BNB,
-		Name:       "Ethereum bnb",
-		RPCUrl:     "wss://bnb-testnet.g.alchemy.com/v2/DpCscOiv_evEPscGYARI3cOVeJ59CRo8",
-		Gateway:    "0x8cFc0173f7D1701bf5010B15B9762264d88c4235",
-		PrivateKey: "",
-		Finality:   1,
-		BlockTime:  time.Second * 12,
-		StartBlock: 47254017,
-		GasLimit:   300000,
+		ChainID:      97,
+		ID:           CHAIN_ID_BNB,
+		Name:         "Ethereum bnb",
+		RPCUrl:       "wss://bnb-testnet.g.alchemy.com/v2/DpCscOiv_evEPscGYARI3cOVeJ59CRo8",
+		AuthWeighted: "0x13bB2b1240E582C1A3519E97a08157eD1bBD36Bf",
+		Gateway:      "0x930C3c4f7d26f18830318115DaD97E0179DA55f0",
+		PrivateKey:   "",
+		Finality:     1,
+		BlockTime:    time.Second * 12,
+		StartBlock:   47254017,
+		GasLimit:     300000,
 	}
 	bnbClient     *evm.EvmClient
 	sepoliaClient *evm.EvmClient
