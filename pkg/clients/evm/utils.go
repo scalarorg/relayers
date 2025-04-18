@@ -155,3 +155,13 @@ func DecodeStartedSwitchPhase(input []byte) (*RedeemPhase, error) {
 		Phase:    phase,
 	}, nil
 }
+
+func DecodeGroupUid(groupHex string) ([32]byte, error) {
+	groupBytes, err := hex.DecodeString(groupHex)
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("failed to decode group uid: %w", err)
+	}
+	groupBytes32 := [32]byte{}
+	copy(groupBytes32[:], groupBytes)
+	return groupBytes32, nil
+}
