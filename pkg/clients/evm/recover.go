@@ -146,7 +146,7 @@ func (c *EvmClient) WaitForSwitchingToPhase(groupUids []string, expectedPhase co
 			}
 			log.Info().Str("Chain", c.EvmConfig.ID).Str("GroupUid", groupHex).
 				Any("Session", redeemSession.Session).
-				Msgf("[EvmClient] [WaitForSwitchingToPreparingPhase] waiting for group %d to switch to preparing phase", len(waitingGroupUids))
+				Msgf("[EvmClient] [WaitForSwitchingToPhase] waiting for group %d to switch to expected phase %v", len(waitingGroupUids), expectedPhase)
 		}
 	}
 	return nil
