@@ -155,6 +155,9 @@ func (m *MissingLogs) appendRedeemLog(redeemEvent *abi.Event, eventLog ethTypes.
 	if m.isRedeemLogInLastPhase(groupUid, redeemToken) {
 		log.Info().Str("Chain", m.chainId).Any("eventLog", eventLog).Msgf("[EvmClient] [AppendLogs] appending redeem log")
 		m.logs = append(m.logs, eventLog)
+		if m.RedeemTxs == nil {
+			m.RedeemTxs = make(map[string][]string)
+		}
 		txs := m.RedeemTxs[redeemToken.DestinationChain]
 		m.RedeemTxs[redeemToken.DestinationChain] = append(txs, redeemToken.Raw.TxHash.Hex())
 	} else {
