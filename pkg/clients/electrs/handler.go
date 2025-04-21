@@ -105,9 +105,9 @@ func (c *Client) tryHandleRedeemsTransaction(blockHeight int) error {
 		txHashes[i] = redeemTx.TxHash
 		redeemTx.Status = string(chains.RedeemStatusVerifying)
 	}
-	confirmRedeemTx := events.ConfirmRedeemTxRequest{
-		Chain:   c.electrumConfig.SourceChain,
-		TxHashs: txHashes,
+	confirmRedeemTx := events.RedeemTxEvents{
+		Chain:     c.electrumConfig.SourceChain,
+		RedeemTxs: redeemTxs,
 	}
 	err = c.dbAdapter.SaveRedeemTxs(redeemTxs)
 	if err != nil {
@@ -256,16 +256,16 @@ func (c *Client) handleRedeemTxs(redeemTxs []*chains.RedeemTx) error {
 	if c.eventBus != nil {
 		for _, txHashs := range mapTxHashs {
 			if len(txHashs) > 0 {
-				confirmRedeemTx := events.ConfirmRedeemTxRequest{
-					Chain:   c.electrumConfig.SourceChain,
-					TxHashs: txHashs,
+				redeemTxEvents := events.RedeemTxEvents{
+					Chain:     c.electrumConfig.SourceChain,
+					RedeemTxs: redeemTxs,
 				}
 
-				log.Debug().Msgf("[ElectrumClient] [handleRedeemTxs] Broadcasting confirm redeem tx request: %v", confirmRedeemTx)
+				log.Debug().Msgf("[ElectrumClient] [handleRedeemTxs] Broadcasting confirm redeem tx request: %v", redeemTxEvents)
 				c.eventBus.BroadcastEvent(&events.EventEnvelope{
 					EventType:        events.EVENT_ELECTRS_REDEEM_TRANSACTION,
 					DestinationChain: events.SCALAR_NETWORK_NAME,
-					Data:             confirmRedeemTx,
+					Data:             redeemTxEvents,
 				})
 			}
 		}

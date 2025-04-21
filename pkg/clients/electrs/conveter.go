@@ -82,9 +82,11 @@ func (c *Client) CreateRedeemTx(vaultTx types.VaultTransaction) *chains.RedeemTx
 			CreatedAt: time.Unix(int64(vaultTx.Timestamp), 0),
 			UpdatedAt: time.Unix(int64(vaultTx.Timestamp), 0),
 		},
-		Chain:       c.electrumConfig.SourceChain,
-		BlockNumber: uint64(vaultTx.Height),
-		TxHash:      vaultTx.TxHash,
-		Status:      string(chains.RedeemStatusVerifying),
+		Chain:             c.electrumConfig.SourceChain,
+		BlockNumber:       uint64(vaultTx.Height),
+		TxHash:            vaultTx.TxHash,
+		SessionSequence:   vaultTx.SessionSequence,
+		CustodianGroupUid: vaultTx.CustodianGroupUid,
+		Status:            string(chains.RedeemStatusVerifying),
 	}
 }

@@ -12,6 +12,9 @@ type CustodiansRecoverRedeemSessions struct {
 }
 
 func (s *CustodiansRecoverRedeemSessions) AddRecoverSessions(chainId string, chainRedeemSessions *types.ChainRedeemSessions) {
+	if s.RecoverSessions == nil {
+		s.RecoverSessions = make(map[string]*types.GroupRedeemSessions)
+	}
 	for groupUid, switchPhaseEvent := range chainRedeemSessions.SwitchPhaseEvents {
 		if len(switchPhaseEvent) == 0 {
 			continue
@@ -19,11 +22,13 @@ func (s *CustodiansRecoverRedeemSessions) AddRecoverSessions(chainId string, cha
 		groupSession, ok := s.RecoverSessions[groupUid]
 		if !ok {
 			groupSession = &types.GroupRedeemSessions{
+				GroupUid:          groupUid,
 				SwitchPhaseEvents: make(map[string][]*contracts.IScalarGatewaySwitchPhase),
 				RedeemTokenEvents: make(map[string][]*contracts.IScalarGatewayRedeemToken),
 			}
 		}
 		groupSession.SwitchPhaseEvents[chainId] = switchPhaseEvent
+		s.RecoverSessions[groupUid] = groupSession
 	}
 	for groupUid, redeemTokenEvent := range chainRedeemSessions.RedeemTokenEvents {
 		if len(redeemTokenEvent) == 0 {
@@ -32,15 +37,21 @@ func (s *CustodiansRecoverRedeemSessions) AddRecoverSessions(chainId string, cha
 		groupSession, ok := s.RecoverSessions[groupUid]
 		if !ok {
 			log.Warn().Msgf("[Relayer] [AddRecoverSessions] no recover session found for group %s", groupUid)
-			continue
+			groupSession = &types.GroupRedeemSessions{
+				GroupUid:          groupUid,
+				SwitchPhaseEvents: make(map[string][]*contracts.IScalarGatewaySwitchPhase),
+				RedeemTokenEvents: make(map[string][]*contracts.IScalarGatewayRedeemToken),
+			}
 		}
 		groupSession.RedeemTokenEvents[chainId] = redeemTokenEvent
+		s.RecoverSessions[groupUid] = groupSession
 	}
 }
 
-func (s *CustodiansRecoverRedeemSessions) CleanUp() {
+func (s *CustodiansRecoverRedeemSessions) ConstructSessions() {
+	log.Info().Msg("[Relayer] [ConstructSessions] start construct sessions")
 	for _, groupSession := range s.RecoverSessions {
-		groupSession.CleanUp()
+		groupSession.Construct()
 	}
 }
 

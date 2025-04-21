@@ -30,10 +30,8 @@ type Client struct {
 	eventBus        *events.EventBus
 	subscriberName  string //Use as subscriber for networkClient
 	pendingCommands *PendingCommands
-	initUtxo        bool //key: chain, value: utxo
-	// pendingPsbtCommands   sync.Map //key: chain, value psbts
-	// pendingSignCommandTxs sync.Map //Sign command request chain => tx hash, used for check if the tx is included in the block
-	// pendingBatchCommands  sync.Map //Batched command id => chain, used for get batched command to get execute data
+	initUtxo        bool                               //key: chain, value: utxo
+	redeemTxCache   map[string]*CustodianGroupRedeemTx //Map RedeemSession by chainId
 	// Add other necessary fields like chain ID, gas prices, etc.
 }
 

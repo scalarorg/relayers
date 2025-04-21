@@ -1,6 +1,9 @@
 package events
 
-import "github.com/scalarorg/relayers/pkg/types"
+import (
+	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/relayers/pkg/types"
+)
 
 const (
 	CUSTODIAL_NETWORK_NAME        = "Custodial.Network"
@@ -47,6 +50,11 @@ type ConfirmTxsRequest struct {
 type ConfirmRedeemTxRequest struct {
 	Chain   string
 	TxHashs []string
+}
+
+type RedeemTxEvents struct {
+	Chain     string
+	RedeemTxs []*chains.RedeemTx
 }
 type ChainBlockHeight struct {
 	Chain  string

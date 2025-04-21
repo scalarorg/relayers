@@ -23,6 +23,9 @@ var (
 )
 
 func (c *Client) GetChainQueryServiceClient() chainstypes.QueryServiceClient {
+	if c.queryClient == nil {
+		return nil
+	}
 	clientCtx, err := c.queryClient.GetClientCtx()
 	if err != nil {
 		return nil
@@ -31,6 +34,9 @@ func (c *Client) GetChainQueryServiceClient() chainstypes.QueryServiceClient {
 }
 
 func (c *Client) GetCovenantQueryClient() covenanttypes.QueryServiceClient {
+	if c.queryClient == nil {
+		return nil
+	}
 	clientCtx, err := c.queryClient.GetClientCtx()
 	if err != nil {
 		return nil
