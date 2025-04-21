@@ -395,13 +395,13 @@ func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) 
 	}
 	switchPhaseEvent := scalarGatewayAbi.Events[events.EVENT_EVM_SWITCHED_PHASE]
 	redeemTokenEvent := scalarGatewayAbi.Events[events.EVENT_EVM_REDEEM_TOKEN]
-	query := ethereum.FilterQuery{
-		Addresses: []common.Address{c.GatewayAddress},
-		Topics:    [][]common.Hash{{switchPhaseEvent.ID}, {redeemTokenEvent.ID}},
-	}
 	chainRedeemSessions := &pkgTypes.ChainRedeemSessions{
 		SwitchPhaseEvents: map[string][]*contracts.IScalarGatewaySwitchPhase{},
 		RedeemTokenEvents: map[string][]*contracts.IScalarGatewayRedeemToken{},
+	}
+	query := ethereum.FilterQuery{
+		Addresses: []common.Address{c.GatewayAddress},
+		Topics:    [][]common.Hash{{switchPhaseEvent.ID, redeemTokenEvent.ID}},
 	}
 	recoverRange := uint64(100000)
 	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < 100000 {
@@ -414,6 +414,10 @@ func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) 
 		fromBlock = currentBlockNumber - recoverRange
 	}
 	toBlock := currentBlockNumber
+	log.Info().Str("Chain", c.EvmConfig.ID).
+		Str("RedeemToken EventID", redeemTokenEvent.ID.String()).
+		Str("SwitchPhase EventID", switchPhaseEvent.ID.String()).
+		Msgf("[EvmClient] [RecoverRedeemSessions] IDs")
 	for len(expectingGroups) > 0 {
 		query.FromBlock = big.NewInt(int64(fromBlock))
 		query.ToBlock = big.NewInt(int64(toBlock))
@@ -421,9 +425,11 @@ func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) 
 		if err != nil {
 			return nil, fmt.Errorf("failed to filter logs: %w", err)
 		}
+		log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverRedeemSessions] found %d logs, fromBlock: %d, toBlock: %d", len(logs), fromBlock, toBlock)
 		//Loop from the last log to the first log
 		for i := len(logs) - 1; i >= 0; i-- {
 			topic := logs[i].Topics[0].String()
+			log.Info().Str("Chain", c.EvmConfig.ID).Str("Topic", topic).Msgf("[EvmClient] [RecoverRedeemSessions] topic")
 			if topic == switchPhaseEvent.ID.String() {
 				switchedPhase, err := parseSwitchPhaseEvent(logs[i])
 				if err != nil {
@@ -461,6 +467,7 @@ func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) 
 		}
 	}
 	if len(expectingGroups) > 0 {
+		log.Warn().Msgf("[EvmClient] [RecoverRedeemSessions] some groups are not recovered: %v", expectingGroups)
 		return nil, fmt.Errorf("some groups are not found: %v", expectingGroups)
 	}
 	return chainRedeemSessions, nil

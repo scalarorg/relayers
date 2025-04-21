@@ -19,6 +19,7 @@ func (s *CustodiansRecoverRedeemSessions) AddRecoverSessions(chainId string, cha
 		groupSession, ok := s.RecoverSessions[groupUid]
 		if !ok {
 			groupSession = &types.GroupRedeemSessions{
+				GroupUid:          groupUid,
 				SwitchPhaseEvents: make(map[string][]*contracts.IScalarGatewaySwitchPhase),
 				RedeemTokenEvents: make(map[string][]*contracts.IScalarGatewayRedeemToken),
 			}
@@ -40,7 +41,7 @@ func (s *CustodiansRecoverRedeemSessions) AddRecoverSessions(chainId string, cha
 
 func (s *CustodiansRecoverRedeemSessions) CleanUp() {
 	for _, groupSession := range s.RecoverSessions {
-		groupSession.CleanUp()
+		groupSession.Construct()
 	}
 }
 

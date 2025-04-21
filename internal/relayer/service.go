@@ -150,8 +150,11 @@ func (s *Service) RecoverEvmSessions(groups []*covExported.CustodianGroup) error
 			if err != nil {
 				log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover sessions for evm client %s", client.EvmConfig.GetId())
 			}
-			recoverSessions.AddRecoverSessions(client.EvmConfig.GetId(), chainRedeemSessions)
-
+			if chainRedeemSessions != nil {
+				recoverSessions.AddRecoverSessions(client.EvmConfig.GetId(), chainRedeemSessions)
+			} else {
+				panic(fmt.Sprintf("[Relayer] [RecoverEvmSessions] cannot recover sessions for evm client %s", client.EvmConfig.GetId()))
+			}
 		}()
 	}
 	wg.Wait()
@@ -207,12 +210,12 @@ func (s *Service) processRecoverExecutingPhase(groupUid string, groupRedeemSessi
 		log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot wait for group %s to switch to preparing phase", groupUid)
 		return err
 	}
-	//3. Wait for utxo snapshot
-	err = s.ScalarClient.WaitForUtxoSnapshot(groupUid)
-	if err != nil {
-		log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot wait for utxo snapshot for group %s", groupUid)
-		return err
-	}
+	// 3. Wait for utxo snapshot
+	// err = s.ScalarClient.WaitForUtxoSnapshot(groupUid)
+	// if err != nil {
+	// 	log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot wait for utxo snapshot for group %s", groupUid)
+	// 	return err
+	// }
 	//4. Replay all redeem transactions
 	for _, evmClient := range s.EvmClients {
 		wg.Add(1)
@@ -225,18 +228,18 @@ func (s *Service) processRecoverExecutingPhase(groupUid string, groupRedeemSessi
 				return
 			}
 			sourceTxs := map[string]bool{}
-			//Call reserve utxo request
-			for _, redeemTokenEvent := range redeemTokenEvents {
-				err := s.ScalarClient.ReserveUtxo(chainId, redeemTokenEvent)
-				if err != nil {
-					log.Warn().
-						Str("chainId", chainId).
-						Any("redeemTokenEvent", redeemTokenEvent).
-						Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] broadcast reserve utxo requests")
-				} else {
-					sourceTxs[redeemTokenEvent.Raw.TxHash.String()] = true
-				}
-			}
+			// Scalar network will update reserve utxo request on each confirm RedeemToken event
+			// for _, redeemTokenEvent := range redeemTokenEvents {
+			// 	err := s.ScalarClient.ReserveUtxo(chainId, redeemTokenEvent)
+			// 	if err != nil {
+			// 		log.Warn().
+			// 			Str("chainId", chainId).
+			// 			Any("redeemTokenEvent", redeemTokenEvent).
+			// 			Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] broadcast reserve utxo requests")
+			// 	} else {
+			// 		sourceTxs[redeemTokenEvent.Raw.TxHash.String()] = true
+			// 	}
+			// }
 
 			for _, redeemTokenEvent := range redeemTokenEvents {
 				err := evmClient.HandleRedeemToken(redeemTokenEvent)

@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	mockCustodianGroupUid = sha3.Sum256([]byte("scalarv32"))
+	mockCustodianGroupUid = sha3.Sum256([]byte("scalarv33"))
 	mockCustodianGroup    = &covExported.CustodianGroup{
 		UID: chainExported.Hash(mockCustodianGroupUid[:]),
 	}
@@ -26,7 +26,19 @@ var (
 
 func TestCustodianGroup(t *testing.T) {
 	guidHex := hex.EncodeToString(mockCustodianGroupUid[:])
-	require.Equal(t, "3e79326a9493896e13af62194e694dff4c9300700407449363564b0eaeaf07e8", guidHex)
+	t.Logf("guidHex: %s", guidHex)
+	require.Equal(t, "bffb71bf819ae4cb65188905ac54763a09144bc3a0629808d7142dd5dbd98693", guidHex)
+}
+
+func TestRecoverRedeemSessions(t *testing.T) {
+	sepoliaClient, err := evm.NewEvmClient(&globalConfig, sepoliaConfig, nil, nil, nil)
+	if err != nil {
+		log.Error().Msgf("failed to create evm client: %v", err)
+	}
+	chainsRedeemSessions, err := sepoliaClient.RecoverRedeemSessions([]*covExported.CustodianGroup{mockCustodianGroup})
+	require.NoError(t, err)
+	require.NotNil(t, chainsRedeemSessions)
+	t.Logf("chainsRedeemSessions: %v", chainsRedeemSessions)
 }
 func TestSepoliaRecoverEvents(t *testing.T) {
 	sepoliaClient, err := evm.NewEvmClient(&globalConfig, sepoliaConfig, nil, nil, nil)

@@ -1,6 +1,8 @@
 package types
 
 import (
+	"math"
+
 	"github.com/btcsuite/btcd/btcutil"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -123,10 +125,32 @@ type Session struct {
 	Phase    uint8
 }
 
+func (s *Session) Cmp(other *Session) int64 {
+	if other == nil {
+		return math.MaxInt64
+	}
+	var diffSeq, diffPhase int64
+	if s.Sequence >= other.Sequence {
+		diffSeq = int64(s.Sequence - other.Sequence)
+	} else {
+		diffSeq = -int64(other.Sequence - s.Sequence)
+	}
+
+	if s.Phase >= other.Phase {
+		diffPhase = int64(s.Phase - other.Phase)
+	} else {
+		diffPhase = -int64(other.Phase - s.Phase)
+	}
+
+	return diffSeq*2 + diffPhase
+}
+
 // Eache chainId container an array of SwitchPhaseEvents,
 // with the first element is switch to Preparing phase
 type GroupRedeemSessions struct {
+	GroupUid          string
 	MaxSession        Session
+	MinSession        Session
 	SwitchPhaseEvents map[string][]*contracts.IScalarGatewaySwitchPhase //Map by chainId
 	RedeemTokenEvents map[string][]*contracts.IScalarGatewayRedeemToken
 }
@@ -134,8 +158,8 @@ type GroupRedeemSessions struct {
 /*
 * For each custodian group, maximum difference between the session of evms is a phase
  */
-func (s *GroupRedeemSessions) CleanUp() {
-	//Find the max session
+func (s *GroupRedeemSessions) Construct() {
+	//Find the max, min session
 	for _, switchPhaseEvent := range s.SwitchPhaseEvents {
 		lastEvent := switchPhaseEvent[len(switchPhaseEvent)-1]
 		if s.MaxSession.Sequence < lastEvent.Sequence {
@@ -144,10 +168,50 @@ func (s *GroupRedeemSessions) CleanUp() {
 		} else if s.MaxSession.Sequence == lastEvent.Sequence && s.MaxSession.Phase < lastEvent.To {
 			s.MaxSession.Phase = lastEvent.To
 		}
+		if s.MinSession.Sequence > lastEvent.Sequence {
+			s.MinSession.Sequence = lastEvent.Sequence
+			s.MinSession.Phase = lastEvent.To
+		} else if s.MinSession.Sequence == lastEvent.Sequence && s.MinSession.Phase > lastEvent.To {
+			s.MinSession.Phase = lastEvent.To
+		}
 	}
+	diff := s.MaxSession.Cmp(&s.MinSession)
+	log.Info().Str("groupUid", s.GroupUid).Int64("diff", diff).
+		Msg("[GroupRedeemSessions] [ConstructPreparingPhase] max session and min session difference is greater than 1")
+
 	if s.MaxSession.Phase == uint8(covExported.Preparing) {
-		//These are some chains switch to the preparing phase,
-		//we don't need to recreate Redeem transaction to btc,
+		s.ConstructPreparingPhase()
+	} else if s.MaxSession.Phase == uint8(covExported.Executing) {
+		s.ConstructExecutingPhase()
+	}
+}
+
+func (s *GroupRedeemSessions) ConstructPreparingPhase() {
+	diff := s.MaxSession.Cmp(&s.MinSession)
+	if diff == 0 {
+		log.Warn().Str("groupUid", s.GroupUid).Msg("[GroupRedeemSessions] [ConstructPreparingPhase] max session and min session are the same")
+		//Each chain keep only one switch phase event to Preparing phase
+		for chainId, switchPhaseEvent := range s.SwitchPhaseEvents {
+			if len(switchPhaseEvent) == 0 {
+				continue
+			}
+			if len(switchPhaseEvent) == 2 {
+				s.SwitchPhaseEvents[chainId] = switchPhaseEvent[1:]
+			}
+		}
+		//Keep all redeem token events of the max session's sequence
+		for chainId, redeemTokenEvents := range s.RedeemTokenEvents {
+			currentSessionEvents := make([]*contracts.IScalarGatewayRedeemToken, 0)
+			for _, redeemTokenEvent := range redeemTokenEvents {
+				if redeemTokenEvent.Sequence == s.MaxSession.Sequence {
+					currentSessionEvents = append(currentSessionEvents, redeemTokenEvent)
+				}
+			}
+			s.RedeemTokenEvents[chainId] = currentSessionEvents
+		}
+	} else {
+		//These are some chains switch to the preparing phase, and some other is in execution phase from previous session
+		//We don't need to recreate Redeem transaction to btc,
 		//show we don't need to send RedeemEvent for confirmation
 		s.RedeemTokenEvents = make(map[string][]*contracts.IScalarGatewayRedeemToken)
 		//Remove old switch phase event
@@ -157,21 +221,24 @@ func (s *GroupRedeemSessions) CleanUp() {
 				s.SwitchPhaseEvents[chainId] = switchPhaseEvent[1:]
 			}
 		}
-	} else if s.MaxSession.Phase == uint8(covExported.Executing) {
-		//Expecting all chains are switching to the executing phase
-		for chainId, switchPhaseEvent := range s.SwitchPhaseEvents {
-			if switchPhaseEvent[0].Sequence < s.MaxSession.Sequence {
-				log.Warn().Str("chainId", chainId).Any("First preparing event", switchPhaseEvent[0]).
-					Msg("[Relayer] [RecoverRedeemSessions] Session is too low. Some thing wrong")
-			}
+	}
+}
+
+func (s *GroupRedeemSessions) ConstructExecutingPhase() {
+	//For both case diff == 0 and diff = 1, we need to resend the redeem transaction to the scalar network
+	//Expecting all chains are switching to the executing phase
+	for chainId, switchPhaseEvent := range s.SwitchPhaseEvents {
+		if switchPhaseEvent[0].Sequence < s.MaxSession.Sequence {
+			log.Warn().Str("chainId", chainId).Any("First preparing event", switchPhaseEvent[0]).
+				Msg("[Relayer] [RecoverRedeemSessions] Session is too low. Some thing wrong")
 		}
-		//We resend to the scalar network onlye the redeem transaction of the last session
-		for chainId, redeemTokenEvent := range s.RedeemTokenEvents {
-			for _, event := range redeemTokenEvent {
-				if event.Sequence < s.MaxSession.Sequence {
-					log.Warn().Str("chainId", chainId).Any("Redeem transaction", event).
-						Msg("[Relayer] [RecoverRedeemSessions] Redeem transaction is too low. Some thing wrong")
-				}
+	}
+	//We resend to the scalar network onlye the redeem transaction of the last session
+	for chainId, redeemTokenEvent := range s.RedeemTokenEvents {
+		for _, event := range redeemTokenEvent {
+			if event.Sequence < s.MaxSession.Sequence {
+				log.Warn().Str("chainId", chainId).Any("Redeem transaction", event).
+					Msg("[Relayer] [RecoverRedeemSessions] Redeem transaction is too low. Some thing wrong")
 			}
 		}
 	}
