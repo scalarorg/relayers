@@ -2,6 +2,8 @@ package utils
 
 import (
 	"encoding/hex"
+	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/bitcoin-vault/go-utils/encode"
@@ -25,4 +27,14 @@ func DecodeContractCallWithTokenPayload(payload []byte) (*encode.ContractCallWit
 		return decodedPayload, nil
 	}
 	return nil, err
+}
+
+func DecodeGroupUid(groupHex string) ([32]byte, error) {
+	groupBytes, err := hex.DecodeString(strings.TrimPrefix(groupHex, "0x"))
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("failed to decode group uid: %w", err)
+	}
+	groupBytes32 := [32]byte{}
+	copy(groupBytes32[:], groupBytes)
+	return groupBytes32, nil
 }

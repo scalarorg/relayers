@@ -18,6 +18,7 @@ import (
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/clients/evm/parser"
 	"github.com/scalarorg/relayers/pkg/events"
+	pkgTypes "github.com/scalarorg/relayers/pkg/types"
 	chains "github.com/scalarorg/scalar-core/x/chains/types"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 )
@@ -28,9 +29,9 @@ var (
 		events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN,
 		events.EVENT_EVM_TOKEN_SENT,
 		events.EVENT_EVM_CONTRACT_CALL_APPROVED,
-		//events.EVENT_EVM_COMMAND_EXECUTED,
+		events.EVENT_EVM_COMMAND_EXECUTED,
 		//events.EVENT_EVM_TOKEN_DEPLOYED,
-		events.EVENT_EVM_REDEEM_TOKEN,
+		//events.EVENT_EVM_REDEEM_TOKEN,
 	}
 )
 
@@ -89,6 +90,7 @@ func (c *EvmClient) ProcessMissingLogs() {
 	log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] finished processing all missing evm events")
 }
 
+// Recover all events after recovering
 func (c *EvmClient) RecoverAllEvents(ctx context.Context, groups []*covExported.CustodianGroup) error {
 	currentBlockNumber, err := c.Client.BlockNumber(context.Background())
 	if err != nil {
@@ -98,22 +100,22 @@ func (c *EvmClient) RecoverAllEvents(ctx context.Context, groups []*covExported.
 		Msg("[EvmClient] [RecoverAllEvents] recovering all events")
 
 	//Recover switched phase event
-	mapPreparingEvents, mapExecutingEvents, err := c.RecoverSwitchedPhaseEvent(ctx, currentBlockNumber, groups)
-	if err != nil {
-		return err
-	}
-	log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverAllEvents] recovered %d preparing events and %d executing events", len(mapPreparingEvents), len(mapExecutingEvents))
-	//First handle all preparing events
-	//TODO: turn on the flag Recovering
-	groupUids := []string{}
-	for groupUid, preparingEvent := range mapPreparingEvents {
-		log.Info().Str("Chain", c.EvmConfig.ID).Str("GroupUid", groupUid).Msgf("[EvmClient] [RecoverAllEvents] handle switched phase event to preparing")
-		c.HandleSwitchPhase(preparingEvent)
-		groupUids = append(groupUids, groupUid)
-	}
-	c.MissingLogs.SetLastSwitchedEvents(mapPreparingEvents, mapExecutingEvents)
-	//Wait for scalar network switch to preparing phase
-	c.WaitForSwitchingToPhase(groupUids, covExported.Preparing)
+	// mapPreparingEvents, mapExecutingEvents, err := c.RecoverSwitchedPhaseEvent(ctx, currentBlockNumber, groups)
+	// if err != nil {
+	// 	return err
+	// }
+	// log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverAllEvents] recovered %d preparing events and %d executing events", len(mapPreparingEvents), len(mapExecutingEvents))
+	// //First handle all preparing events
+	// //TODO: turn on the flag Recovering
+	// groupUids := []string{}
+	// for groupUid, preparingEvent := range mapPreparingEvents {
+	// 	log.Info().Str("Chain", c.EvmConfig.ID).Str("GroupUid", groupUid).Msgf("[EvmClient] [RecoverAllEvents] handle switched phase event to preparing")
+	// 	c.HandleSwitchPhase(preparingEvent)
+	// 	groupUids = append(groupUids, groupUid)
+	// }
+	// c.MissingLogs.SetLastSwitchedEvents(mapPreparingEvents, mapExecutingEvents)
+	// //Wait for scalar network switch to preparing phase
+	// c.WaitForSwitchingToPhase(groupUids, covExported.Preparing)
 	//Recover all other events
 	err = c.RecoverEvents(ctx, ALL_EVENTS, currentBlockNumber)
 	if err != nil {
@@ -374,4 +376,116 @@ func (c *EvmClient) UpdateLastCheckPoint(events map[string]abi.Event, logs []typ
 		}
 	}
 	c.dbAdapter.UpdateLastEventCheckPoints(eventCheckPoints)
+}
+
+/*
+For each evm chain, we need to recover from the last Event which switch to PrepringPhase
+So, we need to recover one event Preparing if it is last
+or 2 last events, Preparing and Executing, beetween 2 this events, relayer push all redeem transactions of current session
+*/
+func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) (*pkgTypes.ChainRedeemSessions, error) {
+	currentBlockNumber, err := c.Client.BlockNumber(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current block number: %w", err)
+	}
+	expectingGroups := map[string]string{}
+	for _, group := range groups {
+		groupUid := strings.TrimPrefix(group.UID.Hex(), "0x")
+		expectingGroups[groupUid] = group.Name
+	}
+	switchPhaseEvent := scalarGatewayAbi.Events[events.EVENT_EVM_SWITCHED_PHASE]
+	redeemTokenEvent := scalarGatewayAbi.Events[events.EVENT_EVM_REDEEM_TOKEN]
+	query := ethereum.FilterQuery{
+		Addresses: []common.Address{c.GatewayAddress},
+		Topics:    [][]common.Hash{{switchPhaseEvent.ID}, {redeemTokenEvent.ID}},
+	}
+	chainRedeemSessions := &pkgTypes.ChainRedeemSessions{
+		SwitchPhaseEvents: map[string][]*contracts.IScalarGatewaySwitchPhase{},
+		RedeemTokenEvents: map[string][]*contracts.IScalarGatewayRedeemToken{},
+	}
+	recoverRange := uint64(100000)
+	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < 100000 {
+		recoverRange = c.EvmConfig.RecoverRange
+	}
+	var fromBlock uint64
+	if currentBlockNumber < recoverRange {
+		fromBlock = 0
+	} else {
+		fromBlock = currentBlockNumber - recoverRange
+	}
+	toBlock := currentBlockNumber
+	for len(expectingGroups) > 0 {
+		query.FromBlock = big.NewInt(int64(fromBlock))
+		query.ToBlock = big.NewInt(int64(toBlock))
+		logs, err := c.Client.FilterLogs(context.Background(), query)
+		if err != nil {
+			return nil, fmt.Errorf("failed to filter logs: %w", err)
+		}
+		//Loop from the last log to the first log
+		for i := len(logs) - 1; i >= 0; i-- {
+			topic := logs[i].Topics[0].String()
+			if topic == switchPhaseEvent.ID.String() {
+				switchedPhase, err := parseSwitchPhaseEvent(logs[i])
+				if err != nil {
+					log.Error().Err(err).Msgf("[EvmClient] [RecoverRedeemSessions] failed to parse event %s", switchPhaseEvent.Name)
+					continue
+				}
+				groupUid := strings.TrimPrefix(hex.EncodeToString(switchedPhase.CustodianGroupId[:]), "0x")
+				chainRedeemSessions.AppendSwitchPhaseEvent(groupUid, switchedPhase)
+				//We don't need to recover redeem tx which come from the sessionbefore the last switch to preparing phase
+				//Each group has one of 2 forms:
+				//1. [Preparing]
+				//2. [Preparing, Executing]
+				if switchedPhase.To == uint8(covExported.Preparing) {
+					log.Info().Str("groupUid", groupUid).Msg("[EvmClient] [RecoverSwitchedPhaseEvent] found preparing event")
+					delete(expectingGroups, groupUid)
+				}
+			} else if topic == redeemTokenEvent.ID.String() {
+				redeemToken, err := parseRedeemTokenEvent(logs[i])
+				if err != nil {
+					log.Error().Err(err).Msgf("[EvmClient] [RecoverRedeemSessions] failed to parse event %s", redeemTokenEvent.Name)
+					continue
+				}
+				groupUid := strings.TrimPrefix(hex.EncodeToString(redeemToken.CustodianGroupUID[:]), "0x")
+				chainRedeemSessions.AppendRedeemTokenEvent(groupUid, redeemToken)
+			}
+		}
+		if fromBlock <= c.EvmConfig.StartBlock {
+			break
+		}
+		toBlock = fromBlock - 1
+		if fromBlock < recoverRange+c.EvmConfig.StartBlock {
+			fromBlock = c.EvmConfig.StartBlock
+		} else {
+			fromBlock = fromBlock - recoverRange
+		}
+	}
+	if len(expectingGroups) > 0 {
+		return nil, fmt.Errorf("some groups are not found: %v", expectingGroups)
+	}
+	return chainRedeemSessions, nil
+}
+
+func parseSwitchPhaseEvent(log types.Log) (*contracts.IScalarGatewaySwitchPhase, error) {
+	eventName := events.EVENT_EVM_SWITCHED_PHASE
+	switchedPhase := &contracts.IScalarGatewaySwitchPhase{
+		Raw: log,
+	}
+	err := parser.ParseEventData(&log, eventName, switchedPhase)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse event %s: %w", eventName, err)
+	}
+	return switchedPhase, nil
+}
+
+func parseRedeemTokenEvent(log types.Log) (*contracts.IScalarGatewayRedeemToken, error) {
+	eventName := events.EVENT_EVM_REDEEM_TOKEN
+	redeemToken := &contracts.IScalarGatewayRedeemToken{
+		Raw: log,
+	}
+	err := parser.ParseEventData(&log, eventName, redeemToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse event %s: %w", eventName, err)
+	}
+	return redeemToken, nil
 }

@@ -4,8 +4,11 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/bitcoin-vault/go-utils/btc"
 	"github.com/scalarorg/bitcoin-vault/go-utils/types"
+	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 )
 
 type ExecuteParams struct {
@@ -110,8 +113,125 @@ func (p *PsbtParams) GetTaprootAddress() (btcutil.Address, error) {
 	return btc.ScriptPubKeyToAddress(p.CustodianScript, p.NetworkType)
 }
 
-// type RedeemTx struct {
-// 	BlockHeight uint64
-// 	TxHash      string
-// 	LogIndex    uint
-// }
+//	type RedeemTx struct {
+//		BlockHeight uint64
+//		TxHash      string
+//		LogIndex    uint
+//	}
+type Session struct {
+	Sequence uint64
+	Phase    uint8
+}
+
+// Eache chainId container an array of SwitchPhaseEvents,
+// with the first element is switch to Preparing phase
+type GroupRedeemSessions struct {
+	MaxSession        Session
+	SwitchPhaseEvents map[string][]*contracts.IScalarGatewaySwitchPhase //Map by chainId
+	RedeemTokenEvents map[string][]*contracts.IScalarGatewayRedeemToken
+}
+
+/*
+* For each custodian group, maximum difference between the session of evms is a phase
+ */
+func (s *GroupRedeemSessions) CleanUp() {
+	//Find the max session
+	for _, switchPhaseEvent := range s.SwitchPhaseEvents {
+		lastEvent := switchPhaseEvent[len(switchPhaseEvent)-1]
+		if s.MaxSession.Sequence < lastEvent.Sequence {
+			s.MaxSession.Sequence = lastEvent.Sequence
+			s.MaxSession.Phase = lastEvent.To
+		} else if s.MaxSession.Sequence == lastEvent.Sequence && s.MaxSession.Phase < lastEvent.To {
+			s.MaxSession.Phase = lastEvent.To
+		}
+	}
+	if s.MaxSession.Phase == uint8(covExported.Preparing) {
+		//These are some chains switch to the preparing phase,
+		//we don't need to recreate Redeem transaction to btc,
+		//show we don't need to send RedeemEvent for confirmation
+		s.RedeemTokenEvents = make(map[string][]*contracts.IScalarGatewayRedeemToken)
+		//Remove old switch phase event
+		//Find all chains with 2 events [Preparing, Executing], remove the first event
+		for chainId, switchPhaseEvent := range s.SwitchPhaseEvents {
+			if len(switchPhaseEvent) == 2 && switchPhaseEvent[0].To == uint8(covExported.Preparing) && switchPhaseEvent[1].To == uint8(covExported.Executing) {
+				s.SwitchPhaseEvents[chainId] = switchPhaseEvent[1:]
+			}
+		}
+	} else if s.MaxSession.Phase == uint8(covExported.Executing) {
+		//Expecting all chains are switching to the executing phase
+		for chainId, switchPhaseEvent := range s.SwitchPhaseEvents {
+			if switchPhaseEvent[0].Sequence < s.MaxSession.Sequence {
+				log.Warn().Str("chainId", chainId).Any("First preparing event", switchPhaseEvent[0]).
+					Msg("[Relayer] [RecoverRedeemSessions] Session is too low. Some thing wrong")
+			}
+		}
+		//We resend to the scalar network onlye the redeem transaction of the last session
+		for chainId, redeemTokenEvent := range s.RedeemTokenEvents {
+			for _, event := range redeemTokenEvent {
+				if event.Sequence < s.MaxSession.Sequence {
+					log.Warn().Str("chainId", chainId).Any("Redeem transaction", event).
+						Msg("[Relayer] [RecoverRedeemSessions] Redeem transaction is too low. Some thing wrong")
+				}
+			}
+		}
+	}
+}
+
+// Each chain store switch phase events array with 1 or 2 elements of the form:
+// 1. [Preparing]
+// 2. [Preparing, Executing] in the same sequence
+type ChainRedeemSessions struct {
+	SwitchPhaseEvents map[string][]*contracts.IScalarGatewaySwitchPhase //Map by custodian group uid
+	RedeemTokenEvents map[string][]*contracts.IScalarGatewayRedeemToken
+}
+
+func (s *ChainRedeemSessions) AppendSwitchPhaseEvent(groupUid string, event *contracts.IScalarGatewaySwitchPhase) {
+	//Put switch phase event in the first position
+	switchPhaseEvents, ok := s.SwitchPhaseEvents[groupUid]
+	if !ok {
+		s.SwitchPhaseEvents[groupUid] = []*contracts.IScalarGatewaySwitchPhase{event}
+	} else {
+		if len(switchPhaseEvents) >= 2 {
+			log.Warn().Str("groupUid", groupUid).Msg("[ChainRedeemSessions] [AppendSwitchPhaseEvent] switch phase events already has 2 elements")
+			return
+		}
+		currentPhase := switchPhaseEvents[len(switchPhaseEvents)-1]
+		if currentPhase.Sequence != event.Sequence {
+			log.Warn().Str("groupUid", groupUid).Any("current element", currentPhase).
+				Any("incomming element", event).
+				Msg("[ChainRedeemSessions] [AppendSwitchPhaseEvent] switch phase event has different sequence")
+			return
+		}
+		if currentPhase.To == uint8(covExported.Preparing) && event.To == uint8(covExported.Executing) {
+			s.SwitchPhaseEvents[groupUid] = append(switchPhaseEvents, event)
+		} else if currentPhase.To == uint8(covExported.Executing) && event.To == uint8(covExported.Preparing) {
+			s.SwitchPhaseEvents[groupUid] = []*contracts.IScalarGatewaySwitchPhase{event, currentPhase}
+
+		} else {
+			log.Warn().Str("groupUid", groupUid).Any("current element", currentPhase).
+				Any("incomming element", event).
+				Msg("[ChainRedeemSessions] [AppendSwitchPhaseEvent] switch phase event is not valid")
+
+		}
+	}
+}
+
+// Put redeem token event in the first position
+// we keep only the redeem transaction of the max session's sequence
+func (s *ChainRedeemSessions) AppendRedeemTokenEvent(groupUid string, event *contracts.IScalarGatewayRedeemToken) {
+	redeemEvents, ok := s.RedeemTokenEvents[groupUid]
+	if !ok {
+		s.RedeemTokenEvents[groupUid] = []*contracts.IScalarGatewayRedeemToken{event}
+	} else if len(redeemEvents) > 0 {
+		lastInsertedEvent := redeemEvents[0]
+		if event.Sequence > lastInsertedEvent.Sequence {
+			s.RedeemTokenEvents[groupUid] = []*contracts.IScalarGatewayRedeemToken{event}
+		} else if lastInsertedEvent.Sequence == event.Sequence {
+			s.RedeemTokenEvents[groupUid] = append([]*contracts.IScalarGatewayRedeemToken{event}, redeemEvents...)
+		} else {
+			log.Warn().Str("groupUid", groupUid).Any("last inserted event", lastInsertedEvent).
+				Any("incomming event", event).
+				Msg("[ChainRedeemSessions] [AppendRedeemTokenEvent] ignore redeem token tx with lower sequence")
+		}
+	}
+}
