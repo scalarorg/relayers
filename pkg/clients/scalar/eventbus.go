@@ -21,9 +21,10 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 		return c.handleElectrsEventNewBlock(event.Data.(events.ChainBlockHeight))
 	case events.EVENT_EVM_TOKEN_SENT,
 		events.EVENT_EVM_CONTRACT_CALL,
-		events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN,
-		events.EVENT_EVM_REDEEM_TOKEN:
+		events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN:
 		return c.requestConfirmEvmTxs(event.Data.(events.ConfirmTxsRequest))
+	case events.EVENT_EVM_REDEEM_TOKEN:
+		return c.handleElectrsEventRedeemTx(event.Data.(events.ConfirmTxsRequest))
 	case events.EVENT_EVM_TOKEN_DEPLOYED:
 		return c.requestConfirmTokenDeployed(event.Data.(*chains.TokenDeployed))
 	case events.EVENT_EVM_SWITCHED_PHASE:
