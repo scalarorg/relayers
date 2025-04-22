@@ -379,9 +379,8 @@ func (c *EvmClient) UpdateLastCheckPoint(events map[string]abi.Event, logs []typ
 }
 
 /*
-For each evm chain, we need to recover from the last Event which switch to PrepringPhase
-So, we need to recover one event Preparing if it is last
-or 2 last events, Preparing and Executing, beetween 2 this events, relayer push all redeem transactions of current session
+For each evm chain, we need to get 2 last switch phase events
+so we have to case, [Preparing, Executing], [Executing, Preparing] or [Preparing]
 */
 func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) (*pkgTypes.ChainRedeemSessions, error) {
 	currentBlockNumber, err := c.Client.BlockNumber(context.Background())
@@ -442,13 +441,10 @@ func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) 
 					log.Warn().Str("Chain", c.EvmConfig.ID).Str("groupUid", groupUid).Msg("[EvmClient] [RecoverRedeemSessions] unexpected groupUid")
 					continue
 				}
-				chainRedeemSessions.AppendSwitchPhaseEvent(groupUid, switchedPhase)
-				//We don't need to recover redeem tx which come from the sessionbefore the last switch to preparing phase
-				//Each group has one of 2 forms:
-				//1. [Preparing]
-				//2. [Preparing, Executing]
 				log.Info().Str("Chain", c.EvmConfig.ID).Str("groupUid", groupUid).Msg("[EvmClient] [RecoverRedeemSessions] found preparing event")
-				if switchedPhase.To == uint8(covExported.Preparing) {
+				counter := chainRedeemSessions.AppendSwitchPhaseEvent(groupUid, switchedPhase)
+				if counter == 2 || switchedPhase.To == uint8(covExported.Preparing) && switchedPhase.Sequence == 1 {
+					//Stop get logs if we have 2 switch phase events or hit the fist event from sequence 1
 					delete(expectingGroups, groupUid)
 				}
 			} else if topic == redeemTokenEvent.ID.String() {

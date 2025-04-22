@@ -124,6 +124,7 @@ func (c *Client) requestConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed
 
 func (c *Client) requestConfirmSwitchedPhase(switchedPhase *chains.SwitchedPhase) error {
 	log.Debug().
+		Str("Chain", switchedPhase.Chain).
 		Str("TxHash", switchedPhase.TxHash).
 		Uint64("SessionSequence", switchedPhase.SessionSequence).
 		Uint8("From", switchedPhase.From).

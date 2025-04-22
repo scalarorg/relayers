@@ -152,24 +152,24 @@ func (c *BtcClient) BroadcastRawTx(signedPsbtHex string) (*chainhash.Hash, error
 	return future.Receive()
 }
 
-func (c *BtcClient) FindBroadcastedTx(signedPsbtHex string) (*chainhash.Hash, error) {
+func (c *BtcClient) FindBroadcastedTx(signedPsbtHex string) (*chainhash.Hash, bool, error) {
 	// First decode the hex string to MsgTx
 	msgTx := wire.NewMsgTx(wire.TxVersion)
+	txHash := msgTx.TxHash()
 	txBytes, err := hex.DecodeString(signedPsbtHex)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if err := msgTx.Deserialize(bytes.NewReader(txBytes)); err != nil {
-		return nil, err
+		return &txHash, false, err
 	}
-	txHash := msgTx.TxHash()
+
 	tx, err := c.client.GetTransaction(&txHash)
 	if err != nil {
-		return nil, err
+		return &txHash, false, err
 	}
 	log.Debug().Msgf("[BtcClient] FindBroadcastedTx: %v", tx)
-
-	return nil, fmt.Errorf("transaction not found %s", txHash.String())
+	return &txHash, true, nil
 }
 
 func (c *BtcClient) TestMempoolRawTx(signedPsbtHex string) (*chainhash.Hash, error) {

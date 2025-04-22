@@ -255,34 +255,49 @@ type ChainRedeemSessions struct {
 	RedeemTokenEvents map[string][]*contracts.IScalarGatewayRedeemToken
 }
 
-func (s *ChainRedeemSessions) AppendSwitchPhaseEvent(groupUid string, event *contracts.IScalarGatewaySwitchPhase) {
+// Return number of events added
+func (s *ChainRedeemSessions) AppendSwitchPhaseEvent(groupUid string, event *contracts.IScalarGatewaySwitchPhase) int {
 	//Put switch phase event in the first position
 	switchPhaseEvents, ok := s.SwitchPhaseEvents[groupUid]
 	if !ok {
 		s.SwitchPhaseEvents[groupUid] = []*contracts.IScalarGatewaySwitchPhase{event}
-	} else {
-		if len(switchPhaseEvents) >= 2 {
-			log.Warn().Str("groupUid", groupUid).Msg("[ChainRedeemSessions] [AppendSwitchPhaseEvent] switch phase events already has 2 elements")
-			return
-		}
-		currentPhase := switchPhaseEvents[len(switchPhaseEvents)-1]
-		if currentPhase.Sequence != event.Sequence {
-			log.Warn().Str("groupUid", groupUid).Any("current element", currentPhase).
-				Any("incomming element", event).
-				Msg("[ChainRedeemSessions] [AppendSwitchPhaseEvent] switch phase event has different sequence")
-			return
-		}
+		return 1
+	}
+	if len(switchPhaseEvents) >= 2 {
+		log.Warn().Str("groupUid", groupUid).Msg("[ChainRedeemSessions] [AppendSwitchPhaseEvent] switch phase events already has 2 elements")
+		return 2
+	}
+	currentPhase := switchPhaseEvents[0]
+	log.Warn().Str("groupUid", groupUid).Any("current element", currentPhase).
+		Any("incomming element", event).
+		Msg("[ChainRedeemSessions] [AppendSwitchPhaseEvent] switch phase event has the same sequence")
+	if currentPhase.Sequence == event.Sequence {
 		if currentPhase.To == uint8(covExported.Preparing) && event.To == uint8(covExported.Executing) {
 			s.SwitchPhaseEvents[groupUid] = append(switchPhaseEvents, event)
+			return 2
 		} else if currentPhase.To == uint8(covExported.Executing) && event.To == uint8(covExported.Preparing) {
 			s.SwitchPhaseEvents[groupUid] = []*contracts.IScalarGatewaySwitchPhase{event, currentPhase}
-
+			return 2
 		} else {
-			log.Warn().Str("groupUid", groupUid).Any("current element", currentPhase).
-				Any("incomming element", event).
-				Msg("[ChainRedeemSessions] [AppendSwitchPhaseEvent] switch phase event is not valid")
-
+			log.Warn().Msg("[ChainRedeemSessions] [AppendSwitchPhaseEvent] event is already in the list")
+			return 1
 		}
+	} else if event.Sequence < currentPhase.Sequence {
+		if event.Sequence == currentPhase.Sequence-1 && event.To == uint8(covExported.Executing) && currentPhase.To == uint8(covExported.Preparing) {
+			s.SwitchPhaseEvents[groupUid] = []*contracts.IScalarGatewaySwitchPhase{event, currentPhase}
+			return 2
+		}
+		log.Warn().Msg("[ChainRedeemSessions] [AppendSwitchPhaseEvent] incomming event is too old")
+		return 1
+	} else {
+		//event.Sequence > currentPhase.Sequence
+		if currentPhase.Sequence == event.Sequence-1 && currentPhase.To == uint8(covExported.Executing) && event.To == uint8(covExported.Preparing) {
+			s.SwitchPhaseEvents[groupUid] = []*contracts.IScalarGatewaySwitchPhase{currentPhase, event}
+			return 2
+		}
+		log.Warn().Msg("[ChainRedeemSessions] [AppendSwitchPhaseEvent] Incomming event is too high, set it as an unique item in the list")
+		s.SwitchPhaseEvents[groupUid] = []*contracts.IScalarGatewaySwitchPhase{event}
+		return 1
 	}
 }
 
