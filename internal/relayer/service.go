@@ -318,6 +318,7 @@ func (s *Service) replayBtcRedeemTxs(groupUid string) error {
 		return fmt.Errorf("[Relayer] [processRecoverPreparingPhase] cannot get redeem session for group %s", groupUid)
 	}
 	redeemTxs := s.ScalarClient.PickCacheRedeemTx(groupUid, redeemSession.Session.Sequence)
+	log.Info().Any("redeemTxs", redeemTxs).Msgf("[Relayer] [replayBtcRedeemTxs] redeem txs in cache")
 	for chainId, redeemTxs := range redeemTxs {
 		err := s.ScalarClient.BroadcastRedeemTxsConfirmRequest(chainId, redeemTxs)
 		if err != nil {

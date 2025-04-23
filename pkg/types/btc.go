@@ -39,5 +39,5 @@ type CommandOutPoint struct {
 	CommandID  string
 	BTCFeeOpts types.BTCFeeOpts
 	RBF        bool
-	OutPoint   types.UnstakingOutput
+	OutPoint   types.UnlockingOutput
 }

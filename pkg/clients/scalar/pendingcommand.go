@@ -203,7 +203,7 @@ func TryExtractCommandOutPoint(cmd chainstypes.QueryCommandResponse) (types.Comm
 			CommandID:  cmd.ID,
 			BTCFeeOpts: payload.CustodianOnly.FeeOptions,
 			RBF:        payload.CustodianOnly.RBF,
-			OutPoint: utiltypes.UnstakingOutput{
+			OutPoint: utiltypes.UnlockingOutput{
 				Amount:        amount,
 				LockingScript: payload.CustodianOnly.RecipientChainIdentifier,
 			},

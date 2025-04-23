@@ -151,7 +151,7 @@ func TestCreatePsbts(t *testing.T) {
 		{
 			BTCFeeOpts: 0,
 			RBF:        false,
-			OutPoint:   utils.UnstakingOutput{Amount: 10_000, LockingScript: lockingScript},
+			OutPoint:   utils.UnlockingOutput{Amount: 10_000, LockingScript: lockingScript},
 		},
 	}
 
