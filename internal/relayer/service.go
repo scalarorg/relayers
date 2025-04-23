@@ -18,6 +18,7 @@ import (
 	types "github.com/scalarorg/relayers/pkg/types"
 	"github.com/scalarorg/relayers/pkg/utils"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
+	covTypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
 
 type Service struct {
@@ -195,45 +196,48 @@ func (s *Service) RecoverEvmSessions(groups []*covExported.CustodianGroup) error
 func (s *Service) processRecoverExecutingPhase(groupUid string, groupRedeemSessions *types.GroupRedeemSessions) error {
 	log.Info().Str("groupUid", groupUid).
 		Msg("[Relayer] [RecoverEvmSessions] processRecoverExecutingPhase")
-	//1. Replay all switch to preparing phase event,
-	expectedPhase, evmCounter, hasDifferentPhase := s.replaySwitchPhaseEvents(groupRedeemSessions.SwitchPhaseEvents, 0)
-	log.Info().Int32("evmCounter", evmCounter).
-		Any("ExpectedPhase", expectedPhase).
-		Bool("hasDifferentPhase", hasDifferentPhase).
-		Msg("[Relayer] [processRecoverExecutingPhase] first events")
-	if hasDifferentPhase {
-		panic("[Relayer] [processRecoverExecutingPhase] cannot recover all evm switch phase events to the same phase")
-	}
-	if evmCounter != int32(len(s.EvmClients)) {
-		panic(fmt.Sprintf("[Relayer] [processRecoverExecutingPhase] cannot recover all evm switch phase events, evm counter is %d", evmCounter))
-	}
-	if expectedPhase != int32(covExported.Preparing) {
-		panic("[Relayer] [processRecoverExecutingPhase] by design, recover first event switch to Preparing for all evm chains")
-	}
-	//2. wait for group's session switch to preparing then replay all redeem token events
-	err := s.ScalarClient.WaitForSwitchingToPhase(groupUid, covExported.Preparing)
+	//0. Check if the redeem session is broadcasted to bitcoin network
+	isBroadcasted, err := s.isRedeemSessionBroadcasted(groupRedeemSessions.RedeemTokenEvents)
 	if err != nil {
-		log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot wait for group %s to switch to preparing phase", groupUid)
+		log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutingPhase] cannot check if the redeem session is broadcasted to bitcoin network")
 		return err
 	}
-	// 3. Wait for utxo snapshot
-	// err = s.ScalarClient.WaitForUtxoSnapshot(groupUid)
-	// if err != nil {
-	// 	log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot wait for utxo snapshot for group %s", groupUid)
-	// 	return err
-	// }
-	//4. Replay all redeem transactions
+	if !isBroadcasted {
+		log.Info().Msgf("[Relayer] [processRecoverExecutingPhase] redeem session is not broadcasted to bitcoin network")
 
-	mapTxHashes, err := s.replayRedeemTransactions(groupUid, groupRedeemSessions.RedeemTokenEvents)
-	if err != nil {
-		log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot replay redeem transactions")
-		return err
+		//1. Replay all switch to preparing phase event,
+		expectedPhase, evmCounter, hasDifferentPhase := s.replaySwitchPhaseEvents(groupRedeemSessions.SwitchPhaseEvents, 0)
+		log.Info().Int32("evmCounter", evmCounter).
+			Any("ExpectedPhase", expectedPhase).
+			Bool("hasDifferentPhase", hasDifferentPhase).
+			Msg("[Relayer] [processRecoverExecutingPhase] first events")
+		if hasDifferentPhase {
+			panic("[Relayer] [processRecoverExecutingPhase] cannot recover all evm switch phase events to the same phase")
+		}
+		if evmCounter != int32(len(s.EvmClients)) {
+			panic(fmt.Sprintf("[Relayer] [processRecoverExecutingPhase] cannot recover all evm switch phase events, evm counter is %d", evmCounter))
+		}
+		if expectedPhase != int32(covExported.Preparing) {
+			panic("[Relayer] [processRecoverExecutingPhase] by design, recover first event switch to Preparing for all evm chains")
+		}
+		//2. wait for group's session switch to preparing then replay all redeem token events
+		err := s.ScalarClient.WaitForSwitchingToPhase(groupUid, covExported.Preparing)
+		if err != nil {
+			log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot wait for group %s to switch to preparing phase", groupUid)
+			return err
+		}
+
+		mapTxHashes, err := s.replayRedeemTransactions(groupUid, groupRedeemSessions.RedeemTokenEvents)
+		if err != nil {
+			log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot replay redeem transactions")
+			return err
+		}
+		log.Info().Any("mapTxHashes", mapTxHashes).Msg("[Relayer] [processRecoverExecutionPhase] finished replay redeem transactions")
+		s.waitingForPendingCommands(mapTxHashes)
+		log.Info().Msgf("[Relayer] [processRecoverExecutionPhase] all pending commands are ready")
 	}
-	log.Info().Any("mapTxHashes", mapTxHashes).Msg("[Relayer] [processRecoverExecutionPhase] finished replay redeem transactions")
-	s.waitingForPendingCommands(mapTxHashes)
-	log.Info().Msgf("[Relayer] [processRecoverExecutionPhase] all pending commands are ready")
 	//5. Replay all switch to executing phase events
-	expectedPhase, evmCounter, hasDifferentPhase = s.replaySwitchPhaseEvents(groupRedeemSessions.SwitchPhaseEvents, 1)
+	expectedPhase, evmCounter, hasDifferentPhase := s.replaySwitchPhaseEvents(groupRedeemSessions.SwitchPhaseEvents, 1)
 	log.Info().Int32("evmCounter", evmCounter).
 		Any("ExpectedPhase", expectedPhase).
 		Bool("hasDifferentPhase", hasDifferentPhase).
@@ -313,9 +317,9 @@ func (s *Service) replayBtcRedeemTxs(groupUid string) error {
 	if err != nil {
 		return fmt.Errorf("[Relayer] [processRecoverPreparingPhase] cannot get redeem session for group %s", groupUid)
 	}
-	redeemTxs := s.ScalarClient.PickCacheRedeemTx(groupUid)
+	redeemTxs := s.ScalarClient.PickCacheRedeemTx(groupUid, redeemSession.Session.Sequence)
 	for chainId, redeemTxs := range redeemTxs {
-		err := s.ScalarClient.BroadcastRedeemTxsConfirmRequest(chainId, redeemSession.Session, redeemTxs)
+		err := s.ScalarClient.BroadcastRedeemTxsConfirmRequest(chainId, redeemTxs)
 		if err != nil {
 			return fmt.Errorf("[Relayer] [processRecoverPreparingPhase] cannot broadcast redeem txs confirm request for group %s", groupUid)
 		}
@@ -383,6 +387,45 @@ func (s *Service) replaySwitchPhaseEvents(mapSwitchPhaseEvents map[string][]*con
 	wg.Wait()
 	return expectedPhase.Load(), evmCounter.Load(), hasDifferentPhase.Load()
 }
+
+/*
+ * check if the current redeem session is broadcasted to bitcoin network by checking if the first input utxo is present in the bitcoin network
+ */
+func (s *Service) isRedeemSessionBroadcasted(mapRedeemTokenEvents map[string][]*contracts.IScalarGatewayRedeemToken) (bool, error) {
+	log.Info().Msgf("[Relayer] [isRedeemSessionBroadcasted] checking if the current redeem session is broadcasted to bitcoin network")
+	if s.BtcClient == nil {
+		return false, fmt.Errorf("[Relayer] [isRedeemSessionBroadcasted] btc client is undefined")
+	}
+	var firstRedeemTokenEvent *contracts.IScalarGatewayRedeemToken
+	for _, redeemTxs := range mapRedeemTokenEvents {
+		if len(redeemTxs) > 0 {
+			firstRedeemTokenEvent = redeemTxs[0]
+			break
+		}
+	}
+	params := covTypes.RedeemTokenPayloadWithType{}
+	err := params.AbiUnpack(firstRedeemTokenEvent.Payload)
+	if err != nil {
+		return false, fmt.Errorf("[Relayer] [isRedeemSessionBroadcasted] cannot unpack redeem token payload: %s", err)
+	}
+	if len(params.Utxos) == 0 {
+		return false, fmt.Errorf("[Relayer] [isRedeemSessionBroadcasted] no utxos found in redeem token payload")
+	}
+	for _, btcClient := range s.BtcClient {
+		if btcClient.Config().ID == firstRedeemTokenEvent.DestinationChain {
+			outResult, err := btcClient.GetTxOut(params.Utxos[0].TxID.Hex(), params.Utxos[0].Vout)
+			if err != nil {
+				return false, fmt.Errorf("[Relayer] [isRedeemSessionBroadcasted] cannot get utxo for redeem token event: %s", err)
+			}
+			if outResult == nil {
+				return true, nil
+			}
+			break
+		}
+	}
+	return false, nil
+}
+
 func (s *Service) replayRedeemTransactions(groupUid string, mapRedeemTokenEvents map[string][]*contracts.IScalarGatewayRedeemToken) (map[string][]string, error) {
 	if s.ScalarClient == nil {
 		return nil, fmt.Errorf("[Relayer] [processRecoverExecutionPhase] scalar client is undefined")

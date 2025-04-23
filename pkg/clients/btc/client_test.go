@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	utils "github.com/scalarorg/bitcoin-vault/go-utils/types"
@@ -13,7 +14,9 @@ import (
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
+	covTypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -40,8 +43,8 @@ func TestMain(m *testing.M) {
 		Name:       "test",
 		Host:       "testnet4.btc.scalar.org",
 		Port:       80,
-		User:       "user",
-		Password:   "password",
+		User:       "scalar",
+		Password:   "scalartestnet4",
 		SSL:        nil,
 		MempoolUrl: "https://mempool.space/testnet4/api",
 		Address:    &TAPROOT_ADDRESS,
@@ -54,6 +57,37 @@ func TestMain(m *testing.M) {
 		nil,
 	)
 	os.Exit(m.Run())
+}
+
+// CGO_LDFLAGS="-L./lib -lbitcoin_vault_ffi" CGO_CFLAGS="-I./lib" go test -timeout 10m -run ^TestGetTxOutUtxo$ github.com/scalarorg/relayers/pkg/clients/btc -v -count=1
+// curl --user scalar --data-binary '{"jsonrpc": "1.0", "id": "curltest", "method": "gettxout", "params": ["1c1fe66b53c9994a27436a67afbe68fd5e0445aedc7cc01d787a4bb911486dbd", 0]}' -H 'content-type: text/plain;' http://testnet4.btc.scalar.org/
+func TestGetTxOutUtxo(t *testing.T) {
+	utxos, err := btcClient.GetListOfUTXOs("tb1q2rwweg2c48y8966qt4fzj0f4zyg9wty7tykzwg")
+	fmt.Println("%w", err)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, utxos)
+	for _, utxo := range utxos {
+		fmt.Println(utxo.Txid, utxo.Vout, utxo.Value)
+		txOut, err := btcClient.GetTxOut(utxo.Txid, utxo.Vout)
+		fmt.Printf("txOut: %+v, err: %v\n", txOut, err)
+		require.NoError(t, err)
+		require.NotNil(t, txOut)
+	}
+
+	payload := "0000000000000000000000000000000000000000000000000000000000000003E800000000000000000000000000000000000000000000000000000000000000C0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001C0000000000000000000000000000000000000000000000000000000000000020085FEF9623731168B1EDF1D09C28064818A086C7F867747C81D54C3548F4A19D30000000000000000000000000000000000000000000000000000000000000016001450DCECA158A9C872EB405D52293D351110572C9E0000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000004230783733373763626133333663666636653064333934373837323234366339396664383039353035336631386461623239616137633663303632336431376330353200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000003E8"
+	payloadBytes, err := hex.DecodeString(payload)
+	require.NoError(t, err)
+	params := covTypes.RedeemTokenPayloadWithType{}
+	err = params.AbiUnpack(payloadBytes)
+	require.NoError(t, err)
+	t.Logf("params: %+v", params)
+	txHash := params.Utxos[0].TxID.Hex()
+	vout := params.Utxos[0].Vout
+	t.Logf("params.TokenId: %s, vout: %d", txHash, vout)
+	txOut, err := btcClient.GetTxOut(strings.TrimPrefix(txHash, "0x"), vout)
+	fmt.Printf("txOut: %+v, err: %v\n", txOut, err)
+	assert.Error(t, err)
+	assert.Nil(t, txOut)
 }
 
 // CGO_LDFLAGS="-L./lib -lbitcoin_vault_ffi" CGO_CFLAGS="-I./lib" go test -timeout 10m -run ^TestGetUtxtSnapshot$ github.com/scalarorg/relayers/pkg/clients/btc -v -count=1

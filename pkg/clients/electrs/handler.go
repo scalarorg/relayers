@@ -243,32 +243,46 @@ func (c *Client) handleRedeemTxs(redeemTxs []*chains.RedeemTx) error {
 		txHashes[i] = tx.TxHash
 	}
 	c.dbAdapter.UpdateRedeemExecutedCommands(c.electrumConfig.SourceChain, txHashes)
-	//3. Filter redeem with enough confirmations and group by custodian group id
-	mapTxHashs := make(map[string][]string)
 
-	//If confirmations is 1, send to the event bus with destination chain is scalar for confirmation
-	//If confirmations is greater than 1, wait for the next blocks to get more confirmations before broadcasting to the scalar network
-	for _, redeemTx := range redeemTxs {
-		if c.electrumConfig.Confirmations <= 1 || c.currentHeight-int(redeemTx.BlockNumber) >= c.electrumConfig.Confirmations {
-			mapTxHashs[redeemTx.CustodianGroupUid] = append(mapTxHashs[redeemTx.CustodianGroupUid], redeemTx.TxHash)
-		}
-	}
-	if c.eventBus != nil {
-		for _, txHashs := range mapTxHashs {
-			if len(txHashs) > 0 {
-				redeemTxEvents := events.RedeemTxEvents{
-					Chain:     c.electrumConfig.SourceChain,
-					RedeemTxs: redeemTxs,
-				}
-
-				log.Debug().Msgf("[ElectrumClient] [handleRedeemTxs] Broadcasting confirm redeem tx request: %v", redeemTxEvents)
-				c.eventBus.BroadcastEvent(&events.EventEnvelope{
-					EventType:        events.EVENT_ELECTRS_REDEEM_TRANSACTION,
-					DestinationChain: events.SCALAR_NETWORK_NAME,
-					Data:             redeemTxEvents,
-				})
-			}
+	//Group redeem txs by custodian group id, in each group we keep only txs with highest sequence number
+	mapRedeemTxs := c.groupRedeemTxs(redeemTxs)
+	if c.eventBus != nil && len(mapRedeemTxs) > 0 {
+		for groupUid, redeemTxEvents := range mapRedeemTxs {
+			log.Debug().Str("groupUid", groupUid).Msgf("[ElectrumClient] [handleRedeemTxs] Broadcasting confirm redeem tx request: %v", redeemTxEvents)
+			c.eventBus.BroadcastEvent(&events.EventEnvelope{
+				EventType:        events.EVENT_ELECTRS_REDEEM_TRANSACTION,
+				DestinationChain: events.SCALAR_NETWORK_NAME,
+				Data:             redeemTxEvents,
+			})
 		}
 	}
 	return nil
+}
+
+// Group redeem txs by custodian group uid with condition:
+// Redeem txs have enough confirmations and highest sequence number
+func (c *Client) groupRedeemTxs(redeemTxs []*chains.RedeemTx) map[string]*events.RedeemTxEvents {
+	mapRedeemTxs := make(map[string]*events.RedeemTxEvents)
+	for _, redeemTx := range redeemTxs {
+		txConfirmations := c.currentHeight - int(redeemTx.BlockNumber) + 1
+		if txConfirmations < c.electrumConfig.Confirmations {
+			continue
+		}
+		redeemTxEvents := mapRedeemTxs[redeemTx.CustodianGroupUid]
+		if redeemTxEvents == nil {
+			redeemTxEvents = &events.RedeemTxEvents{
+				Chain:     c.electrumConfig.SourceChain,
+				GroupUid:  redeemTx.CustodianGroupUid,
+				RedeemTxs: []*chains.RedeemTx{},
+			}
+		}
+		if redeemTx.SessionSequence > redeemTxEvents.Sequence {
+			redeemTxEvents.Sequence = redeemTx.SessionSequence
+			redeemTxEvents.RedeemTxs = []*chains.RedeemTx{redeemTx}
+		} else if redeemTx.SessionSequence == redeemTxEvents.Sequence {
+			redeemTxEvents.RedeemTxs = append(redeemTxEvents.RedeemTxs, redeemTx)
+		}
+		mapRedeemTxs[redeemTx.CustodianGroupUid] = redeemTxEvents
+	}
+	return mapRedeemTxs
 }

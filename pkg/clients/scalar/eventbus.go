@@ -16,7 +16,7 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 		return c.requestConfirmBtcTxs(event.Data.(events.ConfirmTxsRequest))
 	case events.EVENT_ELECTRS_REDEEM_TRANSACTION:
 		//Broadcast from electrs.handleRedeemTransaction
-		return c.handleElectrsEventRedeemTx(event.Data.(events.RedeemTxEvents))
+		return c.handleElectrsEventRedeemTx(event.Data.(*events.RedeemTxEvents))
 	case events.EVENT_ELECTRS_NEW_BLOCK:
 		return c.handleElectrsEventNewBlock(event.Data.(events.ChainBlockHeight))
 	case events.EVENT_EVM_TOKEN_SENT,

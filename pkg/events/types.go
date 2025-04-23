@@ -54,6 +54,8 @@ type ConfirmRedeemTxRequest struct {
 
 type RedeemTxEvents struct {
 	Chain     string
+	GroupUid  string
+	Sequence  uint64
 	RedeemTxs []*chains.RedeemTx
 }
 type ChainBlockHeight struct {

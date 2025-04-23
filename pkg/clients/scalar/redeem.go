@@ -21,47 +21,49 @@ import (
 
 // Struct for cache redeem transaction from btc network
 type CustodianGroupRedeemTx struct {
-	lock            sync.Mutex
-	RedeemTxSession map[string]uint64
-	GroupRedeemTxs  map[string][]*models.RedeemTx
+	lock         sync.Mutex
+	mapSequences map[string]uint64
+	mapRedeemTxs map[string][]*models.RedeemTx
 }
 
-func (s *CustodianGroupRedeemTx) AddRedeemTx(redeemTx *models.RedeemTx) {
+func (s *CustodianGroupRedeemTx) AddRedeemTxs(redeemTxEvents *events.RedeemTxEvents) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	if s.GroupRedeemTxs == nil {
-		s.GroupRedeemTxs = make(map[string][]*models.RedeemTx)
+	if s.mapRedeemTxs == nil {
+		s.mapRedeemTxs = make(map[string][]*models.RedeemTx)
 	}
-	if s.RedeemTxSession == nil {
-		s.RedeemTxSession = make(map[string]uint64)
+	if s.mapSequences == nil {
+		s.mapSequences = make(map[string]uint64)
 	}
-	groupUid := redeemTx.CustodianGroupUid
-	redeemTxs := s.GroupRedeemTxs[groupUid]
-	sessionSequence := s.RedeemTxSession[groupUid]
-	if redeemTxs == nil {
-		s.GroupRedeemTxs[groupUid] = []*models.RedeemTx{redeemTx}
-		s.RedeemTxSession[groupUid] = redeemTx.SessionSequence
+	groupUid := redeemTxEvents.GroupUid
+	redeemTxs := s.mapRedeemTxs[groupUid]
+	sessionSequence := s.mapSequences[groupUid]
+	if redeemTxEvents.Sequence > sessionSequence {
+		s.mapRedeemTxs[groupUid] = redeemTxEvents.RedeemTxs
+		s.mapSequences[groupUid] = redeemTxEvents.Sequence
+	} else if redeemTxEvents.Sequence == sessionSequence {
+		s.mapRedeemTxs[groupUid] = append(redeemTxs, redeemTxEvents.RedeemTxs...)
 	} else {
-		//Store only the latest redeem tx (with highest session sequence)
-		if redeemTx.SessionSequence > sessionSequence {
-			s.GroupRedeemTxs[groupUid] = []*models.RedeemTx{redeemTx}
-			s.RedeemTxSession[groupUid] = redeemTx.SessionSequence
-		} else if redeemTx.SessionSequence == sessionSequence {
-			s.GroupRedeemTxs[groupUid] = append(redeemTxs, redeemTx)
-		} else {
-			log.Warn().Msgf("[ScalarClient] [AddRedeemTx] session sequence %d is lower than stored one: %d", redeemTx.SessionSequence, sessionSequence)
-		}
+		log.Warn().Msgf("[ScalarClient] [AddRedeemTx] session sequence %d is lower than stored one: %d", redeemTxEvents.Sequence, sessionSequence)
 	}
 }
 
-func (s *CustodianGroupRedeemTx) PickRedeemTxsByGroupUid(groupUid string) ([]*models.RedeemTx, error) {
+func (s *CustodianGroupRedeemTx) PickRedeemTxsByGroupUid(groupUid string, sequence uint64) ([]*models.RedeemTx, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	redeemTxs, ok := s.GroupRedeemTxs[groupUid]
+	storedSequence, ok := s.mapSequences[groupUid]
+	if !ok {
+		return nil, fmt.Errorf("[ScalarClient] [PickRedeemTxsByGroupUid] no sequence found for group uid: %s", groupUid)
+	}
+	if sequence != storedSequence {
+		return nil, fmt.Errorf("[ScalarClient] [PickRedeemTxsByGroupUid] request and stored sequence do not match %d != %d", sequence, storedSequence)
+	}
+	redeemTxs, ok := s.mapRedeemTxs[groupUid]
 	if !ok {
 		return nil, fmt.Errorf("[ScalarClient] [PickRedeemTxsByGroupUid] no redeem txs found for group uid: %s", groupUid)
 	}
-	delete(s.GroupRedeemTxs, groupUid)
+	delete(s.mapRedeemTxs, groupUid)
+	delete(s.mapSequences, groupUid)
 	return redeemTxs, nil
 }
 
@@ -169,68 +171,66 @@ func (c *Client) WaitForPendingCommands(chainId string, sourceTxs []string) erro
 	return nil
 }
 
-func (c *Client) handleElectrsEventRedeemTx(redeemTxEvents events.RedeemTxEvents) error {
-	//TODO: implement recovering
-	mapTxHashes := make(map[string][]*models.RedeemTx)
-	for _, redeemTx := range redeemTxEvents.RedeemTxs {
-		txHashes := mapTxHashes[redeemTx.CustodianGroupUid]
-		mapTxHashes[redeemTx.CustodianGroupUid] = append(txHashes, redeemTx)
+func (c *Client) handleElectrsEventRedeemTx(redeemTxEvents *events.RedeemTxEvents) error {
+	broadcastingRedeemTxs := []*models.RedeemTx{}
+	groupBytes32, err := utils.DecodeGroupUid(redeemTxEvents.GroupUid)
+	if err != nil {
+		log.Error().Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to decode group uid: %s", redeemTxEvents.GroupUid)
+		return err
 	}
-	for groupUid, redeemTxs := range mapTxHashes {
-		broadcastingRedeemTxs := []*models.RedeemTx{}
-		groupBytes32, err := utils.DecodeGroupUid(groupUid)
-		if err != nil {
-			log.Error().Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to decode group uid: %s", groupUid)
-			continue
-		}
-		redeemSession, err := c.GetRedeemSession(groupBytes32)
-		if err != nil || redeemSession == nil || redeemSession.Session == nil {
+	redeemSession, err := c.GetRedeemSession(groupBytes32)
+	if err != nil || redeemSession == nil || redeemSession.Session == nil {
+		log.Error().Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to get redeem session: %s", err)
+		c.AddRedeemTxsToCache(redeemTxEvents.Chain, redeemTxEvents)
+	} else if redeemSession.Session.Sequence < redeemTxEvents.Sequence {
+		log.Info().Str("groupUid", redeemTxEvents.GroupUid).
+			Any("Session", redeemSession.Session).
+			Uint64("Incomming RedeemTx Sequence", redeemTxEvents.Sequence).
+			Msgf("[EvmClient] [handleElectrsEventRedeemTx] redeem tx is belong to past redeem session")
+	} else if redeemSession.Session.Sequence == redeemTxEvents.Sequence {
+		if redeemSession.Session.CurrentPhase == covExported.Executing {
+			err = c.BroadcastRedeemTxsConfirmRequest(redeemTxEvents.Chain, broadcastingRedeemTxs)
 			if err != nil {
-				log.Error().Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to get redeem session: %s", err)
+				log.Error().Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to broadcast redeem txs confirm request")
 			}
-			continue
-		} else if redeemSession.Session.CurrentPhase != covExported.Executing {
-			log.Info().Str("groupUid", groupUid).
-				Any("Session", redeemSession.Session).
-				Msgf("[EvmClient] [handleElectrsEventRedeemTx] redeem session is not in executing phase")
-			c.AddRedeemTxsToCache(redeemTxEvents.Chain, redeemSession.Session, redeemTxs)
 		} else {
-			broadcastingRedeemTxs = append(broadcastingRedeemTxs, redeemTxs...)
+			log.Info().Str("groupUid", redeemTxEvents.GroupUid).
+				Any("Session", redeemSession.Session).
+				Uint64("Incomming RedeemTx Sequence", redeemTxEvents.Sequence).
+				Msgf("[EvmClient] [handleElectrsEventRedeemTx] current redeem session is not in executing phase, add redeem txs to cache")
+			c.AddRedeemTxsToCache(redeemTxEvents.Chain, redeemTxEvents)
 		}
-		err = c.BroadcastRedeemTxsConfirmRequest(redeemTxEvents.Chain, redeemSession.Session, broadcastingRedeemTxs)
-		if err != nil {
-			log.Error().Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to broadcast redeem txs confirm request")
-			continue
-		}
+	} else {
+		log.Warn().Str("groupUid", redeemTxEvents.GroupUid).
+			Any("Session", redeemSession.Session).
+			Uint64("Incomming RedeemTx Sequence", redeemTxEvents.Sequence).
+			Msgf("[EvmClient] [handleElectrsEventRedeemTx] redeem tx is belong to future redeem session")
+		return fmt.Errorf("[EvmClient] [handleElectrsEventRedeemTx] redeem tx is belong to future redeem session")
 	}
 	return nil
 }
 
-func (c *Client) AddRedeemTxsToCache(chainId string, redeemSession *covenant.RedeemSession, redeemTxs []*models.RedeemTx) {
+func (c *Client) AddRedeemTxsToCache(chainId string, redeemTxEvents *events.RedeemTxEvents) {
+	if c.redeemTxCache == nil {
+		c.redeemTxCache = make(map[string]*CustodianGroupRedeemTx)
+	}
 	groupRedeemTx, ok := c.redeemTxCache[chainId]
 	if !ok {
 		groupRedeemTx = &CustodianGroupRedeemTx{
-			GroupRedeemTxs:  make(map[string][]*models.RedeemTx),
-			RedeemTxSession: make(map[string]uint64),
+			mapRedeemTxs: make(map[string][]*models.RedeemTx),
+			mapSequences: make(map[string]uint64),
 		}
 	}
-	for _, tx := range redeemTxs {
-		if tx.SessionSequence >= redeemSession.Sequence {
-			//Add to cache txes with sequence number greater than or equal to current redeem session sequence
-			groupRedeemTx.AddRedeemTx(tx)
-		}
-	}
+	groupRedeemTx.AddRedeemTxs(redeemTxEvents)
 	c.redeemTxCache[chainId] = groupRedeemTx
 }
-func (c *Client) BroadcastRedeemTxsConfirmRequest(chainId string, redeemSession *covenant.RedeemSession, redeemTxs []*models.RedeemTx) error {
+func (c *Client) BroadcastRedeemTxsConfirmRequest(chainId string, redeemTxs []*models.RedeemTx) error {
 	if len(redeemTxs) == 0 {
 		return nil
 	}
 	txHashes := []string{}
 	for _, tx := range redeemTxs {
-		if tx.SessionSequence == redeemSession.Sequence {
-			txHashes = append(txHashes, tx.TxHash)
-		}
+		txHashes = append(txHashes, tx.TxHash)
 	}
 	confirmRedeemTxRequest := events.ConfirmRedeemTxRequest{
 		Chain:   chainId,
@@ -243,15 +243,17 @@ func (c *Client) BroadcastRedeemTxsConfirmRequest(chainId string, redeemSession 
 	}
 	return nil
 }
-func (c *Client) PickCacheRedeemTx(groupUid string) map[string][]*models.RedeemTx {
+func (c *Client) PickCacheRedeemTx(groupUid string, sequence uint64) map[string][]*models.RedeemTx {
 	result := make(map[string][]*models.RedeemTx)
 	for chainId, redeemTxCache := range c.redeemTxCache {
-		redeemTxs, err := redeemTxCache.PickRedeemTxsByGroupUid(groupUid)
+		redeemTxs, err := redeemTxCache.PickRedeemTxsByGroupUid(groupUid, sequence)
 		if err != nil {
 			log.Error().Err(err).Msgf("[EvmClient] [PickCacheRedeemTx] failed to get redeem txs")
 			continue
 		}
-		result[chainId] = redeemTxs
+		if len(redeemTxs) > 0 {
+			result[chainId] = redeemTxs
+		}
 	}
 	return result
 }

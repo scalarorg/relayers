@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -225,6 +226,22 @@ func (c *BtcClient) TestMempoolAccept(txs []*wire.MsgTx, maxFeeRatePerKb float64
 	}
 }
 
+func (c *BtcClient) GetTxOut(txHex string, vout uint32) (*btcjson.GetTxOutResult, error) {
+	log.Debug().Msgf("GetTxOut: %s, vout: %d", txHex, vout)
+	var txHash chainhash.Hash
+	txBytes, err := hex.DecodeString(strings.TrimPrefix(txHex, "0x"))
+	if err != nil {
+		return nil, err
+	}
+	if len(txBytes) != chainhash.HashSize {
+		return nil, fmt.Errorf("txBytes length is not %d", chainhash.HashSize)
+	}
+	for i := 0; i < chainhash.HashSize/2; i++ {
+		txHash[i], txHash[chainhash.HashSize-1-i] = txBytes[chainhash.HashSize-1-i], txBytes[i]
+	}
+	txOut, err := c.client.GetTxOut(&txHash, vout, true)
+	return txOut, err
+}
 func CreateRawTx(tx *wire.MsgTx) (string, error) {
 	// Serialize the transaction and convert to hex string.
 	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
