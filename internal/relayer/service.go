@@ -320,7 +320,7 @@ func (s *Service) replayBtcRedeemTxs(groupUid string) error {
 	redeemTxs := s.ScalarClient.PickCacheRedeemTx(groupUid, redeemSession.Session.Sequence)
 	log.Info().Any("redeemTxs", redeemTxs).Msgf("[Relayer] [replayBtcRedeemTxs] redeem txs in cache")
 	for chainId, redeemTxs := range redeemTxs {
-		err := s.ScalarClient.BroadcastRedeemTxsConfirmRequest(chainId, redeemTxs)
+		err := s.ScalarClient.BroadcastRedeemTxsConfirmRequest(chainId, groupUid, redeemTxs)
 		if err != nil {
 			return fmt.Errorf("[Relayer] [processRecoverPreparingPhase] cannot broadcast redeem txs confirm request for group %s", groupUid)
 		}

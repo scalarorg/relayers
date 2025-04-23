@@ -126,6 +126,7 @@ func (c *Broadcaster) ConfirmRedeemTxRequest(redeemRequest events.ConfirmRedeemT
 	msg := covtypes.NewConfirmRedeemTxRequest(
 		c.network.GetAddress(),
 		redeemRequest.Chain,
+		redeemRequest.GroupUid,
 		txHashs,
 	)
 	return c.QueueTxMsg(msg)

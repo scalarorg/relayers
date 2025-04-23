@@ -48,8 +48,9 @@ type ConfirmTxsRequest struct {
 }
 
 type ConfirmRedeemTxRequest struct {
-	Chain   string
-	TxHashs []string
+	Chain    string
+	GroupUid string
+	TxHashs  []string
 }
 
 type RedeemTxEvents struct {
