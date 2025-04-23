@@ -1,6 +1,7 @@
 package electrs
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -86,7 +87,7 @@ func (c *Client) CreateRedeemTx(vaultTx types.VaultTransaction) *chains.RedeemTx
 		BlockNumber:       uint64(vaultTx.Height),
 		TxHash:            vaultTx.TxHash,
 		SessionSequence:   vaultTx.SessionSequence,
-		CustodianGroupUid: vaultTx.CustodianGroupUid,
+		CustodianGroupUid: hex.EncodeToString(vaultTx.CustodianGroupUid),
 		Status:            string(chains.RedeemStatusVerifying),
 	}
 }

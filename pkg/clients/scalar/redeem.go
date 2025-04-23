@@ -172,7 +172,7 @@ func (c *Client) WaitForPendingCommands(chainId string, sourceTxs []string) erro
 }
 
 func (c *Client) handleElectrsEventRedeemTx(redeemTxEvents *events.RedeemTxEvents) error {
-	broadcastingRedeemTxs := []*models.RedeemTx{}
+	log.Info().Any("redeemTxEvents", redeemTxEvents).Msg("[ScalarClient] handleElectrsEventRedeemTx")
 	groupBytes32, err := utils.DecodeGroupUid(redeemTxEvents.GroupUid)
 	if err != nil {
 		log.Error().Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to decode group uid: %s", redeemTxEvents.GroupUid)
@@ -182,30 +182,35 @@ func (c *Client) handleElectrsEventRedeemTx(redeemTxEvents *events.RedeemTxEvent
 	if err != nil || redeemSession == nil || redeemSession.Session == nil {
 		log.Error().Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to get redeem session: %s", err)
 		c.AddRedeemTxsToCache(redeemTxEvents.Chain, redeemTxEvents)
-	} else if redeemSession.Session.Sequence < redeemTxEvents.Sequence {
+		return nil
+	}
+	log.Info().Any("RedeemSession", redeemSession).Msg("[ScalarClient] handleElectrsEventRedeemTx")
+	if redeemSession.Session.Sequence < redeemTxEvents.Sequence {
 		log.Info().Str("groupUid", redeemTxEvents.GroupUid).
 			Any("Session", redeemSession.Session).
 			Uint64("Incomming RedeemTx Sequence", redeemTxEvents.Sequence).
 			Msgf("[EvmClient] [handleElectrsEventRedeemTx] redeem tx is belong to past redeem session")
 	} else if redeemSession.Session.Sequence == redeemTxEvents.Sequence {
 		if redeemSession.Session.CurrentPhase == covExported.Executing {
-			err = c.BroadcastRedeemTxsConfirmRequest(redeemTxEvents.Chain, broadcastingRedeemTxs)
+			err = c.BroadcastRedeemTxsConfirmRequest(redeemTxEvents.Chain, redeemTxEvents.RedeemTxs)
 			if err != nil {
-				log.Error().Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to broadcast redeem txs confirm request")
+				log.Error().Err(err).Msgf("[ScalarClient] [handleElectrsEventRedeemTx] failed to broadcast redeem txs confirm request")
+			} else {
+				log.Info().Msg("[ScalarClient] handleElectrsEventRedeemTx broadcasted RedeemTxsConfirmRequest")
 			}
 		} else {
 			log.Info().Str("groupUid", redeemTxEvents.GroupUid).
 				Any("Session", redeemSession.Session).
 				Uint64("Incomming RedeemTx Sequence", redeemTxEvents.Sequence).
-				Msgf("[EvmClient] [handleElectrsEventRedeemTx] current redeem session is not in executing phase, add redeem txs to cache")
+				Msgf("[ScalarClient] [handleElectrsEventRedeemTx] current redeem session is not in executing phase, add redeem txs to cache")
 			c.AddRedeemTxsToCache(redeemTxEvents.Chain, redeemTxEvents)
 		}
 	} else {
 		log.Warn().Str("groupUid", redeemTxEvents.GroupUid).
 			Any("Session", redeemSession.Session).
 			Uint64("Incomming RedeemTx Sequence", redeemTxEvents.Sequence).
-			Msgf("[EvmClient] [handleElectrsEventRedeemTx] redeem tx is belong to future redeem session")
-		return fmt.Errorf("[EvmClient] [handleElectrsEventRedeemTx] redeem tx is belong to future redeem session")
+			Msgf("[ScalarClient] [handleElectrsEventRedeemTx] redeem tx is belong to future redeem session")
+		return fmt.Errorf("[ScalarClient] [handleElectrsEventRedeemTx] redeem tx is belong to future redeem session")
 	}
 	return nil
 }
@@ -226,6 +231,7 @@ func (c *Client) AddRedeemTxsToCache(chainId string, redeemTxEvents *events.Rede
 }
 func (c *Client) BroadcastRedeemTxsConfirmRequest(chainId string, redeemTxs []*models.RedeemTx) error {
 	if len(redeemTxs) == 0 {
+		log.Info().Msgf("[ScalarClient] BroadcastRedeemTxsConfirmRequest, redeemTxs is empty")
 		return nil
 	}
 	txHashes := []string{}
