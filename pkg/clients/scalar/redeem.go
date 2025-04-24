@@ -12,7 +12,6 @@ import (
 	models "github.com/scalarorg/data-models/chains"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/events"
-	"github.com/scalarorg/relayers/pkg/utils"
 	chains "github.com/scalarorg/scalar-core/x/chains/types"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	covenant "github.com/scalarorg/scalar-core/x/covenant/types"
@@ -53,7 +52,8 @@ func (s *CustodianGroupRedeemTx) PickRedeemTxsByGroupUid(groupUid string, sequen
 	defer s.lock.Unlock()
 	storedSequence, ok := s.mapSequences[groupUid]
 	if !ok {
-		return nil, fmt.Errorf("[ScalarClient] [PickRedeemTxsByGroupUid] no sequence found for group uid: %s", groupUid)
+		log.Debug().Str("GroupUid", groupUid).Msg("[ScalarClient] [PickRedeemTxsByGroupUid] sequence not found")
+		return nil, nil
 	}
 	if sequence != storedSequence {
 		return nil, fmt.Errorf("[ScalarClient] [PickRedeemTxsByGroupUid] request and stored sequence do not match %d != %d", sequence, storedSequence)
@@ -69,12 +69,12 @@ func (s *CustodianGroupRedeemTx) PickRedeemTxsByGroupUid(groupUid string, sequen
 
 func (c *Client) WaitForSwitchingToPhase(groupHex string, expectedPhase covExported.Phase) error {
 	for {
-		groupBytes32, err := utils.DecodeGroupUid(groupHex)
+		groupBytes, err := hex.DecodeString(groupHex)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[EvmClient] [RecoverAllEvents] failed to decode group uid: %s", groupHex)
 			return err
 		}
-		redeemSession, err := c.GetRedeemSession(groupBytes32)
+		redeemSession, err := c.GetRedeemSession(groupBytes)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[EvmClient] [RecoverAllEvents] failed to get current redeem session from scalarnet")
 			continue
@@ -173,14 +173,14 @@ func (c *Client) WaitForPendingCommands(chainId string, sourceTxs []string) erro
 
 func (c *Client) handleElectrsEventRedeemTx(redeemTxEvents *events.RedeemTxEvents) error {
 	log.Info().Any("redeemTxEvents", redeemTxEvents).Msg("[ScalarClient] handleElectrsEventRedeemTx")
-	groupBytes32, err := utils.DecodeGroupUid(redeemTxEvents.GroupUid)
+	groupBytes, err := hex.DecodeString(strings.TrimPrefix(redeemTxEvents.GroupUid, "0x"))
 	if err != nil {
 		log.Error().Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to decode group uid: %s", redeemTxEvents.GroupUid)
 		return err
 	}
-	redeemSession, err := c.GetRedeemSession(groupBytes32)
+	redeemSession, err := c.GetRedeemSession(groupBytes)
 	if err != nil || redeemSession == nil || redeemSession.Session == nil {
-		log.Error().Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to get redeem session: %s", err)
+		log.Error().Str("GroupUid", redeemTxEvents.GroupUid).Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to get redeem session: %s", err)
 		c.AddRedeemTxsToCache(redeemTxEvents.Chain, redeemTxEvents)
 		return nil
 	}

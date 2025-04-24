@@ -13,8 +13,8 @@ func (db *DatabaseAdapter) SaveRedeemTxs(redeemTxs []*chains.RedeemTx) error {
 // Get last pending redeem transaction by block height
 func (db *DatabaseAdapter) FindPendingRedeemsTransaction(chainId string, blockHeight int) ([]*chains.RedeemTx, error) {
 	var redeemTxs []*chains.RedeemTx
-	err := db.PostgresClient.Where("chain = ? AND block_number <= ?", chainId, blockHeight).
-		Where("status = ?", chains.RedeemStatusExecuting).Find(&redeemTxs).Error
+	err := db.PostgresClient.Where("chain = ? AND block_number <= ? AND status = ?", chainId, blockHeight, chains.RedeemStatusExecuting).
+		Find(&redeemTxs).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to find pending redeem transaction: %w", err)
 	}

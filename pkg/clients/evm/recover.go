@@ -134,12 +134,12 @@ func (c *EvmClient) WaitForSwitchingToPhase(groupUids []string, expectedPhase co
 	for len(waitingGroupUids) > 0 {
 		time.Sleep(2 * time.Second)
 		for groupHex := range waitingGroupUids {
-			groupBytes32, err := DecodeGroupUid(groupHex)
+			groupBytes, err := hex.DecodeString(groupHex)
 			if err != nil {
 				log.Warn().Err(err).Msgf("[EvmClient] [RecoverAllEvents] failed to decode group uid: %s", groupHex)
 				continue
 			}
-			redeemSession, err := c.ScalarClient.GetRedeemSession(groupBytes32)
+			redeemSession, err := c.ScalarClient.GetRedeemSession(groupBytes)
 			if err != nil {
 				log.Warn().Err(err).Msgf("[EvmClient] [RecoverAllEvents] failed to get current redeem session from scalarnet")
 			}

@@ -78,6 +78,8 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (*chains.TokenS
 }
 
 func (c *Client) CreateRedeemTx(vaultTx types.VaultTransaction) *chains.RedeemTx {
+	//We redeem by custodian group which can be shared between protocol,
+	//so we can't store tokenaddress and symbol here
 	return &chains.RedeemTx{
 		Model: gorm.Model{
 			CreatedAt: time.Unix(int64(vaultTx.Timestamp), 0),
@@ -86,8 +88,9 @@ func (c *Client) CreateRedeemTx(vaultTx types.VaultTransaction) *chains.RedeemTx
 		Chain:             c.electrumConfig.SourceChain,
 		BlockNumber:       uint64(vaultTx.Height),
 		TxHash:            vaultTx.TxHash,
+		Amount:            vaultTx.Amount,
 		SessionSequence:   vaultTx.SessionSequence,
 		CustodianGroupUid: hex.EncodeToString(vaultTx.CustodianGroupUid),
-		Status:            string(chains.RedeemStatusVerifying),
+		Status:            string(chains.RedeemStatusExecuting),
 	}
 }

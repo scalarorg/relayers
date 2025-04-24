@@ -2,6 +2,7 @@ package relayer
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -16,7 +17,6 @@ import (
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 	types "github.com/scalarorg/relayers/pkg/types"
-	"github.com/scalarorg/relayers/pkg/utils"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	covTypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
@@ -309,11 +309,11 @@ func (s *Service) replayBtcRedeemTxs(groupUid string) error {
 	if s.ScalarClient == nil {
 		return fmt.Errorf("[Relayer] [processRecoverPreparingPhase] scalar client is undefined")
 	}
-	groupBytes32, err := utils.DecodeGroupUid(groupUid)
+	groupBytes, err := hex.DecodeString(groupUid)
 	if err != nil {
 		return fmt.Errorf("[Relayer] [processRecoverPreparingPhase] cannot decode group uid: %s", err)
 	}
-	redeemSession, err := s.ScalarClient.GetRedeemSession(groupBytes32)
+	redeemSession, err := s.ScalarClient.GetRedeemSession(groupBytes)
 	if err != nil {
 		return fmt.Errorf("[Relayer] [processRecoverPreparingPhase] cannot get redeem session for group %s", groupUid)
 	}

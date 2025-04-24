@@ -22,6 +22,8 @@ import (
 	"github.com/scalarorg/relayers/internal/codec"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
+	"github.com/scalarorg/relayers/pkg/utils"
+	covenanttypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/encoding"
@@ -53,6 +55,7 @@ var (
 	}
 	err           error
 	clientCtx     *client.Context
+	queryClient   *cosmos.QueryClient
 	accAddress    sdk.AccAddress
 	networkClient *cosmos.NetworkClient
 )
@@ -69,13 +72,28 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Error().Msgf("failed to create client context: %+v", err)
 	}
-	queryClient := cosmos.NewQueryClient(clientCtx)
+	queryClient = cosmos.NewQueryClient(clientCtx)
 	txConfig := tx.NewTxConfig(codec.GetProtoCodec(), tx.DefaultSignModes)
 	networkClient, err = cosmos.NewNetworkClient(&ScalarNetworkConfig, queryClient, txConfig)
 	if err != nil {
 		log.Error().Msgf("failed to create network client: %+v", err)
 	}
 	m.Run()
+}
+
+func TestQueryRedeemSession(t *testing.T) {
+	groupUid := "bffb71bf819ae4cb65188905ac54763a09144bc3a0629808d7142dd5dbd98693"
+	groupBytes32, err := utils.DecodeGroupUid(groupUid)
+	require.NoError(t, err)
+	clientCtx, err := queryClient.GetClientCtx()
+	require.NoError(t, err)
+	queryClient := covenanttypes.NewQueryServiceClient(clientCtx)
+	session, err := queryClient.RedeemSession(context.Background(), &covenanttypes.RedeemSessionRequest{
+		UID: groupBytes32[:],
+	})
+	require.NoError(t, err)
+	t.Logf("Session %++v", session.Session.String())
+
 }
 func TestConfirmRedeemTx(t *testing.T) {
 	broadcaster := scalar.NewBroadcaster(networkClient,

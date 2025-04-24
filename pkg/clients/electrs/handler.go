@@ -97,17 +97,14 @@ func (c *Client) tryHandleRedeemsTransaction(blockHeight int) error {
 		return fmt.Errorf("failed to get pending redeem transactions from db: %w", err)
 	}
 	if len(redeemTxs) == 0 {
-		log.Debug().Msgf("[ElectrumClient] [tryHandleRedeemTransaction] No pending redeem transactions with %d confirmations found", c.electrumConfig.Confirmations)
+		log.Debug().Int("blockHeight", blockHeight).Msgf("[ElectrumClient] [tryHandleRedeemTransaction] No pending redeem transactions with %d confirmations found", c.electrumConfig.Confirmations)
 		return nil
 	}
+	log.Debug().Int("RedeemTx found", len(redeemTxs)).Msg("[ScalarClient] found executing redeem tx")
 	txHashes := make([]string, len(redeemTxs))
 	for i, redeemTx := range redeemTxs {
 		txHashes[i] = redeemTx.TxHash
 		redeemTx.Status = string(chains.RedeemStatusVerifying)
-	}
-	confirmRedeemTx := events.RedeemTxEvents{
-		Chain:     c.electrumConfig.SourceChain,
-		RedeemTxs: redeemTxs,
 	}
 	err = c.dbAdapter.SaveRedeemTxs(redeemTxs)
 	if err != nil {
@@ -115,12 +112,16 @@ func (c *Client) tryHandleRedeemsTransaction(blockHeight int) error {
 		return fmt.Errorf("failed to save redeem transactions: %w", err)
 	}
 	if c.eventBus != nil {
-		log.Debug().Msgf("[ElectrumClient] [tryHandleRedeemTransaction] Broadcasting confirm redeem tx request: %v", confirmRedeemTx)
-		c.eventBus.BroadcastEvent(&events.EventEnvelope{
-			EventType:        events.EVENT_ELECTRS_REDEEM_TRANSACTION,
-			DestinationChain: events.SCALAR_NETWORK_NAME,
-			Data:             confirmRedeemTx,
-		})
+		//Group tx by groupUid
+		mapRedeemTxEvents := c.groupRedeemTxs(redeemTxs)
+		for _, redeemTxEvents := range mapRedeemTxEvents {
+			log.Debug().Msgf("[ElectrumClient] [tryHandleRedeemTransaction] Broadcasting confirm RedeemTxEvents: %v", redeemTxEvents)
+			c.eventBus.BroadcastEvent(&events.EventEnvelope{
+				EventType:        events.EVENT_ELECTRS_REDEEM_TRANSACTION,
+				DestinationChain: events.SCALAR_NETWORK_NAME,
+				Data:             redeemTxEvents,
+			})
+		}
 	} else {
 		log.Warn().Msg("[ElectrumClient] [tryHandleRedeemTransaction] event bus is undefined")
 	}
