@@ -63,3 +63,14 @@ type Utxo struct {
 	} `json:"status"`
 	Value uint64 `json:"value"`
 }
+type OutSpend struct {
+	Spent  bool   `json:"spent"`
+	Txid   string `json:"txid"`
+	Vin    int    `json:"vin"`
+	Status struct {
+		Confirmed   bool   `json:"confirmed"`
+		BlockHeight uint64 `json:"block_height"`
+		BlockHash   string `json:"block_hash"`
+		BlockTime   uint64 `json:"block_time"`
+	} `json:"status"`
+}

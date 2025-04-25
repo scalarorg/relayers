@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -409,19 +410,23 @@ func (s *Service) isRedeemSessionBroadcasted(mapRedeemTokenEvents map[string][]*
 	if err != nil {
 		return false, fmt.Errorf("[Relayer] [isRedeemSessionBroadcasted] cannot unpack redeem token payload: %s", err)
 	}
+	log.Info().Any("First EvmRedeemTx", params).Msg("[Service] check if redeem session is broadcasted")
 	if len(params.Utxos) == 0 {
 		return false, fmt.Errorf("[Relayer] [isRedeemSessionBroadcasted] no utxos found in redeem token payload")
 	}
 	for _, btcClient := range s.BtcClient {
 		if btcClient.Config().ID == firstRedeemTokenEvent.DestinationChain {
-			outResult, err := btcClient.GetTxOut(params.Utxos[0].TxID.Hex(), params.Utxos[0].Vout)
+			txId := strings.TrimPrefix(params.Utxos[0].TxID.Hex(), "0x")
+			outspend, err := btcClient.GetOutSpend(txId, params.Utxos[0].Vout)
+			// outResult, err := btcClient.GetTxOut(params.Utxos[0].TxID.Hex(), params.Utxos[0].Vout)
 			if err != nil {
-				return false, fmt.Errorf("[Relayer] [isRedeemSessionBroadcasted] cannot get utxo for redeem token event: %s", err)
+				return false, fmt.Errorf("[Relayer] [isRedeemSessionBroadcasted] cannot get outspend for redeem token event: %s", err)
 			}
-			if outResult == nil {
-				return true, nil
-			}
-			break
+			log.Info().Any("OutSpend", outspend).Msg("Successfully get outspend from mempool")
+			// if outResult == nil {
+			// 	return true, nil
+			// }
+			return outspend.Spent, nil
 		}
 	}
 	return false, nil

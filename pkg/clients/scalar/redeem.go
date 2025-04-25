@@ -189,7 +189,7 @@ func (c *Client) handleElectrsEventRedeemTx(redeemTxEvents *events.RedeemTxEvent
 		log.Info().Str("groupUid", redeemTxEvents.GroupUid).
 			Any("Session", redeemSession.Session).
 			Uint64("Incomming RedeemTx Sequence", redeemTxEvents.Sequence).
-			Msgf("[EvmClient] [handleElectrsEventRedeemTx] redeem tx is belong to past redeem session")
+			Msgf("[EvmClient] [handleElectrsEventRedeemTx] redeem tx is belong to future redeem session")
 	} else if redeemSession.Session.Sequence == redeemTxEvents.Sequence {
 		if redeemSession.Session.CurrentPhase == covExported.Executing {
 			err = c.BroadcastRedeemTxsConfirmRequest(redeemTxEvents.Chain, redeemTxEvents.GroupUid, redeemTxEvents.RedeemTxs)
@@ -209,8 +209,8 @@ func (c *Client) handleElectrsEventRedeemTx(redeemTxEvents *events.RedeemTxEvent
 		log.Warn().Str("groupUid", redeemTxEvents.GroupUid).
 			Any("Session", redeemSession.Session).
 			Uint64("Incomming RedeemTx Sequence", redeemTxEvents.Sequence).
-			Msgf("[ScalarClient] [handleElectrsEventRedeemTx] redeem tx is belong to future redeem session")
-		return fmt.Errorf("[ScalarClient] [handleElectrsEventRedeemTx] redeem tx is belong to future redeem session")
+			Msgf("[ScalarClient] [handleElectrsEventRedeemTx] redeem tx is belong to past redeem session")
+		return fmt.Errorf("[ScalarClient] [handleElectrsEventRedeemTx] redeem tx is belong to past redeem session")
 	}
 	return nil
 }

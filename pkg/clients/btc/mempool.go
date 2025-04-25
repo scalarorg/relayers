@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
@@ -125,6 +126,29 @@ func (c BtcClient) GetListOfUTXOs(taprootAddress string) ([]Utxo, error) {
 	}
 	return utxos, nil
 
+}
+
+func (c BtcClient) GetOutSpend(txId string, vout uint32) (*OutSpend, error) {
+	url := fmt.Sprintf("%s/tx/%s/outspend/%d", c.btcConfig.MempoolUrl, txId, vout)
+	log.Info().Str("OutSpend url", url).Msg("[BtcClient] GetOutSpend")
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get outspend: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	//log.Debug().Msgf("[BtcClient] [GetAddressTxsUtxo] body: %v", string(body))
+
+	var outSpend OutSpend
+	if err := json.Unmarshal(body, &outSpend); err != nil {
+		return nil, fmt.Errorf("failed to decode outSpend: %w", err)
+	}
+	return &outSpend, nil
 }
 
 func SortUTXOsByBlockHeight(utxos []Utxo) []Utxo {
