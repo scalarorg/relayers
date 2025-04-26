@@ -105,19 +105,23 @@ func (c *BtcClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRes
 		return err
 	}
 	for _, psbt := range psbts {
-		txHash, found, err := c.FindBroadcastedTx(psbt)
+		// txHash, found, err := c.FindBroadcastedTx(psbt)
+		// if err != nil {
+		// 	log.Warn().Err(err).Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to find transaction on the btc network.")
+		// }
+		// if found {
+		// 	log.Info().Str("txHash", txHash.String()).Msg("[BtcClient] [handleScalarBatchCommandSigned] transaction found on the btc network, don't need to broadcast.")
+		// } else {
+		// 	broadcastedTxHash, err := c.BroadcastRawTx(psbt)
+		// 	if err != nil {
+		// 		log.Error().Str("TxHash", txHash.String()).Err(err).Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to broadcast tx")
+		// 	} else {
+		// 		txHash = broadcastedTxHash
+		// 	}
+		// }
+		txHash, err := c.BroadcastRawTx(psbt)
 		if err != nil {
-			log.Error().Err(err).Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to find transaction on the btc network.")
-		}
-		if found {
-			log.Info().Str("txHash", txHash.String()).Msg("[BtcClient] [handleScalarBatchCommandSigned] transaction found on the btc network, don't need to broadcast.")
-		} else {
-			broadcastedTxHash, err := c.BroadcastRawTx(psbt)
-			if err != nil {
-				log.Error().Str("TxHash", txHash.String()).Err(err).Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to broadcast tx")
-			} else {
-				txHash = broadcastedTxHash
-			}
+			log.Error().Str("TxHash", txHash.String()).Err(err).Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to broadcast tx")
 		}
 		if txHash != nil {
 			txHashStr := txHash.String()
