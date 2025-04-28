@@ -29,9 +29,13 @@ func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chain
 			}
 		} else if vaultTx.VaultTxType == 2 {
 			//2.Unstaking
-			redeemTx := c.CreateRedeemTx(vaultTx)
-			redeemTxs = append(redeemTxs, redeemTx)
-			log.Info().Any("RedeemTx", redeemTx).Msg("[ElectrumClient] [CategorizeVaultTxs]")
+			redeemTx, err := c.CreateRedeemTx(vaultTx)
+			if err != nil {
+				log.Error().Err(err).Msg("[ElectrumClient] failed to create redeem tx")
+			} else {
+				redeemTxs = append(redeemTxs, redeemTx)
+				log.Info().Any("RedeemTx", redeemTx).Msg("[ElectrumClient] [CategorizeVaultTxs]")
+			}
 		}
 	}
 	return tokenSents, redeemTxs
@@ -77,20 +81,26 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (*chains.TokenS
 	return &tokenSent, nil
 }
 
-func (c *Client) CreateRedeemTx(vaultTx types.VaultTransaction) *chains.RedeemTx {
+func (c *Client) CreateRedeemTx(vaultTx types.VaultTransaction) (*chains.RedeemTx, error) {
 	//We redeem by custodian group which can be shared between protocol,
 	//so we can't store tokenaddress and symbol here
-	return &chains.RedeemTx{
-		Model: gorm.Model{
-			CreatedAt: time.Unix(int64(vaultTx.Timestamp), 0),
-			UpdatedAt: time.Unix(int64(vaultTx.Timestamp), 0),
-		},
-		Chain:             c.electrumConfig.SourceChain,
-		BlockNumber:       uint64(vaultTx.Height),
-		TxHash:            vaultTx.TxHash,
-		Amount:            vaultTx.Amount,
-		SessionSequence:   vaultTx.SessionSequence,
-		CustodianGroupUid: hex.EncodeToString(vaultTx.CustodianGroupUid),
-		Status:            string(chains.RedeemStatusExecuting),
+	groupUid := hex.EncodeToString(vaultTx.CustodianGroupUid)
+	for _, avaiable := range c.custodialGroupUids {
+		if groupUid == avaiable {
+			return &chains.RedeemTx{
+				Model: gorm.Model{
+					CreatedAt: time.Unix(int64(vaultTx.Timestamp), 0),
+					UpdatedAt: time.Unix(int64(vaultTx.Timestamp), 0),
+				},
+				Chain:             c.electrumConfig.SourceChain,
+				BlockNumber:       uint64(vaultTx.Height),
+				TxHash:            vaultTx.TxHash,
+				Amount:            vaultTx.Amount,
+				SessionSequence:   vaultTx.SessionSequence,
+				CustodianGroupUid: groupUid,
+				Status:            string(chains.RedeemStatusExecuting),
+			}, nil
+		}
 	}
+	return nil, fmt.Errorf("custodian group uid is not valid %s", groupUid)
 }

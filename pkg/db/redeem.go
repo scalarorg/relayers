@@ -11,7 +11,7 @@ func (db *DatabaseAdapter) SaveRedeemTxs(redeemTxs []*chains.RedeemTx) error {
 }
 
 // Get last pending redeem transaction by block height
-func (db *DatabaseAdapter) FindPendingRedeemsTransaction(chainId string, blockHeight int) ([]*chains.RedeemTx, error) {
+func (db *DatabaseAdapter) FindExecutingRedeemTxs(chainId string, blockHeight int) ([]*chains.RedeemTx, error) {
 	var redeemTxs []*chains.RedeemTx
 	err := db.PostgresClient.Where("chain = ? AND block_number <= ? AND status = ?", chainId, blockHeight, chains.RedeemStatusExecuting).
 		Find(&redeemTxs).Error

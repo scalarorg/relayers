@@ -2,7 +2,9 @@ package scalar
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -157,13 +159,17 @@ func (c *Client) GetCovenantGroups(ctx context.Context) ([]*covExported.Custodia
 	return response.Groups, nil
 }
 
-func (c *Client) GetRedeemSession(custodianGroupUid []byte) (*covenanttypes.RedeemSessionResponse, error) {
+func (c *Client) GetRedeemSession(custodianGroupUid string) (*covenanttypes.RedeemSessionResponse, error) {
 	client := c.GetCovenantQueryClient()
 	if client == nil {
 		return nil, errors.New("covenant query client is nil")
 	}
+	groupBytes, err := hex.DecodeString(custodianGroupUid)
+	if err != nil {
+		return nil, fmt.Errorf("[ScalarClient] [GetRedeemSession] cannot decode group uid: %w", err)
+	}
 	response, err := client.RedeemSession(context.Background(), &covenanttypes.RedeemSessionRequest{
-		UID: custodianGroupUid,
+		UID: groupBytes,
 	})
 	if err != nil {
 		return nil, err
