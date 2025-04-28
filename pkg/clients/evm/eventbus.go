@@ -159,15 +159,19 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 		return fmt.Errorf("[EvmClient] [handleScalarBatchCommandSigned] auth is nil")
 	}
 	//Estimate gas
-
 	gas, err := ec.Client.EstimateGas(context.Background(), ethereum.CallMsg{
 		From: ec.auth.From,
 		To:   &ec.GatewayAddress,
 		Data: executeDataBytes,
 	})
-	if gas > ec.auth.GasLimit {
-		ec.auth.GasLimit = gas
+	gasPrice := uint64(0)
+	if ec.auth.GasPrice != nil {
+		gasPrice = ec.auth.GasPrice.Uint64()
 	}
+	log.Debug().Uint64("Estimated gas", gas).
+		Uint64("Config gas limit", ec.auth.GasLimit).
+		Uint64("Gas price", gasPrice).Msg("[EvmClient] successfully estimate gas")
+	ec.auth.GasLimit = gas
 	if err != nil {
 		log.Error().Err(err).
 			Str("BatchedCommandID", batchedCmdRes.ID).
@@ -182,6 +186,9 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 	ec.auth.NoSend = true
 	signedTx, err := ec.Gateway.Execute(ec.auth, decodedExecuteData.Input)
 	ec.auth.NoSend = false
+	log.Debug().Uint64("Tx gas", signedTx.Gas()).
+		Uint64("Tx gas price", signedTx.GasPrice().Uint64()).
+		Msg("[EvmClient] successfully estimate gas")
 	if err != nil {
 		log.Error().Err(err).
 			Str("input", hex.EncodeToString(decodedExecuteData.Input)).
