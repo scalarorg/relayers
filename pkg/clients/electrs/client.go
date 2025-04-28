@@ -2,6 +2,7 @@ package electrs
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"time"
@@ -16,13 +17,14 @@ import (
 )
 
 type Client struct {
-	globalConfig   *config.Config
-	electrumConfig *Config
-	Electrs        *electrum.Client
-	dbAdapter      *db.DatabaseAdapter
-	eventBus       *events.EventBus
-	scalarClient   *scalar.Client
-	currentHeight  int
+	globalConfig       *config.Config
+	electrumConfig     *Config
+	Electrs            *electrum.Client
+	dbAdapter          *db.DatabaseAdapter
+	eventBus           *events.EventBus
+	scalarClient       *scalar.Client
+	custodialGroupUids []string
+	currentHeight      int
 }
 
 func NewElectrumClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus, scalarClient *scalar.Client) ([]*Client, error) {
@@ -88,7 +90,17 @@ func (c *Client) Start(ctx context.Context) error {
 	params := []interface{}{}
 	//Set batch size from config or default value
 	params = append(params, c.electrumConfig.BatchSize)
-
+	c.custodialGroupUids = []string{}
+	if c.scalarClient != nil {
+		custodialGroups, err := c.scalarClient.GetCovenantGroups(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("[ElectrumClient] failed to get custodian group")
+		} else {
+			for _, group := range custodialGroups {
+				c.custodialGroupUids = append(c.custodialGroupUids, hex.EncodeToString(group.UID[:]))
+			}
+		}
+	}
 	lastCheckpoint := c.getLastCheckpoint()
 	log.Debug().Msgf("[ElectrumClient] [Start] Last checkpoint: %v", lastCheckpoint)
 	if lastCheckpoint.EventKey != "" {

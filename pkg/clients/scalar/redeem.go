@@ -69,12 +69,7 @@ func (s *CustodianGroupRedeemTx) PickRedeemTxsByGroupUid(groupUid string, sequen
 
 func (c *Client) WaitForSwitchingToPhase(groupHex string, expectedPhase covExported.Phase) error {
 	for {
-		groupBytes, err := hex.DecodeString(groupHex)
-		if err != nil {
-			log.Warn().Err(err).Msgf("[EvmClient] [RecoverAllEvents] failed to decode group uid: %s", groupHex)
-			return err
-		}
-		redeemSession, err := c.GetRedeemSession(groupBytes)
+		redeemSession, err := c.GetRedeemSession(groupHex)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[EvmClient] [RecoverAllEvents] failed to get current redeem session from scalarnet")
 			continue
@@ -173,12 +168,7 @@ func (c *Client) WaitForPendingCommands(chainId string, sourceTxs []string) erro
 
 func (c *Client) handleElectrsEventRedeemTx(redeemTxEvents *events.RedeemTxEvents) error {
 	log.Info().Any("redeemTxEvents", redeemTxEvents).Msg("[ScalarClient] handleElectrsEventRedeemTx")
-	groupBytes, err := hex.DecodeString(strings.TrimPrefix(redeemTxEvents.GroupUid, "0x"))
-	if err != nil {
-		log.Error().Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to decode group uid: %s", redeemTxEvents.GroupUid)
-		return err
-	}
-	redeemSession, err := c.GetRedeemSession(groupBytes)
+	redeemSession, err := c.GetRedeemSession(strings.TrimPrefix(redeemTxEvents.GroupUid, "0x"))
 	if err != nil || redeemSession == nil || redeemSession.Session == nil {
 		log.Error().Str("GroupUid", redeemTxEvents.GroupUid).Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to get redeem session: %s", err)
 		c.AddRedeemTxsToCache(redeemTxEvents.Chain, redeemTxEvents)
@@ -207,7 +197,7 @@ func (c *Client) handleElectrsEventRedeemTx(redeemTxEvents *events.RedeemTxEvent
 		}
 	} else {
 		log.Warn().Str("groupUid", redeemTxEvents.GroupUid).
-			Any("Session", redeemSession.Session).
+			Any("Current Session", redeemSession.Session).
 			Uint64("Incomming RedeemTx Sequence", redeemTxEvents.Sequence).
 			Msgf("[ScalarClient] [handleElectrsEventRedeemTx] redeem tx is belong to past redeem session")
 		return fmt.Errorf("[ScalarClient] [handleElectrsEventRedeemTx] redeem tx is belong to past redeem session")

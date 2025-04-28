@@ -27,7 +27,7 @@ func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err err
 		return fmt.Errorf("failed to handle token sents: %w", err)
 	}
 
-	err = c.tryHandleRedeemsTransaction(header.Height)
+	err = c.findAndHandleRedeemTxs(header.Height)
 	if err != nil {
 		log.Error().Err(err).Msg("[ElectrumClient] [BlockchainHeaderHandler] Failed to handle redeem transaction")
 		return fmt.Errorf("failed to handle redeem transaction: %w", err)
@@ -88,44 +88,19 @@ func (c *Client) tryConfirmTokenSents(blockHeight int) error {
 	}
 	return nil
 }
-func (c *Client) tryHandleRedeemsTransaction(blockHeight int) error {
-	// Check pending redeem transactions in the relayer db, if the confirmation is enough, send to the event bus
+func (c *Client) findAndHandleRedeemTxs(blockHeight int) error {
+	// Check executing redeem transactions in the relayer db, if the confirmation is enough, send to the event bus
 	lastConfirmedBlockNumber := blockHeight - c.electrumConfig.Confirmations + 1
-	redeemTxs, err := c.dbAdapter.FindPendingRedeemsTransaction(c.electrumConfig.SourceChain, lastConfirmedBlockNumber)
+	redeemTxs, err := c.dbAdapter.FindExecutingRedeemTxs(c.electrumConfig.SourceChain, lastConfirmedBlockNumber)
 	if err != nil {
-		log.Error().Err(err).Msg("[ElectrumClient] [tryHandleRedeemTransaction] Failed to get pending redeem transactions from db")
-		return fmt.Errorf("failed to get pending redeem transactions from db: %w", err)
+		log.Error().Err(err).Msg("[ElectrumClient] [findAndHandleRedeemTxs] Failed to get executing redeem transactions from db")
+		return fmt.Errorf("failed to get executing redeem transactions from db: %w", err)
 	}
 	if len(redeemTxs) == 0 {
-		log.Debug().Int("blockHeight", blockHeight).Msgf("[ElectrumClient] [tryHandleRedeemTransaction] No pending redeem transactions with %d confirmations found", c.electrumConfig.Confirmations)
+		log.Debug().Int("blockHeight", blockHeight).Msgf("[ElectrumClient] [findAndHandleRedeemTxs] No pending redeem transactions with %d confirmations found", c.electrumConfig.Confirmations)
 		return nil
 	}
-	log.Debug().Int("RedeemTx found", len(redeemTxs)).Msg("[ScalarClient] found executing redeem tx")
-	txHashes := make([]string, len(redeemTxs))
-	for i, redeemTx := range redeemTxs {
-		txHashes[i] = redeemTx.TxHash
-		redeemTx.Status = string(chains.RedeemStatusVerifying)
-	}
-	err = c.dbAdapter.SaveRedeemTxs(redeemTxs)
-	if err != nil {
-		log.Error().Err(err).Msg("[ElectrumClient] [tryHandleRedeemTransaction] Failed to save redeem transactions")
-		return fmt.Errorf("failed to save redeem transactions: %w", err)
-	}
-	if c.eventBus != nil {
-		//Group tx by groupUid
-		mapRedeemTxEvents := c.groupRedeemTxs(redeemTxs)
-		for _, redeemTxEvents := range mapRedeemTxEvents {
-			log.Debug().Msgf("[ElectrumClient] [tryHandleRedeemTransaction] Broadcasting confirm RedeemTxEvents: %v", redeemTxEvents)
-			c.eventBus.BroadcastEvent(&events.EventEnvelope{
-				EventType:        events.EVENT_ELECTRS_REDEEM_TRANSACTION,
-				DestinationChain: events.SCALAR_NETWORK_NAME,
-				Data:             redeemTxEvents,
-			})
-		}
-	} else {
-		log.Warn().Msg("[ElectrumClient] [tryHandleRedeemTransaction] event bus is undefined")
-	}
-	return nil
+	return c.handleRedeemTxs(redeemTxs)
 }
 
 // Handle vault messages
@@ -232,6 +207,34 @@ func (c *Client) handleTokenSents(tokenSents []*chains.TokenSent) error {
 // Todo: update ContractCallWithToken status with execution confirmation from bitcoin network
 func (c *Client) handleRedeemTxs(redeemTxs []*chains.RedeemTx) error {
 	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [handleRedeemTxs] Received %d redeem transactions", len(redeemTxs))
+	//Group redeem txs by custodian group id, in each group we keep only txs with highest sequence number
+	mapRedeemTxs := c.groupRedeemTxs(redeemTxs)
+	if c.eventBus != nil && len(mapRedeemTxs) > 0 {
+		for groupUid, redeemTxEvents := range mapRedeemTxs {
+			redeemSession, err := c.scalarClient.GetRedeemSession(groupUid)
+			if err != nil || redeemSession == nil || redeemSession.Session == nil {
+				log.Error().Err(err).Str("CustodianGroupUid", groupUid).Msg("[ElectrumClient] cannot get RedeemSession")
+				continue
+			}
+			if redeemSession.Session.Sequence == redeemTxEvents.Sequence {
+				log.Debug().Str("groupUid", groupUid).Msgf("[ElectrumClient] [handleRedeemTxs] Broadcasting confirm redeem tx request: %v", redeemTxEvents)
+				for _, tx := range redeemTxEvents.RedeemTxs {
+					tx.Status = string(chains.RedeemStatusVerifying)
+				}
+				c.eventBus.BroadcastEvent(&events.EventEnvelope{
+					EventType:        events.EVENT_ELECTRS_REDEEM_TRANSACTION,
+					DestinationChain: events.SCALAR_NETWORK_NAME,
+					Data:             redeemTxEvents,
+				})
+			} else {
+				log.Debug().Str("groupUid", groupUid).
+					Any("Current RedeemSession", redeemSession.Session).
+					Any("RedeemTxEvents", redeemTxEvents).
+					Msgf("[ElectrumClient] [handleRedeemTxs] RedeemTxs don't belong to current redeem session")
+			}
+		}
+	}
+	//TODO: add two db executions in a single transaction
 	//1. Store redeem transactions to the db
 	err := c.dbAdapter.SaveRedeemTxs(redeemTxs)
 	if err != nil {
@@ -244,19 +247,6 @@ func (c *Client) handleRedeemTxs(redeemTxs []*chains.RedeemTx) error {
 		txHashes[i] = tx.TxHash
 	}
 	c.dbAdapter.UpdateRedeemExecutedCommands(c.electrumConfig.SourceChain, txHashes)
-
-	//Group redeem txs by custodian group id, in each group we keep only txs with highest sequence number
-	mapRedeemTxs := c.groupRedeemTxs(redeemTxs)
-	if c.eventBus != nil && len(mapRedeemTxs) > 0 {
-		for groupUid, redeemTxEvents := range mapRedeemTxs {
-			log.Debug().Str("groupUid", groupUid).Msgf("[ElectrumClient] [handleRedeemTxs] Broadcasting confirm redeem tx request: %v", redeemTxEvents)
-			c.eventBus.BroadcastEvent(&events.EventEnvelope{
-				EventType:        events.EVENT_ELECTRS_REDEEM_TRANSACTION,
-				DestinationChain: events.SCALAR_NETWORK_NAME,
-				Data:             redeemTxEvents,
-			})
-		}
-	}
 	return nil
 }
 
