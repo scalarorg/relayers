@@ -1,6 +1,7 @@
 package electrs
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -42,6 +43,22 @@ func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chain
 }
 
 func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (*chains.TokenSent, error) {
+	//Check if vaultTx.scriptPubkey is btcPubkey of a custodianGroup
+	foundCustodianGroup := false
+	for _, group := range c.custodialGroups {
+		if bytes.Equal(vaultTx.ScriptPubkey, group.BitcoinPubkey) {
+			foundCustodianGroup = true
+			break
+		}
+	}
+	if !foundCustodianGroup {
+		pubkeys := []string{}
+		for _, group := range c.custodialGroups {
+			pubkeys = append(pubkeys, hex.EncodeToString(group.BitcoinPubkey))
+		}
+		log.Debug().Strs("Supported custodian groups taproot pubkey", pubkeys).Msg("[ElectrumClient] CreateTokenSent failed")
+		return nil, fmt.Errorf("custodian group for script pubkey %s not found", hex.EncodeToString(vaultTx.ScriptPubkey))
+	}
 	//For btc vault tx, the log index is tx position in the block
 	index := vaultTx.TxPosition
 	eventId := fmt.Sprintf("%s-%d", utils.NormalizeHash(vaultTx.TxHash), index)
@@ -85,8 +102,8 @@ func (c *Client) CreateRedeemTx(vaultTx types.VaultTransaction) (*chains.RedeemT
 	//We redeem by custodian group which can be shared between protocol,
 	//so we can't store tokenaddress and symbol here
 	groupUid := hex.EncodeToString(vaultTx.CustodianGroupUid)
-	for _, avaiable := range c.custodialGroupUids {
-		if groupUid == avaiable {
+	for _, group := range c.custodialGroups {
+		if bytes.Equal(vaultTx.CustodianGroupUid, group.UID[:]) {
 			return &chains.RedeemTx{
 				Model: gorm.Model{
 					CreatedAt: time.Unix(int64(vaultTx.Timestamp), 0),

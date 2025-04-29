@@ -2,7 +2,6 @@ package electrs
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"net"
 	"time"
@@ -14,17 +13,18 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	"github.com/scalarorg/scalar-core/x/covenant/exported"
 )
 
 type Client struct {
-	globalConfig       *config.Config
-	electrumConfig     *Config
-	Electrs            *electrum.Client
-	dbAdapter          *db.DatabaseAdapter
-	eventBus           *events.EventBus
-	scalarClient       *scalar.Client
-	custodialGroupUids []string
-	currentHeight      int
+	globalConfig    *config.Config
+	electrumConfig  *Config
+	Electrs         *electrum.Client
+	dbAdapter       *db.DatabaseAdapter
+	eventBus        *events.EventBus
+	scalarClient    *scalar.Client
+	custodialGroups []*exported.CustodianGroup
+	currentHeight   int
 }
 
 func NewElectrumClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus, scalarClient *scalar.Client) ([]*Client, error) {
@@ -90,15 +90,11 @@ func (c *Client) Start(ctx context.Context) error {
 	params := []interface{}{}
 	//Set batch size from config or default value
 	params = append(params, c.electrumConfig.BatchSize)
-	c.custodialGroupUids = []string{}
 	if c.scalarClient != nil {
-		custodialGroups, err := c.scalarClient.GetCovenantGroups(ctx)
+		var err error
+		c.custodialGroups, err = c.scalarClient.GetCovenantGroups(ctx)
 		if err != nil {
 			log.Error().Err(err).Msg("[ElectrumClient] failed to get custodian group")
-		} else {
-			for _, group := range custodialGroups {
-				c.custodialGroupUids = append(c.custodialGroupUids, hex.EncodeToString(group.UID[:]))
-			}
 		}
 	}
 	lastCheckpoint := c.getLastCheckpoint()
