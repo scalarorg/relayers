@@ -79,14 +79,6 @@ func (s *Service) Start(ctx context.Context) error {
 	} else {
 		log.Warn().Msg("[Relayer] [Start] scalar client is undefined")
 	}
-	//Start btc clients
-	for _, client := range s.BtcClient {
-		go client.Start(ctx)
-	}
-	//Start electrum clients. This client can get all vault transactions from last checkpoint of begining if no checkpoint is found
-	for _, client := range s.Electrs {
-		go client.Start(ctx)
-	}
 	// Improvement recovery evm missing source events
 	// 2025, March 10
 	// Recover all swiched phase events from evm networks
@@ -100,6 +92,14 @@ func (s *Service) Start(ctx context.Context) error {
 	if err != nil {
 		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover sessions")
 		panic(err)
+	}
+	//Start btc clients
+	for _, client := range s.BtcClient {
+		go client.Start(ctx)
+	}
+	//Start electrum clients. This client can get all vault transactions from last checkpoint of begining if no checkpoint is found
+	for _, client := range s.Electrs {
+		go client.Start(ctx)
 	}
 	//Recover all events
 	for _, client := range s.EvmClients {

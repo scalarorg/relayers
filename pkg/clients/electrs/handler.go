@@ -233,11 +233,19 @@ func (c *Client) handleRedeemTxs(redeemTxs []*chains.RedeemTx) error {
 						Any("Current RedeemSession", redeemSession.Session).
 						Msgf("[ElectrumClient] [handleRedeemTxs] current session is not in executing phase")
 				}
+			} else if redeemSession.Session.Sequence > redeemTxEvents.Sequence {
+				log.Error().Str("groupUid", groupUid).
+					Any("Current RedeemSession", redeemSession.Session).
+					Any("RedeemTxEvents", redeemTxEvents).
+					Msgf("[ElectrumClient] [handleRedeemTxs] RedeemTxs don't belong to current redeem session")
+				for _, tx := range redeemTxEvents.RedeemTxs {
+					tx.Status = string(chains.RedeemStatusApproved)
+				}
 			} else {
 				log.Debug().Str("groupUid", groupUid).
 					Any("Current RedeemSession", redeemSession.Session).
 					Any("RedeemTxEvents", redeemTxEvents).
-					Msgf("[ElectrumClient] [handleRedeemTxs] RedeemTxs don't belong to current redeem session")
+					Msgf("[ElectrumClient] [handleRedeemTxs] RedeemTxs has future session")
 			}
 		}
 	}
