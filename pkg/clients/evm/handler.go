@@ -182,6 +182,10 @@ func (ec *EvmClient) preprocessContractCallWithToken(event *contracts.IScalarGat
 }
 
 func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) error {
+	if !ec.ScalarClient.HasChain(event.DestinationChain) {
+		log.Warn().Str("chainId", event.DestinationChain).Msg("[EvmClient] [HandleTokenSent] chain not supported")
+		return fmt.Errorf("chain %s not supported", event.DestinationChain)
+	}
 	//0. Preprocess the event
 	ec.preprocessTokenSent(event)
 	//1. Convert into a RelayData instance then store to the db

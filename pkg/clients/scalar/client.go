@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -13,6 +14,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 
 	//tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -32,6 +34,7 @@ type Client struct {
 	pendingCommands *PendingCommands
 	initUtxo        bool                               //key: chain, value: utxo
 	redeemTxCache   map[string]*CustodianGroupRedeemTx //Map RedeemSession by chainId
+	chains          []string
 	// Add other necessary fields like chain ID, gas prices, etc.
 }
 
@@ -86,6 +89,18 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 	if err != nil {
 		return nil, err
 	}
+	clientCtx, err = queryClient.GetClientCtx()
+	if err != nil {
+		return nil, err
+	}
+	chainClient := chainstypes.NewQueryServiceClient(clientCtx)
+	chains := make([]string, 0)
+	response, err := chainClient.Chains(context.Background(), &chainstypes.ChainsRequest{})
+	if err == nil {
+		for _, chain := range response.Chains {
+			chains = append(chains, string(chain))
+		}
+	}
 	pendingCommands := NewPendingCommands()
 	broadcaster := NewBroadcaster(networkClient, pendingCommands, time.Second, 10)
 	client := &Client{
@@ -99,6 +114,7 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 		dbAdapter:       dbAdapter,
 		eventBus:        eventBus,
 		pendingCommands: pendingCommands,
+		chains:          chains,
 	}
 	return client, nil
 }
@@ -345,6 +361,9 @@ func SubscribeWithTimeout[T proto.Message](ctx context.Context,
 			}
 		}
 	}
+}
+func (c *Client) HasChain(chainId string) bool {
+	return slices.Contains(c.chains, chainId)
 }
 
 // func (c *Client) ConfirmEvmTxs(ctx context.Context, chainName string, txIds []string) (*sdk.TxResponse, error) {

@@ -195,3 +195,19 @@ func (c *Client) GetChainRedeemSession(chainId string, custodianGroupUid [32]byt
 	}
 	return nil, errors.New("redeem session not found")
 }
+
+func (c *Client) GetAllChains(ctx context.Context) ([]string, error) {
+	client := c.GetChainQueryServiceClient()
+	if client == nil {
+		return nil, errors.New("chain query client is nil")
+	}
+	response, err := client.Chains(ctx, &chainstypes.ChainsRequest{})
+	if err != nil {
+		return nil, err
+	}
+	chains := make([]string, 0, len(response.Chains))
+	for _, chain := range response.Chains {
+		chains = append(chains, string(chain))
+	}
+	return chains, nil
+}
