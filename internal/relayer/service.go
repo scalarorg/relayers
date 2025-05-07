@@ -147,6 +147,8 @@ func (s *Service) RecoverEvmSessions(groups []*covExported.CustodianGroup) error
 	recoverSessions := CustodiansRecoverRedeemSessions{}
 	for _, client := range s.EvmClients {
 		wg.Add(1)
+		log.Info().Str("chainId", client.EvmConfig.GetId()).
+			Msg("[Relayer] [RecoverEvmSessions] start goroutine for recovering redeem sessions")
 		go func() {
 			defer wg.Done()
 			chainRedeemSessions, err := client.RecoverRedeemSessions(groups)

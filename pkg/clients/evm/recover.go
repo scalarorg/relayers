@@ -378,6 +378,8 @@ For each evm chain, we need to get 2 last switch phase events
 so we have to case, [Preparing, Executing], [Executing, Preparing] or [Preparing]
 */
 func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) (*pkgTypes.ChainRedeemSessions, error) {
+	log.Info().Str("Chain", c.EvmConfig.ID).
+		Msgf("[EvmClient] [RecoverRedeemSessions] start recovering redeem sessions")
 	currentBlockNumber, err := c.Client.BlockNumber(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current block number: %w", err)
