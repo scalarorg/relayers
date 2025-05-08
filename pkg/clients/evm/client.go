@@ -2,6 +2,7 @@ package evm
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
@@ -17,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog/log"
+	chains "github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/config"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
@@ -27,17 +29,18 @@ import (
 )
 
 type EvmClient struct {
-	globalConfig   *config.Config
-	EvmConfig      *EvmNetworkConfig
-	Client         *ethclient.Client
-	ScalarClient   *scalar.Client
-	ChainName      string
-	GatewayAddress common.Address
-	Gateway        *contracts.IScalarGateway
-	auth           *bind.TransactOpts
-	dbAdapter      *db.DatabaseAdapter
-	eventBus       *events.EventBus
-	MissingLogs    MissingLogs
+	globalConfig      *config.Config
+	EvmConfig         *EvmNetworkConfig
+	Client            *ethclient.Client
+	ScalarClient      *scalar.Client
+	ChainName         string
+	GatewayAddress    common.Address
+	Gateway           *contracts.IScalarGateway
+	auth              *bind.TransactOpts
+	dbAdapter         *db.DatabaseAdapter
+	eventBus          *events.EventBus
+	MissingLogs       MissingLogs
+	ChnlReceivedBlock chan uint64
 	// pendingTxs     pending.PendingTxs //Transactions sent to Gateway for approval, waiting for event from EVM chain.
 	retryInterval time.Duration
 }
@@ -120,7 +123,8 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 			chainId:   evmConfig.GetId(),
 			RedeemTxs: make(map[string][]string),
 		},
-		retryInterval: RETRY_INTERVAL,
+		ChnlReceivedBlock: make(chan uint64),
+		retryInterval:     RETRY_INTERVAL,
 	}
 
 	return evmClient, nil
@@ -209,6 +213,7 @@ func (c *EvmClient) SetAuth(auth *bind.TransactOpts) {
 }
 
 func (c *EvmClient) Start(ctx context.Context) error {
+	c.startFetchBlock()
 	//Subscribe to the event bus
 	c.subscribeEventBus()
 	c.ConnectWithRetry(ctx)
@@ -717,6 +722,48 @@ func (c *EvmClient) handleEventLog(event abi.Event, txLog types.Log) error {
 	}
 }
 
+func (c *EvmClient) startFetchBlock() {
+	go func() {
+		for blockNumber := range c.ChnlReceivedBlock {
+			if c.dbAdapter == nil {
+				log.Error().Msgf("[EvmClient] [startFetchBlock] db adapter is not set")
+				continue
+			}
+			log.Info().Str("ChainId", c.EvmConfig.ID).Uint64("BlockNumber", blockNumber).Msg("[EvmClient] Fetch block by number")
+			block, err := c.Client.BlockByNumber(context.Background(), big.NewInt(int64(blockNumber)))
+			if err != nil {
+				log.Error().Err(err).Msgf("[EvmClient] [startFetchBlock] failed to fetch block %d", blockNumber)
+			} else if block == nil {
+				log.Error().Msgf("[EvmClient] [startFetchBlock] block %d not found", blockNumber)
+			} else {
+				log.Info().Msgf("[EvmClient] [startFetchBlock] block %+v found", block)
+				log.Info().Msgf("[EvmClient] [startFetchBlock] block number %d", block.NumberU64())
+				log.Info().Msgf("[EvmClient] [startFetchBlock] block hash %s", hex.EncodeToString(block.Hash().Bytes()))
+				log.Info().Msgf("[EvmClient] [startFetchBlock] block time %d", block.Time())
+				blockNumber := block.NumberU64()
+				blockHeader := &chains.BlockHeader{
+					Chain:       c.EvmConfig.GetId(),
+					BlockNumber: blockNumber,
+					BlockHash:   hex.EncodeToString(block.Hash().Bytes()),
+					BlockTime:   block.Time(),
+				}
+				err = c.dbAdapter.CreateBlockHeader(blockHeader)
+				if err != nil {
+					log.Error().Err(err).Msgf("[EvmClient] [startFetchBlock] failed to save block header %d", blockNumber)
+				}
+			}
+		}
+	}()
+}
+func (c *EvmClient) fetchBlockHeader(blockNumber uint64) error {
+	blockHeader, err := c.dbAdapter.FindBlockHeader(c.EvmConfig.GetId(), blockNumber)
+	if err == nil && blockHeader != nil {
+		log.Info().Any("blockHeader", blockHeader).Msgf("[EvmClient] [startFetchBlock] block header already exists")
+		return nil
+	}
+	c.ChnlReceivedBlock <- blockNumber
+	return nil
+}
 func (c *EvmClient) subscribeEventBus() {
 	if c.eventBus != nil {
 		log.Debug().Msgf("[EvmClient] [Start] subscribe to the event bus %s", c.EvmConfig.GetId())

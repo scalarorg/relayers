@@ -419,9 +419,18 @@ func (c *EvmClient) RecoverAllRedeemSessions(groups []*covExported.CustodianGrou
 		query.ToBlock = big.NewInt(int64(toBlock))
 		logs, err := c.Client.FilterLogs(context.Background(), query)
 		if err != nil {
-			return nil, fmt.Errorf("failed to filter logs: %w", err)
+			log.Error().Uint64("FromBlock", fromBlock).
+				Uint64("ToBlock", toBlock).Err(err).
+				Msg("[EvmClient] [RecoverAllRedeemSessions] Sleep for a while then retry")
+			time.Sleep(time.Second)
+			continue
+		} else {
+			log.Info().Str("Chain", c.EvmConfig.ID).
+				Uint64("FromBlock", fromBlock).
+				Uint64("ToBlock", toBlock).
+				Int("Logs found", len(logs)).
+				Msg("[EvmClient] [RecoverAllRedeemSessions]")
 		}
-		log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverAllRedeemSessions] found %d logs, fromBlock: %d, toBlock: %d", len(logs), fromBlock, toBlock)
 		//Loop from the last log to the first log
 		for i := len(logs) - 1; i >= 0; i-- {
 			topic := logs[i].Topics[0].String()

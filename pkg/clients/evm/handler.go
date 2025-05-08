@@ -79,6 +79,11 @@ import (
 func (ec *EvmClient) HandleContractCallWithToken(event *contracts.IScalarGatewayContractCallWithToken) error {
 	//0. Preprocess the event
 	ec.preprocessContractCallWithToken(event)
+	//Get block header
+	err := ec.fetchBlockHeader(event.Raw.BlockNumber)
+	if err != nil {
+		log.Error().Err(err).Msgf("[EvmClient] [HandleContractCallWithToken] failed to fetch block header %d", event.Raw.BlockNumber)
+	}
 	//1. Convert into a RelayData instance then store to the db
 	contractCallWithToken, err := ec.ContractCallWithToken2Model(event)
 	if err != nil {
@@ -123,6 +128,10 @@ func (ec *EvmClient) HandleContractCallWithToken(event *contracts.IScalarGateway
 func (ec *EvmClient) HandleRedeemToken(event *contracts.IScalarGatewayRedeemToken) error {
 	//0. Preprocess the event
 	log.Info().Str("Chain", ec.EvmConfig.ID).Any("event", event).Msg("[EvmClient] [HandleRedeemToken] Start processing evm redeem token")
+	err := ec.fetchBlockHeader(event.Raw.BlockNumber)
+	if err != nil {
+		log.Error().Err(err).Msgf("[EvmClient] [HandleRedeemToken] failed to fetch block header %d", event.Raw.BlockNumber)
+	}
 	//1. Convert into a RelayData instance then store to the db
 	redeemToken, err := ec.RedeemTokenEvent2Model(event)
 	if err != nil {
@@ -188,6 +197,10 @@ func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) e
 	}
 	//0. Preprocess the event
 	ec.preprocessTokenSent(event)
+	err := ec.fetchBlockHeader(event.Raw.BlockNumber)
+	if err != nil {
+		log.Error().Err(err).Msgf("[EvmClient] [HandleTokenSent] failed to fetch block header %d", event.Raw.BlockNumber)
+	}
 	//1. Convert into a RelayData instance then store to the db
 	tokenSent, err := ec.TokenSentEvent2Model(event)
 	if err != nil {
@@ -253,6 +266,10 @@ func (ec *EvmClient) HandleContractCallApproved(event *contracts.IScalarGatewayC
 	err := ec.preprocessContractCallApproved(event)
 	if err != nil {
 		return fmt.Errorf("failed to preprocess contract call approved: %w", err)
+	}
+	err = ec.fetchBlockHeader(event.Raw.BlockNumber)
+	if err != nil {
+		log.Error().Err(err).Msgf("[EvmClient] [HandleRedeemToken] failed to fetch block header %d", event.Raw.BlockNumber)
 	}
 	//1. Convert into a RelayData instance then store to the db
 	contractCallApproved, err := ec.ContractCallApprovedEvent2Model(event)
@@ -369,6 +386,10 @@ func (ec *EvmClient) preprocessContractCallApproved(event *contracts.IScalarGate
 func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecuted) error {
 	//0. Preprocess the event
 	ec.preprocessCommandExecuted(event)
+	err := ec.fetchBlockHeader(event.Raw.BlockNumber)
+	if err != nil {
+		log.Error().Err(err).Msgf("[EvmClient] [HandleCommandExecuted] failed to fetch block header %d", event.Raw.BlockNumber)
+	}
 	//1. Convert into a RelayData instance then store to the db
 	cmdExecuted := ec.CommandExecutedEvent2Model(event)
 	//Get commandId from scalarnet

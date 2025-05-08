@@ -123,6 +123,8 @@ func (c *EvmClient) RedeemTokenEvent2Model(event *contracts.IScalarGatewayRedeem
 		TokenContractAddress: utils.NormalizeAddress(event.DestinationContractAddress, chainInfoBytes.ChainType()),
 		Symbol:               event.Symbol,
 		Amount:               event.Amount.Uint64(),
+		CustodianGroupUid:    hex.EncodeToString(event.CustodianGroupUID[:]),
+		SessionSequence:      event.Sequence,
 	}
 	return contractCallWithToken, nil
 }

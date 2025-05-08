@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
+	chains "github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
@@ -125,6 +126,21 @@ func createEVMClient(key string) (*ethclient.Client, error) {
 		return nil, err
 	}
 	return ethclient.NewClient(rpcSepolia), nil
+}
+func TestGetBlockHeader(t *testing.T) {
+	sepoliaClient, err := evm.NewEvmClient(&globalConfig, sepoliaConfig, nil, nil, nil)
+	if err != nil {
+		log.Error().Msgf("failed to create evm client: %v", err)
+	}
+	block, err := sepoliaClient.Client.BlockByNumber(context.Background(), big.NewInt(8279879))
+	require.NoError(t, err)
+	blockHeader := &chains.BlockHeader{
+		Chain:       sepoliaConfig.GetId(),
+		BlockNumber: block.NumberU64(),
+		BlockHash:   hex.EncodeToString(block.Hash().Bytes()),
+		BlockTime:   block.Time(),
+	}
+	t.Logf("blockHeader %++v", blockHeader)
 }
 func TestSepoliaEstimateGas(t *testing.T) {
 	executeData := BIG_EXECUTE_DATA2
