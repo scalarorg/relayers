@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
+	chainsModel "github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/clients/evm/parser"
@@ -374,6 +375,112 @@ func (c *EvmClient) UpdateLastCheckPoint(events map[string]abi.Event, logs []typ
 }
 
 /*
+Recover all redeem sessions with redeem events from the last switch phase event back to the startBlock in the config
+*/
+func (c *EvmClient) RecoverAllRedeemSessions(groups []*covExported.CustodianGroup,
+	redeemTokenChannel chan *chainsModel.ContractCallWithToken) (*pkgTypes.ChainRedeemSessions, error) {
+	log.Info().Str("Chain", c.EvmConfig.ID).
+		Msgf("[EvmClient] [RecoverAllRedeemSessions] start recovering redeem sessions")
+	currentBlockNumber, err := c.Client.BlockNumber(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current block number: %w", err)
+	}
+	if currentBlockNumber < c.EvmConfig.StartBlock {
+		return nil, fmt.Errorf("invalid config: start block %d is greater than current block number %d", c.EvmConfig.StartBlock, currentBlockNumber)
+	}
+	allGroups := map[string]string{}
+	for _, group := range groups {
+		groupUid := strings.TrimPrefix(group.UID.Hex(), "0x")
+		allGroups[groupUid] = group.Name
+	}
+	switchPhaseEvent := scalarGatewayAbi.Events[events.EVENT_EVM_SWITCHED_PHASE]
+	redeemTokenEvent := scalarGatewayAbi.Events[events.EVENT_EVM_REDEEM_TOKEN]
+	chainRedeemSessions := &pkgTypes.ChainRedeemSessions{
+		SwitchPhaseEvents: map[string][]*contracts.IScalarGatewaySwitchPhase{},
+		RedeemTokenEvents: map[string][]*contracts.IScalarGatewayRedeemToken{},
+	}
+	maxSequences := map[string]uint64{}
+	query := ethereum.FilterQuery{
+		Addresses: []common.Address{c.GatewayAddress},
+		Topics:    [][]common.Hash{{switchPhaseEvent.ID, redeemTokenEvent.ID}},
+	}
+	recoverRange := uint64(100000)
+	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < 100000 {
+		recoverRange = c.EvmConfig.RecoverRange
+	}
+	fromBlock := currentBlockNumber - recoverRange
+	if fromBlock < c.EvmConfig.StartBlock {
+		fromBlock = c.EvmConfig.StartBlock
+	}
+	toBlock := currentBlockNumber
+	switchedPhaseCounter := 0
+	for fromBlock >= c.EvmConfig.StartBlock {
+		query.FromBlock = big.NewInt(int64(fromBlock))
+		query.ToBlock = big.NewInt(int64(toBlock))
+		logs, err := c.Client.FilterLogs(context.Background(), query)
+		if err != nil {
+			return nil, fmt.Errorf("failed to filter logs: %w", err)
+		}
+		log.Info().Str("Chain", c.EvmConfig.ID).Msgf("[EvmClient] [RecoverAllRedeemSessions] found %d logs, fromBlock: %d, toBlock: %d", len(logs), fromBlock, toBlock)
+		//Loop from the last log to the first log
+		for i := len(logs) - 1; i >= 0; i-- {
+			topic := logs[i].Topics[0].String()
+			if topic == switchPhaseEvent.ID.String() {
+				if switchedPhaseCounter == 2 {
+					//We need only 2 last switch phase events
+					continue
+				}
+				switchedPhase, err := parseSwitchPhaseEvent(logs[i])
+				if err != nil {
+					log.Error().Err(err).Msgf("[EvmClient] [RecoverAllRedeemSessions] failed to parse event %s", switchPhaseEvent.Name)
+					continue
+				}
+				groupUid := hex.EncodeToString(switchedPhase.CustodianGroupId[:])
+				if _, ok := allGroups[groupUid]; !ok {
+					log.Warn().Str("Chain", c.EvmConfig.ID).Str("groupUid", groupUid).Msg("[EvmClient] [RecoverAllRedeemSessions] unexpected groupUid")
+					continue
+				}
+				log.Info().Str("Chain", c.EvmConfig.ID).Str("groupUid", groupUid).Msg("[EvmClient] [RecoverAllRedeemSessions] found preparing event")
+				switchedPhaseCounter = chainRedeemSessions.AppendSwitchPhaseEvent(groupUid, switchedPhase)
+			} else if topic == redeemTokenEvent.ID.String() {
+				redeemEvent, err := parseRedeemTokenEvent(logs[i])
+				if err != nil {
+					log.Error().Err(err).Msgf("[EvmClient] [RecoverAllRedeemSessions] failed to parse event %s", redeemTokenEvent.Name)
+					continue
+				}
+				groupUid := hex.EncodeToString(redeemEvent.CustodianGroupUID[:])
+				if _, ok := allGroups[groupUid]; !ok {
+					log.Warn().Str("Chain", c.EvmConfig.ID).Str("groupUid", groupUid).Msg("[EvmClient] [RecoverAllRedeemSessions] unexpected groupUid")
+					continue
+				}
+				log.Info().Str("Chain", c.EvmConfig.ID).Str("groupUid", groupUid).Msg("[EvmClient] [RecoverAllRedeemSessions] found redeemToken event")
+				redeemToken, err := c.RedeemTokenEvent2Model(redeemEvent)
+				if err != nil {
+					log.Error().Err(err).Msg("[EvmClient] [RecoverAllRedeemSessions] failed to convert IScalarGatewayRedeemToken to ContractCallWithToken")
+					continue
+				}
+				maxSequence := maxSequences[groupUid]
+				if maxSequence <= redeemEvent.Sequence {
+					//Add to buffer only redeem event of the latest sequence
+					maxSequences[groupUid] = redeemEvent.Sequence
+					chainRedeemSessions.AppendRedeemTokenEvent(groupUid, redeemEvent)
+				}
+				if redeemEvent.Sequence < maxSequence {
+					redeemToken.Status = chainsModel.ContractCallStatusSuccess
+				}
+				redeemTokenChannel <- &redeemToken
+			}
+		}
+		toBlock = fromBlock - 1
+		fromBlock = fromBlock - recoverRange
+		if fromBlock < c.EvmConfig.StartBlock && toBlock >= c.EvmConfig.StartBlock {
+			fromBlock = c.EvmConfig.StartBlock
+		}
+	}
+	return chainRedeemSessions, nil
+}
+
+/*
 For each evm chain, we need to get 2 last switch phase events
 so we have to case, [Preparing, Executing], [Executing, Preparing] or [Preparing]
 */
@@ -383,6 +490,9 @@ func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) 
 	currentBlockNumber, err := c.Client.BlockNumber(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current block number: %w", err)
+	}
+	if currentBlockNumber < c.EvmConfig.StartBlock {
+		return nil, fmt.Errorf("invalid config: start block %d is greater than current block number %d", c.EvmConfig.StartBlock, currentBlockNumber)
 	}
 	allGroups := map[string]string{}
 	expectingGroups := map[string]string{}
@@ -405,17 +515,11 @@ func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) 
 	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < 100000 {
 		recoverRange = c.EvmConfig.RecoverRange
 	}
-	var fromBlock uint64
-	if currentBlockNumber < recoverRange {
-		fromBlock = 0
-	} else {
-		fromBlock = currentBlockNumber - recoverRange
+	fromBlock := currentBlockNumber - recoverRange
+	if fromBlock < c.EvmConfig.StartBlock {
+		fromBlock = c.EvmConfig.StartBlock
 	}
 	toBlock := currentBlockNumber
-	log.Info().Str("Chain", c.EvmConfig.ID).
-		Str("RedeemToken EventID", redeemTokenEvent.ID.String()).
-		Str("SwitchPhase EventID", switchPhaseEvent.ID.String()).
-		Msgf("[EvmClient] [RecoverRedeemSessions] IDs")
 	for len(expectingGroups) > 0 {
 		query.FromBlock = big.NewInt(int64(fromBlock))
 		query.ToBlock = big.NewInt(int64(toBlock))
@@ -433,7 +537,7 @@ func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) 
 					log.Error().Err(err).Msgf("[EvmClient] [RecoverRedeemSessions] failed to parse event %s", switchPhaseEvent.Name)
 					continue
 				}
-				groupUid := strings.TrimPrefix(hex.EncodeToString(switchedPhase.CustodianGroupId[:]), "0x")
+				groupUid := hex.EncodeToString(switchedPhase.CustodianGroupId[:])
 				if _, ok := allGroups[groupUid]; !ok {
 					log.Warn().Str("Chain", c.EvmConfig.ID).Str("groupUid", groupUid).Msg("[EvmClient] [RecoverRedeemSessions] unexpected groupUid")
 					continue
@@ -450,7 +554,7 @@ func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) 
 					log.Error().Err(err).Msgf("[EvmClient] [RecoverRedeemSessions] failed to parse event %s", redeemTokenEvent.Name)
 					continue
 				}
-				groupUid := strings.TrimPrefix(hex.EncodeToString(redeemToken.CustodianGroupUID[:]), "0x")
+				groupUid := hex.EncodeToString(redeemToken.CustodianGroupUID[:])
 				if _, ok := allGroups[groupUid]; !ok {
 					log.Warn().Str("Chain", c.EvmConfig.ID).Str("groupUid", groupUid).Msg("[EvmClient] [RecoverRedeemSessions] unexpected groupUid")
 					continue

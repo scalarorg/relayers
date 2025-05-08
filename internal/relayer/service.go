@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/btc"
 	"github.com/scalarorg/relayers/pkg/clients/electrs"
@@ -145,13 +146,23 @@ func (s *Service) Start(ctx context.Context) error {
 func (s *Service) RecoverEvmSessions(groups []*covExported.CustodianGroup) error {
 	wg := sync.WaitGroup{}
 	recoverSessions := CustodiansRecoverRedeemSessions{}
+	redeemTokenChannel := make(chan *chains.ContractCallWithToken)
+	//Store all redeem events from all evm chains into db
+	go func() {
+		for redeemToken := range redeemTokenChannel {
+			err := s.DbAdapter.CreateContractCallWithToken(redeemToken, nil)
+			if err != nil {
+				log.Warn().Err(err).Msgf("[Relayer] [RecoverEvmSessions] cannot save redeem token to db")
+			}
+		}
+	}()
 	for _, client := range s.EvmClients {
 		wg.Add(1)
 		log.Info().Str("chainId", client.EvmConfig.GetId()).
 			Msg("[Relayer] [RecoverEvmSessions] start goroutine for recovering redeem sessions")
 		go func() {
 			defer wg.Done()
-			chainRedeemSessions, err := client.RecoverRedeemSessions(groups)
+			chainRedeemSessions, err := client.RecoverAllRedeemSessions(groups, redeemTokenChannel)
 			if err != nil {
 				log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover sessions for evm client %s", client.EvmConfig.GetId())
 			}
@@ -166,6 +177,7 @@ func (s *Service) RecoverEvmSessions(groups []*covExported.CustodianGroup) error
 		}()
 	}
 	wg.Wait()
+	close(redeemTokenChannel)
 	log.Info().Msgf("[Relayer] [RecoverEvmSessions] finished get SwitchPhase And redeemTx from evm chains")
 	recoverSessions.ConstructSessions()
 	for groupUid, groupRedeemSessions := range recoverSessions.RecoverSessions {

@@ -120,9 +120,9 @@ func (db *DatabaseAdapter) CreateContractCall(contractCall chains.ContractCall, 
 	}
 	return nil
 }
-func (db *DatabaseAdapter) CreateContractCallWithToken(contractCallWithToken chains.ContractCallWithToken, lastCheckpoint *scalarnet.EventCheckPoint) error {
+func (db *DatabaseAdapter) CreateContractCallWithToken(contractCallWithToken *chains.ContractCallWithToken, lastCheckpoint *scalarnet.EventCheckPoint) error {
 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
-		result := tx.Save(&contractCallWithToken)
+		result := tx.Save(contractCallWithToken)
 		if result.Error != nil {
 			return result.Error
 		}

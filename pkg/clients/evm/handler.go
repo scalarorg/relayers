@@ -99,7 +99,7 @@ func (ec *EvmClient) HandleContractCallWithToken(event *contracts.IScalarGateway
 		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.Index)
 	}
 	//3. store relay data to the db, update last checkpoint
-	err = ec.dbAdapter.CreateContractCallWithToken(contractCallWithToken, lastCheckpoint)
+	err = ec.dbAdapter.CreateContractCallWithToken(&contractCallWithToken, lastCheckpoint)
 	if err != nil {
 		return fmt.Errorf("failed to create evm contract call: %w", err)
 	}
@@ -143,7 +143,7 @@ func (ec *EvmClient) HandleRedeemToken(event *contracts.IScalarGatewayRedeemToke
 		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.Index)
 	}
 	//3. store relay data to the db, update last checkpoint
-	err = ec.dbAdapter.CreateContractCallWithToken(redeemToken, lastCheckpoint)
+	err = ec.dbAdapter.CreateContractCallWithToken(&redeemToken, lastCheckpoint)
 	if err != nil {
 		return fmt.Errorf("failed to create evm contract call: %w", err)
 	}

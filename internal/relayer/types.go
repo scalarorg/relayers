@@ -1,6 +1,8 @@
 package relayer
 
 import (
+	"sync"
+
 	"github.com/rs/zerolog/log"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	types "github.com/scalarorg/relayers/pkg/types"
@@ -8,10 +10,13 @@ import (
 
 // Store all evm recovering redeem sessions
 type CustodiansRecoverRedeemSessions struct {
+	lock            sync.RWMutex
 	RecoverSessions map[string]*types.GroupRedeemSessions
 }
 
 func (s *CustodiansRecoverRedeemSessions) AddRecoverSessions(chainId string, chainRedeemSessions *types.ChainRedeemSessions) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	if s.RecoverSessions == nil {
 		s.RecoverSessions = make(map[string]*types.GroupRedeemSessions)
 	}

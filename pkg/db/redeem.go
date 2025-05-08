@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/scalarorg/data-models/chains"
+	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 )
 
 func (db *DatabaseAdapter) SaveRedeemTxs(redeemTxs []*chains.RedeemTx) error {
@@ -27,4 +28,8 @@ func (db *DatabaseAdapter) UpdateRedeemTxsStatus(redeemTxs []*chains.RedeemTx, s
 		txHashes[i] = redeemTx.TxHash
 	}
 	return db.PostgresClient.Model(&chains.RedeemTx{}).Where("tx_hash IN (?)", txHashes).Update("status", status).Error
+}
+
+func (db *DatabaseAdapter) StoreRedeemEvent(redeemEvent *contracts.IScalarGatewayRedeemToken) error {
+	return db.PostgresClient.Create(redeemEvent).Error
 }
