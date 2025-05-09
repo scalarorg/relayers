@@ -418,7 +418,7 @@ func (c *EvmClient) RecoverAllRedeemSessions(groups []chainsExported.Hash,
 	}
 	toBlock := currentBlockNumber
 	switchedPhaseCounter := 0
-	for fromBlock >= c.EvmConfig.StartBlock {
+	for toBlock > c.EvmConfig.StartBlock {
 		time.Sleep(5 * time.Second)
 		query.FromBlock = big.NewInt(int64(fromBlock))
 		query.ToBlock = big.NewInt(int64(toBlock))

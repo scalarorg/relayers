@@ -54,7 +54,7 @@ var (
 		ChainID:      11155111,
 		ID:           CHAIN_ID_SEPOLIA,
 		Name:         "Ethereum sepolia",
-		RPCUrl:       "wss://eth-sepolia.g.alchemy.com/v2/nNbspp-yjKP9GtAcdKi8xcLnBTptR2Zx",
+		RPCUrl:       "https://eth-sepolia.g.alchemy.com/v2/nNbspp-yjKP9GtAcdKi8xcLnBTptR2Zx",
 		AuthWeighted: "0xE3ff6841C7B9a9b540eD7207b2B88D65A138FB4a",
 		//Gateway:    "0x842C080EE1399addb76830CFe21D41e47aaaf57e",
 		//Gateway:    "0x78eE3111ab44078FB32D7E7A7bCf99cf3664415B", //Version Mar 27, 2025
