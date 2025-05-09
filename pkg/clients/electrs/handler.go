@@ -38,10 +38,16 @@ func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err err
 		blockHeight := events.ChainBlockHeight{
 			Chain:  c.electrumConfig.SourceChain,
 			Height: uint64(header.Height),
+			Hex:    header.Hex,
 		}
 		c.eventBus.BroadcastEvent(&events.EventEnvelope{
 			EventType:        events.EVENT_ELECTRS_NEW_BLOCK,
 			DestinationChain: events.SCALAR_NETWORK_NAME,
+			Data:             blockHeight,
+		})
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_ELECTRS_NEW_BLOCK,
+			DestinationChain: c.electrumConfig.SourceChain,
 			Data:             blockHeight,
 		})
 	} else {

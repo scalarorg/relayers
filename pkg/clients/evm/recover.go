@@ -380,6 +380,8 @@ Recover all redeem sessions with redeem events from the last switch phase event 
 func (c *EvmClient) RecoverAllRedeemSessions(groups []*covExported.CustodianGroup,
 	redeemTokenChannel chan *chainsModel.ContractCallWithToken) (*pkgTypes.ChainRedeemSessions, error) {
 	log.Info().Str("Chain", c.EvmConfig.ID).
+		Uint64("Start block", c.EvmConfig.StartBlock).
+		Uint64("Recover range", c.EvmConfig.RecoverRange).
 		Msgf("[EvmClient] [RecoverAllRedeemSessions] start recovering redeem sessions")
 	currentBlockNumber, err := c.Client.BlockNumber(context.Background())
 	if err != nil {
@@ -390,7 +392,7 @@ func (c *EvmClient) RecoverAllRedeemSessions(groups []*covExported.CustodianGrou
 	}
 	allGroups := map[string]string{}
 	for _, group := range groups {
-		groupUid := strings.TrimPrefix(group.UID.Hex(), "0x")
+		groupUid := hex.EncodeToString(group.UID[:])
 		allGroups[groupUid] = group.Name
 	}
 	switchPhaseEvent := scalarGatewayAbi.Events[events.EVENT_EVM_SWITCHED_PHASE]
@@ -405,7 +407,7 @@ func (c *EvmClient) RecoverAllRedeemSessions(groups []*covExported.CustodianGrou
 		Topics:    [][]common.Hash{{switchPhaseEvent.ID, redeemTokenEvent.ID}},
 	}
 	recoverRange := uint64(100000)
-	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < 100000 {
+	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < recoverRange {
 		recoverRange = c.EvmConfig.RecoverRange
 	}
 	fromBlock := currentBlockNumber - recoverRange

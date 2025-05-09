@@ -41,6 +41,11 @@ func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scalar client: %w", err)
 	}
+	// Initialize BTC service
+	btcClients, err := btc.NewBtcClients(config, dbAdapter, eventBus, scalarClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create btc clients: %w", err)
+	}
 	// Initialize Electrs clients
 	electrsClients, err := electrs.NewElectrumClients(config, dbAdapter, eventBus, scalarClient)
 	if err != nil {
@@ -50,12 +55,6 @@ func NewService(config *config.Config, dbAdapter *db.DatabaseAdapter,
 	evmClients, err := evm.NewEvmClients(config, dbAdapter, eventBus, scalarClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create evm clients: %w", err)
-	}
-
-	// Initialize BTC service
-	btcClients, err := btc.NewBtcClients(config, dbAdapter, eventBus, scalarClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create btc clients: %w", err)
 	}
 
 	return &Service{

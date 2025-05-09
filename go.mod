@@ -14,7 +14,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250423032410-4181b61dd605
 	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250423032410-4181b61dd605
-	github.com/scalarorg/data-models v0.0.0-20250508083824-b6cdba1386de
+	github.com/scalarorg/data-models v0.0.0-20250509023839-ac4f8927af87
 	github.com/scalarorg/go-electrum v0.1.2-0.20250429072405-20f120a1c831
 	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250423071208-012267db44fe
 	github.com/spf13/cobra v1.8.1
