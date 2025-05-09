@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	chainExported "github.com/scalarorg/scalar-core/x/chains/exported"
@@ -105,5 +106,27 @@ func TestSepoliaProcessMissingLogs(t *testing.T) {
 	//err = sepoliaClient.RecoverEvents(context.Background(), []string{events.EVENT_EVM_SWITCHED_PHASE})
 	err = sepoliaClient.RecoverAllEvents(context.Background(), []*covExported.CustodianGroup{mockCustodianGroup})
 	require.NoError(t, err)
+	wg.Wait()
+}
+
+func TestRecoverBnbRedeemSessions(t *testing.T) {
+	bnbClient, err := evm.NewEvmClient(&globalConfig, bnbConfig, nil, nil, nil)
+	if err != nil {
+		log.Error().Msgf("failed to create evm client: %v", err)
+	}
+	groups := []chainExported.Hash{
+		sha3.Sum256([]byte("scalarv36")),
+	}
+	wg := sync.WaitGroup{}
+	redeemTokenChannel := make(chan *chains.ContractCallWithToken)
+	wg.Add(1)
+	go func() {
+		for redeemToken := range redeemTokenChannel {
+			log.Info().Any("RedeemToken", redeemToken).Msg("Received redeem token")
+		}
+	}()
+	_, err = bnbClient.RecoverAllRedeemSessions(groups, redeemTokenChannel)
+	require.NoError(t, err)
+	close(redeemTokenChannel)
 	wg.Wait()
 }

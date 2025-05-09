@@ -64,21 +64,23 @@ var (
 		Finality:     1,
 		BlockTime:    time.Second * 12,
 		StartBlock:   8095740,
-		RecoverRange: 1000000,
+		RecoverRange: 500,
 		GasLimit:     300000,
 	}
 	bnbConfig *evm.EvmNetworkConfig = &evm.EvmNetworkConfig{
-		ChainID:      97,
-		ID:           CHAIN_ID_BNB,
-		Name:         "Ethereum bnb",
-		RPCUrl:       "wss://bnb-testnet.g.alchemy.com/v2/DpCscOiv_evEPscGYARI3cOVeJ59CRo8",
+		ChainID: 97,
+		ID:      CHAIN_ID_BNB,
+		Name:    "Ethereum bnb",
+		RPCUrl:  "https://bnb-testnet.g.alchemy.com/v2/DpCscOiv_evEPscGYARI3cOVeJ59CRo8",
+		//RPCUrl:       "https://data-seed-prebsc-2-s1.binance.org:8545/",
 		AuthWeighted: "0x13bB2b1240E582C1A3519E97a08157eD1bBD36Bf",
 		Gateway:      "0x930C3c4f7d26f18830318115DaD97E0179DA55f0",
 		PrivateKey:   "",
 		Finality:     1,
 		BlockTime:    time.Second * 12,
-		StartBlock:   47254017,
+		StartBlock:   50180903,
 		GasLimit:     300000,
+		RecoverRange: 1000000,
 	}
 	bnbClient     *evm.EvmClient
 	sepoliaClient *evm.EvmClient
@@ -93,7 +95,6 @@ func TestMain(m *testing.M) {
 	evmPrivateKey = os.Getenv("EVM_PRIVATE_KEY")
 	evmUserPrivKey = os.Getenv("EVM_USER_PRIVATE_KEY")
 	evmUserAddress = os.Getenv("EVM_USER_ADDRESS")
-	bnbConfig.RPCUrl = os.Getenv("URL_BNB_WSS")
 	sepoliaConfig.PrivateKey = evmPrivateKey
 	bnbConfig.PrivateKey = evmPrivateKey
 	sepoliaEthClient, _ = createEVMClient("RPC_SEPOLIA")

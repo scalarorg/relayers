@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	mockCustodianGroupUid = sha3.Sum256([]byte("scalarv33"))
+	mockCustodianGroupUid = sha3.Sum256([]byte("scalarv36"))
 	mockCustodianGroup    = &covExported.CustodianGroup{
 		UID: chainExported.Hash(mockCustodianGroupUid[:]),
 	}
@@ -52,7 +52,9 @@ var (
 // CGO_LDFLAGS="-L./lib -lbitcoin_vault_ffi" CGO_CFLAGS="-I./lib" go test -timeout 10m -run ^TestRecoverEvmSessions$ github.com/scalarorg/relayers/internal/relayer -v -count=1
 func TestRecoverEvmSessions(t *testing.T) {
 	service := createMockService()
-	groups := []*covExported.CustodianGroup{mockCustodianGroup}
+	groups := []chainExported.Hash{
+		(chainExported.Hash)(mockCustodianGroupUid),
+	}
 	err := service.RecoverEvmSessions(groups)
 	require.NoError(t, err)
 }

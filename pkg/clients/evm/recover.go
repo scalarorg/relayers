@@ -20,6 +20,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/evm/parser"
 	"github.com/scalarorg/relayers/pkg/events"
 	pkgTypes "github.com/scalarorg/relayers/pkg/types"
+	chainsExported "github.com/scalarorg/scalar-core/x/chains/exported"
 	chains "github.com/scalarorg/scalar-core/x/chains/types"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 )
@@ -377,7 +378,7 @@ func (c *EvmClient) UpdateLastCheckPoint(events map[string]abi.Event, logs []typ
 /*
 Recover all redeem sessions with redeem events from the last switch phase event back to the startBlock in the config
 */
-func (c *EvmClient) RecoverAllRedeemSessions(groups []*covExported.CustodianGroup,
+func (c *EvmClient) RecoverAllRedeemSessions(groups []chainsExported.Hash,
 	redeemTokenChannel chan *chainsModel.ContractCallWithToken) (*pkgTypes.ChainRedeemSessions, error) {
 	log.Info().Str("Chain", c.EvmConfig.ID).
 		Uint64("Start block", c.EvmConfig.StartBlock).
@@ -387,13 +388,14 @@ func (c *EvmClient) RecoverAllRedeemSessions(groups []*covExported.CustodianGrou
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current block number: %w", err)
 	}
+	log.Info().Str("ChainId", c.EvmConfig.ID).Uint64("Current block", currentBlockNumber).Msg("[EvmClient] RecoverAllRedeemSessions")
 	if currentBlockNumber < c.EvmConfig.StartBlock {
 		return nil, fmt.Errorf("invalid config: start block %d is greater than current block number %d", c.EvmConfig.StartBlock, currentBlockNumber)
 	}
-	allGroups := map[string]string{}
+	allGroups := map[string]bool{}
 	for _, group := range groups {
-		groupUid := hex.EncodeToString(group.UID[:])
-		allGroups[groupUid] = group.Name
+		groupUid := hex.EncodeToString(group[:])
+		allGroups[groupUid] = true
 	}
 	switchPhaseEvent := scalarGatewayAbi.Events[events.EVENT_EVM_SWITCHED_PHASE]
 	redeemTokenEvent := scalarGatewayAbi.Events[events.EVENT_EVM_REDEEM_TOKEN]
@@ -410,13 +412,14 @@ func (c *EvmClient) RecoverAllRedeemSessions(groups []*covExported.CustodianGrou
 	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < recoverRange {
 		recoverRange = c.EvmConfig.RecoverRange
 	}
-	fromBlock := currentBlockNumber - recoverRange
+	fromBlock := currentBlockNumber - recoverRange + 1
 	if fromBlock < c.EvmConfig.StartBlock {
 		fromBlock = c.EvmConfig.StartBlock
 	}
 	toBlock := currentBlockNumber
 	switchedPhaseCounter := 0
 	for fromBlock >= c.EvmConfig.StartBlock {
+		time.Sleep(5 * time.Second)
 		query.FromBlock = big.NewInt(int64(fromBlock))
 		query.ToBlock = big.NewInt(int64(toBlock))
 		logs, err := c.Client.FilterLogs(context.Background(), query)
@@ -424,8 +427,7 @@ func (c *EvmClient) RecoverAllRedeemSessions(groups []*covExported.CustodianGrou
 			log.Error().Uint64("FromBlock", fromBlock).
 				Uint64("ToBlock", toBlock).Err(err).
 				Msg("[EvmClient] [RecoverAllRedeemSessions] Sleep for a while then retry")
-			time.Sleep(time.Second)
-			continue
+			return nil, err
 		} else {
 			log.Info().Str("Chain", c.EvmConfig.ID).
 				Uint64("FromBlock", fromBlock).
@@ -482,8 +484,8 @@ func (c *EvmClient) RecoverAllRedeemSessions(groups []*covExported.CustodianGrou
 				redeemTokenChannel <- &redeemToken
 			}
 		}
-		toBlock = fromBlock - 1
-		fromBlock = fromBlock - recoverRange
+		toBlock = fromBlock
+		fromBlock = fromBlock - recoverRange + 1
 		if fromBlock < c.EvmConfig.StartBlock && toBlock >= c.EvmConfig.StartBlock {
 			fromBlock = c.EvmConfig.StartBlock
 		}
@@ -526,7 +528,7 @@ func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) 
 	if c.EvmConfig.RecoverRange > 0 && c.EvmConfig.RecoverRange < 100000 {
 		recoverRange = c.EvmConfig.RecoverRange
 	}
-	fromBlock := currentBlockNumber - recoverRange
+	fromBlock := currentBlockNumber - recoverRange + 1
 	if fromBlock < c.EvmConfig.StartBlock {
 		fromBlock = c.EvmConfig.StartBlock
 	}
@@ -577,11 +579,11 @@ func (c *EvmClient) RecoverRedeemSessions(groups []*covExported.CustodianGroup) 
 		if fromBlock <= c.EvmConfig.StartBlock {
 			break
 		}
-		toBlock = fromBlock - 1
+		toBlock = fromBlock
 		if fromBlock < recoverRange+c.EvmConfig.StartBlock {
 			fromBlock = c.EvmConfig.StartBlock
 		} else {
-			fromBlock = fromBlock - recoverRange
+			fromBlock = fromBlock - recoverRange + 1
 		}
 	}
 	if len(expectingGroups) > 0 {

@@ -18,6 +18,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 	types "github.com/scalarorg/relayers/pkg/types"
+	chainExported "github.com/scalarorg/scalar-core/x/chains/exported"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	covTypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
@@ -87,8 +88,12 @@ func (s *Service) Start(ctx context.Context) error {
 		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot get covenant groups")
 		panic(err)
 	}
+	groupUids := make([]chainExported.Hash, len(groups))
+	for ind, group := range groups {
+		groupUids[ind] = group.UID
+	}
 	//Perform recovery redeem session before recover other events
-	err = s.RecoverEvmSessions(groups)
+	err = s.RecoverEvmSessions(groupUids)
 	if err != nil {
 		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover sessions")
 		panic(err)
@@ -142,7 +147,7 @@ func (s *Service) Start(ctx context.Context) error {
 
 	return nil
 }
-func (s *Service) RecoverEvmSessions(groups []*covExported.CustodianGroup) error {
+func (s *Service) RecoverEvmSessions(groups []chainExported.Hash) error {
 	wg := sync.WaitGroup{}
 	recoverSessions := CustodiansRecoverRedeemSessions{}
 	redeemTokenChannel := make(chan *chains.ContractCallWithToken)
