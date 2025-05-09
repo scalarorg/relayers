@@ -62,5 +62,6 @@ type RedeemTxEvents struct {
 type ChainBlockHeight struct {
 	Chain  string
 	Height uint64
-	Hex    string
+	Time   uint32
+	Hash   string
 }

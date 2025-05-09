@@ -19,7 +19,7 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 		return c.broadcastRedeemTxsConfirm(event.Data.(*events.RedeemTxEvents))
 		//return c.handleElectrsEventRedeemTx(event.Data.(*events.RedeemTxEvents))
 	case events.EVENT_ELECTRS_NEW_BLOCK:
-		return c.handleElectrsEventNewBlock(event.Data.(events.ChainBlockHeight))
+		return c.handleElectrsEventNewBlock(event.Data.(*chains.BlockHeader))
 	case events.EVENT_EVM_TOKEN_SENT,
 		events.EVENT_EVM_CONTRACT_CALL,
 		events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN,
@@ -65,11 +65,11 @@ func (c *Client) requestConfirmEvmTxs(confirmRequest events.ConfirmTxsRequest) e
 	}
 	return nil
 }
-func (c *Client) handleElectrsEventNewBlock(blockHeight events.ChainBlockHeight) error {
-	log.Debug().Uint64("blockHeight", blockHeight.Height).Msg("[ScalarClient] [handleElectrsEventNewBlock] Received new block event")
+func (c *Client) handleElectrsEventNewBlock(blockHeader *chains.BlockHeader) error {
+	log.Debug().Uint64("blockHeight", blockHeader.BlockNumber).Msg("[ScalarClient] [handleElectrsEventNewBlock] Received new block event")
 	// Todo: init utxo for first time
 	if !c.initUtxo {
-		c.broadcaster.InitializeUtxoRequest(blockHeight.Chain, blockHeight.Height)
+		c.broadcaster.InitializeUtxoRequest(blockHeader.Chain, blockHeader.BlockNumber)
 		c.initUtxo = true
 	}
 	return nil
