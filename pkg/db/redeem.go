@@ -9,6 +9,20 @@ import (
 
 func (db *DatabaseAdapter) SaveRedeemTxs(redeemTxs []*chains.RedeemTx) error {
 	return db.PostgresClient.Save(redeemTxs).Error
+	// return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+	// 	err := tx.Save(redeemTxs).Error
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	tx.Exec(`
+	// 		UPDATE redeem_txs
+	// 		SET block_time = block_headers.block_time
+	// 		FROM block_headers
+	// 		WHERE redeem_txs.chain = block_headers.chain
+	// 		AND redeem_txs.block_number = block_headers.block_number
+	// 	`)
+	// 	return nil
+	// })
 }
 
 // Get last pending redeem transaction by block height

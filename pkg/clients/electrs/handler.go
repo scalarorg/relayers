@@ -2,6 +2,7 @@ package electrs
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
@@ -261,9 +262,23 @@ func (c *Client) handleRedeemTxs(redeemTxs []*chains.RedeemTx) error {
 			}
 		}
 	}
-	//TODO: add two db executions in a single transaction
+	blockNumbers := make([]uint64, 0)
+	for _, tx := range redeemTxs {
+		if slices.Contains(blockNumbers, tx.BlockNumber) {
+			continue
+		}
+		blockNumbers = append(blockNumbers, tx.BlockNumber)
+	}
+	blockTimes, err := c.dbAdapter.GetBlockTime(c.electrumConfig.SourceChain, blockNumbers)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get block time")
+		return fmt.Errorf("failed to get block time: %w", err)
+	}
+	for _, tx := range redeemTxs {
+		tx.BlockTime = blockTimes[tx.BlockNumber]
+	}
 	//1. Store redeem transactions to the db
-	err := c.dbAdapter.SaveRedeemTxs(redeemTxs)
+	err = c.dbAdapter.SaveRedeemTxs(redeemTxs)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to store redeem transactions to the db")
 		return fmt.Errorf("failed to store redeem transactions to the db: %w", err)
