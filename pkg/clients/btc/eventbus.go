@@ -31,9 +31,38 @@ func (c *BtcClient) handleEventBusMessage(event *events.EventEnvelope) error {
 		return c.handleScalarBatchCommandSigned(event.DestinationChain, event.Data.(*chainstypes.BatchedCommandsResponse))
 	case events.EVENT_CUSTODIAL_SIGNATURES_CONFIRMED:
 		return c.handleCustodialSignaturesConfirmed(event.MessageID, event.Data.(string))
+		// case events.EVENT_ELECTRS_NEW_BLOCK:
+		// 	return c.handleElectrsEventNewBlock(event.Data.([]int64))
 	}
 	return nil
 }
+
+// func (c *BtcClient) handleElectrsEventNewBlock(blockHeights []int64) error {
+// 	for _, blockHeight := range blockHeights {
+// 		blockHash, err := c.client.GetBlockHash(blockHeight)
+// 		if err != nil {
+// 			log.Error().Err(err).Str("BlockHex", blockHeight.Hex).Msg("[BtcClient] Cannot convert from block hex to hash")
+// 			return err
+// 		}
+// 		btcBlockHeader, err := c.client.GetBlockHeaderVerbose(blockHash)
+// 		if err != nil {
+// 			log.Error().Err(err).Msg("[BtcClient] Cannot get block header by hash")
+// 			return err
+// 		}
+// 		blockHeader := chains.BlockHeader{
+// 			Chain:       c.btcConfig.ID,
+// 			BlockNumber: uint64(btcBlockHeader.Height),
+// 			BlockHash:   btcBlockHeader.Hash,
+// 			BlockTime:   uint64(btcBlockHeader.Time),
+// 		}
+// 		err = c.dbAdapter.CreateBlockHeader(&blockHeader)
+// 		if err != nil {
+// 			log.Error().Err(err).Msg("[BtcClient] Cannot save block header into db")
+// 			return err
+// 		}
+// 	}
+// 	return nil
+// }
 
 func (c *BtcClient) handleScalarContractCallApproved(messageID string, executeData string) error {
 	decodedExecuteData, err := DecodeExecuteData(executeData)

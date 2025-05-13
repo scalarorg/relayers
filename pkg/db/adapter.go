@@ -53,9 +53,9 @@ func SetupDatabase(dsn string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 	// Convert tables to hyper tables
-	if err := InitHyperTables(db); err != nil {
-		return nil, fmt.Errorf("failed to initialize hyper tables: %w", err)
-	}
+	// if err := InitHyperTables(db); err != nil {
+	// 	return nil, fmt.Errorf("failed to initialize hyper tables: %w", err)
+	//}
 
 	return db, nil
 }
@@ -79,32 +79,32 @@ func RunMigrations(db *gorm.DB) error {
 	)
 }
 
-func InitHyperTables(db *gorm.DB) error {
-	// Convert tables with timestamp columns into hyper tables
-	tables := []struct {
-		name       string
-		timeColumn string
-	}{
-		{"commands", "created_at"},
-		{"token_sents", "created_at"},
-		// Add other tables that need to be converted to hyper tables
-	}
+// func InitHyperTables(db *gorm.DB) error {
+// 	// Convert tables with timestamp columns into hyper tables
+// 	tables := []struct {
+// 		name       string
+// 		timeColumn string
+// 	}{
+// 		{"commands", "created_at"},
+// 		{"token_sents", "created_at"},
+// 		// Add other tables that need to be converted to hyper tables
+// 	}
 
-	for _, table := range tables {
-		if err := CreateHyperTable(db, table.name, table.timeColumn); err != nil {
-			return fmt.Errorf("failed to create hyper table for %s: %w", table.name, err)
-		}
-	}
+// 	for _, table := range tables {
+// 		if err := CreateHyperTable(db, table.name, table.timeColumn); err != nil {
+// 			return fmt.Errorf("failed to create hyper table for %s: %w", table.name, err)
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-func CreateHyperTable(db *gorm.DB, tableName string, timeColumn string) error {
-	sql := fmt.Sprintf(
-		"SELECT create_hypertable('%s', by_range('%s'), if_not_exists => TRUE, migrate_data => TRUE);",
-		tableName,
-		timeColumn,
-	)
+// func CreateHyperTable(db *gorm.DB, tableName string, timeColumn string) error {
+// 	sql := fmt.Sprintf(
+// 		"SELECT create_hypertable('%s', by_range('%s'), if_not_exists => TRUE, migrate_data => TRUE);",
+// 		tableName,
+// 		timeColumn,
+// 	)
 
-	return db.Exec(sql).Error
-}
+// 	return db.Exec(sql).Error
+// }
