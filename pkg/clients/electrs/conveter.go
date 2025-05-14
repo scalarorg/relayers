@@ -23,10 +23,12 @@ func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chain
 			tokenSent, err := c.CreateTokenSent(vaultTx)
 			if err != nil {
 				log.Error().Err(err).Any("BridgeTx", vaultTx).Msg("[ElectrumClient] [CreateTokenSents] failed to create token sent")
-			} else if tokenSent.Symbol == "" {
-				log.Error().Msgf("[ElectrumClient] [CreateTokenSents] symbol not found for token: %s", vaultTx.DestTokenAddress)
-			} else {
-				tokenSents = append(tokenSents, tokenSent)
+			} else if tokenSent != nil {
+				if tokenSent.Symbol == "" {
+					log.Error().Msgf("[ElectrumClient] [CreateTokenSents] symbol not found for token: %s", vaultTx.DestTokenAddress)
+				} else {
+					tokenSents = append(tokenSents, tokenSent)
+				}
 			}
 		} else if vaultTx.VaultTxType == 2 {
 			//2.Unstaking
