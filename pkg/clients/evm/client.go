@@ -719,21 +719,22 @@ func (c *EvmClient) startFetchBlock() {
 				continue
 			}
 			log.Info().Str("ChainId", c.EvmConfig.ID).Uint64("BlockNumber", blockNumber).Msg("[EvmClient] Fetch block by number")
-			block, err := c.Client.BlockByNumber(context.Background(), big.NewInt(int64(blockNumber)))
+			//block, err := c.Client.BlockByNumber(context.Background(), big.NewInt(int64(blockNumber)))
+			blockHeader, err := c.Client.HeaderByNumber(context.Background(), big.NewInt(int64(blockNumber)))
 			if err != nil {
 				log.Error().Err(err).Msgf("[EvmClient] [startFetchBlock] failed to fetch block %d", blockNumber)
-			} else if block == nil {
+			} else if blockHeader == nil {
 				log.Error().Msgf("[EvmClient] [startFetchBlock] block %d not found", blockNumber)
 			} else {
-				log.Info().Uint64("blockNumber", block.NumberU64()).
-					Uint64("blockTime", block.Time()).
+				log.Info().Uint64("blockNumber", blockHeader.Number.Uint64()).
+					Uint64("blockTime", blockHeader.Time).
 					Msgf("[EvmClient] [startFetchBlock] block found")
-				blockNumber := block.NumberU64()
+				blockNumber := blockHeader.Number.Uint64()
 				blockHeader := &chains.BlockHeader{
 					Chain:       c.EvmConfig.GetId(),
 					BlockNumber: blockNumber,
-					BlockHash:   hex.EncodeToString(block.Hash().Bytes()),
-					BlockTime:   block.Time(),
+					BlockHash:   hex.EncodeToString(blockHeader.Hash().Bytes()),
+					BlockTime:   blockHeader.Time,
 				}
 				err = c.dbAdapter.CreateBlockHeader(blockHeader)
 				if err != nil {
