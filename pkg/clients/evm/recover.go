@@ -347,7 +347,6 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string, curr
 		}
 		//Set fromBlock to the next block number for next iteration
 		fromBlock = query.ToBlock.Uint64() + 1
-		fnSetQueryRange(&query, fromBlock, recoverRange)
 	}
 	log.Info().
 		Str("Chain", c.EvmConfig.ID).

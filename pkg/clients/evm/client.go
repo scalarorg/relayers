@@ -2,6 +2,7 @@ package evm
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -26,6 +27,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	"golang.org/x/crypto/sha3"
 )
 
 type EvmClient struct {
@@ -107,7 +109,7 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 	if err != nil {
 		//Not fatal, we can still use the gateway without auth
 		//auth is only used for sending transaction
-		log.Warn().Msgf("[EvmClient] [NewEvmClient] failed to create auth for network %s: %v", evmConfig.Name, err)
+		panic(fmt.Errorf("[EvmClient] [NewEvmClient] failed to create auth for network %s: %w", evmConfig.Name, err))
 	}
 	evmClient := &EvmClient{
 		globalConfig:   globalConfig,
@@ -179,33 +181,20 @@ func (ec *EvmClient) gatewayExecute(input []byte) (*types.Transaction, error) {
 	return signedTx, nil
 }
 func preparePrivateKey(evmCfg *EvmNetworkConfig) error {
-	if evmCfg.PrivateKey == "" {
-		if config.GlobalConfig.EvmPrivateKey == "" {
-			return fmt.Errorf("private key is not set")
-		}
-		evmCfg.PrivateKey = config.GlobalConfig.EvmPrivateKey
-		// if evmCfg.Mnemonic != nil || evmCfg.WalletIndex != nil {
-		// 	wallet, err := hdwallet.NewFromMnemonic(*networkConfig.Mnemonic)
-		// 	if err != nil {
-		// 		return "", fmt.Errorf("failed to create wallet from mnemonic: %w", err)
-		// 	}
-
-		// 	path := hdwallet.MustParseDerivationPath(fmt.Sprintf("m/44'/60'/0'/0/%s", *networkConfig.WalletIndex))
-		// 	account, err := wallet.Derive(path, true)
-		// 	if err != nil {
-		// 		return "", fmt.Errorf("failed to derive account: %w", err)
-		// 	}
-
-		// 	privateKeyECDSA, err := wallet.PrivateKey(account)
-		// 	if err != nil {
-		// 		return "", fmt.Errorf("failed to get private key: %w", err)
-		// 	}
-
-		// 	privateKeyBytes := crypto.FromECDSA(privateKeyECDSA)
-		// 	privateKey = hex.EncodeToString(privateKeyBytes)
-		// 	return fmt.Errorf("private key and mnemonic/wallet index cannot be set at the same time")
-		// }
+	evm_key, err := base64.StdEncoding.DecodeString(config.GlobalConfig.EvmKey)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to decode evm_key: %v", err))
 	}
+	nonce, err := base64.StdEncoding.DecodeString(config.GlobalConfig.Nonce)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to decode nonce: %v", err))
+	}
+	hash := sha3.Sum256([]byte(config.APP_NAME))
+	decrypted, err := AESGCMDecrypt(hash[:], nonce, evm_key)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to decrypt evm_key: %v", err))
+	}
+	evmCfg.PrivateKey = string(decrypted)
 	return nil
 }
 func (c *EvmClient) SetAuth(auth *bind.TransactOpts) {

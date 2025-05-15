@@ -23,11 +23,16 @@ type Config struct {
 	ConfigPath        string                 `mapstructure:"config_path"`
 	ConnnectionString string                 `mapstructure:"database_url"` // Postgres db connection string
 	ScalarMnemonic    string                 `mapstructure:"scalar_mnemonic"`
-	EvmPrivateKey     string                 `mapstructure:"evm_private_key"`
+	EvmKey            string                 `mapstructure:"evm_key"`
+	Nonce             string                 `mapstructure:"nonce"`
 	BtcPrivateKey     string                 `mapstructure:"btc_private_key"`
 	ChainConfigs      map[string]ChainFamily `mapstructure:"chain_configs"` //Store all valid chain configs
 	//ActiveChains      map[string]bool        `mapstructure:"active_chains"` //Store all active chains in the scalar network
 }
+
+const (
+	APP_NAME = "scalar"
+)
 
 var GlobalConfig Config
 

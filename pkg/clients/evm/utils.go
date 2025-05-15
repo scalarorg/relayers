@@ -1,6 +1,8 @@
 package evm
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/hex"
 	"fmt"
 	"math/big"
@@ -164,4 +166,23 @@ func DecodeGroupUid(groupHex string) ([32]byte, error) {
 	groupBytes32 := [32]byte{}
 	copy(groupBytes32[:], groupBytes)
 	return groupBytes32, nil
+}
+
+func AESGCMDecrypt(key, nonce, ciphertext []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	plaintext, err := aesgcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return plaintext, nil
 }
