@@ -471,7 +471,7 @@ func (c *EvmClient) RecoverAllRedeemSessions(groups []chainsExported.Hash,
 				Uint64("FromBlock", query.FromBlock.Uint64()).
 				Uint64("ToBlock", toBlock).
 				Int("Logs found", len(logs)).
-				Msg("[EvmClient] [RecoverAllRedeemSessions]")
+				Msgf("[EvmClient] [RecoverAllRedeemSessions] progress %d/%d", currentBlockNumber-query.FromBlock.Uint64()+1, currentBlockNumber-c.EvmConfig.StartBlock+1)
 		}
 		//Loop from the last log to the first log
 		for i := len(logs) - 1; i >= 0; i-- {
