@@ -2,6 +2,7 @@ package db
 
 import (
 	"github.com/scalarorg/data-models/chains"
+	"gorm.io/gorm"
 )
 
 func (db *DatabaseAdapter) FindBlockHeader(chainId string, blockNumber uint64) (*chains.BlockHeader, error) {
@@ -14,7 +15,34 @@ func (db *DatabaseAdapter) FindBlockHeader(chainId string, blockNumber uint64) (
 }
 
 func (db *DatabaseAdapter) CreateBlockHeader(blockHeader *chains.BlockHeader) error {
-	return db.PostgresClient.Create(blockHeader).Error
+	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		err := tx.Create(blockHeader).Error
+		if err != nil {
+			return err
+		}
+		//Update token sent block_time
+		err = tx.Model(&chains.TokenSent{}).
+			Where("block_number = ? AND source_chain = ?", blockHeader.BlockNumber, blockHeader.Chain).
+			Update("block_time", blockHeader.BlockTime).Error
+		if err != nil {
+			return err
+		}
+		//Update contract call with token
+		err = tx.Model(&chains.ContractCallWithToken{}).
+			Where("block_number = ? AND source_chain = ?", blockHeader.BlockNumber, blockHeader.Chain).
+			Update("block_time", blockHeader.BlockTime).Error
+		if err != nil {
+			return err
+		}
+		//Update command executed block_time
+		err = tx.Model(&chains.CommandExecuted{}).
+			Where("block_number = ? AND source_chain = ?", blockHeader.BlockNumber, blockHeader.Chain).
+			Update("block_time", blockHeader.BlockTime).Error
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func (db *DatabaseAdapter) GetBlockTime(chainId string, blockNumbers []uint64) (map[uint64]uint64, error) {

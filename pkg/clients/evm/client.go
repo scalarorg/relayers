@@ -725,10 +725,9 @@ func (c *EvmClient) startFetchBlock() {
 			} else if block == nil {
 				log.Error().Msgf("[EvmClient] [startFetchBlock] block %d not found", blockNumber)
 			} else {
-				log.Info().Msgf("[EvmClient] [startFetchBlock] block %+v found", block)
-				log.Info().Msgf("[EvmClient] [startFetchBlock] block number %d", block.NumberU64())
-				log.Info().Msgf("[EvmClient] [startFetchBlock] block hash %s", hex.EncodeToString(block.Hash().Bytes()))
-				log.Info().Msgf("[EvmClient] [startFetchBlock] block time %d", block.Time())
+				log.Info().Uint64("blockNumber", block.NumberU64()).
+					Uint64("blockTime", block.Time()).
+					Msgf("[EvmClient] [startFetchBlock] block found")
 				blockNumber := block.NumberU64()
 				blockHeader := &chains.BlockHeader{
 					Chain:       c.EvmConfig.GetId(),
