@@ -185,7 +185,7 @@ func TestSaveMintTokenCommandExecuted(t *testing.T) {
 		BlockNumber: 66084,
 		LogIndex:    735,
 	}
-	err := dbAdapter.SaveCommandExecuted(&cmdExecuted, &chainstypes.CommandResponse{Type: "mintToken"}, "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291")
+	err := dbAdapter.SaveCommandExecuted(&cmdExecuted, &chainstypes.CommandResponse{Type: "mintToken"})
 	tokenSent := chains.TokenSent{}
 	dbAdapter.PostgresClient.Find(&chains.TokenSent{}).Where("event_id = ?", TOKEN_SENT_EVENT_ID).First(&tokenSent)
 	require.NoError(t, err)
@@ -202,7 +202,7 @@ func TestSaveContractCallApproved(t *testing.T) {
 		BlockNumber: 66084,
 		LogIndex:    735,
 	}
-	err := dbAdapter.SaveCommandExecuted(&cmdExecuted, &chainstypes.CommandResponse{Type: "approveContractCallWithMint"}, "2919df3249096c9b166ce5f16e7dc55e94a141b50f0941270f2f52187640c291")
+	err := dbAdapter.SaveCommandExecuted(&cmdExecuted, &chainstypes.CommandResponse{Type: "approveContractCallWithMint"})
 	require.NoError(t, err)
 	cleanup()
 }

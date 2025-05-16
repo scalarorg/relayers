@@ -15,6 +15,7 @@ import (
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	"github.com/scalarorg/scalar-core/x/chains/types"
 	"github.com/scalarorg/scalar-core/x/covenant/exported"
 )
 
@@ -392,29 +393,31 @@ func (ec *EvmClient) HandleCommandExecuted(event *contracts.IScalarGatewayExecut
 	}
 	//1. Convert into a RelayData instance then store to the db
 	cmdExecuted := ec.CommandExecutedEvent2Model(event)
+	var command *types.CommandResponse
 	//Get commandId from scalarnet
 	if ec.ScalarClient != nil {
-		command, err := ec.ScalarClient.GetCommand(cmdExecuted.SourceChain, cmdExecuted.CommandID)
+		command, err = ec.ScalarClient.GetCommand(cmdExecuted.SourceChain, cmdExecuted.CommandID)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[EvmClient] [HandleCommandExecuted] failed to get commandId from scalarnet")
 		} else if command != nil {
 			log.Info().Any("command", command).Msg("[EvmClient] [HandleCommandExecuted] get command from scalarnet")
 		} else {
-			log.Warn().Any("command", command).Msg("[EvmClient] [HandleCommandExecuted] command not found in scalarnet")
+			log.Warn().Msg("[EvmClient] [HandleCommandExecuted] command not found in scalarnet")
 		}
-		if ec.dbAdapter != nil {
-			err = ec.dbAdapter.SaveCommandExecuted(&cmdExecuted, command, cmdExecuted.CommandID)
-			if err != nil {
-				log.Error().Err(err).Msg("[EvmClient] [HandleCommandExecuted] failed to save evm executed to the db")
-				return fmt.Errorf("failed to create evm executed: %w", err)
-			}
+	}
+	if ec.dbAdapter != nil {
+		err = ec.dbAdapter.SaveCommandExecuted(&cmdExecuted, command)
+		if err != nil {
+			log.Error().Err(err).Msg("[EvmClient] [HandleCommandExecuted] failed to save evm executed to the db")
+			return fmt.Errorf("failed to create evm executed: %w", err)
 		}
 	}
 	return nil
 }
 
 func (ec *EvmClient) preprocessCommandExecuted(event *contracts.IScalarGatewayExecuted) error {
-	log.Info().Any("event", event).Msg("[EvmClient] [ExecutedHandler] Start processing evm command executed")
+	log.Info().Str("commandId", hex.EncodeToString(event.CommandId[:])).
+		Msg("[EvmClient] [HandleCommandExecuted] Start processing evm command executed")
 	//Todo: validate the event
 	return nil
 }

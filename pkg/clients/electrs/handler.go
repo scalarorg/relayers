@@ -212,10 +212,10 @@ func (c *Client) handleTokenSents(tokenSents []*chains.TokenSent) error {
 	}
 
 	//3. store relay data to the db, update last checkpoint
-	err := c.dbAdapter.SaveTokenSentsAndRemoveDupplicates(tokenSents)
+	err := c.dbAdapter.SaveTokenSentsAndRemoveDuplicates(tokenSents)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to store relay data to the db")
-		return fmt.Errorf("failed to store relay data to the db: %w", err)
+		log.Error().Err(err).Msg("[ElectrumClient] [handleTokenSents] Failed to store token sents to the db")
+		return fmt.Errorf("[ElectrumClient] [handleTokenSents] failed to store token sents to the db: %w", err)
 	}
 	if c.eventBus != nil {
 		//4. Send to the event bus with destination chain is scalar for confirmation

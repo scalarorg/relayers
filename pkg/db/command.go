@@ -67,23 +67,8 @@ func (db *DatabaseAdapter) SaveCommands(commands []*scalarnet.Command) error {
 	})
 }
 
-func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecuted, command *chainstypes.CommandResponse, commandId string) error {
-	// var eventId string
-	// var err error
-	// //Find eventId by commandId
-	// if command != nil {
-	// 	switch command.Type {
-	// 	case "approveContractCallWithMint":
-	// 		err = db.PostgresClient.Select("event_id").Model(&scalarnet.ContractCallApprovedWithMint{}).Where("command_id = ?", commandId).Find(&eventId).Error
-	// 	case "mintToken":
-	// 		err = db.PostgresClient.Select("event_id").Model(&scalarnet.TokenSentApproved{}).Where("command_id = ?", commandId).First(&eventId).Error
-	// 	}
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to find eventId: %w", err)
-	// 	}
-	// 	log.Debug().Str("commandType", command.Type).Str("commandId", commandId).Msgf("[DatabaseAdapter] [SaveCommandExecuted] found eventId: %s", eventId)
-
-	// }
+func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecuted, command *chainstypes.CommandResponse) error {
+	commandId := cmdExecuted.CommandID
 	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
 		//TODO: use original postgres for upsert command instead of timescaledb
 		// storedCmdExecuted := chains.CommandExecuted{}
@@ -108,6 +93,17 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 			ExecutedTxHash: cmdExecuted.TxHash,
 			Status:         scalarnet.CommandStatusExecuted,
 		}
+		//1. Get command from db
+		// storedCommand := scalarnet.Command{}
+		// err = tx.Where("command_id = ?", cmdExecuted.CommandID).First(&storedCommand).Error
+		// if err != nil {
+		// 	tx.Create(&commandModel)
+		// } else {
+		// 	tx.Model(&scalarnet.Command{}).Where("command_id = ?", cmdExecuted.CommandID).Updates(map[string]interface{}{
+		// 		"executed_tx_hash": cmdExecuted.TxHash,
+		// 		"status":           scalarnet.CommandStatusExecuted,
+		// 	})
+		// }
 		err = tx.Clauses(
 			clause.OnConflict{
 				Columns: []clause.Column{{Name: "command_id"}},
@@ -121,27 +117,32 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 			return fmt.Errorf("failed to create command: %w", err)
 		}
 
-		//1. Get command from db
-		// storedCommand := scalarnet.Command{}
-		// err = tx.Where("command_id = ?", cmdExecuted.CommandID).First(&storedCommand).Error
-		// if err != nil {
-		// 	tx.Create(&commandModel)
-		// } else {
-		// 	tx.Model(&scalarnet.Command{}).Where("command_id = ?", cmdExecuted.CommandID).Updates(map[string]interface{}{
-		// 		"executed_tx_hash": cmdExecuted.TxHash,
-		// 		"status":           scalarnet.CommandStatusExecuted,
-		// 	})
-		// }
-
-		//The eventId is empty only when we restart whole system from beginning
-		// if eventId != "" && command != nil {
-		// 	switch command.Type {
-		// 	case "approveContractCallWithMint":
-		// 		tx.Model(&chains.ContractCallWithToken{}).Where("event_id = ?", eventId).Update("status", chains.TokenSentStatusSuccess)
-		// 	case "mintToken":
-		// 		tx.Model(&chains.TokenSent{}).Where("event_id = ?", eventId).Update("status", chains.TokenSentStatusSuccess)
-		// 	}
-		// }
+		var eventId string
+		//Find eventId by commandId
+		if command != nil {
+			switch command.Type {
+			case "approveContractCallWithMint":
+				err = db.PostgresClient.Select("event_id").Model(&scalarnet.ContractCallApprovedWithMint{}).Where("command_id = ?", commandId).Find(&eventId).Error
+				if err == nil {
+					tx.Model(&chains.ContractCallWithToken{}).Where("event_id = ?", eventId).Update("status", chains.TokenSentStatusSuccess)
+				} else {
+					log.Error().Err(err).
+						Str("commandType", command.Type).
+						Str("commandId", commandId).
+						Msgf("[DatabaseAdapter] [SaveCommandExecuted] failed to find eventId")
+				}
+			case "mintToken":
+				err = db.PostgresClient.Select("event_id").Model(&scalarnet.TokenSentApproved{}).Where("command_id = ?", commandId).First(&eventId).Error
+				if err == nil {
+					tx.Model(&chains.TokenSent{}).Where("event_id = ?", eventId).Update("status", chains.TokenSentStatusSuccess)
+				} else {
+					log.Error().Err(err).
+						Str("commandType", command.Type).
+						Str("commandId", commandId).
+						Msgf("[DatabaseAdapter] [SaveCommandExecuted] failed to find eventId")
+				}
+			}
+		}
 		return nil
 	})
 	if err != nil {
