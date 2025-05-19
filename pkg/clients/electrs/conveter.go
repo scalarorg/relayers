@@ -14,9 +14,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chains.TokenSent, []*chains.RedeemTx) {
+func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chains.TokenSent, []*chains.BtcRedeemTx) {
 	tokenSents := []*chains.TokenSent{}
-	redeemTxs := []*chains.RedeemTx{}
+	redeemTxs := []*chains.BtcRedeemTx{}
 	for _, vaultTx := range vaultTxs {
 		if vaultTx.VaultTxType == 1 {
 			//1.Staking
@@ -101,13 +101,13 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (*chains.TokenS
 	return &tokenSent, nil
 }
 
-func (c *Client) CreateRedeemTx(vaultTx types.VaultTransaction) (*chains.RedeemTx, error) {
+func (c *Client) CreateRedeemTx(vaultTx types.VaultTransaction) (*chains.BtcRedeemTx, error) {
 	//We redeem by custodian group which can be shared between protocol,
 	//so we can't store tokenaddress and symbol here
 	groupUid := hex.EncodeToString(vaultTx.CustodianGroupUid)
 	for _, group := range c.custodialGroups {
 		if bytes.Equal(vaultTx.CustodianGroupUid, group.UID[:]) {
-			return &chains.RedeemTx{
+			return &chains.BtcRedeemTx{
 				Model: gorm.Model{
 					CreatedAt: time.Unix(int64(vaultTx.Timestamp), 0),
 					UpdatedAt: time.Unix(int64(vaultTx.Timestamp), 0),

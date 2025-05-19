@@ -69,12 +69,15 @@ func RunMigrations(db *gorm.DB) error {
 		&chains.ContractCall{},
 		&chains.ContractCallWithToken{},
 		&chains.TokenDeployed{},
-		&chains.RedeemTx{},
+		&chains.BtcRedeemTx{},
+		&chains.EvmRedeemTx{},
 		&chains.SwitchedPhase{},
 		&scalarnet.Command{},
+		&scalarnet.ScalarRedeemTokenApproved{},
 		&scalarnet.CallContractWithToken{},
 		&scalarnet.TokenSentApproved{},
 		&scalarnet.ContractCallApprovedWithMint{},
+
 		&scalarnet.EventCheckPoint{},
 	)
 }

@@ -76,7 +76,8 @@ func (db *DatabaseAdapter) SaveTokenSentsAndRemoveDuplicates(tokenSents []*chain
 		log.Warn().Err(err).Msgf("[DatabaseAdapter] failed to remove reorged token sents")
 		return err
 	} else {
-		log.Debug().Msgf("[DatabaseAdapter] [SaveTokenSentsAndRemoveDuplicates] removed %d reorged token sents", len(removeHashes))
+		log.Debug().
+			Strs("Removed hash", removeHashes).Msgf("[DatabaseAdapter] [SaveTokenSentsAndRemoveDuplicates] removed %d reorged token sents", len(removeHashes))
 	}
 
 	// Save new token sents

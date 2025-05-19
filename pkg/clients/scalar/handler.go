@@ -19,9 +19,9 @@ import (
 )
 
 func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*chainstypes.EventTokenSent]) error {
-	tokenSentApproveds := make([]scalarnet.TokenSentApproved, len(events))
+	tokenSentApproveds := []scalarnet.TokenSentApproved{}
 	mapChains := make(map[string]int, 0)
-	for i, event := range events {
+	for _, event := range events {
 		chain := string(event.Args.DestinationChain)
 		counter, ok := mapChains[chain]
 		if !ok {
@@ -29,8 +29,17 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*c
 		}
 		mapChains[chain] = counter + 1
 		model := models.EventTokenSent2Model(event.Args)
+		//Check if event_id is not empty
+		if model.EventID == "" {
+			log.Warn().Msgf("[ScalarClient] [handleTokenSentEvents] event_id is empty for event %v", event)
+			continue
+		}
 		model.Status = string(chains.TokenSentStatusApproved)
-		tokenSentApproveds[i] = model
+		tokenSentApproveds = append(tokenSentApproveds, model)
+	}
+	if len(tokenSentApproveds) == 0 {
+		log.Debug().Msg("[ScalarClient] [handleTokenSentEvents] No token sent approveds to save")
+		return nil
 	}
 	err := c.dbAdapter.SaveTokenSentApproveds(tokenSentApproveds)
 	if err != nil {
@@ -121,6 +130,22 @@ func (c *Client) handleContractCallApprovedEvents(ctx context.Context, events []
 	// 	}
 	// }
 	// return c.dbAdapter.UpdateBatchRelayDataStatus(updates, len(updates))
+}
+func (c *Client) handleRedeemTokenApprovedEvents(events []IBCEvent[*chainstypes.EventRedeemTokenApproved]) error {
+	entities := make([]scalarnet.ScalarRedeemTokenApproved, len(events))
+	for i, event := range events {
+		entities[i] = scalarnet.ScalarRedeemTokenApproved{
+			EventID:          string(event.Args.EventID),
+			SourceChain:      string(event.Args.Chain),
+			SourceTxHash:     event.Hash,
+			CommandID:        hex.EncodeToString(event.Args.CommandID[:]),
+			Sender:           event.Args.Sender,
+			DestinationChain: string(event.Args.DestinationChain),
+			ContractAddress:  event.Args.ContractAddress,
+			PayloadHash:      hex.EncodeToString(event.Args.PayloadHash[:]),
+		}
+	}
+	return c.dbAdapter.CreateBatchValue(entities, len(entities))
 }
 
 // func (c *Client) handleContractCallApprovedEvent(ctx context.Context, event *IBCEvent[*chainstypes.ContractCallApproved]) (*db.RelaydataExecuteResult, error) {

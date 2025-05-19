@@ -142,8 +142,8 @@ func (ec *EvmClient) HandleRedeemToken(event *contracts.IScalarGatewayRedeemToke
 	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_REDEEM_TOKEN, ec.EvmConfig.StartBlock)
 	if err != nil {
 		log.Debug().Str("chainId", ec.EvmConfig.GetId()).
-			Str("eventName", events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN).
-			Msg("[EvmClient] [handleContractCallWithToken] Get event from begining")
+			Str("eventName", events.EVENT_EVM_REDEEM_TOKEN).
+			Msg("[EvmClient] [handleRedeemToken] Get event from begining")
 	}
 	if event.Raw.BlockNumber > lastCheckpoint.BlockNumber ||
 		(event.Raw.BlockNumber == lastCheckpoint.BlockNumber && event.Raw.TxIndex > lastCheckpoint.LogIndex) {
@@ -153,7 +153,7 @@ func (ec *EvmClient) HandleRedeemToken(event *contracts.IScalarGatewayRedeemToke
 		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.Index)
 	}
 	//3. store relay data to the db, update last checkpoint
-	err = ec.dbAdapter.CreateContractCallWithToken(&redeemToken, lastCheckpoint)
+	err = ec.dbAdapter.CreateEvmRedeemToken(redeemToken, lastCheckpoint)
 	if err != nil {
 		return fmt.Errorf("failed to create evm contract call: %w", err)
 	}

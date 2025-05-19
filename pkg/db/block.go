@@ -34,6 +34,13 @@ func (db *DatabaseAdapter) CreateBlockHeader(blockHeader *chains.BlockHeader) er
 		if err != nil {
 			return err
 		}
+		//Update Redeem token block_time
+		err = tx.Model(&chains.EvmRedeemTx{}).
+			Where("block_number = ? AND source_chain = ?", blockHeader.BlockNumber, blockHeader.Chain).
+			Update("block_time", blockHeader.BlockTime).Error
+		if err != nil {
+			return err
+		}
 		//Update command executed block_time
 		err = tx.Model(&chains.CommandExecuted{}).
 			Where("block_number = ? AND source_chain = ?", blockHeader.BlockNumber, blockHeader.Chain).

@@ -185,16 +185,3 @@ func (db *DatabaseAdapter) UpdateBroadcastedCommands(chainId string, batchedComm
 	}
 	return nil
 }
-
-func (db *DatabaseAdapter) UpdateRedeemExecutedCommands(chainId string, txHashes []string) error {
-	log.Info().Str("chainId", chainId).Any("txHashes", txHashes).Msg("[DatabaseAdapter] [UpdateBtcExecutedCommands]")
-
-	result := db.PostgresClient.Exec(`UPDATE contract_call_with_tokens as ccwt SET status = ? 
-						WHERE ccwt.event_id 
-						IN (SELECT ccawm.event_id FROM contract_call_approved_with_mints as ccawm 
-							JOIN commands as c ON ccawm.command_id = c.command_id 
-							WHERE c.chain_id = ? AND c.executed_tx_hash IN (?))`,
-		chains.ContractCallStatusSuccess, chainId, txHashes)
-	log.Info().Any("RowsAffected", result.RowsAffected).Msg("[DatabaseAdapter] [UpdateBtcExecutedCommands]")
-	return result.Error
-}

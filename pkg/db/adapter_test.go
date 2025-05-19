@@ -221,18 +221,18 @@ func TestUpdateBroadcastedCommands(t *testing.T) {
 	cleanup()
 }
 
-func TestUpdateBtcExecutedCommands(t *testing.T) {
-	err := dbAdapter.UpdateBroadcastedCommands("bitcoin|4",
-		BATCH_COMMAND_ID,
-		[]string{COMMAND_ID},
-		TX_HASH_BTC)
-	require.NoError(t, err)
-	err = dbAdapter.UpdateRedeemExecutedCommands("bitcoin|4", []string{TX_HASH_BTC})
-	require.NoError(t, err)
-	contractCallWithToken := chains.ContractCallWithToken{}
-	dbAdapter.PostgresClient.Find(&chains.ContractCallWithToken{}).
-		Where("event_id = ?", CONTRACT_CALL_WITH_TOKEN_EVENT_ID).
-		First(&contractCallWithToken)
-	require.Equal(t, chains.ContractCallStatusSuccess, contractCallWithToken.Status)
-	cleanup()
-}
+// func TestUpdateBtcExecutedCommands(t *testing.T) {
+// 	err := dbAdapter.UpdateBroadcastedCommands("bitcoin|4",
+// 		BATCH_COMMAND_ID,
+// 		[]string{COMMAND_ID},
+// 		TX_HASH_BTC)
+// 	require.NoError(t, err)
+// 	err = dbAdapter.UpdateRedeemExecutedCommands("bitcoin|4", []string{TX_HASH_BTC})
+// 	require.NoError(t, err)
+// 	contractCallWithToken := chains.ContractCallWithToken{}
+// 	dbAdapter.PostgresClient.Find(&chains.ContractCallWithToken{}).
+// 		Where("event_id = ?", CONTRACT_CALL_WITH_TOKEN_EVENT_ID).
+// 		First(&contractCallWithToken)
+// 	require.Equal(t, chains.ContractCallStatusSuccess, contractCallWithToken.Status)
+// 	cleanup()
+// }

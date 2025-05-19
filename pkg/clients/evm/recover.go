@@ -401,7 +401,7 @@ func (c *EvmClient) UpdateLastCheckPoint(events map[string]abi.Event, logs []typ
 Recover all redeem sessions with redeem events from the last switch phase event back to the startBlock in the config
 */
 func (c *EvmClient) RecoverAllRedeemSessions(groups []chainsExported.Hash,
-	redeemTokenChannel chan *chainsModel.ContractCallWithToken) (*pkgTypes.ChainRedeemSessions, error) {
+	redeemTokenChannel chan *chainsModel.EvmRedeemTx) (*pkgTypes.ChainRedeemSessions, error) {
 	log.Info().Str("Chain", c.EvmConfig.ID).
 		Uint64("Start block", c.EvmConfig.StartBlock).
 		Uint64("Recover range", c.EvmConfig.RecoverRange).
@@ -516,9 +516,9 @@ func (c *EvmClient) RecoverAllRedeemSessions(groups []chainsExported.Hash,
 					chainRedeemSessions.AppendRedeemTokenEvent(groupUid, redeemEvent)
 				}
 				if redeemEvent.Sequence < maxSequence {
-					redeemToken.Status = chainsModel.ContractCallStatusSuccess
+					redeemToken.Status = chainsModel.RedeemStatusApproved
 				}
-				redeemTokenChannel <- &redeemToken
+				redeemTokenChannel <- redeemToken
 			}
 		}
 		toBlock = query.FromBlock.Uint64() - 1

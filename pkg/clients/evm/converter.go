@@ -90,43 +90,39 @@ func (c *EvmClient) ContractCallWithToken2Model(event *contracts.IScalarGatewayC
 }
 
 // Use contractCallToken to store the redeem token event
-func (c *EvmClient) RedeemTokenEvent2Model(event *contracts.IScalarGatewayRedeemToken) (chains.ContractCallWithToken, error) {
+func (c *EvmClient) RedeemTokenEvent2Model(event *contracts.IScalarGatewayRedeemToken) (*chains.EvmRedeemTx, error) {
 	eventId := fmt.Sprintf("%s-%d", utils.NormalizeHash(event.Raw.TxHash.String()), event.Raw.Index)
 	senderAddress := event.Sender.String()
 
 	chainInfoBytes := chainTypes.ChainInfoBytes{}
 	err := chainInfoBytes.FromString(event.DestinationChain)
 	if err != nil {
-		return chains.ContractCallWithToken{}, fmt.Errorf("failed to convert destination chain: %w", err)
+		return nil, fmt.Errorf("failed to convert destination chain: %w", err)
 	}
 
 	destinationAddress, err := utils.CalculateDestinationAddress(event.Payload, &chainInfoBytes)
 	if err != nil {
-		return chains.ContractCallWithToken{}, fmt.Errorf("failed to calculate destination address: %w", err)
+		return nil, fmt.Errorf("failed to calculate destination address: %w", err)
 	}
-
-	callContract := chains.ContractCall{
-		EventID:     eventId,
-		TxHash:      utils.NormalizeHash(event.Raw.TxHash.String()),
-		BlockNumber: event.Raw.BlockNumber,
-		LogIndex:    event.Raw.Index,
-		SourceChain: c.EvmConfig.GetId(),
-		//3 follows field are used for query to get back payload, so need to convert to lower case
-		DestinationChain:   event.DestinationChain,
-		DestinationAddress: utils.NormalizeAddress(destinationAddress, chainInfoBytes.ChainType()),
-		SourceAddress:      utils.NormalizeAddress(senderAddress, chainInfoBytes.ChainType()),
-		PayloadHash:        utils.NormalizeHash(hex.EncodeToString(event.PayloadHash[:])),
-		Payload:            event.Payload,
-	}
-	contractCallWithToken := chains.ContractCallWithToken{
-		ContractCall:         callContract,
-		TokenContractAddress: utils.NormalizeAddress(event.DestinationContractAddress, chainInfoBytes.ChainType()),
+	evmRedeemTx := chains.EvmRedeemTx{
+		EventID:              eventId,
+		TxHash:               utils.NormalizeHash(event.Raw.TxHash.String()),
+		BlockNumber:          event.Raw.BlockNumber,
+		LogIndex:             event.Raw.Index,
+		SourceChain:          c.EvmConfig.GetId(),
+		SourceAddress:        utils.NormalizeAddress(senderAddress, chainInfoBytes.ChainType()),
+		DestinationChain:     event.DestinationChain,
+		DestinationAddress:   utils.NormalizeAddress(destinationAddress, chainInfoBytes.ChainType()),
 		Symbol:               event.Symbol,
 		Amount:               event.Amount.Uint64(),
+		TokenContractAddress: utils.NormalizeAddress(event.DestinationContractAddress, chainInfoBytes.ChainType()),
 		CustodianGroupUid:    hex.EncodeToString(event.CustodianGroupUID[:]),
 		SessionSequence:      event.Sequence,
+		Status:               chains.RedeemStatusVerifying,
+		Payload:              event.Payload,
+		PayloadHash:          utils.NormalizeHash(hex.EncodeToString(event.PayloadHash[:])),
 	}
-	return contractCallWithToken, nil
+	return &evmRedeemTx, nil
 }
 
 func (c *EvmClient) TokenSentEvent2Model(event *contracts.IScalarGatewayTokenSent) (chains.TokenSent, error) {

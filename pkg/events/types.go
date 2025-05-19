@@ -3,6 +3,7 @@ package events
 import (
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/types"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 )
 
 const (
@@ -53,11 +54,14 @@ type ConfirmRedeemTxRequest struct {
 	TxHashs  []string
 }
 
-type RedeemTxEvents struct {
-	Chain     string
-	GroupUid  string
-	Sequence  uint64
-	RedeemTxs []*chains.RedeemTx
+// Store redeemTx in one btc block
+type BtcRedeemTxEvents struct {
+	Chain       string
+	GroupUid    string
+	Sequence    uint64
+	Phase       covExported.Phase
+	BlockNumber uint64
+	RedeemTxs   []*chains.BtcRedeemTx
 }
 type ChainBlockHeight struct {
 	Chain  string

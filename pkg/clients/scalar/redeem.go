@@ -22,14 +22,14 @@ import (
 type CustodianGroupRedeemTx struct {
 	lock         sync.Mutex
 	mapSequences map[string]uint64
-	mapRedeemTxs map[string][]*models.RedeemTx
+	mapRedeemTxs map[string][]*models.BtcRedeemTx
 }
 
-func (s *CustodianGroupRedeemTx) AddRedeemTxs(redeemTxEvents *events.RedeemTxEvents) {
+func (s *CustodianGroupRedeemTx) AddRedeemTxs(redeemTxEvents *events.BtcRedeemTxEvents) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	if s.mapRedeemTxs == nil {
-		s.mapRedeemTxs = make(map[string][]*models.RedeemTx)
+		s.mapRedeemTxs = make(map[string][]*models.BtcRedeemTx)
 	}
 	if s.mapSequences == nil {
 		s.mapSequences = make(map[string]uint64)
@@ -47,7 +47,7 @@ func (s *CustodianGroupRedeemTx) AddRedeemTxs(redeemTxEvents *events.RedeemTxEve
 	}
 }
 
-func (s *CustodianGroupRedeemTx) PickRedeemTxsByGroupUid(groupUid string, sequence uint64) ([]*models.RedeemTx, error) {
+func (s *CustodianGroupRedeemTx) PickRedeemTxsByGroupUid(groupUid string, sequence uint64) ([]*models.BtcRedeemTx, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	storedSequence, ok := s.mapSequences[groupUid]
@@ -166,7 +166,7 @@ func (c *Client) WaitForPendingCommands(chainId string, sourceTxs []string) erro
 	return nil
 }
 
-func (c *Client) broadcastRedeemTxsConfirm(redeemTxEvents *events.RedeemTxEvents) error {
+func (c *Client) broadcastRedeemTxsConfirm(redeemTxEvents *events.BtcRedeemTxEvents) error {
 	err := c.BroadcastRedeemTxsConfirmRequest(redeemTxEvents.Chain, redeemTxEvents.GroupUid, redeemTxEvents.RedeemTxs)
 	if err != nil {
 		log.Error().Err(err).Msgf("[ScalarClient] [broadcastRedeemTxsConfirm] failed to broadcast redeem txs confirm request")
@@ -216,21 +216,21 @@ func (c *Client) broadcastRedeemTxsConfirm(redeemTxEvents *events.RedeemTxEvents
 // 	return nil
 // }
 
-func (c *Client) AddRedeemTxsToCache(chainId string, redeemTxEvents *events.RedeemTxEvents) {
+func (c *Client) AddRedeemTxsToCache(chainId string, redeemTxEvents *events.BtcRedeemTxEvents) {
 	if c.redeemTxCache == nil {
 		c.redeemTxCache = make(map[string]*CustodianGroupRedeemTx)
 	}
 	groupRedeemTx, ok := c.redeemTxCache[chainId]
 	if !ok {
 		groupRedeemTx = &CustodianGroupRedeemTx{
-			mapRedeemTxs: make(map[string][]*models.RedeemTx),
+			mapRedeemTxs: make(map[string][]*models.BtcRedeemTx),
 			mapSequences: make(map[string]uint64),
 		}
 	}
 	groupRedeemTx.AddRedeemTxs(redeemTxEvents)
 	c.redeemTxCache[chainId] = groupRedeemTx
 }
-func (c *Client) BroadcastRedeemTxsConfirmRequest(chainId string, groupUid string, redeemTxs []*models.RedeemTx) error {
+func (c *Client) BroadcastRedeemTxsConfirmRequest(chainId string, groupUid string, redeemTxs []*models.BtcRedeemTx) error {
 	if len(redeemTxs) == 0 {
 		log.Info().Msgf("[ScalarClient] BroadcastRedeemTxsConfirmRequest, redeemTxs is empty")
 		return nil
@@ -251,8 +251,8 @@ func (c *Client) BroadcastRedeemTxsConfirmRequest(chainId string, groupUid strin
 	}
 	return nil
 }
-func (c *Client) PickCacheRedeemTx(groupUid string, sequence uint64) map[string][]*models.RedeemTx {
-	result := make(map[string][]*models.RedeemTx)
+func (c *Client) PickCacheRedeemTx(groupUid string, sequence uint64) map[string][]*models.BtcRedeemTx {
+	result := make(map[string][]*models.BtcRedeemTx)
 	for chainId, redeemTxCache := range c.redeemTxCache {
 		redeemTxs, err := redeemTxCache.PickRedeemTxsByGroupUid(groupUid, sequence)
 		if err != nil {

@@ -118,7 +118,7 @@ func TestRecoverBnbRedeemSessions(t *testing.T) {
 		sha3.Sum256([]byte("scalarv36")),
 	}
 	wg := sync.WaitGroup{}
-	redeemTokenChannel := make(chan *chains.ContractCallWithToken)
+	redeemTokenChannel := make(chan *chains.EvmRedeemTx)
 	wg.Add(1)
 	go func() {
 		for redeemToken := range redeemTokenChannel {

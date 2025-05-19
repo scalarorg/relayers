@@ -9,6 +9,7 @@ import (
 	"github.com/scalarorg/go-electrum/electrum/types"
 	"github.com/scalarorg/relayers/pkg/events"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
+	covTypes "github.com/scalarorg/scalar-core/x/covenant/types"
 )
 
 func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err error) error {
@@ -238,101 +239,122 @@ func (c *Client) handleTokenSents(tokenSents []*chains.TokenSent) error {
 }
 
 // Todo: update ContractCallWithToken status with execution confirmation from bitcoin network
-func (c *Client) handleRedeemTxs(redeemTxs []*chains.RedeemTx) error {
+func (c *Client) handleRedeemTxs(redeemTxs []*chains.BtcRedeemTx) error {
 	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [handleRedeemTxs] Received %d redeem transactions", len(redeemTxs))
+
 	//Group redeem txs by custodian group id, in each group we keep only txs with highest sequence number
 	mapRedeemTxs := c.groupRedeemTxs(redeemTxs)
+
 	if c.eventBus != nil && len(mapRedeemTxs) > 0 {
 		for groupUid, redeemTxEvents := range mapRedeemTxs {
-			redeemSession, err := c.scalarClient.GetRedeemSession(groupUid)
-			if err != nil || redeemSession == nil || redeemSession.Session == nil {
-				log.Error().Err(err).Str("CustodianGroupUid", groupUid).Msg("[ElectrumClient] cannot get RedeemSession")
-				continue
-			}
-			if redeemSession.Session.Sequence == redeemTxEvents.Sequence {
-				if redeemSession.Session.CurrentPhase == covExported.Executing {
-					log.Debug().Str("groupUid", groupUid).Msgf("[ElectrumClient] [handleRedeemTxs] Broadcasting confirm redeem tx request: %v", redeemTxEvents)
-					for _, tx := range redeemTxEvents.RedeemTxs {
-						tx.Status = string(chains.RedeemStatusVerifying)
-					}
-					c.eventBus.BroadcastEvent(&events.EventEnvelope{
-						EventType:        events.EVENT_ELECTRS_REDEEM_TRANSACTION,
-						DestinationChain: events.SCALAR_NETWORK_NAME,
-						Data:             redeemTxEvents,
-					})
-				} else {
-					log.Debug().Str("groupUid", groupUid).
-						Any("Current RedeemSession", redeemSession.Session).
-						Msgf("[ElectrumClient] [handleRedeemTxs] current session is not in executing phase")
-				}
-			} else if redeemSession.Session.Sequence > redeemTxEvents.Sequence {
-				log.Error().Str("groupUid", groupUid).
-					Any("Current RedeemSession", redeemSession.Session).
-					Any("RedeemTxEvents", redeemTxEvents).
-					Msgf("[ElectrumClient] [handleRedeemTxs] RedeemTxs don't belong to current redeem session")
+			log.Debug().Str("groupUid", groupUid).
+				Uint64("Current SessionSequence", redeemTxEvents.Sequence).
+				Uint64("RedeemTx BlockNumber", redeemTxEvents.BlockNumber).
+				Msgf("[ElectrumClient] [handleRedeemTxs] Broadcasting confirm redeem tx request: %v", redeemTxEvents)
+			if redeemTxEvents.Phase == covExported.Executing {
 				for _, tx := range redeemTxEvents.RedeemTxs {
-					tx.Status = string(chains.RedeemStatusApproved)
+					tx.Status = string(chains.RedeemStatusVerifying)
 				}
+				c.eventBus.BroadcastEvent(&events.EventEnvelope{
+					EventType:        events.EVENT_ELECTRS_REDEEM_TRANSACTION,
+					DestinationChain: events.SCALAR_NETWORK_NAME,
+					Data:             redeemTxEvents,
+				})
 			} else {
-				log.Debug().Str("groupUid", groupUid).
-					Any("Current RedeemSession", redeemSession.Session).
-					Any("RedeemTxEvents", redeemTxEvents).
-					Msgf("[ElectrumClient] [handleRedeemTxs] RedeemTxs has future session")
+				log.Debug().Msg("[ElectrumClient] [handleRedeemTxs] current session is not in executing phase")
 			}
 		}
 	}
-	blockNumbers := make([]uint64, 0)
-	for _, tx := range redeemTxs {
-		if slices.Contains(blockNumbers, tx.BlockNumber) {
-			continue
-		}
-		blockNumbers = append(blockNumbers, tx.BlockNumber)
-	}
-	blockTimes, err := c.dbAdapter.GetBlockTime(c.electrumConfig.SourceChain, blockNumbers)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to get block time")
-		return fmt.Errorf("failed to get block time: %w", err)
-	}
-	for _, tx := range redeemTxs {
-		tx.BlockTime = blockTimes[tx.BlockNumber]
-	}
+	// blockNumbers := make([]uint64, 0)
+	// for _, tx := range redeemTxs {
+	// 	if slices.Contains(blockNumbers, tx.BlockNumber) {
+	// 		continue
+	// 	}
+	// 	blockNumbers = append(blockNumbers, tx.BlockNumber)
+	// }
+	// blockTimes, err := c.dbAdapter.GetBlockTime(c.electrumConfig.SourceChain, blockNumbers)
+	// if err != nil {
+	// 	log.Error().Err(err).Msg("Failed to get block time")
+	// 	return fmt.Errorf("failed to get block time: %w", err)
+	// }
+	// for _, tx := range redeemTxs {
+	// 	tx.BlockTime = blockTimes[tx.BlockNumber]
+	// }
 	//1. Store redeem transactions to the db
-	err = c.dbAdapter.SaveRedeemTxs(redeemTxs)
+	// Clean redeemTxs to keep only one element per custodianGroupUid and SessionSequence with highest blockNumber
+	cleanedRedeemTxs := make([]*chains.BtcRedeemTx, 0)
+	redeemTxMap := make(map[string]*chains.BtcRedeemTx)
+
+	for _, tx := range redeemTxs {
+		key := fmt.Sprintf("%s_%d", tx.CustodianGroupUid, tx.SessionSequence)
+		existingTx, exists := redeemTxMap[key]
+		if !exists || tx.BlockNumber > existingTx.BlockNumber {
+			redeemTxMap[key] = tx
+		}
+	}
+
+	for _, tx := range redeemTxMap {
+		cleanedRedeemTxs = append(cleanedRedeemTxs, tx)
+	}
+	err := c.dbAdapter.SaveBtcRedeemTxs(c.electrumConfig.SourceChain, cleanedRedeemTxs)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to store redeem transactions to the db")
 		return fmt.Errorf("failed to store redeem transactions to the db: %w", err)
 	}
-	//2. Update ContractCallWithToken status with execution confirmation from bitcoin network
-	txHashes := make([]string, len(redeemTxs))
-	for i, tx := range redeemTxs {
-		txHashes[i] = tx.TxHash
-	}
-	c.dbAdapter.UpdateRedeemExecutedCommands(c.electrumConfig.SourceChain, txHashes)
 	return nil
 }
 
 // Group redeem txs by custodian group uid with condition:
 // Redeem txs have enough confirmations and highest sequence number
-func (c *Client) groupRedeemTxs(redeemTxs []*chains.RedeemTx) map[string]*events.RedeemTxEvents {
-	mapRedeemTxs := make(map[string]*events.RedeemTxEvents)
+func (c *Client) groupRedeemTxs(redeemTxs []*chains.BtcRedeemTx) map[string]*events.BtcRedeemTxEvents {
+	mapRedeemTxs := make(map[string]*events.BtcRedeemTxEvents)
+	redeemSessions := make(map[string]*covTypes.RedeemSession)
+	//Store group uids that have been queried to ensure each group uid is only queried once
+	queriedGroupUids := make(map[string]bool)
 	for _, redeemTx := range redeemTxs {
 		txConfirmations := c.currentHeight - int(redeemTx.BlockNumber) + 1
 		if txConfirmations < c.electrumConfig.Confirmations {
 			continue
 		}
-		redeemTxEvents := mapRedeemTxs[redeemTx.CustodianGroupUid]
-		if redeemTxEvents == nil {
-			redeemTxEvents = &events.RedeemTxEvents{
-				Chain:     c.electrumConfig.SourceChain,
-				GroupUid:  redeemTx.CustodianGroupUid,
-				RedeemTxs: []*chains.RedeemTx{},
+		//Find current redeem session
+		redeemSession, ok := redeemSessions[redeemTx.CustodianGroupUid]
+		queried := queriedGroupUids[redeemTx.CustodianGroupUid]
+		if !ok && !queried {
+			queriedGroupUids[redeemTx.CustodianGroupUid] = true
+			redeemSessionRes, err := c.scalarClient.GetRedeemSession(redeemTx.CustodianGroupUid)
+			if err != nil || redeemSessionRes == nil || redeemSessionRes.Session == nil {
+				continue
+			} else {
+				redeemSession = redeemSessionRes.Session
+				redeemSessions[redeemTx.CustodianGroupUid] = redeemSession
 			}
 		}
-		if redeemTx.SessionSequence > redeemTxEvents.Sequence {
-			redeemTxEvents.Sequence = redeemTx.SessionSequence
-			redeemTxEvents.RedeemTxs = []*chains.RedeemTx{redeemTx}
-		} else if redeemTx.SessionSequence == redeemTxEvents.Sequence {
-			redeemTxEvents.RedeemTxs = append(redeemTxEvents.RedeemTxs, redeemTx)
+		if redeemSession.Sequence != redeemTx.SessionSequence {
+			log.Debug().Str("groupUid", redeemTx.CustodianGroupUid).
+				Str("Sequence", fmt.Sprintf("CurrentSession %d, RedeemTx %d", redeemSession.Sequence, redeemTx.SessionSequence)).
+				Any("Current RedeemSession", redeemSession).
+				Any("RedeemTx", redeemTx).
+				Msgf("[ElectrumClient] [groupRedeemTxs] RedeemTx don't belong to current redeem session")
+			continue
+		}
+		redeemTxEvents := mapRedeemTxs[redeemTx.CustodianGroupUid]
+		if redeemTxEvents == nil {
+			redeemTxEvents = &events.BtcRedeemTxEvents{
+				Chain:       c.electrumConfig.SourceChain,
+				GroupUid:    redeemTx.CustodianGroupUid,
+				Sequence:    redeemSession.Sequence,
+				Phase:       redeemSession.CurrentPhase,
+				BlockNumber: redeemTx.BlockNumber,
+				RedeemTxs:   []*chains.BtcRedeemTx{redeemTx},
+			}
+		} else {
+			//TODO: keep only latest redeem tx
+			if redeemTx.BlockNumber > redeemTxEvents.BlockNumber {
+				redeemTxEvents.BlockNumber = redeemTx.BlockNumber
+				redeemTxEvents.RedeemTxs = []*chains.BtcRedeemTx{redeemTx}
+			} else if redeemTx.BlockNumber == redeemTxEvents.BlockNumber {
+				redeemTxEvents.RedeemTxs = append(redeemTxEvents.RedeemTxs, redeemTx)
+			}
 		}
 		mapRedeemTxs[redeemTx.CustodianGroupUid] = redeemTxEvents
 	}

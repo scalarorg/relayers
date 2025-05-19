@@ -27,6 +27,10 @@ func (c *Client) handleNewBlockEvents(ctx context.Context, events map[string][]s
 	if err != nil {
 		log.Error().Msgf("[ScalarClient] [handleNewBlockEvents] failed to handle contract call approved events: %v", err)
 	}
+	err = c.tryHandleRedeemTokenApprovedEvents(events)
+	if err != nil {
+		log.Error().Msgf("[ScalarClient] [handleNewBlockEvents] failed to handle redeem token approved events: %v", err)
+	}
 	err = c.tryHandleCommandBatchSignedEvent(ctx, events)
 	if err != nil {
 		log.Error().Msgf("[ScalarClient] [handleNewBlockEvents] failed to handle command batch signed events: %v", err)
@@ -85,6 +89,17 @@ func (c *Client) tryHandleContractCallApprovedEvents(ctx context.Context, events
 		return c.handleContractCallApprovedEvents(ctx, contractCallApprovedEvents)
 	} else {
 		log.Debug().Msg("[ScalarClient] [handleNewBlockEvents] no contract call approved events")
+		return nil
+	}
+}
+
+func (c *Client) tryHandleRedeemTokenApprovedEvents(events map[string][]string) error {
+	redeemTokenApprovedEvents, err := ParseIBCEvent[*chainstypes.EventRedeemTokenApproved](events)
+	if err == nil && len(redeemTokenApprovedEvents) > 0 {
+		log.Debug().Any("RedeemTokenApprovedEvents", redeemTokenApprovedEvents).Msg("[ScalarClient] [tryHandleRedeemTokenApprovedEvents]")
+		return c.handleRedeemTokenApprovedEvents(redeemTokenApprovedEvents)
+	} else {
+		log.Debug().Msg("[ScalarClient] [handleNewBlockEvents] no redeem token approved events")
 		return nil
 	}
 }

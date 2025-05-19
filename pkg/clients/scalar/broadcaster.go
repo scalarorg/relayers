@@ -253,7 +253,7 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 	for chain, msg := range signCommandReqs {
 		resp, err := b.network.SignAndBroadcastMsgs(ctx, msg)
 		if err != nil {
-			log.Error().Err(err).Msgf("[Broadcaster] Failed to broadcast signCommandReqs %T for chain %s", msg, chain)
+			log.Warn().Err(err).Msgf("[Broadcaster] Failed to broadcast signCommandReqs %T for chain %s", msg, chain)
 			return err
 		} else if resp.Code == 0 {
 			log.Debug().

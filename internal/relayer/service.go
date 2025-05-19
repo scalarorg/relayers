@@ -14,6 +14,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/electrs"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
+	"github.com/scalarorg/relayers/pkg/clients/indexer"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
@@ -25,6 +26,7 @@ import (
 
 type Service struct {
 	DbAdapter    *db.DatabaseAdapter
+	Indexer      *indexer.EVMIndexer
 	EventBus     *events.EventBus
 	ScalarClient *scalar.Client
 	//CustodialClient *custodial.Client
@@ -150,11 +152,11 @@ func (s *Service) Start(ctx context.Context) error {
 func (s *Service) RecoverEvmSessions(groups []chainExported.Hash) error {
 	wg := sync.WaitGroup{}
 	recoverSessions := CustodiansRecoverRedeemSessions{}
-	redeemTokenChannel := make(chan *chains.ContractCallWithToken)
+	redeemTokenChannel := make(chan *chains.EvmRedeemTx)
 	//Store all redeem events from all evm chains into db
 	go func() {
 		for redeemToken := range redeemTokenChannel {
-			err := s.DbAdapter.CreateContractCallWithToken(redeemToken, nil)
+			err := s.DbAdapter.CreateEvmRedeemToken(redeemToken, nil)
 			if err != nil {
 				log.Warn().Err(err).Msgf("[Relayer] [RecoverEvmSessions] cannot save redeem token to db")
 			}
