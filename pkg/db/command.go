@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
@@ -116,38 +115,43 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 		if err != nil {
 			return fmt.Errorf("failed to create command: %w", err)
 		}
-
-		var eventId string
-		//Find eventId by commandId
-		if command != nil {
-			switch command.Type {
-			case "approveContractCallWithMint":
-				err = db.PostgresClient.Select("event_id").Model(&scalarnet.ContractCallApprovedWithMint{}).Where("command_id = ?", commandId).Find(&eventId).Error
-				if err == nil {
-					tx.Model(&chains.ContractCallWithToken{}).Where("event_id = ?", eventId).Update("status", chains.TokenSentStatusSuccess)
-				} else {
-					log.Error().Err(err).
-						Str("commandType", command.Type).
-						Str("commandId", commandId).
-						Msgf("[DatabaseAdapter] [SaveCommandExecuted] failed to find eventId")
-				}
-			case "mintToken":
-				err = db.PostgresClient.Select("event_id").Model(&scalarnet.TokenSentApproved{}).Where("command_id = ?", commandId).First(&eventId).Error
-				if err == nil {
-					tx.Model(&chains.TokenSent{}).Where("event_id = ?", eventId).Update("status", chains.TokenSentStatusSuccess)
-				} else {
-					log.Error().Err(err).
-						Str("commandType", command.Type).
-						Str("commandId", commandId).
-						Msgf("[DatabaseAdapter] [SaveCommandExecuted] failed to find eventId")
-				}
-			}
-		}
+		tx.Exec(`UPDATE contract_call_with_tokens SET status = ? WHERE tx_hash = ?;`, chains.TokenSentStatusSuccess, commandId)
+		tx.Exec(`UPDATE token_sents SET status = ? WHERE tx_hash = ?;`, chains.TokenSentStatusSuccess, commandId)
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("failed to save command executed: %w", err)
 	}
+	// if command != nil {
+	// 	db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+	// 		var eventId string
+	// 		var err error
+	// 		//Find eventId by commandId
+	// 		switch command.Type {
+	// 		case "approveContractCallWithMint":
+	// 			err = db.PostgresClient.Select("event_id").Model(&scalarnet.ContractCallApprovedWithMint{}).Where("command_id = ?", commandId).Find(&eventId).Error
+	// 			if err == nil {
+	// 				tx.Model(&chains.ContractCallWithToken{}).Where("event_id = ?", eventId).Update("status", chains.TokenSentStatusSuccess)
+	// 			} else {
+	// 				log.Error().Err(err).
+	// 					Str("commandType", command.Type).
+	// 					Str("commandId", commandId).
+	// 					Msgf("[DatabaseAdapter] [SaveCommandExecuted] failed to find eventId")
+	// 			}
+	// 		case "mintToken":
+	// 			err = db.PostgresClient.Select("event_id").Model(&scalarnet.TokenSentApproved{}).Where("command_id = ?", commandId).First(&eventId).Error
+	// 			if err == nil {
+	// 				tx.Model(&chains.TokenSent{}).Where("event_id = ?", eventId).Update("status", chains.TokenSentStatusSuccess)
+	// 			} else {
+	// 				log.Error().Err(err).
+	// 					Str("commandType", command.Type).
+	// 					Str("commandId", commandId).
+	// 					Msgf("[DatabaseAdapter] [SaveCommandExecuted] failed to find eventId")
+	// 			}
+	// 		}
+	// 		return err
+	// 	})
+	// }
 	return nil
 }
 
