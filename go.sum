@@ -1504,6 +1504,8 @@ github.com/scalarorg/data-models v0.0.0-20250519040755-30704246dddd h1:Ll3eJenT2
 github.com/scalarorg/data-models v0.0.0-20250519040755-30704246dddd/go.mod h1:kztLaPfTTMOCRcLqNZTCRw0dTJOw8GIB1wI4UhFh57o=
 github.com/scalarorg/data-models v0.0.0-20250519064734-f01627e1a189 h1:eLihhP1//0h5FT+yZRkTscVIQTDJSU2lU7co7yEfRYE=
 github.com/scalarorg/data-models v0.0.0-20250519064734-f01627e1a189/go.mod h1:kztLaPfTTMOCRcLqNZTCRw0dTJOw8GIB1wI4UhFh57o=
+github.com/scalarorg/data-models v0.0.0-20250520025412-218478ff45b9 h1:SBXSo4kzdL+fPIHh3urFnReSQn/jQ/1AvyDoed4c5JU=
+github.com/scalarorg/data-models v0.0.0-20250520025412-218478ff45b9/go.mod h1:kztLaPfTTMOCRcLqNZTCRw0dTJOw8GIB1wI4UhFh57o=
 github.com/scalarorg/go-electrum v0.1.2-0.20250512080740-4b926c21c774 h1:X9LNmFLwv5UYUrjVGW2Oyv91L+yV+0tYMZG746YkgkI=
 github.com/scalarorg/go-electrum v0.1.2-0.20250512080740-4b926c21c774/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250423071208-012267db44fe h1:21cIHkGzDmE4Xi9G23g0AuYoNhK1K7jAMkSTcW8XhDE=

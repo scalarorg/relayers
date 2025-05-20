@@ -17,7 +17,29 @@ import (
 func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chains.TokenSent, []*chains.BtcRedeemTx) {
 	tokenSents := []*chains.TokenSent{}
 	redeemTxs := []*chains.BtcRedeemTx{}
+	//Handle reorg, process only tx with highest block number
+	mapTxBlockNumbers := make(map[string]int)
 	for _, vaultTx := range vaultTxs {
+		blockNumber := mapTxBlockNumbers[vaultTx.TxHash]
+		if blockNumber > vaultTx.Height {
+			log.Debug().Str("VaultTxHash", vaultTx.TxHash).
+				Int("BlockNumber", vaultTx.Height).
+				Int("ExistingBlockNumber", blockNumber).
+				Msg("[ElectrumClient] [CategorizeVaultTxs] skip tx")
+			continue
+		} else {
+			mapTxBlockNumbers[vaultTx.TxHash] = vaultTx.Height
+			if blockNumber == 0 {
+				log.Debug().Str("VaultTxHash", vaultTx.TxHash).
+					Int("BlockNumber", vaultTx.Height).
+					Msg("[ElectrumClient] [CategorizeVaultTxs] process tx")
+			} else {
+				log.Debug().Str("VaultTxHash", vaultTx.TxHash).
+					Int("BlockNumber", vaultTx.Height).
+					Int("ExistingBlockNumber", blockNumber).
+					Msg("[ElectrumClient] [CategorizeVaultTxs] process tx")
+			}
+		}
 		if vaultTx.VaultTxType == 1 {
 			//1.Staking
 			tokenSent, err := c.CreateTokenSent(vaultTx)

@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 
+	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
@@ -11,12 +12,54 @@ import (
 
 func (db *DatabaseAdapter) SaveBtcRedeemTxs(btcChain string, redeemTxs []*chains.BtcRedeemTx) error {
 	//2. Update ContractCallWithToken status with execution confirmation from bitcoin network
-	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
-		err := tx.Save(redeemTxs).Error
-		if err != nil {
-			return err
+	// Clean redeemTxs to keep only one element per custodianGroupUid and SessionSequence with highest blockNumber
+	cleanedRedeemTxs := make([]*chains.BtcRedeemTx, 0)
+	redeemTxMap := make(map[string]*chains.BtcRedeemTx)
+
+	for _, tx := range redeemTxs {
+		key := fmt.Sprintf("%s_%d", tx.CustodianGroupUid, tx.SessionSequence)
+		existingTx, exists := redeemTxMap[key]
+		if !exists || tx.BlockNumber > existingTx.BlockNumber {
+			redeemTxMap[key] = tx
 		}
-		tx.Exec(`UPDATE evm_redeem_txes SET status = ?, execute_hash = brt.tx_hash
+	}
+	for _, tx := range cleanedRedeemTxs {
+		key := fmt.Sprintf("%s_%d", tx.CustodianGroupUid, tx.SessionSequence)
+		existingTx, exists := redeemTxMap[key]
+		if !exists || tx.BlockNumber > existingTx.BlockNumber {
+			redeemTxMap[key] = tx
+		}
+	}
+	oldRedeemTxs := make([]uint, 0)
+	for _, tx := range redeemTxMap {
+		var existingTx chains.BtcRedeemTx
+		err := db.PostgresClient.Where("chain = ? AND custodian_group_uid = ? AND session_sequence = ? AND block_number < ?",
+			btcChain, tx.CustodianGroupUid, tx.SessionSequence, tx.BlockNumber).First(&existingTx).Error
+		if err == nil {
+			log.Error().Err(err).Msg("Redeem Tx with the same custodian_group_uid and session_sequence found")
+			if tx.BlockNumber > existingTx.BlockNumber {
+				oldRedeemTxs = append(oldRedeemTxs, existingTx.ID)
+				cleanedRedeemTxs = append(cleanedRedeemTxs, tx)
+			}
+		} else {
+			//RedeemTx with the same custodian_group_uid and session_sequence is not exist
+			cleanedRedeemTxs = append(cleanedRedeemTxs, tx)
+		}
+	}
+
+	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		// Remove existing records with same custodian_group_uid and session_sequence but smaller block_number
+		result := tx.Exec(`DELETE FROM btc_redeem_txes where id IN (?)`, oldRedeemTxs)
+		if result.Error != nil {
+			return result.Error
+		}
+		log.Info().Any("RowsAffected", result.RowsAffected).Msg("Deleted old redeem transactions")
+		result = tx.Save(cleanedRedeemTxs)
+		if result.Error != nil {
+			return result.Error
+		}
+		log.Info().Any("RowsAffected", result.RowsAffected).Msg("Saved cleaned redeem transactions")
+		result = tx.Exec(`UPDATE evm_redeem_txes SET status = ?, execute_hash = brt.tx_hash
 				FROM evm_redeem_txes ert 
 				JOIN btc_redeem_txes brt 
 				ON ert.custodian_group_uid = brt.custodian_group_uid
@@ -25,6 +68,10 @@ func (db *DatabaseAdapter) SaveBtcRedeemTxs(btcChain string, redeemTxs []*chains
 				WHERE ert.destination_chain = ?
 				`,
 			chains.RedeemStatusSuccess, btcChain)
+		if result.Error != nil {
+			return result.Error
+		}
+		log.Info().Any("RowsAffected", result.RowsAffected).Msg("Updated evm redeem txes status")
 		return nil
 	})
 }
@@ -81,3 +128,9 @@ func (db *DatabaseAdapter) StoreRedeemEvent(redeemEvent *contracts.IScalarGatewa
 // 	log.Info().Any("RowsAffected", result.RowsAffected).Msg("[DatabaseAdapter] [UpdateRedeemExecutedCommands]")
 // 	return result.Error
 // }
+
+// Delete existing redeem transactions with same custodian_group_uid and session_sequence but smaller block_number
+func (db *DatabaseAdapter) DeleteBtcRedeemTxsByGroupAndSequence(chainId string, custodianGroupUid string, sessionSequence uint64, blockNumber uint64) error {
+	return db.PostgresClient.Where("chain = ? AND custodian_group_uid = ? AND session_sequence = ? AND block_number < ?",
+		chainId, custodianGroupUid, sessionSequence, blockNumber).Delete(&chains.BtcRedeemTx{}).Error
+}

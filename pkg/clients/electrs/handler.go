@@ -265,38 +265,9 @@ func (c *Client) handleRedeemTxs(redeemTxs []*chains.BtcRedeemTx) error {
 			}
 		}
 	}
-	// blockNumbers := make([]uint64, 0)
-	// for _, tx := range redeemTxs {
-	// 	if slices.Contains(blockNumbers, tx.BlockNumber) {
-	// 		continue
-	// 	}
-	// 	blockNumbers = append(blockNumbers, tx.BlockNumber)
-	// }
-	// blockTimes, err := c.dbAdapter.GetBlockTime(c.electrumConfig.SourceChain, blockNumbers)
-	// if err != nil {
-	// 	log.Error().Err(err).Msg("Failed to get block time")
-	// 	return fmt.Errorf("failed to get block time: %w", err)
-	// }
-	// for _, tx := range redeemTxs {
-	// 	tx.BlockTime = blockTimes[tx.BlockNumber]
-	// }
 	//1. Store redeem transactions to the db
-	// Clean redeemTxs to keep only one element per custodianGroupUid and SessionSequence with highest blockNumber
-	cleanedRedeemTxs := make([]*chains.BtcRedeemTx, 0)
-	redeemTxMap := make(map[string]*chains.BtcRedeemTx)
 
-	for _, tx := range redeemTxs {
-		key := fmt.Sprintf("%s_%d", tx.CustodianGroupUid, tx.SessionSequence)
-		existingTx, exists := redeemTxMap[key]
-		if !exists || tx.BlockNumber > existingTx.BlockNumber {
-			redeemTxMap[key] = tx
-		}
-	}
-
-	for _, tx := range redeemTxMap {
-		cleanedRedeemTxs = append(cleanedRedeemTxs, tx)
-	}
-	err := c.dbAdapter.SaveBtcRedeemTxs(c.electrumConfig.SourceChain, cleanedRedeemTxs)
+	err := c.dbAdapter.SaveBtcRedeemTxs(c.electrumConfig.SourceChain, redeemTxs)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to store redeem transactions to the db")
 		return fmt.Errorf("failed to store redeem transactions to the db: %w", err)

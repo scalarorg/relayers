@@ -3,6 +3,7 @@ package db
 import (
 	"github.com/scalarorg/data-models/chains"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func (db *DatabaseAdapter) FindBlockHeader(chainId string, blockNumber uint64) (*chains.BlockHeader, error) {
@@ -16,7 +17,13 @@ func (db *DatabaseAdapter) FindBlockHeader(chainId string, blockNumber uint64) (
 
 func (db *DatabaseAdapter) CreateBlockHeader(blockHeader *chains.BlockHeader) error {
 	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
-		err := tx.Create(blockHeader).Error
+		err := tx.Clauses(
+			clause.OnConflict{
+				Columns:   []clause.Column{{Name: "chain"}, {Name: "block_number"}},
+				DoNothing: true,
+			},
+		).Create(blockHeader).Error
+
 		if err != nil {
 			return err
 		}
