@@ -744,14 +744,14 @@ func (c *EvmClient) startFetchBlock() {
 		}
 	}()
 }
-func (c *EvmClient) fetchBlockHeader(blockNumber uint64) error {
+func (c *EvmClient) fetchBlockHeader(blockNumber uint64) (*chains.BlockHeader, error) {
 	blockHeader, err := c.dbAdapter.FindBlockHeader(c.EvmConfig.GetId(), blockNumber)
 	if err == nil && blockHeader != nil {
 		log.Info().Any("blockHeader", blockHeader).Msgf("[EvmClient] [startFetchBlock] block header already exists")
-		return nil
+		return blockHeader, nil
 	}
 	c.ChnlReceivedBlock <- blockNumber
-	return nil
+	return nil, nil
 }
 func (c *EvmClient) subscribeEventBus() {
 	if c.eventBus != nil {
