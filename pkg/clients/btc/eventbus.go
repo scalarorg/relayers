@@ -149,7 +149,7 @@ func (c *BtcClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRes
 		// }
 		txHash, err := c.BroadcastRawTx(psbt)
 		if err != nil {
-			log.Error().Str("TxHash", txHash.String()).Err(err).Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to broadcast tx")
+			log.Error().Err(err).Msg("[BtcClient] [handleScalarBatchCommandSigned] failed to broadcast tx")
 		}
 		if txHash != nil {
 			txHashStr := txHash.String()
