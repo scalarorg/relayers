@@ -12,11 +12,11 @@ require (
 	github.com/gogo/protobuf v1.3.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/rs/zerolog v1.33.0
-	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250423032410-4181b61dd605
-	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250423032410-4181b61dd605
+	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250426033010-eb69d1a47edd
+	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250426033010-eb69d1a47edd
 	github.com/scalarorg/data-models v0.0.0-20250520025412-218478ff45b9
 	github.com/scalarorg/go-electrum v0.1.2-0.20250512080740-4b926c21c774
-	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250423071208-012267db44fe
+	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250520074909-c261f1435f57
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
