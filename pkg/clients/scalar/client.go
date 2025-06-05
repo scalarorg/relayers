@@ -9,12 +9,15 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/internal/codec"
 	"github.com/scalarorg/relayers/pkg/clients/cosmos"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	"github.com/scalarorg/relayers/pkg/types"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	//tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -147,10 +150,130 @@ func (c *Client) Start(ctx context.Context) error {
 			log.Error().Err(err).Msg("[ScalarClient] [subscribeAllBlockEventsWithHeatBeat] Failed")
 		}
 	}()
+	go func() {
+		err := c.ProcessNextBlock(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("[ScalarClient] [getNextBlock] Failed")
+		}
+	}()
 	// go func() {
 	// 	c.subscribeWithHeatBeat(ctx)
 	// }()
 	log.Info().Msg("Scalar client started")
+	return nil
+}
+
+func (c *Client) RefreshCurrentBlock(ctx context.Context, lastCurrentBlock *types.BlockTime) *types.BlockTime {
+	for {
+		if lastCurrentBlock == nil || time.Since(lastCurrentBlock.QueryTime) >= time.Second*5 {
+			currentBlock, err := c.network.GetCurrentBlock(ctx)
+			if err == nil {
+				return currentBlock
+			}
+		} else {
+			sleeptime := time.Second*5 - time.Since(lastCurrentBlock.QueryTime)
+			log.Info().Msgf("[ScalarClient] [RefreshCurrentBlock] sleep for %v", sleeptime)
+			time.Sleep(sleeptime)
+		}
+	}
+}
+func (c *Client) ProcessNextBlock(ctx context.Context) error {
+	lastEvtCheckpoint := &scalarnet.EventCheckPoint{
+		ChainName:   c.networkConfig.GetId(),
+		EventName:   events.EVENT_SCALAR_NEW_BLOCK,
+		BlockNumber: uint64(1),
+	}
+	if c.dbAdapter != nil {
+		evtCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.networkConfig.GetId(), events.EVENT_SCALAR_NEW_BLOCK)
+		if err != nil {
+			log.Error().Msgf("[ScalarClient] [getNextBlock] Failed: %v", err)
+		}
+		if evtCheckpoint != nil {
+			lastEvtCheckpoint.BlockNumber = evtCheckpoint.BlockNumber + 1
+		}
+	}
+	currentBlock, err := c.network.GetCurrentBlock(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("[ScalarClient] [ProcessNextBlock] Failed to get current block")
+	}
+	log.Info().Msgf("[ScalarClient] [ProcessNextBlock] current block: %v", currentBlock)
+	var startTime time.Time
+	for {
+		startTime = time.Now()
+		if lastEvtCheckpoint.BlockNumber > uint64(currentBlock.ResultBlock.Block.Height) {
+			log.Info().Int64("currentBlock", currentBlock.ResultBlock.Block.Height).
+				Uint64("lastEvtCheckpoint", lastEvtCheckpoint.BlockNumber).
+				Msgf("[ScalarClient] [ProcessNextBlock] current block: %v, lastEvtCheckpoint: %v", currentBlock.ResultBlock.Block.Height,
+					lastEvtCheckpoint.BlockNumber)
+			currentBlock = c.RefreshCurrentBlock(ctx, currentBlock)
+			continue
+		}
+		blockResults, err := c.network.GetNextBlockResults(ctx, lastEvtCheckpoint.BlockNumber)
+		if err != nil {
+			log.Error().Err(err).Msg("[ScalarClient] [ProcessNextBlock] with error, sleep for 1 second")
+			time.Sleep(time.Second)
+			continue
+		}
+		if c.dbAdapter != nil {
+			err = c.dbAdapter.UpdateLastEventCheckPoint(lastEvtCheckpoint)
+			if err != nil {
+				log.Error().Msgf("[ScalarClient] [getNextBlock] Failed: %v", err)
+			}
+		}
+		err = c.handleBlockResultsEvents(blockResults)
+		if err != nil {
+			log.Error().Msgf("[ScalarClient] [getNextBlock] failed to handle new block events: %v", err)
+		}
+		elapsed := time.Since(startTime)
+		log.Info().Msgf("[ScalarClient] [getNextBlock] processed block: %d in %f seconds", blockResults.Height, elapsed.Seconds())
+		//Set height to next block
+		lastEvtCheckpoint.BlockNumber = uint64(blockResults.Height) + 1
+
+		log.Info().Msgf("[ScalarClient] [getNextBlock] processed block: %d with %d events in %f seconds", blockResults.Height, len(blockResults.EndBlockEvents), elapsed.Seconds())
+	}
+}
+func (c *Client) handleBlockResultsEvents(blockResults *ctypes.ResultBlockResults) error {
+	for _, event := range blockResults.EndBlockEvents {
+		log.Info().Msgf("[ScalarClient] [handleBlockResultsEvents] event: %s", event.Type)
+		switch event.Type {
+		case EventTypeTokenSent:
+			tokenSentEvent := &chainstypes.EventTokenSent{}
+			err := ParseAbciEvent(event, tokenSentEvent)
+			if err != nil {
+				log.Error().Err(err).Msgf("[ScalarClient] [handleBlockResultsEvents] error parsing token sent event: %v", err)
+			}
+			log.Info().Msgf("[ScalarClient] [handleBlockResultsEvents] token sent event: %v", tokenSentEvent)
+		case EventTypeMintCommand:
+			log.Info().Msgf("[ScalarClient] [handleBlockResultsEvents] event: %s", event.Type)
+		case EventTypeContractCallApproved:
+			log.Info().Msgf("[ScalarClient] [handleBlockResultsEvents] event: %s", event.Type)
+		case EventTypeContractCallWithMintApproved:
+			log.Info().Msgf("[ScalarClient] [handleBlockResultsEvents] event: %s", event.Type)
+		case EventTypeContractCallSubmitted:
+			log.Info().Msgf("[ScalarClient] [handleBlockResultsEvents] event: %s", event.Type)
+		case EventTypeContractCallWithTokenSubmitted:
+			log.Info().Msgf("[ScalarClient] [handleBlockResultsEvents] event: %s", event.Type)
+		case EventTypeRedeemTokenApproved:
+			log.Info().Msgf("[ScalarClient] [handleBlockResultsEvents] event: %s", event.Type)
+		case EventTypeCommandBatchSigned:
+			log.Info().Msgf("[ScalarClient] [handleBlockResultsEvents] event: %s", event.Type)
+		case EventTypeEVMEventCompleted:
+			log.Info().Msgf("[ScalarClient] [handleBlockResultsEvents] event: %s", event.Type)
+		case EventTypeSwitchPhaseStarted:
+			log.Info().Msgf("[ScalarClient] [handleBlockResultsEvents] event: %s", event.Type)
+		case EventTypeSwitchPhaseCompleted:
+			log.Info().Msgf("[ScalarClient] [handleBlockResultsEvents] event: %s", event.Type)
+		}
+	}
+
+	// EventTypeMintCommand                     = "scalar.chains.v1beta1.MintCommand"
+	// EventTypeContractCallApproved            = "scalar.chains.v1beta1.ContractCallApproved"
+	// EventTypeContractCallWithMintApproved    = "scalar.chains.v1beta1.ContractCallWithMintApproved"
+	// EventTypeTokenSent                       = "scalar.chains.v1beta1.EventTokenSent"
+	// EventTypeEVMEventCompleted               = "scalar.chains.v1beta1.EVMEventCompleted"
+	// EventTypeCommandBatchSigned              = "scalar.chains.v1beta1.CommandBatchSigned"
+	// EventTypeContractCallSubmitted           = "scalar.scalarnet.v1beta1.ContractCallSubmitted"
+	// EventTypeContractCallWithTokenSubmitted  = "scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted"
 	return nil
 }
 func (c *Client) subscribeAllBlockEventsWithHeatBeat(ctx context.Context) error {

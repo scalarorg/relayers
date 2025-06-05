@@ -16,6 +16,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/relayers/pkg/types"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
@@ -40,38 +41,63 @@ func createDefaultTxFactory(config *CosmosNetworkConfig, txConfig client.TxConfi
 	return factory, nil
 }
 
+type AccountSequence struct {
+	BlockHeight   int64
+	AccountNumber uint64
+	Sequence      uint64
+}
 type NetworkClient struct {
-	config         *CosmosNetworkConfig
-	rpcClient      rpcclient.Client
-	queryClient    *QueryClient
-	addr           sdk.AccAddress
-	privKey        *secp256k1.PrivKey
-	txConfig       client.TxConfig
-	txFactory      tx.Factory
-	sequenceNumber uint64
-	seqMutex       sync.Mutex // Add mutex for sequence number synchronization
-
+	config          *CosmosNetworkConfig
+	rpcClient       rpcclient.Client
+	queryClient     *QueryClient
+	addr            sdk.AccAddress
+	privKey         *secp256k1.PrivKey
+	txConfig        client.TxConfig
+	txFactory       tx.Factory
+	accountSequence *AccountSequence
+	seqMutex        sync.Mutex // Add mutex for sequence number synchronization
 }
 
 // Add method to safely get sequence number
 func (c *NetworkClient) GetSequenceNumber() uint64 {
 	c.seqMutex.Lock()
 	defer c.seqMutex.Unlock()
-	return c.sequenceNumber
+	if c.accountSequence == nil {
+		c.accountSequence = &AccountSequence{
+			BlockHeight:   0,
+			AccountNumber: 0,
+			Sequence:      0,
+		}
+	}
+	return c.accountSequence.Sequence
 }
 
 // Add method to safely increment sequence number
 func (c *NetworkClient) IncrementSequenceNumber() {
 	c.seqMutex.Lock()
 	defer c.seqMutex.Unlock()
-	c.sequenceNumber++
+	if c.accountSequence == nil {
+		c.accountSequence = &AccountSequence{
+			BlockHeight:   0,
+			AccountNumber: 0,
+			Sequence:      0,
+		}
+	}
+	c.accountSequence.Sequence++
 }
 
 // Add method to safely set sequence number
 func (c *NetworkClient) SetSequenceNumber(seq uint64) {
 	c.seqMutex.Lock()
 	defer c.seqMutex.Unlock()
-	c.sequenceNumber = seq
+	if c.accountSequence == nil {
+		c.accountSequence = &AccountSequence{
+			BlockHeight:   0,
+			AccountNumber: 0,
+			Sequence:      0,
+		}
+	}
+	c.accountSequence.Sequence = seq
 }
 func NewNetworkClient(config *CosmosNetworkConfig, queryClient *QueryClient, txConfig client.TxConfig) (*NetworkClient, error) {
 	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic, config.Bip44Path)
@@ -99,6 +125,11 @@ func NewNetworkClient(config *CosmosNetworkConfig, queryClient *QueryClient, txC
 		privKey:     privKey,
 		txConfig:    txConfig,
 		txFactory:   txFactory,
+		accountSequence: &AccountSequence{
+			BlockHeight:   0,
+			AccountNumber: 0,
+			Sequence:      0,
+		},
 	}
 	return networkClient, nil
 }
@@ -265,27 +296,26 @@ func (c *NetworkClient) Start() (rpcclient.Client, error) {
 // Inject account number and sequence number into txFactory for signing
 func (c *NetworkClient) CreateTxFactory(ctx context.Context) tx.Factory {
 	txf := c.txFactory
-	resp, err := c.queryClient.QueryAccount(ctx, c.GetAddress())
+	//Get current Scalar's block height
+	blockTime, err := c.GetCurrentBlock(ctx)
 	if err != nil {
-		log.Error().Msgf("failed to get account: %+v", err)
-	} else {
-		log.Debug().Msgf("[ScalarClient] [NetworkClient] account number: %v, sequence number: %v", resp.AccountNumber, resp.Sequence)
-		txf = txf.WithAccountNumber(resp.AccountNumber)
-
-		//If sequence number is greater than current sequence number, update the sequence number
-		//This is to avoid the situation where the transaction is not included in the next block
-		//Then account sequence number is not updated on the server side
-		//Todo: better set sequence = resp.Sequence + number of pendingTx
-		currentSeq := c.GetSequenceNumber()
-		if resp.Sequence > currentSeq {
-			c.SetSequenceNumber(resp.Sequence)
-			txf = txf.WithSequence(resp.Sequence)
+		log.Error().Msgf("failed to get current block: %+v", err)
+	} else if blockTime != nil && blockTime.ResultBlock.Block.Height > c.accountSequence.BlockHeight {
+		//Fetch new account number and sequence number from network
+		resp, err := c.queryClient.QueryAccount(ctx, c.GetAddress())
+		if err != nil {
+			log.Error().Msgf("failed to get account: %+v", err)
 		} else {
-			txf = txf.WithSequence(currentSeq)
+			c.accountSequence.AccountNumber = resp.AccountNumber
+			c.accountSequence.Sequence = resp.Sequence
+			c.accountSequence.BlockHeight = blockTime.ResultBlock.Block.Height
 		}
 	}
+	//Set adjusted account number and sequence number to the txFactory
+	txf = txf.WithAccountNumber(c.accountSequence.AccountNumber).WithSequence(c.accountSequence.Sequence)
 	return txf
 }
+
 func (c *NetworkClient) CreateTxBuilder(ctx context.Context, msgs ...sdk.Msg) (client.TxBuilder, error) {
 	//1. Build unsigned transaction using txFactory
 	txf := c.CreateTxFactory(ctx)
@@ -568,4 +598,30 @@ func (c *NetworkClient) RemoveRpcClient() {
 
 func (c *NetworkClient) GetQueryClient() *QueryClient {
 	return c.queryClient
+}
+func (c *NetworkClient) GetCurrentBlock(ctx context.Context) (*types.BlockTime, error) {
+	client, err := c.GetRpcClient()
+	if err != nil {
+		return nil, err
+	}
+	block, err := client.Block(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &types.BlockTime{
+		ResultBlock: *block,
+		QueryTime:   time.Now(),
+	}, nil
+}
+func (c *NetworkClient) GetNextBlockResults(ctx context.Context, blockHeight uint64) (*ctypes.ResultBlockResults, error) {
+	client, err := c.GetRpcClient()
+	if err != nil {
+		return nil, err
+	}
+	height := int64(blockHeight)
+	blockResults, err := client.BlockResults(ctx, &height)
+	if err != nil {
+		return nil, err
+	}
+	return blockResults, nil
 }

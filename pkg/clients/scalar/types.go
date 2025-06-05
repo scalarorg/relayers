@@ -23,14 +23,18 @@ import (
 // Add this new type definition
 
 const (
+	BlockEventsBase64Encoded                 = false
 	EventTypeMintCommand                     = "scalar.chains.v1beta1.MintCommand"
 	EventTypeContractCallApproved            = "scalar.chains.v1beta1.ContractCallApproved"
 	EventTypeContractCallWithMintApproved    = "scalar.chains.v1beta1.ContractCallWithMintApproved"
 	EventTypeTokenSent                       = "scalar.chains.v1beta1.EventTokenSent"
 	EventTypeEVMEventCompleted               = "scalar.chains.v1beta1.EVMEventCompleted"
 	EventTypeCommandBatchSigned              = "scalar.chains.v1beta1.CommandBatchSigned"
+	EventTypeRedeemTokenApproved             = "scalar.chains.v1beta1.EventRedeemTokenApproved"
 	EventTypeContractCallSubmitted           = "scalar.scalarnet.v1beta1.ContractCallSubmitted"
 	EventTypeContractCallWithTokenSubmitted  = "scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted"
+	EventTypeSwitchPhaseStarted              = "scalar.covenant.v1beta1.SwitchPhaseStarted"
+	EventTypeSwitchPhaseCompleted            = "scalar.covenant.v1beta1.SwitchPhaseCompleted"
 	TokenSentEventTopicId                    = "tm.event='NewBlock' AND scalar.chains.v1beta1.EventTokenSent.event_id EXISTS"
 	MintCommandEventTopicId                  = "tm.event='NewBlock' AND scalar.chains.v1beta1.MintCommand.event_id EXISTS"
 	ContractCallApprovedEventTopicId         = "tm.event='NewBlock' AND scalar.chains.v1beta1.ContractCallApproved.event_id EXISTS"

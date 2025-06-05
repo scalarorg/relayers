@@ -22,6 +22,7 @@ const (
 	EVENT_SCALAR_CREATE_PSBT_REQUEST     = "Scalar.CreatePsbtRequest"
 	EVENT_SCALAR_SWITCH_PHASE_STARTED    = "Scalar.StartedSwitchPhase"
 	EVENT_SCALAR_REDEEM_TOKEN_APPROVED   = "Scalar.RedeemTokenApproved"
+	EVENT_SCALAR_NEW_BLOCK               = "Scalar.NewBlock"
 	EVENT_EVM_CONTRACT_CALL_APPROVED     = "ContractCallApproved"
 	EVENT_EVM_CONTRACT_CALL              = "ContractCall"
 	EVENT_EVM_CONTRACT_CALL_WITH_TOKEN   = "ContractCallWithToken"

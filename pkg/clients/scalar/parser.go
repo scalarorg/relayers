@@ -1,6 +1,7 @@
 package scalar
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	proto "github.com/gogo/protobuf/proto"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/scalar-core/x/chains/types"
+	abci "github.com/tendermint/tendermint/abci/types"
 	//gogoproto "google.golang.org/protobuf/proto"
 )
 
@@ -42,18 +44,40 @@ func removeQuote(str string) string {
 	return strings.Trim(str, "\"")
 }
 
-//	func ParseEvent[T proto.Message](rawData map[string][]string, messages T) ([]T, error) {
-//		msgName, values, err := parseTarget(rawData, messages)
-//		if err != nil {
-//			return nil, fmt.Errorf("failed to parse type: %T", reflect.TypeOf(messages))
-//		}
-//		log.Info().Str("MessageType", msgName).Msg("Successful parsed event")
-//		// // Handle both struct and pointer cases
-//		// if targetVal.Kind() != reflect.Struct && targetVal.Kind() != reflect.Ptr && targetVal.Elem().Kind() != reflect.Struct {
-//		// 	return fmt.Errorf("target must be a struct or pointer to struct, got: %T", target)
-//		// }
-//		return values, nil
-//	}
+func ParseAbciEvent[T proto.Message](event abci.Event, messages T) error {
+	rawData := map[string]string{}
+	log.Info().Msgf("[ScalarClient] [ParseAbciEvent] event: %v", event)
+	for _, attribute := range event.Attributes {
+		var value string
+		var keyItem string
+		if BlockEventsBase64Encoded {
+			// Should we even be decoding these from base64? What are the implications?
+			valueBytes, err := base64.StdEncoding.DecodeString(string(attribute.Value))
+			if err != nil {
+				return err
+			}
+
+			keyBytes, err := base64.StdEncoding.DecodeString(string(attribute.Key))
+			if err != nil {
+				return err
+			}
+
+			value = string(valueBytes)
+			keyItem = string(keyBytes)
+		} else {
+			value = strings.Trim(string(attribute.Value), "\"")
+			keyItem = strings.Trim(string(attribute.Key), "\"")
+		}
+
+		rawData[keyItem] = value
+
+	}
+	err := UnmarshalJson(rawData, messages)
+	if err != nil {
+		log.Error().Err(err).Any("RawData", rawData).Msg("Cannot unmarshal message")
+	}
+	return err
+}
 func ParseIBCEvent[T proto.Message](rawData map[string][]string) ([]IBCEvent[T], error) {
 	jsonDatas := []map[string]string{}
 	var args T

@@ -94,7 +94,8 @@ func (ec *EvmClient) HandleContractCallWithToken(event *contracts.IScalarGateway
 		contractCallWithToken.BlockTime = blockHeader.BlockTime
 	}
 	//2. update last checkpoint
-	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN, ec.EvmConfig.StartBlock)
+	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN)
+	lastCheckpoint.BlockNumber = ec.EvmConfig.StartBlock
 	if err != nil {
 		log.Debug().Str("chainId", ec.EvmConfig.GetId()).
 			Str("eventName", events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN).
@@ -145,7 +146,8 @@ func (ec *EvmClient) HandleRedeemToken(event *contracts.IScalarGatewayRedeemToke
 		redeemToken.BlockTime = blockHeader.BlockTime
 	}
 	//2. update last checkpoint
-	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_REDEEM_TOKEN, ec.EvmConfig.StartBlock)
+	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_REDEEM_TOKEN)
+	lastCheckpoint.BlockNumber = ec.EvmConfig.StartBlock
 	if err != nil {
 		log.Debug().Str("chainId", ec.EvmConfig.GetId()).
 			Str("eventName", events.EVENT_EVM_REDEEM_TOKEN).
@@ -220,7 +222,8 @@ func (ec *EvmClient) HandleTokenSent(event *contracts.IScalarGatewayTokenSent) e
 	//For evm, the token sent is verified immediately by the scalarnet
 	tokenSent.Status = chains.TokenSentStatusVerifying
 	//2. update last checkpoint
-	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_TOKEN_SENT, ec.EvmConfig.StartBlock)
+	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_TOKEN_SENT)
+	lastCheckpoint.BlockNumber = ec.EvmConfig.StartBlock
 	if err != nil {
 		log.Debug().Str("chainId", ec.EvmConfig.GetId()).
 			Str("eventName", events.EVENT_EVM_TOKEN_SENT).

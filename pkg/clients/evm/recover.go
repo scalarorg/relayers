@@ -292,7 +292,7 @@ func (c *EvmClient) RecoverEvents(ctx context.Context, eventNames []string, curr
 		}
 	}
 
-	lastCheckpoint, err := c.dbAdapter.GetLastCheckPoint(c.EvmConfig.GetId(), c.EvmConfig.StartBlock)
+	lastCheckpoint, err := c.dbAdapter.GetLastCheckPoint(c.EvmConfig.GetId())
 	if err != nil {
 		log.Warn().Err(err).Msgf("[EvmClient] [RecoverEvents] failed to get last checkpoint use default value")
 	}

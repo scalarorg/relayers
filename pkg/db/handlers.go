@@ -66,12 +66,12 @@ func (db *DatabaseAdapter) CreateBatchValue(values any, batchSize int) error {
 }
 
 // Get earliest event check point for all eventNames
-func (db *DatabaseAdapter) GetLastCheckPoint(chainName string, fromBlock uint64) (*scalarnet.EventCheckPoint, error) {
+func (db *DatabaseAdapter) GetLastCheckPoint(chainName string) (*scalarnet.EventCheckPoint, error) {
 	//Default value
 	lastBlock := scalarnet.EventCheckPoint{
 		ChainName:   chainName,
 		EventName:   "",
-		BlockNumber: fromBlock,
+		BlockNumber: 0,
 		TxHash:      "",
 		LogIndex:    0,
 		EventKey:    "",
@@ -80,12 +80,12 @@ func (db *DatabaseAdapter) GetLastCheckPoint(chainName string, fromBlock uint64)
 	return &lastBlock, result.Error
 }
 
-func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string, fromBlock uint64) (*scalarnet.EventCheckPoint, error) {
+func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string) (*scalarnet.EventCheckPoint, error) {
 	//Default value
 	lastBlock := scalarnet.EventCheckPoint{
 		ChainName:   chainName,
 		EventName:   eventName,
-		BlockNumber: fromBlock,
+		BlockNumber: 0,
 		TxHash:      "",
 		LogIndex:    0,
 		EventKey:    "",

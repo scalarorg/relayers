@@ -2,6 +2,7 @@ package types
 
 import (
 	"math"
+	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -11,8 +12,13 @@ import (
 	"github.com/scalarorg/bitcoin-vault/go-utils/types"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
+type BlockTime struct {
+	ResultBlock ctypes.ResultBlock
+	QueryTime   time.Time
+}
 type ExecuteParams struct {
 	SourceChain      string
 	SourceAddress    string

@@ -315,7 +315,8 @@ func (c *EvmClient) RecoverExecutedEvents(ctx context.Context) error {
 
 // Try to recover missing events from the last checkpoint block number to the current block number
 func RecoverEvent[T ValidEvmEvent](c *EvmClient, ctx context.Context, eventName string, fnCreateEventData func(types.Log) T) error {
-	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.EvmConfig.GetId(), eventName, c.EvmConfig.StartBlock)
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.EvmConfig.GetId(), eventName)
+	lastCheckpoint.BlockNumber = c.EvmConfig.StartBlock
 	if err != nil {
 		log.Warn().Str("chainId", c.EvmConfig.GetId()).
 			Str("eventName", eventName).
@@ -495,7 +496,8 @@ const (
 
 func WatchForEvent[T ValidWatchEvent](c *EvmClient, ctx context.Context, eventName string) error {
 
-	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.EvmConfig.GetId(), eventName, c.EvmConfig.StartBlock)
+	lastCheckpoint, err := c.dbAdapter.GetLastEventCheckPoint(c.EvmConfig.GetId(), eventName)
+	lastCheckpoint.BlockNumber = c.EvmConfig.StartBlock
 	if err != nil {
 		log.Warn().Str("chainId", c.EvmConfig.GetId()).
 			Str("eventName", eventName).

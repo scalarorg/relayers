@@ -53,10 +53,8 @@ var (
 		BroadcastMode: "sync",
 		Mnemonic:      "",
 	}
-	err           error
 	clientCtx     *client.Context
 	queryClient   *cosmos.QueryClient
-	accAddress    sdk.AccAddress
 	networkClient *cosmos.NetworkClient
 )
 
@@ -210,4 +208,11 @@ func TestLongtimeListing(t *testing.T) {
 		time.Sleep(retryInterval)
 	}
 	//cancelFunc()
+}
+
+func TestGetNextBlock(t *testing.T) {
+	scalarClient, err := scalar.NewClientFromConfig(&DefaultGlobalConfig, &ScalarNetworkConfig, nil, nil)
+	require.NoError(t, err)
+	scalarClient.ProcessNextBlock(context.Background())
+	select {}
 }
