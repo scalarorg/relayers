@@ -66,7 +66,13 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 	b.isRunning = true
 	b.mutex.Unlock()
 	go b.broadcastLoop(ctx)
-	//b.queue.Start()
+	//Update account sequence for every 1 second
+	go func() {
+		for {
+			b.network.UpdateAccountSequence(ctx)
+			time.Sleep(time.Second)
+		}
+	}()
 	return nil
 }
 
@@ -83,8 +89,8 @@ func (b *Broadcaster) QueueTxMsg(msg types.Msg) error {
 	if !b.isRunning {
 		return fmt.Errorf("broadcaster is not running")
 	}
-	log.Debug().Msgf("[Broadcaster] [QueueTxMsg] enqueue message %T", msg)
 	b.messageBuffer.AddNewMsg(msg)
+	log.Debug().Msgf("[Broadcaster] [QueueTxMsg] enqueue message %T, current message buffer size: %d", msg, b.messageBuffer.GetMsgBufferSize())
 	return nil
 }
 func (b *Broadcaster) QueueSignCommandReq(chain string, msg types.Msg) error {
@@ -254,7 +260,6 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 		resp, err := b.network.SignAndBroadcastMsgs(ctx, msg)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[Broadcaster] Failed to broadcast signCommandReqs %T for chain %s", msg, chain)
-			return err
 		} else if resp.Code == 0 {
 			log.Debug().
 				Str("chain", chain).

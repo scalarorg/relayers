@@ -192,7 +192,7 @@ func (c *QueryClient) UnmarshalAccount(resp *auth.QueryAccountResponse, account 
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal account: %w", err)
 	}
-	log.Debug().Msgf("accountMap: %v", accountMap)
+	log.Debug().Any("accountMap", accountMap).Msgf("[QueryClient] [UnmarshalAccount]")
 	account.Address = accountMap["address"].(string)
 	account.AccountNumber, err = strconv.ParseUint(accountMap["account_number"].(string), 10, 64)
 	if err != nil {

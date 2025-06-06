@@ -23,6 +23,7 @@ import (
 // Add this new type definition
 
 const (
+	BroadcasterBatchSize                     = 10
 	BlockEventsBase64Encoded                 = false
 	EventTypeMintCommand                     = "scalar.chains.v1beta1.MintCommand"
 	EventTypeContractCallApproved            = "scalar.chains.v1beta1.ContractCallApproved"
@@ -512,7 +513,11 @@ func (b *MessageBuffer) AddNewMsg(msgs ...sdk.Msg) {
 	defer b.mutex.Unlock()
 	b.txBuffers = append(b.txBuffers, msgs...)
 }
-
+func (b *MessageBuffer) GetMsgBufferSize() int {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	return len(b.txBuffers)
+}
 func (b *MessageBuffer) AddFailedMsg(msgs ...sdk.Msg) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()

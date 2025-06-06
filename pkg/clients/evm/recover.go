@@ -446,9 +446,11 @@ func (c *EvmClient) RecoverAllRedeemSessions(groups []chainsExported.Hash,
 
 	switchedPhaseCounter := 0
 	for toBlock > c.EvmConfig.StartBlock {
-		time.Sleep(5 * time.Second)
+		//time.Sleep(500 * time.Millisecond)
 		fnSetQueryRange(&query, toBlock, recoverRange)
+		start := time.Now()
 		logs, err := c.Client.FilterLogs(context.Background(), query)
+		elapsed := time.Since(start)
 		if err != nil {
 			log.Error().Err(err).
 				Str("Chain", c.EvmConfig.ID).
@@ -470,6 +472,7 @@ func (c *EvmClient) RecoverAllRedeemSessions(groups []chainsExported.Hash,
 				Uint64("FromBlock", query.FromBlock.Uint64()).
 				Uint64("ToBlock", toBlock).
 				Int("Logs found", len(logs)).
+				Str("Elapsed", elapsed.String()).
 				Msgf("[EvmClient] [RecoverAllRedeemSessions] progress %d/%d", currentBlockNumber-query.FromBlock.Uint64()+1, currentBlockNumber-c.EvmConfig.StartBlock+1)
 		}
 		//Loop from the last log to the first log

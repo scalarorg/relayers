@@ -46,7 +46,6 @@ func removeQuote(str string) string {
 
 func ParseAbciEvent[T proto.Message](event abci.Event, messages T) error {
 	rawData := map[string]string{}
-	log.Info().Msgf("[ScalarClient] [ParseAbciEvent] event: %v", event)
 	for _, attribute := range event.Attributes {
 		var value string
 		var keyItem string

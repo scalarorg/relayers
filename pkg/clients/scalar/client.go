@@ -105,7 +105,7 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 		}
 	}
 	pendingCommands := NewPendingCommands()
-	broadcaster := NewBroadcaster(networkClient, pendingCommands, time.Second, 10)
+	broadcaster := NewBroadcaster(networkClient, pendingCommands, time.Second, BroadcasterBatchSize)
 	client := &Client{
 		globalConfig:    globalConfig,
 		networkConfig:   config,
@@ -150,12 +150,12 @@ func (c *Client) Start(ctx context.Context) error {
 			log.Error().Err(err).Msg("[ScalarClient] [subscribeAllBlockEventsWithHeatBeat] Failed")
 		}
 	}()
-	go func() {
-		err := c.ProcessNextBlock(ctx)
-		if err != nil {
-			log.Error().Err(err).Msg("[ScalarClient] [getNextBlock] Failed")
-		}
-	}()
+	// go func() {
+	// 	err := c.ProcessNextBlock(ctx)
+	// 	if err != nil {
+	// 		log.Error().Err(err).Msg("[ScalarClient] [getNextBlock] Failed")
+	// 	}
+	// }()
 	// go func() {
 	// 	c.subscribeWithHeatBeat(ctx)
 	// }()
@@ -168,6 +168,7 @@ func (c *Client) RefreshCurrentBlock(ctx context.Context, lastCurrentBlock *type
 		if lastCurrentBlock == nil || time.Since(lastCurrentBlock.QueryTime) >= time.Second*5 {
 			currentBlock, err := c.network.GetCurrentBlock(ctx)
 			if err == nil {
+				log.Info().Msgf("[ScalarClient] [RefreshCurrentBlock] current block: %d", currentBlock.ResultBlock.Block.Height)
 				return currentBlock
 			}
 		} else {

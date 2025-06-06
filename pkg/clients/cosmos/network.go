@@ -3,7 +3,6 @@ package cosmos
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -43,6 +42,7 @@ func createDefaultTxFactory(config *CosmosNetworkConfig, txConfig client.TxConfi
 
 type AccountSequence struct {
 	BlockHeight   int64
+	QueryTime     *time.Time
 	AccountNumber uint64
 	Sequence      uint64
 }
@@ -54,50 +54,62 @@ type NetworkClient struct {
 	privKey         *secp256k1.PrivKey
 	txConfig        client.TxConfig
 	txFactory       tx.Factory
-	accountSequence *AccountSequence
+	accountSequence AccountSequence
 	seqMutex        sync.Mutex // Add mutex for sequence number synchronization
 }
 
-// Add method to safely get sequence number
-func (c *NetworkClient) GetSequenceNumber() uint64 {
-	c.seqMutex.Lock()
-	defer c.seqMutex.Unlock()
-	if c.accountSequence == nil {
-		c.accountSequence = &AccountSequence{
-			BlockHeight:   0,
-			AccountNumber: 0,
-			Sequence:      0,
+// Update account sequence for every 1 second
+func (c *NetworkClient) UpdateAccountSequence(ctx context.Context) {
+	if c.accountSequence.QueryTime == nil || time.Since(*c.accountSequence.QueryTime) >= time.Second {
+		blockTime, err := c.GetCurrentBlock(ctx)
+		if err != nil {
+			log.Error().Msgf("failed to get current block: %+v", err)
+		} else if blockTime != nil {
+			now := time.Now()
+			if blockTime.ResultBlock.Block.Height > c.accountSequence.BlockHeight {
+				//Fetch new account number and sequence number from network
+				resp, err := c.queryClient.QueryAccount(ctx, c.GetAddress())
+				if err != nil {
+					log.Error().Msgf("failed to get account: %+v", err)
+				} else {
+					accountSequence := AccountSequence{
+						AccountNumber: resp.AccountNumber,
+						Sequence:      resp.Sequence,
+						BlockHeight:   blockTime.ResultBlock.Block.Height,
+						QueryTime:     &now,
+					}
+					log.Debug().Int64("BlockHeight", blockTime.ResultBlock.Block.Height).
+						Any("accountSequence", accountSequence).
+						Msgf("[NetworkClient] update account sequence")
+					c.SetAccountSequence(accountSequence)
+				}
+			}
 		}
 	}
-	return c.accountSequence.Sequence
+}
+
+// Add method to safely get sequence number
+func (c *NetworkClient) GetAccountSequence() AccountSequence {
+	c.seqMutex.Lock()
+	defer c.seqMutex.Unlock()
+	return c.accountSequence
 }
 
 // Add method to safely increment sequence number
 func (c *NetworkClient) IncrementSequenceNumber() {
 	c.seqMutex.Lock()
 	defer c.seqMutex.Unlock()
-	if c.accountSequence == nil {
-		c.accountSequence = &AccountSequence{
-			BlockHeight:   0,
-			AccountNumber: 0,
-			Sequence:      0,
-		}
-	}
 	c.accountSequence.Sequence++
 }
 
 // Add method to safely set sequence number
-func (c *NetworkClient) SetSequenceNumber(seq uint64) {
+func (c *NetworkClient) SetAccountSequence(accSequence AccountSequence) {
 	c.seqMutex.Lock()
 	defer c.seqMutex.Unlock()
-	if c.accountSequence == nil {
-		c.accountSequence = &AccountSequence{
-			BlockHeight:   0,
-			AccountNumber: 0,
-			Sequence:      0,
-		}
-	}
-	c.accountSequence.Sequence = seq
+	c.accountSequence.Sequence = accSequence.Sequence
+	c.accountSequence.AccountNumber = accSequence.AccountNumber
+	c.accountSequence.BlockHeight = accSequence.BlockHeight
+	c.accountSequence.QueryTime = accSequence.QueryTime
 }
 func NewNetworkClient(config *CosmosNetworkConfig, queryClient *QueryClient, txConfig client.TxConfig) (*NetworkClient, error) {
 	privKey, addr, err := CreateAccountFromMnemonic(config.Mnemonic, config.Bip44Path)
@@ -125,8 +137,9 @@ func NewNetworkClient(config *CosmosNetworkConfig, queryClient *QueryClient, txC
 		privKey:     privKey,
 		txConfig:    txConfig,
 		txFactory:   txFactory,
-		accountSequence: &AccountSequence{
+		accountSequence: AccountSequence{
 			BlockHeight:   0,
+			QueryTime:     nil,
 			AccountNumber: 0,
 			Sequence:      0,
 		},
@@ -206,6 +219,18 @@ func (c *NetworkClient) Start() (rpcclient.Client, error) {
 		return nil, fmt.Errorf("failed to get client: %w", err)
 	}
 	return rpcClient, rpcClient.Start()
+}
+func (c *NetworkClient) AdjustAccountSequence(err error) error {
+	expected, got, err := ExtractCurrentSequence(err)
+	if err != nil {
+		log.Debug().Err(err).Msgf("[NetworkClient] [AdjustAccountSequence] failed to extract current sequence from error message")
+		return err
+	}
+	log.Debug().Int("expected", expected).Int("got", got).Msgf("[NetworkClient] [AdjustAccountSequence] Addjust account sequence")
+	accountSequence := c.GetAccountSequence()
+	accountSequence.Sequence = uint64(expected)
+	c.SetAccountSequence(accountSequence)
+	return nil
 }
 
 // https://github.com/cosmos/cosmos-sdk/blob/main/client/tx/tx.go#L31
@@ -296,42 +321,45 @@ func (c *NetworkClient) Start() (rpcclient.Client, error) {
 // Inject account number and sequence number into txFactory for signing
 func (c *NetworkClient) CreateTxFactory(ctx context.Context) tx.Factory {
 	txf := c.txFactory
-	//Get current Scalar's block height
-	blockTime, err := c.GetCurrentBlock(ctx)
-	if err != nil {
-		log.Error().Msgf("failed to get current block: %+v", err)
-	} else if blockTime != nil && blockTime.ResultBlock.Block.Height > c.accountSequence.BlockHeight {
-		//Fetch new account number and sequence number from network
-		resp, err := c.queryClient.QueryAccount(ctx, c.GetAddress())
-		if err != nil {
-			log.Error().Msgf("failed to get account: %+v", err)
-		} else {
-			c.accountSequence.AccountNumber = resp.AccountNumber
-			c.accountSequence.Sequence = resp.Sequence
-			c.accountSequence.BlockHeight = blockTime.ResultBlock.Block.Height
-		}
-	}
+	//Get current Scalar's block height for every 1 second
+	accountSequence := c.GetAccountSequence()
+	log.Debug().Int64("BlockHeight", accountSequence.BlockHeight).
+		Any("accountSequence", accountSequence).
+		Msgf("[NetworkClient] [CreateTxFactory]")
 	//Set adjusted account number and sequence number to the txFactory
-	txf = txf.WithAccountNumber(c.accountSequence.AccountNumber).WithSequence(c.accountSequence.Sequence)
+	txf = txf.WithAccountNumber(accountSequence.AccountNumber).WithSequence(accountSequence.Sequence)
 	return txf
 }
 
 func (c *NetworkClient) CreateTxBuilder(ctx context.Context, msgs ...sdk.Msg) (client.TxBuilder, error) {
-	//1. Build unsigned transaction using txFactory
-	txf := c.CreateTxFactory(ctx)
 	//Estimate fees
 	cliContext, err := c.queryClient.GetClientCtx()
 	if err != nil {
 		log.Debug().Err(err).Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] cannot create client context")
 	}
-	simRes, adjusted, err := tx.CalculateGas(cliContext, txf, msgs...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate gas: %w", err)
+	//1. Build unsigned transaction using txFactory
+	var txf tx.Factory
+	for {
+		txf = c.CreateTxFactory(ctx)
+		simRes, adjusted, err := tx.CalculateGas(cliContext, txf, msgs...)
+		if err != nil {
+			//Addjust account sequence number if error is "account sequence mismatch"
+			//try extract current sequence from error message: error: code = Unknown desc = account sequence mismatch, expected 32, got 31:
+			err := c.AdjustAccountSequence(err)
+			if err != nil {
+				return nil, fmt.Errorf("failed to calculate gas: %w", err)
+			}
+			//Retry in the next iteration
+			continue
+		}
+		fees := int64(txf.GasAdjustment() * float64(simRes.GasInfo.GasUsed) * c.config.GasPrice)
+		txf = txf.WithGas(adjusted)
+		txf = txf.WithFees(sdk.NewCoin(c.config.Denom, sdk.NewInt(fees)).String())
+		log.Debug().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] estimated gas: %v, gasPrice: %v, fees: %v",
+			adjusted, c.config.GasPrice, txf.Fees())
+		break
 	}
-	fees := int64(txf.GasAdjustment() * float64(simRes.GasInfo.GasUsed) * c.config.GasPrice)
-	txf = txf.WithGas(adjusted)
-	txf = txf.WithFees(sdk.NewCoin(c.config.Denom, sdk.NewInt(fees)).String())
-	log.Debug().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] estimated gas: %v, gasPrice: %v, fees: %v", adjusted, c.config.GasPrice, txf.Fees())
+
 	// Every required params are set in the txFactory
 	txBuilder, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
@@ -358,8 +386,6 @@ func (c *NetworkClient) SignAndBroadcastMsgs(ctx context.Context, msgs ...sdk.Ms
 		//Update sequence and account number
 		log.Debug().Msgf("[NetworkClient] [SignAndBroadcastMsgs] success broadcast tx with tx hash: %s", result.TxHash)
 		c.IncrementSequenceNumber() // Safely increment sequence number on successful broadcast
-	} else {
-		log.Error().Msgf("[ScalarNetworkClient] [SignAndBroadcastMsgs] failed to broadcast tx: %+v", result)
 	}
 	return result, nil
 }
@@ -385,20 +411,17 @@ func (c *NetworkClient) trySignAndBroadcastMsgs(ctx context.Context, txBuilder c
 		}
 
 		result, err = c.BroadcastTx(ctx, txBytes)
+		if err != nil {
+			err := c.AdjustAccountSequence(err)
+			if err != nil {
+				log.Debug().Err(err).Msgf("[NetworkClient] [trySignAndBroadcastMsgs] the error is not account sequence mismatch, cannot adjust account sequence")
+			}
+			continue
+		}
 		//Return if success
 		//Or error it not nil
-		if result != nil && result.Code == 0 || err != nil {
+		if result != nil && result.Code == 0 {
 			return result, err
-		}
-
-		//Sleep for a while if error is nil
-		//Or error "account sequence mismatch"
-		if result != nil && result.Code > 0 && strings.Contains(result.RawLog, "account sequence mismatch") {
-			log.Debug().Msgf("[ScalarNetworkClient] [trySignAndBroadcast] sleep for %d milliseconds due to error: %s", c.config.RetryInterval, result.RawLog)
-			time.Sleep(time.Duration(c.config.RetryInterval) * time.Millisecond)
-		} else {
-			log.Error().Msgf("[ScalarNetworkClient] [trySignAndBroadcast] successfully to broadcast tx after %d retries", c.config.MaxRetries)
-			return result, nil
 		}
 	}
 	log.Error().Msgf("[ScalarNetworkClient] [trySignAndBroadcast] failed to broadcast tx after %d retries", c.config.MaxRetries)

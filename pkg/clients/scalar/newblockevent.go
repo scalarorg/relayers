@@ -107,7 +107,10 @@ func (c *Client) tryHandleRedeemTokenApprovedEvents(events map[string][]string) 
 func (c *Client) tryHandleCommandBatchSignedEvent(ctx context.Context, events map[string][]string) error {
 	commandBatchSignedEvents, err := ParseIBCEvent[*chainstypes.CommandBatchSigned](events)
 	if err == nil && len(commandBatchSignedEvents) > 0 {
-		log.Debug().Any("CommandBatchSignedEvents", commandBatchSignedEvents).Msg("[ScalarClient] [handleCommandBatchSignedEvents]")
+		for _, event := range commandBatchSignedEvents {
+			log.Debug().Any("CommandBatchSignedEvent", event).
+				Hex("BatchCommandId", event.Args.CommandBatchID).Msg("[ScalarClient] [handleCommandBatchSignedEvents]")
+		}
 		return c.handleCommandBatchSignedEvents(ctx, commandBatchSignedEvents)
 	} else {
 		log.Debug().Msg("[ScalarClient] [handleNewBlockEvents] no command batch signed events")
