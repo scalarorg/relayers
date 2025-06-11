@@ -289,6 +289,7 @@ func (c *Client) groupRedeemTxs(redeemTxs []*chains.BtcRedeemTx) map[string]*eve
 		}
 		//Find current redeem session
 		redeemSession, ok := redeemSessions[redeemTx.CustodianGroupUid]
+
 		queried := queriedGroupUids[redeemTx.CustodianGroupUid]
 		if !ok && !queried {
 			queriedGroupUids[redeemTx.CustodianGroupUid] = true
@@ -299,6 +300,11 @@ func (c *Client) groupRedeemTxs(redeemTxs []*chains.BtcRedeemTx) map[string]*eve
 				redeemSession = redeemSessionRes.Session
 				redeemSessions[redeemTx.CustodianGroupUid] = redeemSession
 			}
+		}
+		if redeemSession == nil {
+			log.Debug().Str("groupUid", redeemTx.CustodianGroupUid).
+				Msgf("[ElectrumClient] [groupRedeemTxs] Cannot find redeem session for group uid")
+			continue
 		}
 		if redeemSession.Sequence != redeemTx.SessionSequence {
 			log.Debug().Str("groupUid", redeemTx.CustodianGroupUid).
