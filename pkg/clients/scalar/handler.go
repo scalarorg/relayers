@@ -282,7 +282,8 @@ func (c *Client) getBatchedCommands(ctx context.Context, chain string, batchID [
 		return nil, fmt.Errorf("failed to get execute data: %w", err)
 	}
 
-	log.Debug().Str("Chain", chain).Str("BatchID", hex.EncodeToString(batchID)).Msgf("[ScalarClient] found executeData: %s", res.ExecuteData)
+	//log.Debug().Str("Chain", chain).Str("BatchID", hex.EncodeToString(batchID)).Msgf("[ScalarClient] found executeData: %s", res.ExecuteData)
+	log.Debug().Str("Chain", chain).Str("BatchID", hex.EncodeToString(batchID)).Msgf("[ScalarClient] found executeData")
 	return res, nil
 }
 
