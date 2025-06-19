@@ -470,7 +470,7 @@ func (ec *EvmClient) HandleSwitchPhase(event *contracts.IScalarGatewaySwitchPhas
 	//1. Convert into a RelayData instance then store to the db
 	switchPhase := ec.SwitchPhaseEvent2Model(event)
 	if ec.dbAdapter != nil {
-		err := ec.dbAdapter.SaveSingleValue(&switchPhase)
+		err := ec.dbAdapter.SaveSwitchPhase(&switchPhase)
 		if err != nil {
 			return fmt.Errorf("failed to create evm switch phase: %w", err)
 		}

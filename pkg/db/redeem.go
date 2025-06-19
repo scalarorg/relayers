@@ -8,7 +8,22 @@ import (
 	"github.com/scalarorg/data-models/scalarnet"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+func (db *DatabaseAdapter) SaveSwitchPhase(value *chains.SwitchedPhase) error {
+	err := db.PostgresClient.Clauses(
+		clause.OnConflict{
+			Columns:   []clause.Column{{Name: "chain"}, {Name: "tx_hash"}},
+			DoNothing: true,
+		},
+	).Save(value).Error
+	if err != nil {
+		log.Error().Err(err).Msgf("Failed to save switch phase: %v", value)
+		return err
+	}
+	return nil
+}
 
 func (db *DatabaseAdapter) SaveBtcRedeemTxs(btcChain string, redeemTxs []*chains.BtcRedeemTx) error {
 	//2. Update ContractCallWithToken status with execution confirmation from bitcoin network
