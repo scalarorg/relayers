@@ -141,7 +141,10 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (*chains.TokenS
 		return nil, fmt.Errorf("failed to get symbol: %w", err)
 	}
 	destAddress := utils.NormalizeAddress(vaultTx.DestRecipientAddress, chainInfo.ChainType)
-
+	stakerPubkey, err := hex.DecodeString(vaultTx.StakerPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode staker pubkey: %w", err)
+	}
 	tokenSent := chains.TokenSent{
 		EventID:              eventId,
 		TxHash:               vaultTx.TxHash,
@@ -151,6 +154,7 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (*chains.TokenS
 		LogIndex:             uint(vaultTx.TxPosition),
 		SourceChain:          c.electrumConfig.SourceChain,
 		SourceAddress:        strings.ToLower(vaultTx.StakerAddress),
+		StakerPubkey:         stakerPubkey,
 		DestinationChain:     destinationChainName,
 		DestinationAddress:   destAddress,
 		Symbol:               symbol,
