@@ -266,10 +266,11 @@ func (c *Client) handleBlockBtcTokenSents(blockNumber uint64, tokenSents []*chai
 			}
 		}
 		confirmTxs.Batch.Txs[i] = &chainsTypes.TrustedTx{
-			Hash:       txHash,
-			TxIndex:    tokenSent.TxPosition,
-			Raw:        tokenSent.RawTx,
-			MerklePath: merklePath,
+			Hash:                     txHash,
+			TxIndex:                  tokenSent.TxPosition,
+			Raw:                      tokenSent.RawTx,
+			MerklePath:               merklePath,
+			PrevOutpointScriptPubkey: tokenSent.StakerPubkey,
 		}
 	}
 
