@@ -13,6 +13,7 @@ const (
 	//EVENT_BTC_PSBT_SIGN_REQUEST          = "Btc.PsbtSignRequest"
 	EVENT_CUSTODIAL_SIGNATURES_CONFIRMED = "Custodial.SignaturesConfirmed"
 	EVENT_ELECTRS_VAULT_TRANSACTION      = "Electrs.VaultTransaction"
+	EVENT_ELECTRS_VAULT_BLOCK            = "Electrs.VaultBlock"
 	EVENT_ELECTRS_REDEEM_TRANSACTION     = "Electrs.RedeemTransaction"
 	EVENT_ELECTRS_NEW_BLOCK              = "Electrs.NewBlock"
 	EVENT_SCALAR_TOKEN_SENT              = "Scalar.TokenSent"

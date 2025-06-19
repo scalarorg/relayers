@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/events"
+	chainsTypes "github.com/scalarorg/scalar-core/x/chains/types"
 )
 
 func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
@@ -14,6 +15,9 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 	case events.EVENT_ELECTRS_VAULT_TRANSACTION:
 		//Broadcast from electrs.handleVaultTransaction
 		return c.requestConfirmBtcTxs(event.Data.(events.ConfirmTxsRequest))
+	case events.EVENT_ELECTRS_VAULT_BLOCK:
+		//Broadcast from electrs.handleVaultBlock
+		return c.broadcaster.ConfirmBtcVaultBlock(event.Data.(chainsTypes.ConfirmSourceTxsRequestV2))
 	case events.EVENT_ELECTRS_REDEEM_TRANSACTION:
 		//Broadcast from electrs.handleRedeemTransaction
 		return c.broadcastRedeemTxsConfirm(event.Data.(*events.BtcRedeemTxEvents))
@@ -67,6 +71,7 @@ func (c *Client) requestConfirmEvmTxs(confirmRequest events.ConfirmTxsRequest) e
 }
 func (c *Client) handleElectrsEventNewBlock(blockHeader *chains.BlockHeader) error {
 	log.Debug().Uint64("blockHeight", blockHeader.BlockNumber).Msg("[ScalarClient] [handleElectrsEventNewBlock] Received new block event")
+	c.broadcaster.ConfirmBtcBlock(blockHeader.Chain, blockHeader.BlockHash, blockHeader.BlockNumber)
 	// Todo: init utxo for first time
 	if !c.initUtxo {
 		c.broadcaster.InitializeUtxoRequest(blockHeader.Chain, blockHeader.BlockNumber)

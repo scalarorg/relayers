@@ -9,11 +9,16 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/go-electrum/electrum"
+	"github.com/scalarorg/go-electrum/electrum/types"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/scalar-core/x/covenant/exported"
+)
+
+const (
+	EVENT_ELECTRS_VAULT_BLOCK = "vault_block"
 )
 
 type Client struct {
@@ -106,9 +111,9 @@ func (c *Client) Start(ctx context.Context) error {
 	}
 	log.Debug().Msg("[ElectrumClient] [Start] Subscribing to new block event for request to confirm if vault transaction is get enought confirmation")
 	c.Electrs.BlockchainHeaderSubscribe(ctx, c.BlockchainHeaderHandler)
-	log.Debug().Msgf("[ElectrumClient] [Start] Subscribing to vault transactions with params: %v", params)
-	c.Electrs.VaultTransactionSubscribe(ctx, c.VaultTxMessageHandler, params...)
-
+	//log.Debug().Msgf("[ElectrumClient] [Start] Subscribing to vault transactions with params: %v", params)
+	//c.Electrs.VaultTransactionSubscribe(ctx, c.VaultTxMessageHandler, params...)
+	c.Electrs.SubscribeEvent(ctx, types.VaultBlocksSubscribe, c.HandleValueBlockWithVaultTxs, params...)
 	return nil
 }
 
