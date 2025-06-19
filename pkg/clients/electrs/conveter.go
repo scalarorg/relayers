@@ -14,6 +14,45 @@ import (
 	"gorm.io/gorm"
 )
 
+func (c *Client) CategorizeVaultBlock(vaultBlock *types.VaultBlock) ([]*chains.TokenSent, []*chains.BtcRedeemTx) {
+	tokenSents := []*chains.TokenSent{}
+	redeemTxs := []*chains.BtcRedeemTx{}
+	//Handle reorg, process only tx with highest block number
+	log.Debug().Str("BlockHash", vaultBlock.Hash).
+		Int("BlockHeight", vaultBlock.Height).
+		Msg("[ElectrumClient] [CategorizeVaultTxs] process vault blocks")
+	for _, vaultTx := range vaultBlock.VaultTxs {
+		txInfo := vaultTx.TxInfo
+		if txInfo.VaultTxType == 1 {
+			//1.Staking
+			tokenSent, err := c.CreateTokenSent(txInfo)
+			if err != nil {
+				log.Error().Err(err).Msg("[ElectrumClient] [CreateTokenSents] failed to create token sent")
+			} else if tokenSent != nil {
+				if tokenSent.Symbol == "" {
+					log.Error().Msgf("[ElectrumClient] [CreateTokenSents] symbol not found for token: %s", txInfo.DestTokenAddress)
+				} else {
+					tokenSent.RawTx = vaultTx.RawTx
+					tokenSent.MerkleProof = vaultTx.Proof
+					tokenSents = append(tokenSents, tokenSent)
+				}
+			}
+		} else if txInfo.VaultTxType == 2 {
+			//2.Unstaking
+			redeemTx, err := c.CreateRedeemTx(txInfo)
+			if err != nil {
+				log.Error().Err(err).Msg("[ElectrumClient] failed to create redeem tx")
+			} else {
+				redeemTx.RawTx = vaultTx.RawTx
+				redeemTx.MerkleProof = vaultTx.Proof
+				redeemTxs = append(redeemTxs, redeemTx)
+				log.Info().Any("RedeemTx", redeemTx).Msg("[ElectrumClient] [CategorizeVaultTxs]")
+			}
+		}
+	}
+	return tokenSents, redeemTxs
+}
+
 func (c *Client) CategorizeVaultTxs(vaultTxs []types.VaultTransaction) ([]*chains.TokenSent, []*chains.BtcRedeemTx) {
 	tokenSents := []*chains.TokenSent{}
 	redeemTxs := []*chains.BtcRedeemTx{}
@@ -106,6 +145,7 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (*chains.TokenS
 	tokenSent := chains.TokenSent{
 		EventID:              eventId,
 		TxHash:               vaultTx.TxHash,
+		TxPosition:           uint64(vaultTx.TxPosition),
 		BlockNumber:          uint64(vaultTx.Height),
 		BlockTime:            uint64(vaultTx.Timestamp),
 		LogIndex:             uint(vaultTx.TxPosition),
@@ -138,6 +178,7 @@ func (c *Client) CreateRedeemTx(vaultTx types.VaultTransaction) (*chains.BtcRede
 				BlockNumber:       uint64(vaultTx.Height),
 				BlockTime:         uint64(vaultTx.Timestamp),
 				TxHash:            vaultTx.TxHash,
+				TxPosition:        uint64(vaultTx.TxPosition),
 				Amount:            vaultTx.Amount,
 				SessionSequence:   vaultTx.SessionSequence,
 				CustodianGroupUid: groupUid,

@@ -1,15 +1,18 @@
 package electrs
 
 import (
+	"encoding/json"
 	"fmt"
-	"slices"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/go-electrum/electrum/types"
 	"github.com/scalarorg/relayers/pkg/events"
+	chainExported "github.com/scalarorg/scalar-core/x/chains/exported"
+	chainsTypes "github.com/scalarorg/scalar-core/x/chains/types"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	covTypes "github.com/scalarorg/scalar-core/x/covenant/types"
+	nexusExported "github.com/scalarorg/scalar-core/x/nexus/exported"
 )
 
 func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err error) error {
@@ -68,38 +71,17 @@ func (c *Client) tryConfirmTokenSents(blockHeight int) error {
 	// Check pending vault transactions in the relayer db, if the confirmation is enough, send to the event bus
 	lastConfirmedBlockNumber := blockHeight - c.electrumConfig.Confirmations + 1
 
-	tokenSents, err := c.dbAdapter.FindPendingBtcTokenSent(c.electrumConfig.SourceChain, lastConfirmedBlockNumber)
+	tokenSentsByBlock, err := c.dbAdapter.FindPendingBtcTokenSent(c.electrumConfig.SourceChain, lastConfirmedBlockNumber)
 	if err != nil {
 		log.Error().Err(err).Msg("[ElectrumClient] [tryConfirmTokenSents] Failed to get pending vault transactions from db")
 		return fmt.Errorf("failed to get pending vault transactions from db: %w", err)
 	}
-	if len(tokenSents) == 0 {
+	if len(tokenSentsByBlock) == 0 {
 		log.Debug().Msgf("[ElectrumClient] [tryConfirmTokenSents] No pending vault transactions with %d confirmations found", c.electrumConfig.Confirmations)
 		return nil
 	}
-	confirmTxs := events.ConfirmTxsRequest{
-		ChainName: c.electrumConfig.SourceChain,
-		TxHashs:   make(map[string]string),
-	}
-
-	for _, tokenSent := range tokenSents {
-		tokenSent.Status = chains.TokenSentStatusVerifying
-		confirmTxs.TxHashs[tokenSent.TxHash] = tokenSent.DestinationChain
-	}
-	err = c.dbAdapter.SaveTokenSents(tokenSents)
-	if err != nil {
-		log.Error().Err(err).Msg("[ElectrumClient] [tryConfirmTokenSents] Failed to save token sents")
-		return fmt.Errorf("failed to save token sents: %w", err)
-	}
-	if c.eventBus != nil {
-		log.Debug().Msgf("[ElectrumClient] [tryConfirmTokenSents] Broadcasting confirm tx request: %v", confirmTxs)
-		c.eventBus.BroadcastEvent(&events.EventEnvelope{
-			EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
-			DestinationChain: events.SCALAR_NETWORK_NAME,
-			Data:             confirmTxs,
-		})
-	} else {
-		log.Warn().Msg("[ElectrumClient] [tryConfirmTokenSents] event bus is undefined")
+	for blockNumber, tokenSents := range tokenSentsByBlock {
+		c.handleBlockBtcTokenSents(blockNumber, tokenSents)
 	}
 	return nil
 }
@@ -118,69 +100,109 @@ func (c *Client) findAndHandleRedeemTxs(blockHeight int) error {
 	return c.handleRedeemTxs(redeemTxs)
 }
 
-// Handle vault messages
-// Todo: Add some logging, metric and error handling if needed
-func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err error) error {
+// Handle whole block with vault transactions
+func (c *Client) HandleValueBlockWithVaultTxs(rawMessage json.RawMessage, err error) {
 	if err != nil {
-		log.Warn().Msgf("[ElectrumClient] [vaultTxMessageHandler] Failed to receive vault transaction: %v", err)
-		return fmt.Errorf("failed to receive vault transaction: %w", err)
+		log.Warn().Msgf("[ElectrumClient] [HandleValueBlockWithVaultTxs] Failed to receive vault transaction: %v", err)
+		return
 	}
-	if len(vaultTxs) == 0 {
-		log.Debug().Msg("[ElectrumClient] [vaultTxMessageHandler] No vault transactions received")
-		return nil
+	var vaultBlocks []types.VaultBlock
+	err = json.Unmarshal(rawMessage, &vaultBlocks)
+	if err != nil {
+		log.Warn().Msgf("[ElectrumClient] [HandleValueBlockWithVaultTxs] Failed to unmarshal vault blocks: %v", err)
+		return
 	}
-	c.PreProcessVaultsMessages(vaultTxs)
-	//1. parse vault transactions to token sent and unstaked vault txs
-	tokenSents, redeemTxs := c.CategorizeVaultTxs(vaultTxs)
-	//2. update last checkpoint
-	//blockNumbers := make([]int64, 0)
+	log.Debug().Msgf("[ElectrumClient] [HandleValueBlockWithVaultTxs] Received %d VaultBlocks", len(vaultBlocks))
 	lastCheckpoint := c.getLastCheckpoint()
-	for _, tx := range vaultTxs {
-		// if !slices.Contains(blockNumbers, int64(tx.Height)) {
-		// 	blockNumbers = append(blockNumbers, int64(tx.Height))
-		// }
-		if uint64(tx.Height) > lastCheckpoint.BlockNumber ||
-			(uint64(tx.Height) == lastCheckpoint.BlockNumber && uint(tx.TxPosition) > lastCheckpoint.LogIndex) {
-			lastCheckpoint.BlockNumber = uint64(tx.Height)
-			lastCheckpoint.TxHash = tx.TxHash
-			lastCheckpoint.LogIndex = uint(tx.TxPosition)
-			lastCheckpoint.EventKey = tx.Key
+	for _, vaultBlock := range vaultBlocks {
+		log.Debug().Int("blockHeight", vaultBlock.Height).Msgf("[ElectrumClient] [HandleValueBlockWithVaultTxs] Received %d vault transactions", len(vaultBlock.VaultTxs))
+		if uint64(vaultBlock.Height) > lastCheckpoint.BlockNumber {
+			lastCheckpoint.BlockNumber = uint64(vaultBlock.Height)
+			lastCheckpoint.TxHash = vaultBlock.Hash
+		}
+		tokenSents, redeemTxs := c.CategorizeVaultBlock(&vaultBlock)
+		if len(tokenSents) > 0 {
+			err = c.handleBlockBtcTokenSents(uint64(vaultBlock.Height), tokenSents)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to handle token sents")
+			}
+		}
+		if len(redeemTxs) > 0 {
+			err = c.handleRedeemTxs(redeemTxs)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to handle redeem transactions")
+			}
 		}
 	}
-	// if c.eventBus != nil {
-	// 	c.eventBus.BroadcastEvent(&events.EventEnvelope{
-	// 		EventType:        events.EVENT_ELECTRS_NEW_BLOCK,
-	// 		DestinationChain: c.electrumConfig.SourceChain,
-	// 		Data:             blockNumbers,
-	// 	})
-	// }
-
 	err = c.dbAdapter.UpdateLastEventCheckPoint(lastCheckpoint)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to update last event checkpoint")
 	}
-	if len(tokenSents) == 0 {
-		log.Warn().Msg("No Valid vault transactions to convert to relay data")
-	} else {
-		log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [VaultTxMessageHandler] Received %d validvault transactions", len(tokenSents))
-	}
-	// Redeem transaction
-	if len(redeemTxs) > 0 {
-		err = c.handleRedeemTxs(redeemTxs)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to update unstaked vault transactions")
-		}
-	}
-	if len(tokenSents) > 0 {
-		err := c.handleTokenSents(tokenSents)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to handle token sents")
-		}
-		return err
-	}
-
-	return nil
 }
+
+// Handle vault messages
+// Todo: Add some logging, metric and error handling if needed
+// func (c *Client) VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err error) error {
+// 	if err != nil {
+// 		log.Warn().Msgf("[ElectrumClient] [vaultTxMessageHandler] Failed to receive vault transaction: %v", err)
+// 		return fmt.Errorf("failed to receive vault transaction: %w", err)
+// 	}
+// 	if len(vaultTxs) == 0 {
+// 		log.Debug().Msg("[ElectrumClient] [vaultTxMessageHandler] No vault transactions received")
+// 		return nil
+// 	}
+// 	c.PreProcessVaultsMessages(vaultTxs)
+// 	//1. parse vault transactions to token sent and unstaked vault txs
+// 	tokenSents, redeemTxs := c.CategorizeVaultTxs(vaultTxs)
+// 	//2. update last checkpoint
+// 	//blockNumbers := make([]int64, 0)
+// 	lastCheckpoint := c.getLastCheckpoint()
+// 	for _, tx := range vaultTxs {
+// 		// if !slices.Contains(blockNumbers, int64(tx.Height)) {
+// 		// 	blockNumbers = append(blockNumbers, int64(tx.Height))
+// 		// }
+// 		if uint64(tx.Height) > lastCheckpoint.BlockNumber ||
+// 			(uint64(tx.Height) == lastCheckpoint.BlockNumber && uint(tx.TxPosition) > lastCheckpoint.LogIndex) {
+// 			lastCheckpoint.BlockNumber = uint64(tx.Height)
+// 			lastCheckpoint.TxHash = tx.TxHash
+// 			lastCheckpoint.LogIndex = uint(tx.TxPosition)
+// 			lastCheckpoint.EventKey = tx.Key
+// 		}
+// 	}
+// 	// if c.eventBus != nil {
+// 	// 	c.eventBus.BroadcastEvent(&events.EventEnvelope{
+// 	// 		EventType:        events.EVENT_ELECTRS_NEW_BLOCK,
+// 	// 		DestinationChain: c.electrumConfig.SourceChain,
+// 	// 		Data:             blockNumbers,
+// 	// 	})
+// 	// }
+
+// 	err = c.dbAdapter.UpdateLastEventCheckPoint(lastCheckpoint)
+// 	if err != nil {
+// 		log.Error().Err(err).Msg("Failed to update last event checkpoint")
+// 	}
+// 	if len(tokenSents) == 0 {
+// 		log.Warn().Msg("No Valid vault transactions to convert to relay data")
+// 	} else {
+// 		log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [VaultTxMessageHandler] Received %d validvault transactions", len(tokenSents))
+// 	}
+// 	// Redeem transaction
+// 	if len(redeemTxs) > 0 {
+// 		err = c.handleRedeemTxs(redeemTxs)
+// 		if err != nil {
+// 			log.Error().Err(err).Msg("Failed to update unstaked vault transactions")
+// 		}
+// 	}
+// 	if len(tokenSents) > 0 {
+// 		err := c.handleBlockBtcTokenSents(tokenSents)
+// 		if err != nil {
+// 			log.Error().Err(err).Msg("Failed to handle token sents")
+// 		}
+// 		return err
+// 	}
+
+// 	return nil
+// }
 
 // Todo: Log and validate incomming message
 func (c *Client) PreProcessVaultsMessages(vaultTxs []types.VaultTransaction) error {
@@ -190,53 +212,139 @@ func (c *Client) PreProcessVaultsMessages(vaultTxs []types.VaultTransaction) err
 	}
 	return nil
 }
-func (c *Client) handleTokenSents(tokenSents []*chains.TokenSent) error {
-	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [handleTokenSents] Received %d token sent transactions", len(tokenSents))
-	confirmTxs := events.ConfirmTxsRequest{
-		ChainName: c.electrumConfig.SourceChain,
-		TxHashs:   make(map[string]string),
+
+// All token sent in the same block are sent in one request
+func (c *Client) handleBlockBtcTokenSents(blockNumber uint64, tokenSents []*chains.TokenSent) error {
+	if len(tokenSents) == 0 {
+		log.Debug().Msgf("[ElectrumClient] [handleTokenSents] No token sent transactions to handle")
+		return nil
 	}
+	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [handleTokenSents] Received %d token sent transactions", len(tokenSents))
 	//If confirmations is 1, send to the event bus with destination chain is scalar for confirmation
 	//If confirmations is greater than 1, wait for the next blocks to get more confirmations before broadcasting to the scalar network
-	blockNumbers := make([]uint64, 0)
-	for _, tokenSent := range tokenSents {
-		if !slices.Contains(blockNumbers, tokenSent.BlockNumber) {
-			blockNumbers = append(blockNumbers, tokenSent.BlockNumber)
-		}
-		if c.electrumConfig.Confirmations <= 1 || c.currentHeight-int(tokenSent.BlockNumber) >= c.electrumConfig.Confirmations {
+
+	if c.electrumConfig.Confirmations <= 1 || c.currentHeight-int(blockNumber) >= c.electrumConfig.Confirmations {
+		for _, tokenSent := range tokenSents {
 			tokenSent.Status = chains.TokenSentStatusVerifying
-			confirmTxs.TxHashs[tokenSent.TxHash] = tokenSent.DestinationChain
-		} else {
-			log.Debug().Msgf("[ElectrumClient] [handleTokenSents] BridgeTx %s does not have enough %d confirmed yet",
-				tokenSent.TxHash, c.electrumConfig.Confirmations)
+		}
+
+	} else {
+		log.Debug().Msgf("[ElectrumClient] [handleTokenSents] %d BridgeTxes does not have enough %d confirmed yet. Current block height %d, transactions height %d",
+			len(tokenSents), c.electrumConfig.Confirmations, c.currentHeight, blockNumber)
+	}
+
+	//Get blockHash by blockNumber
+	blockHeader, err := c.dbAdapter.FindBlockHeader(c.electrumConfig.SourceChain, blockNumber)
+	if err != nil {
+		log.Error().Err(err).Msgf("[ElectrumClient] [handleTokenSents] Failed to find block header for block number %d", blockNumber)
+		return fmt.Errorf("failed to find block header for block number %d: %w", blockNumber, err)
+	}
+	blockHash, err := chainExported.HashFromHex(blockHeader.BlockHash)
+	if err != nil {
+		log.Error().Err(err).Msgf("[ElectrumClient] [handleTokenSents] Failed to get block hash for block number %d", blockNumber)
+		return fmt.Errorf("failed to get block hash for block number %d: %w", blockNumber, err)
+	}
+	confirmTxs := chainsTypes.ConfirmSourceTxsRequestV2{
+		Chain: nexusExported.ChainName(c.electrumConfig.SourceChain),
+		Batch: &chainsTypes.TrustedTxsByBlock{
+			BlockHash: blockHash,
+			Txs:       make([]*chainsTypes.TrustedTx, len(tokenSents)),
+		},
+	}
+	for i, tokenSent := range tokenSents {
+		txHash, err := chainExported.HashFromHex(tokenSent.TxHash)
+		if err != nil {
+			log.Error().Err(err).Msgf("[ElectrumClient] [handleTokenSents] Failed to get tx hash for token sent %d", i)
+			continue
+		}
+		merklePath := make([]chainExported.Hash, len(tokenSent.MerkleProof))
+		for j, proofItem := range tokenSent.MerkleProof {
+			merklePath[j], err = chainExported.HashFromHex(proofItem)
+			if err != nil {
+				log.Error().Err(err).Msgf("[ElectrumClient] [handleTokenSents] Failed to get merkle path for token sent %d", i)
+				continue
+			}
+		}
+		confirmTxs.Batch.Txs[i] = &chainsTypes.TrustedTx{
+			Hash:       txHash,
+			TxIndex:    tokenSent.TxPosition,
+			Raw:        tokenSent.RawTx,
+			MerklePath: merklePath,
 		}
 	}
 
 	//3. store relay data to the db, update last checkpoint
-	err := c.dbAdapter.SaveTokenSentsAndRemoveDuplicates(tokenSents)
+	err = c.dbAdapter.SaveTokenSentsAndRemoveDuplicates(tokenSents)
 	if err != nil {
 		log.Error().Err(err).Msg("[ElectrumClient] [handleTokenSents] Failed to store token sents to the db")
 		return fmt.Errorf("[ElectrumClient] [handleTokenSents] failed to store token sents to the db: %w", err)
 	}
 	if c.eventBus != nil {
 		//4. Send to the event bus with destination chain is scalar for confirmation
-		if len(confirmTxs.TxHashs) > 0 {
-			log.Debug().Msgf("[ElectrumClient] [VaultTxMessageHandler] Broadcasting confirm tx request: %v", confirmTxs)
-			c.eventBus.BroadcastEvent(&events.EventEnvelope{
-				EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
-				DestinationChain: events.SCALAR_NETWORK_NAME,
-				Data:             confirmTxs,
-			})
 
-		} else {
-			log.Debug().Msgf("[ElectrumClient] [handleTokenSents] No tokensent have enough %d confirmations to broadcast", c.electrumConfig.Confirmations)
-		}
+		log.Debug().Msgf("[ElectrumClient] [VaultTxMessageHandler] Broadcasting confirm tx request: %v", confirmTxs)
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_ELECTRS_VAULT_BLOCK,
+			DestinationChain: events.SCALAR_NETWORK_NAME,
+			Data:             confirmTxs,
+		})
+
 	} else {
 		log.Warn().Msg("[ElectrumClient] [handleTokenSents] event bus is undefined")
 	}
-
 	return nil
 }
+
+// 2025-06-19
+// Request to confirm all token send in one block using merkle proof
+
+// func (c *Client) handleTokenSents(tokenSents []*chains.TokenSent) error {
+// 	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [handleTokenSents] Received %d token sent transactions", len(tokenSents))
+// 	confirmTxs := events.ConfirmTxsRequest{
+// 		ChainName: c.electrumConfig.SourceChain,
+// 		TxHashs:   make(map[string]string),
+// 	}
+// 	//If confirmations is 1, send to the event bus with destination chain is scalar for confirmation
+// 	//If confirmations is greater than 1, wait for the next blocks to get more confirmations before broadcasting to the scalar network
+// 	blockNumbers := make([]uint64, 0)
+// 	for _, tokenSent := range tokenSents {
+// 		if !slices.Contains(blockNumbers, tokenSent.BlockNumber) {
+// 			blockNumbers = append(blockNumbers, tokenSent.BlockNumber)
+// 		}
+// 		if c.electrumConfig.Confirmations <= 1 || c.currentHeight-int(tokenSent.BlockNumber) >= c.electrumConfig.Confirmations {
+// 			tokenSent.Status = chains.TokenSentStatusVerifying
+// 			confirmTxs.TxHashs[tokenSent.TxHash] = tokenSent.DestinationChain
+// 		} else {
+// 			log.Debug().Msgf("[ElectrumClient] [handleTokenSents] BridgeTx %s does not have enough %d confirmed yet",
+// 				tokenSent.TxHash, c.electrumConfig.Confirmations)
+// 		}
+// 	}
+
+// 	//3. store relay data to the db, update last checkpoint
+// 	err := c.dbAdapter.SaveTokenSentsAndRemoveDuplicates(tokenSents)
+// 	if err != nil {
+// 		log.Error().Err(err).Msg("[ElectrumClient] [handleTokenSents] Failed to store token sents to the db")
+// 		return fmt.Errorf("[ElectrumClient] [handleTokenSents] failed to store token sents to the db: %w", err)
+// 	}
+// 	if c.eventBus != nil {
+// 		//4. Send to the event bus with destination chain is scalar for confirmation
+// 		if len(confirmTxs.TxHashs) > 0 {
+// 			log.Debug().Msgf("[ElectrumClient] [VaultTxMessageHandler] Broadcasting confirm tx request: %v", confirmTxs)
+// 			c.eventBus.BroadcastEvent(&events.EventEnvelope{
+// 				EventType:        events.EVENT_ELECTRS_VAULT_TRANSACTION,
+// 				DestinationChain: events.SCALAR_NETWORK_NAME,
+// 				Data:             confirmTxs,
+// 			})
+
+// 		} else {
+// 			log.Debug().Msgf("[ElectrumClient] [handleTokenSents] No tokensent have enough %d confirmations to broadcast", c.electrumConfig.Confirmations)
+// 		}
+// 	} else {
+// 		log.Warn().Msg("[ElectrumClient] [handleTokenSents] event bus is undefined")
+// 	}
+
+// 	return nil
+// }
 
 // Todo: update ContractCallWithToken status with execution confirmation from bitcoin network
 func (c *Client) handleRedeemTxs(redeemTxs []*chains.BtcRedeemTx) error {

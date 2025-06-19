@@ -11,24 +11,48 @@ import (
 )
 
 // find relay datas by token sent attributes
-func (db *DatabaseAdapter) FindPendingBtcTokenSent(sourceChain string, height int) ([]*chains.TokenSent, error) {
-	var tokenSents []*chains.TokenSent
-	result := db.PostgresClient.
-		Where("source_chain = ? AND block_number <= ?",
+func (db *DatabaseAdapter) FindPendingBtcTokenSent(sourceChain string, height int) (map[uint64][]*chains.TokenSent, error) {
+	//1. Find all distinct block numbers with pending token sents up to the given height
+	var distinctBlockNumbers []uint64
+	result := db.PostgresClient.Model(&chains.TokenSent{}).
+		Select("DISTINCT block_number").
+		Where("source_chain = ? AND block_number <= ? AND status = ?",
 			sourceChain,
-			height).
-		Where("status = ?", string(chains.TokenSentStatusPending)).
-		Find(&tokenSents)
+			height,
+			string(chains.TokenSentStatusPending)).
+		Order("block_number ASC").
+		Find(&distinctBlockNumbers)
 
 	if result.Error != nil {
-		return tokenSents, fmt.Errorf("FindPendingBtcTokenSent with error: %w", result.Error)
+		return nil, fmt.Errorf("FindPendingBtcTokenSent with error: %w", result.Error)
 	}
-	if len(tokenSents) == 0 {
+
+	if len(distinctBlockNumbers) == 0 {
 		log.Warn().
 			Str("sourceChain", sourceChain).
 			Msgf("[DatabaseAdapter] [FindPendingBtcTokenSent] no token sent with block height before %d found", height)
+		return make(map[uint64][]*chains.TokenSent), nil
 	}
-	return tokenSents, nil
+
+	//4. Get all token sents for the distinct block numbers
+	var tokenSents []*chains.TokenSent
+	result = db.PostgresClient.
+		Where("source_chain = ? AND block_number IN (?)",
+			sourceChain,
+			distinctBlockNumbers).
+		Find(&tokenSents)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("FindPendingBtcTokenSent with error: %w", result.Error)
+	}
+
+	//5. Group token sents by block number
+	tokenSentsByBlock := make(map[uint64][]*chains.TokenSent)
+	for _, tokenSent := range tokenSents {
+		tokenSentsByBlock[tokenSent.BlockNumber] = append(tokenSentsByBlock[tokenSent.BlockNumber], tokenSent)
+	}
+
+	return tokenSentsByBlock, nil
 }
 
 /*

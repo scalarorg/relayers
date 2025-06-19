@@ -106,12 +106,37 @@ func (c *Broadcaster) ConfirmEvmTxs(chainName string, txIds []string) error {
 	log.Debug().Msgf("[Broadcaster] [ConfirmEvmTxs] Enqueue for confirmation txs from chain %s: %v", nexusChain, txIds)
 	txHashs := make([]chainsExported.Hash, len(txIds))
 	for i, txId := range txIds {
-		txHashs[i] = chainsExported.Hash(common.HexToHash(txId))
+		txHash, err := chainsExported.HashFromHex(txId)
+		if err != nil {
+			log.Error().Err(err).Msgf("[Broadcaster] [ConfirmEvmTxs] Failed to get tx hash for tx %s", txId)
+			continue
+		}
+		txHashs[i] = txHash
 	}
 	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, txHashs)
 	return c.QueueTxMsg(msg)
 }
-
+func (c *Broadcaster) ConfirmBtcBlock(chainName string, blockHashStr string, blockHeight uint64) error {
+	log.Debug().Msgf("[Broadcaster] [ConfirmBtcBlock] Enqueue for confirmation block %s at height %d from chain %s", blockHashStr, blockHeight, chainName)
+	blockHash, err := chainsExported.HashFromHex(blockHashStr)
+	if err != nil {
+		log.Error().Err(err).Msgf("[Broadcaster] [ConfirmBtcBlock] Failed to get block hash for block number %d", blockHeight)
+		return fmt.Errorf("failed to get block hash for block number %d: %w", blockHeight, err)
+	}
+	msg := &chainstypes.ConfirmBlockRequest{
+		Sender:    c.network.GetAddress(),
+		Chain:     nexus.ChainName(chainName),
+		BlockHash: blockHash,
+	}
+	return c.QueueTxMsg(msg)
+}
+func (c *Broadcaster) ConfirmBtcVaultBlock(confirmRequest chainstypes.ConfirmSourceTxsRequestV2) error {
+	log.Debug().Msgf("[Broadcaster] [ConfirmBtcVaultBlock] Enqueue for confirmation %d txs from chain %s",
+		len(confirmRequest.Batch.Txs), confirmRequest.Chain)
+	confirmRequest.Sender = c.network.GetAddress()
+	c.QueueTxMsg(&confirmRequest)
+	return nil
+}
 func (c *Broadcaster) ConfirmBtcTxs(chainName string, txIds []string) error {
 	//1. Create Confirm message request
 	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
