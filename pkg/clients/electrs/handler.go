@@ -109,10 +109,25 @@ func (c *Client) HandleValueBlockWithVaultTxs(rawMessage json.RawMessage, err er
 	var vaultBlocks []types.VaultBlock
 	err = json.Unmarshal(rawMessage, &vaultBlocks)
 	if err != nil {
-		log.Warn().Msgf("[ElectrumClient] [HandleValueBlockWithVaultTxs] Failed to unmarshal vault blocks: %v", err)
+		log.Warn().Msgf("[ElectrumClient] [HandleValueBlockWithVaultTxs] Failed to unmarshal vault blocks: %v, input payload: %s", err, string(rawMessage))
 		return
 	}
 	log.Debug().Msgf("[ElectrumClient] [HandleValueBlockWithVaultTxs] Received %d VaultBlocks", len(vaultBlocks))
+	//Store all block headers
+	var blockHeaders []chains.BlockHeader
+	for _, vaultBlock := range vaultBlocks {
+		blockHeaders = append(blockHeaders, chains.BlockHeader{
+			Chain:       c.electrumConfig.SourceChain,
+			BlockNumber: uint64(vaultBlock.Height),
+			BlockHash:   vaultBlock.Hash,
+			BlockTime:   uint64(vaultBlock.Time),
+		})
+	}
+	err = c.dbAdapter.CreateBlockHeaders(blockHeaders)
+	if err != nil {
+		log.Error().Err(err).Msg("[ElectrumClient] [HandleValueBlockWithVaultTxs] Failed to store block header")
+	}
+
 	lastCheckpoint := c.getLastCheckpoint()
 	for _, vaultBlock := range vaultBlocks {
 		log.Debug().Int("blockHeight", vaultBlock.Height).Msgf("[ElectrumClient] [HandleValueBlockWithVaultTxs] Received %d vault transactions", len(vaultBlock.VaultTxs))

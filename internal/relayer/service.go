@@ -497,4 +497,7 @@ func (s *Service) replayRedeemTransactions(groupUid string, mapRedeemTokenEvents
 }
 func (s *Service) Stop() {
 	log.Info().Msg("Relayer service stopped")
+	for _, client := range s.Electrs {
+		go client.Electrs.Close()
+	}
 }

@@ -14,13 +14,26 @@ func (db *DatabaseAdapter) FindBlockHeader(chainId string, blockNumber uint64) (
 	}
 	return &blockHeader, nil
 }
-
+func (db *DatabaseAdapter) CreateBlockHeaders(blockHeaders []chains.BlockHeader) error {
+	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+		err := tx.Clauses(
+			clause.OnConflict{
+				Columns:   []clause.Column{{Name: "chain"}, {Name: "block_number"}},
+				DoUpdates: clause.AssignmentColumns([]string{"block_hash", "block_time"}),
+			},
+		).Create(blockHeaders).Error
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+}
 func (db *DatabaseAdapter) CreateBlockHeader(blockHeader *chains.BlockHeader) error {
 	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
 		err := tx.Clauses(
 			clause.OnConflict{
 				Columns:   []clause.Column{{Name: "chain"}, {Name: "block_number"}},
-				DoNothing: true,
+				DoUpdates: clause.AssignmentColumns([]string{"block_hash", "block_time"}),
 			},
 		).Create(blockHeader).Error
 

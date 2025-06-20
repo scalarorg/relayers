@@ -34,6 +34,8 @@ func (c *Client) CategorizeVaultBlock(vaultBlock *types.VaultBlock) ([]*chains.T
 				} else {
 					tokenSent.RawTx = vaultTx.RawTx
 					tokenSent.MerkleProof = vaultTx.Proof
+					tokenSent.BlockNumber = uint64(vaultBlock.Height)
+					tokenSent.BlockTime = uint64(vaultBlock.Time)
 					tokenSents = append(tokenSents, tokenSent)
 				}
 			}
@@ -45,6 +47,7 @@ func (c *Client) CategorizeVaultBlock(vaultBlock *types.VaultBlock) ([]*chains.T
 			} else {
 				redeemTx.RawTx = vaultTx.RawTx
 				redeemTx.MerkleProof = vaultTx.Proof
+				redeemTx.BlockTime = uint64(vaultBlock.Time)
 				redeemTxs = append(redeemTxs, redeemTx)
 				log.Info().Any("RedeemTx", redeemTx).Msg("[ElectrumClient] [CategorizeVaultTxs]")
 			}
