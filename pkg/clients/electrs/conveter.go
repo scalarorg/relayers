@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
+	dataTypes "github.com/scalarorg/data-models/types"
 	"github.com/scalarorg/go-electrum/electrum/types"
 	"github.com/scalarorg/relayers/pkg/utils"
 	"gorm.io/gorm"
@@ -33,7 +34,7 @@ func (c *Client) CategorizeVaultBlock(vaultBlock *types.VaultBlock) ([]*chains.T
 					log.Error().Msgf("[ElectrumClient] [CreateTokenSents] symbol not found for token: %s", txInfo.DestTokenAddress)
 				} else {
 					tokenSent.RawTx = vaultTx.RawTx
-					tokenSent.MerkleProof = vaultTx.Proof
+					tokenSent.MerkleProof = dataTypes.StringArray(vaultTx.Proof)
 					tokenSent.BlockNumber = uint64(vaultBlock.Height)
 					tokenSent.BlockTime = uint64(vaultBlock.Time)
 					tokenSents = append(tokenSents, tokenSent)
@@ -46,7 +47,7 @@ func (c *Client) CategorizeVaultBlock(vaultBlock *types.VaultBlock) ([]*chains.T
 				log.Error().Err(err).Msg("[ElectrumClient] failed to create redeem tx")
 			} else {
 				redeemTx.RawTx = vaultTx.RawTx
-				redeemTx.MerkleProof = vaultTx.Proof
+				redeemTx.MerkleProof = dataTypes.StringArray(vaultTx.Proof)
 				redeemTx.BlockTime = uint64(vaultBlock.Time)
 				redeemTxs = append(redeemTxs, redeemTx)
 				log.Info().Any("RedeemTx", redeemTx).Msg("[ElectrumClient] [CategorizeVaultTxs]")
