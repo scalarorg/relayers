@@ -15,6 +15,10 @@ import (
 	nexusExported "github.com/scalarorg/scalar-core/x/nexus/exported"
 )
 
+const (
+	CONFIRM_BATCH_SIZE = 50
+)
+
 func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err error) error {
 	if err != nil {
 		log.Error().Err(err).Msg("[ElectrumClient] [BlockchainHeaderHandler] Failed to receive block chain header")
@@ -259,13 +263,15 @@ func (c *Client) handleBlockBtcTokenSents(blockNumber uint64, tokenSents []*chai
 		log.Error().Err(err).Msgf("[ElectrumClient] [handleTokenSents] Failed to get block hash for block number %d", blockNumber)
 		return fmt.Errorf("failed to get block hash for block number %d: %w", blockNumber, err)
 	}
-	confirmTxs := chainsTypes.ConfirmSourceTxsRequestV2{
+	confirmTxs := make([]chainsTypes.ConfirmSourceTxsRequestV2, 0)
+	lastConfirmTx := chainsTypes.ConfirmSourceTxsRequestV2{
 		Chain: nexusExported.ChainName(c.electrumConfig.SourceChain),
 		Batch: &chainsTypes.TrustedTxsByBlock{
 			BlockHash: blockHash,
-			Txs:       make([]*chainsTypes.TrustedTx, len(tokenSents)),
+			Txs:       make([]*chainsTypes.TrustedTx, 0),
 		},
 	}
+
 	for i, tokenSent := range tokenSents {
 		txHash, err := chainExported.HashFromHex(tokenSent.TxHash)
 		if err != nil {
@@ -280,13 +286,26 @@ func (c *Client) handleBlockBtcTokenSents(blockNumber uint64, tokenSents []*chai
 				continue
 			}
 		}
-		confirmTxs.Batch.Txs[i] = &chainsTypes.TrustedTx{
+		if len(lastConfirmTx.Batch.Txs) >= CONFIRM_BATCH_SIZE {
+			confirmTxs = append(confirmTxs, lastConfirmTx)
+			lastConfirmTx = chainsTypes.ConfirmSourceTxsRequestV2{
+				Chain: nexusExported.ChainName(c.electrumConfig.SourceChain),
+				Batch: &chainsTypes.TrustedTxsByBlock{
+					BlockHash: blockHash,
+					Txs:       make([]*chainsTypes.TrustedTx, 0),
+				},
+			}
+		}
+		lastConfirmTx.Batch.Txs = append(lastConfirmTx.Batch.Txs, &chainsTypes.TrustedTx{
 			Hash:                     txHash,
 			TxIndex:                  tokenSent.TxPosition,
 			Raw:                      tokenSent.RawTx,
 			MerklePath:               merklePath,
 			PrevOutpointScriptPubkey: tokenSent.StakerPubkey,
-		}
+		})
+	}
+	if len(lastConfirmTx.Batch.Txs) > 0 {
+		confirmTxs = append(confirmTxs, lastConfirmTx)
 	}
 
 	//3. store relay data to the db, update last checkpoint
@@ -297,13 +316,14 @@ func (c *Client) handleBlockBtcTokenSents(blockNumber uint64, tokenSents []*chai
 	}
 	if c.eventBus != nil {
 		//4. Send to the event bus with destination chain is scalar for confirmation
-
-		log.Debug().Msgf("[ElectrumClient] [VaultTxMessageHandler] Broadcasting confirm tx request: %v", confirmTxs)
-		c.eventBus.BroadcastEvent(&events.EventEnvelope{
-			EventType:        events.EVENT_ELECTRS_VAULT_BLOCK,
-			DestinationChain: events.SCALAR_NETWORK_NAME,
-			Data:             confirmTxs,
-		})
+		log.Debug().Msgf("[ElectrumClient] [VaultTxMessageHandler] Broadcasting %d confirm tx request", len(confirmTxs))
+		for _, confirmTx := range confirmTxs {
+			c.eventBus.BroadcastEvent(&events.EventEnvelope{
+				EventType:        events.EVENT_ELECTRS_VAULT_BLOCK,
+				DestinationChain: events.SCALAR_NETWORK_NAME,
+				Data:             confirmTx,
+			})
+		}
 
 	} else {
 		log.Warn().Msg("[ElectrumClient] [handleTokenSents] event bus is undefined")
