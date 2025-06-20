@@ -105,12 +105,16 @@ func (db *DatabaseAdapter) SaveTokenSentsAndRemoveDuplicates(tokenSents []*chain
 	}
 
 	// Save new token sents
-	err = tx.Save(newTokenSents).Error
-	if err != nil {
-		return fmt.Errorf("[DatabaseAdapter] failed to save new token sents: %w", err)
-	} else {
-		log.Debug().Msgf("[DatabaseAdapter] [SaveTokenSentsAndRemoveDuplicates] saved %d new token sents", len(tokenSents))
+	//TODO: use bulk insert to improve performance
+	//Limit 65535 parameter
+	for _, tokenSent := range newTokenSents {
+		err = tx.Save(tokenSent).Error
+		if err != nil {
+			return fmt.Errorf("[DatabaseAdapter] failed to save new token sents: %w", err)
+		}
 	}
+
+	log.Debug().Msgf("[DatabaseAdapter] [SaveTokenSentsAndRemoveDuplicates] saved %d new token sents", len(newTokenSents))
 
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
