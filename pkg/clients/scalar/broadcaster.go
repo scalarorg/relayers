@@ -33,6 +33,7 @@ type Broadcaster struct {
 }
 
 func NewBroadcaster(network *cosmos.NetworkClient, pendingCommands *PendingCommands, broadcastPeriod time.Duration, batchSize int) *Broadcaster {
+	log.Debug().Msgf("[Broadcaster] [NewBroadcaster] New Broadcaster with batch size %d", batchSize)
 	return &Broadcaster{
 		network:         network,
 		pendingCommands: pendingCommands,
@@ -131,8 +132,10 @@ func (c *Broadcaster) ConfirmBtcBlock(chainName string, blockHashStr string, blo
 	return c.QueueTxMsg(msg)
 }
 func (c *Broadcaster) ConfirmBtcVaultBlock(confirmRequest chainstypes.ConfirmSourceTxsRequestV2) error {
-	log.Debug().Msgf("[Broadcaster] [ConfirmBtcVaultBlock] Enqueue for confirmation %d txs from chain %s",
-		len(confirmRequest.Batch.Txs), confirmRequest.Chain)
+	log.Debug().Msgf("[Broadcaster] [ConfirmBtcVaultBlock] Enqueue for confirmation %d txs from block %s from chain %s",
+		len(confirmRequest.Batch.Txs),
+		confirmRequest.Batch.BlockHash.Hex(),
+		confirmRequest.Chain)
 	confirmRequest.Sender = c.network.GetAddress()
 	c.QueueTxMsg(&confirmRequest)
 	return nil
@@ -270,13 +273,13 @@ func (b *Broadcaster) broadcastMsgs(ctx context.Context) error {
 		for _, msg := range failedMsgs {
 			resp, err := b.network.SignAndBroadcastMsgs(ctx, msg)
 			if err != nil {
-				log.Error().Err(err).Msgf("[Broadcaster] Failed to retry broadcast msg %T, %++v", msg, msg)
+				log.Error().Err(err).Msgf("[Broadcaster] Failed to retry broadcast msg %T", msg)
 				return err
 			}
 			if resp.Code == 0 {
 				log.Debug().
 					Str("tx_hash", resp.TxHash).
-					Msgf("[Broadcaster] Successfully retry broadcast msg %T, %++v", msg, msg)
+					Msgf("[Broadcaster] Successfully retry broadcast msg %T", msg)
 			}
 		}
 	}

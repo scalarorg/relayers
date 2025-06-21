@@ -54,14 +54,17 @@ func TestMain(m *testing.M) {
 		Confirmations: confirmations,
 		LastVaultTx:   lastVaultTx,
 		SourceChain:   sourceChain,
+		DialTimeout:   electrs.Duration(10 * time.Second),
+		MethodTimeout: electrs.Duration(60 * time.Second),
+		PingInterval:  electrs.Duration(30 * time.Second),
 	}
 	rpcEndpoint := fmt.Sprintf("%s:%d", electrsConfig.Host, electrsConfig.Port)
 	electrsClient, _ = electrum.Connect(&electrum.Options{
 		Dial: func() (net.Conn, error) {
-			return net.DialTimeout("tcp", rpcEndpoint, time.Second)
+			return net.DialTimeout("tcp", rpcEndpoint, electrsConfig.DialTimeout.ToDuration())
 		},
-		MethodTimeout:   time.Second,
-		PingInterval:    -1,
+		MethodTimeout:   electrsConfig.MethodTimeout.ToDuration(),
+		PingInterval:    electrsConfig.PingInterval.ToDuration(),
 		SoftwareVersion: "scalar-relayer",
 	})
 	if err != nil {

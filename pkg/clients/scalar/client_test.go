@@ -97,7 +97,7 @@ func TestConfirmRedeemTx(t *testing.T) {
 	broadcaster := scalar.NewBroadcaster(networkClient,
 		scalar.NewPendingCommands(),
 		time.Second*10,
-		10)
+		1)
 	broadcaster.Start(context.Background())
 	redeemTxs := []string{"0x8d9eb539206db1e3f4dc4c26419616fb90723a667d5b1c126e2fc4f9c4a6fc98"}
 	broadcaster.ConfirmEvmTxs("evm|11155111", redeemTxs)

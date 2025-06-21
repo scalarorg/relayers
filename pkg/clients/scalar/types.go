@@ -23,7 +23,7 @@ import (
 // Add this new type definition
 
 const (
-	BroadcasterBatchSize                     = 10
+	BroadcasterBatchSize                     = 1
 	BlockEventsBase64Encoded                 = false
 	EventTypeMintCommand                     = "scalar.chains.v1beta1.MintCommand"
 	EventTypeContractCallApproved            = "scalar.chains.v1beta1.ContractCallApproved"

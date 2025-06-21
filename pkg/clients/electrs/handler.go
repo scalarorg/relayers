@@ -22,6 +22,10 @@ const (
 func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err error) error {
 	if err != nil {
 		log.Error().Err(err).Msg("[ElectrumClient] [BlockchainHeaderHandler] Failed to receive block chain header")
+		// Check if it's a timeout error and log additional context
+		if err.Error() == "context deadline exceeded" {
+			log.Error().Msg("[ElectrumClient] [BlockchainHeaderHandler] Timeout error detected - consider increasing MethodTimeout in electrum config")
+		}
 		return fmt.Errorf("failed to parse block chain header: %w", err)
 	}
 	if header == nil {
@@ -108,6 +112,10 @@ func (c *Client) findAndHandleRedeemTxs(blockHeight int) error {
 func (c *Client) HandleValueBlockWithVaultTxs(rawMessage json.RawMessage, err error) {
 	if err != nil {
 		log.Warn().Msgf("[ElectrumClient] [HandleValueBlockWithVaultTxs] Failed to receive vault transaction: %v", err)
+		// Check if it's a timeout error and log additional context
+		if err.Error() == "context deadline exceeded" {
+			log.Error().Msg("[ElectrumClient] [HandleValueBlockWithVaultTxs] Timeout error detected - consider increasing MethodTimeout in electrum config")
+		}
 		return
 	}
 	var vaultBlocks []types.VaultBlock
@@ -309,7 +317,7 @@ func (c *Client) handleBlockBtcTokenSents(blockNumber uint64, tokenSents []*chai
 	}
 
 	//3. store relay data to the db, update last checkpoint
-	err = c.dbAdapter.SaveTokenSentsAndRemoveDuplicates(tokenSents)
+	err = c.dbAdapter.SaveTokenSentsAndReorgTxes(blockNumber, tokenSents)
 	if err != nil {
 		log.Error().Err(err).Msg("[ElectrumClient] [handleTokenSents] Failed to store token sents to the db")
 		return fmt.Errorf("[ElectrumClient] [handleTokenSents] failed to store token sents to the db: %w", err)

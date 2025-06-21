@@ -60,61 +60,52 @@ Remove token sents with same tx_hash due to reorg of the bitcoin
 delete the token sents with the same tx_hash and block_number < the new token sent
 For high performance, we insert token to a temporary table, then update of crete by join 2 tables
 */
-func (db *DatabaseAdapter) SaveTokenSentsAndRemoveDuplicates(tokenSents []*chains.TokenSent) error {
+func (db *DatabaseAdapter) SaveTokenSentsAndReorgTxes(blockNumber uint64, tokenSents []*chains.TokenSent) error {
 	log.Debug().Msgf("[DatabaseAdapter] [SaveTokenSentsAndRemoveDuplicates] save token sents and remove duplicates")
-	txHashes := make([]string, 0)
-	for _, tokenSent := range tokenSents {
-		txHashes = append(txHashes, tokenSent.TxHash)
-	}
-	var existingTokenSents []chains.TokenSent
-	db.PostgresClient.Model(&chains.TokenSent{}).Where("tx_hash IN ?", txHashes).Find(&existingTokenSents)
-	mapTokens := make(map[string]*chains.TokenSent)
-	for _, tokenSent := range existingTokenSents {
-		mapTokens[tokenSent.TxHash] = &tokenSent
-	}
-	removeHashes := make([]string, 0)
-	newTokenSents := make([]*chains.TokenSent, 0)
-	for _, tokenSent := range tokenSents {
-		existingItem, ok := mapTokens[tokenSent.TxHash]
-		if !ok {
-			//TokenSent is not exist, create new one
-			newTokenSents = append(newTokenSents, tokenSent)
-		} else if existingItem.BlockNumber <= tokenSent.BlockNumber {
-			//TokenSent is exist, and block number is less than the new one, so it is a reorged token sent
-			removeHashes = append(removeHashes, tokenSent.TxHash)
-			newTokenSents = append(newTokenSents, tokenSent)
-		} else {
-			//TokenSent is exist, and block number is greater than the new one, so it is a new token sent
-			//We ignore new coming token sent
-		}
-	}
+
 	tx := db.PostgresClient.Begin()
 	if tx == nil {
 		return fmt.Errorf("failed to begin transaction")
 	}
 	defer tx.Rollback() // Will be ignored if transaction is committed
-
-	// Delete existing verifying entries with matching tx_hashes
-	err := tx.Where("tx_hash IN ?", removeHashes).Delete(&chains.TokenSent{}).Error
-	if err != nil {
-		log.Warn().Err(err).Msgf("[DatabaseAdapter] failed to remove reorged token sents")
-		return err
-	} else {
-		log.Debug().
-			Strs("Removed hash", removeHashes).Msgf("[DatabaseAdapter] [SaveTokenSentsAndRemoveDuplicates] removed %d reorged token sents", len(removeHashes))
+	batchSize := 100
+	startRemoveIndex := 0
+	// Delete reorged token sents
+	for {
+		hashes := make([]string, 0)
+		for i := 0; i < batchSize && startRemoveIndex+i < len(tokenSents); i++ {
+			hashes = append(hashes, tokenSents[startRemoveIndex+i].TxHash)
+		}
+		if len(hashes) == 0 {
+			break
+		}
+		err := tx.Where("block_number < ? and tx_hash IN ?", blockNumber, hashes).Delete(&chains.TokenSent{}).Error
+		if err != nil {
+			return fmt.Errorf("[DatabaseAdapter] failed to remove reorged token sents: %w", err)
+		}
+		startRemoveIndex += len(hashes)
 	}
 
 	// Save new token sents
 	//TODO: use bulk insert to improve performance
 	//Limit 65535 parameter
-	for _, tokenSent := range newTokenSents {
-		err = tx.Save(tokenSent).Error
+	startSaveIndex := 0
+	for {
+		batch := make([]*chains.TokenSent, 0)
+		for i := 0; i < batchSize && startSaveIndex+i < len(tokenSents); i++ {
+			batch = append(batch, tokenSents[startSaveIndex+i])
+		}
+		if len(batch) == 0 {
+			break
+		}
+		err := tx.Save(batch).Error
 		if err != nil {
 			return fmt.Errorf("[DatabaseAdapter] failed to save new token sents: %w", err)
+		} else {
+			log.Debug().Msgf("[DatabaseAdapter] [SaveTokenSentsAndReorgTxes] saved %d new token sents", len(batch))
 		}
+		startSaveIndex += len(batch)
 	}
-
-	log.Debug().Msgf("[DatabaseAdapter] [SaveTokenSentsAndRemoveDuplicates] saved %d new token sents", len(newTokenSents))
 
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {

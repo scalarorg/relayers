@@ -1,0 +1,15 @@
+[
+    {
+        "host": "your-electrum-server.com",
+        "port": 50001,
+        "user": "your-username",
+        "password": "your-password",
+        "source_chain": "bitcoin|4",
+        "batch_size": 1,
+        "confirmations": 1,
+        "last_vault_tx": "",
+        "dial_timeout": "10s",
+        "method_timeout": "30s",
+        "ping_interval": "-1s"
+    }
+]

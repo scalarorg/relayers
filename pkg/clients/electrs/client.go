@@ -68,13 +68,30 @@ func NewElectrumClient(globalConfig *config.Config, config *Config, dbAdapter *d
 	if config.Confirmations == 0 {
 		config.Confirmations = 1
 	}
+
+	// Set default timeouts if not provided
+	if config.DialTimeout == 0 {
+		config.DialTimeout = Duration(10 * time.Second)
+	}
+	if config.MethodTimeout <= 0 {
+		config.MethodTimeout = Duration(60 * time.Second)
+	}
+	if config.PingInterval <= 0 {
+		config.PingInterval = Duration(30 * time.Second)
+	}
+
+	log.Debug().Dur("dialTimeout", config.DialTimeout.ToDuration()).
+		Dur("methodTimeout", config.MethodTimeout.ToDuration()).
+		Dur("pingInterval", config.PingInterval.ToDuration()).
+		Msg("[ElectrumClient] [NewElectrumClient] Using timeout configuration")
+
 	rpcEndpoint := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	electrs, err := electrum.Connect(&electrum.Options{
 		Dial: func() (net.Conn, error) {
-			return net.DialTimeout("tcp", rpcEndpoint, time.Second)
+			return net.DialTimeout("tcp", rpcEndpoint, config.DialTimeout.ToDuration())
 		},
-		MethodTimeout:   time.Second,
-		PingInterval:    -1,
+		MethodTimeout:   config.MethodTimeout.ToDuration(),
+		PingInterval:    config.PingInterval.ToDuration(),
 		SoftwareVersion: "scalar-relayer",
 	})
 	if err != nil {
@@ -94,7 +111,7 @@ func NewElectrumClient(globalConfig *config.Config, config *Config, dbAdapter *d
 func (c *Client) Start(ctx context.Context) error {
 	params := []interface{}{}
 	//Set batch size from config or default value
-	params = append(params, c.electrumConfig.BatchSize)
+	params = append(params, 1)
 	if c.scalarClient != nil {
 		var err error
 		c.custodialGroups, err = c.scalarClient.GetCovenantGroups(ctx)
