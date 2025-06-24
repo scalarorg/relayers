@@ -15,6 +15,22 @@ import (
 	"gorm.io/gorm"
 )
 
+func ReverseString(s string) string {
+	runes := []rune(s)
+	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+		runes[i], runes[j] = runes[j], runes[i]
+	}
+	return string(runes)
+}
+
+func ReverseProofs(proofs []string) []string {
+	reversedProofs := make([]string, len(proofs))
+	for i, proof := range proofs {
+		reversedProofs[i] = ReverseString(proof)
+	}
+	return reversedProofs
+}
+
 func (c *Client) CategorizeVaultBlock(vaultBlock *types.VaultBlock) ([]*chains.TokenSent, []*chains.BtcRedeemTx) {
 	tokenSents := []*chains.TokenSent{}
 	redeemTxs := []*chains.BtcRedeemTx{}
@@ -34,7 +50,7 @@ func (c *Client) CategorizeVaultBlock(vaultBlock *types.VaultBlock) ([]*chains.T
 					log.Error().Msgf("[ElectrumClient] [CreateTokenSents] symbol not found for token: %s", txInfo.DestTokenAddress)
 				} else {
 					tokenSent.RawTx = vaultTx.RawTx
-					tokenSent.MerkleProof = dataTypes.StringArray(vaultTx.Proof)
+					tokenSent.MerkleProof = dataTypes.StringArray(ReverseProofs(vaultTx.Proof))
 					tokenSent.BlockNumber = uint64(vaultBlock.Height)
 					tokenSent.BlockTime = uint64(vaultBlock.Time)
 					tokenSents = append(tokenSents, tokenSent)
@@ -47,7 +63,7 @@ func (c *Client) CategorizeVaultBlock(vaultBlock *types.VaultBlock) ([]*chains.T
 				log.Error().Err(err).Msg("[ElectrumClient] failed to create redeem tx")
 			} else {
 				redeemTx.RawTx = vaultTx.RawTx
-				redeemTx.MerkleProof = dataTypes.StringArray(vaultTx.Proof)
+				redeemTx.MerkleProof = dataTypes.StringArray(ReverseProofs(vaultTx.Proof))
 				redeemTx.BlockTime = uint64(vaultBlock.Time)
 				redeemTxs = append(redeemTxs, redeemTx)
 				log.Info().Any("RedeemTx", redeemTx).Msg("[ElectrumClient] [CategorizeVaultTxs]")
