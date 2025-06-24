@@ -169,10 +169,10 @@ func (db *DatabaseAdapter) SaveTokenDeployed(tokenDeployed *chains.TokenDeployed
 }
 
 // CountTokenSentsByTxHashes counts the number of TokenSent records whose transaction hash appears in the input tx list
-func (db *DatabaseAdapter) CountTokenSentsByTxHashes(txHashes []string) (int64, error) {
+func (db *DatabaseAdapter) CountExecutedCommandByCommandIds(commandIds []string) (int64, error) {
 	var count int64
-	result := db.PostgresClient.Model(&chains.TokenSent{}).
-		Where("tx_hash IN ?", txHashes).
+	result := db.PostgresClient.Model(&chains.CommandExecuted{}).
+		Where("command_id IN ?", commandIds).
 		Count(&count)
 
 	if result.Error != nil {

@@ -295,9 +295,10 @@ func (c *Client) handleBlockBtcTokenSents(blockNumber uint64, tokenSents []*chai
 			}
 		}
 
-		log.Debug().Str("txHash", txHash.String()).
-			Strs("merklePath", tokenSent.MerkleProof).
-			Msgf("[ElectrumClient] [handleTokenSents] merkle path")
+		// log.Debug().Str("txHash", txHash.String()).
+		// 	Strs("merklePath", tokenSent.MerkleProof).
+		// 	Str("PrevOutpointScriptPubkey", hex.EncodeToString(tokenSent.StakerPubkey)).
+		// 	Msgf("[ElectrumClient] [handleTokenSents] merkle path")
 
 		if len(lastConfirmTx.Batch.Txs) >= CONFIRM_BATCH_SIZE {
 			confirmTxs = append(confirmTxs, lastConfirmTx)
