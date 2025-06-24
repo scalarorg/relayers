@@ -294,6 +294,11 @@ func (c *Client) handleBlockBtcTokenSents(blockNumber uint64, tokenSents []*chai
 				continue
 			}
 		}
+
+		log.Debug().Str("txHash", txHash.String()).
+			Strs("merklePath", tokenSent.MerkleProof).
+			Msgf("[ElectrumClient] [handleTokenSents] merkle path")
+
 		if len(lastConfirmTx.Batch.Txs) >= CONFIRM_BATCH_SIZE {
 			confirmTxs = append(confirmTxs, lastConfirmTx)
 			lastConfirmTx = chainsTypes.ConfirmSourceTxsRequestV2{

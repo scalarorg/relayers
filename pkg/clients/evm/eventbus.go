@@ -149,9 +149,13 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 	if err != nil {
 		return fmt.Errorf("failed to decode execute data: %w", err)
 	}
+	if ec.checkIfBroadcasted(decodedExecuteData) {
+		log.Debug().Msg("[EvmClient] [handleScalarBatchCommandSigned] tx is already broadcasted")
+		return nil
+	}
 	ec.observeScalarExecuteData(decodedExecuteData)
 	//1. Call ScalarGateway's execute method
-	//Todo add retry
+	//TODO: add retry
 	if ec.auth == nil {
 		log.Error().
 			Str("chainId", ec.EvmConfig.GetId()).
@@ -303,6 +307,24 @@ func (ec *EvmClient) observeScalarExecuteData(decodedExecuteData *DecodedExecute
 		Strs("commandIds", commandIds).
 		Msg("[EvmClient] [observeScalarExecuteData]")
 	return nil
+}
+
+// Check if execute data is already broadcasted
+// TODO: improve this function for handling other types of commands
+func (ec *EvmClient) checkIfBroadcasted(decodedExecuteData *DecodedExecuteData) bool {
+	txHashes := []string{}
+	for _, commandId := range decodedExecuteData.CommandIds {
+		txHashes = append(txHashes, hex.EncodeToString(commandId[:]))
+	}
+	count, err := ec.dbAdapter.CountTokenSentsByTxHashes(txHashes)
+	if err != nil {
+		log.Error().Err(err).Msg("[EvmClient] [checkBroadcasted] failed to count token sents by tx hashes")
+		return false
+	}
+	if count >= int64(len(txHashes)) {
+		return true
+	}
+	return false
 }
 
 func (ec *EvmClient) handleStartedSwitchPhase(event *covTypes.SwitchPhaseStarted) error {

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	dataTypes "github.com/scalarorg/data-models/types"
@@ -15,18 +16,15 @@ import (
 	"gorm.io/gorm"
 )
 
-func ReverseString(s string) string {
-	runes := []rune(s)
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-		runes[i], runes[j] = runes[j], runes[i]
-	}
-	return string(runes)
-}
-
 func ReverseProofs(proofs []string) []string {
 	reversedProofs := make([]string, len(proofs))
 	for i, proof := range proofs {
-		reversedProofs[i] = ReverseString(proof)
+		txHash, err := chainhash.NewHashFromStr(proof)
+		if err != nil {
+			log.Error().Err(err).Msgf("[ElectrumClient] [ReverseProofs] failed to get tx hash for proof: %s", proof)
+			continue
+		}
+		reversedProofs[i] = hex.EncodeToString(txHash.CloneBytes())
 	}
 	return reversedProofs
 }
