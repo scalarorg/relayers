@@ -148,6 +148,7 @@ func (c *Client) Start(ctx context.Context) error {
 	//TODO: remove this after testing
 	c.SetCurrentHeight(87993)
 	c.getVaultBlock(87971)
+	c.getVaultBlock(87988)
 	//params = append(params, 87220)
 	params = append(params, 87970)
 
