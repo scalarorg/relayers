@@ -121,12 +121,14 @@ func (c *Client) Start(ctx context.Context) error {
 	}
 	lastCheckpoint := c.getLastCheckpoint()
 	log.Debug().Msgf("[ElectrumClient] [Start] Last checkpoint: %v", lastCheckpoint)
-	if lastCheckpoint.EventKey != "" {
-		params = append(params, lastCheckpoint.EventKey)
-	} else if c.electrumConfig.LastVaultTx != "" {
-		params = append(params, c.electrumConfig.LastVaultTx)
-	}
-	log.Debug().Msg("[ElectrumClient] [Start] Subscribing to new block event for request to confirm if vault transaction is get enought confirmation")
+	// if lastCheckpoint.EventKey != "" {
+	// 	params = append(params, lastCheckpoint.EventKey)
+	// } else if c.electrumConfig.LastVaultTx != "" {
+	// 	params = append(params, c.electrumConfig.LastVaultTx)
+	// }
+	//params = append(params, 87220)
+	params = append(params, 87950)
+	log.Debug().Msg("[ElectrumClient] [Start] Subscribing to new block event")
 	c.Electrs.BlockchainHeaderSubscribe(ctx, c.BlockchainHeaderHandler)
 	//log.Debug().Msgf("[ElectrumClient] [Start] Subscribing to vault transactions with params: %v", params)
 	//c.Electrs.VaultTransactionSubscribe(ctx, c.VaultTxMessageHandler, params...)
@@ -135,6 +137,7 @@ func (c *Client) Start(ctx context.Context) error {
 		if c.GetCurrentHeight() > 0 {
 			break
 		}
+		log.Debug().Msgf("[ElectrumClient] [Start] Waiting for current height to be updated")
 		time.Sleep(1 * time.Second)
 	}
 	log.Debug().Int64("CurrentHeight", c.GetCurrentHeight()).Msgf("[ElectrumClient] [Start] Subscribing to vault transactions with params: %v", params)

@@ -2,9 +2,7 @@ package scalar
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
-	"slices"
 	"sync"
 	"time"
 
@@ -134,20 +132,20 @@ func (c *Broadcaster) ConfirmBtcBlock(chainName string, blockHashStr string, blo
 	return c.QueueTxMsg(msg)
 }
 
-var BLOCK_HASHES = []string{
-	"0000000000000001e9ba2ab7d92ef0fd3b72d3ccc4949a0511c88066e761c1ed",
-	"0000000000000006040d56615fb3228d0c1c1908a89d19f4b10ef5db60b2c06d",
-}
+// var BLOCK_HASHES = []string{
+// 	"0000000000000001e9ba2ab7d92ef0fd3b72d3ccc4949a0511c88066e761c1ed",
+// 	"0000000000000006040d56615fb3228d0c1c1908a89d19f4b10ef5db60b2c06d",
+// }
 
 func (c *Broadcaster) ConfirmBtcVaultBlock(confirmRequest chainstypes.ConfirmSourceTxsRequestV2) error {
 	confirmRequest.Sender = c.network.GetAddress()
-	if slices.Contains(BLOCK_HASHES, hex.EncodeToString(confirmRequest.Batch.BlockHash.Bytes())) {
-		log.Debug().Msgf("[Broadcaster] [ConfirmBtcVaultBlock] Enqueue for confirmation %d txs from block %s from chain %s",
-			len(confirmRequest.Batch.Txs),
-			confirmRequest.Batch.BlockHash.Hex(),
-			confirmRequest.Chain)
-		c.QueueTxMsg(&confirmRequest)
-	}
+	//if slices.Contains(BLOCK_HASHES, hex.EncodeToString(confirmRequest.Batch.BlockHash.Bytes())) {
+	log.Debug().Msgf("[Broadcaster] [ConfirmBtcVaultBlock] Enqueue for confirmation %d txs from block %s from chain %s",
+		len(confirmRequest.Batch.Txs),
+		confirmRequest.Batch.BlockHash.Hex(),
+		confirmRequest.Chain)
+	c.QueueTxMsg(&confirmRequest)
+	//}
 
 	return nil
 }

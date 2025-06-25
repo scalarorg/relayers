@@ -32,7 +32,7 @@ func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err err
 		log.Debug().Msg("[ElectrumClient] [BlockchainHeaderHandler] No blockchain header received")
 		return nil
 	}
-	log.Debug().Msgf("[ElectrumClient] [BlockchainHeaderHandler] Update current block chain header: %v", header)
+	log.Debug().Msgf("[ElectrumClient] [BlockchainHeaderHandler] Update current block chain header: %+v", header)
 	c.SetCurrentHeight(int64(header.Height))
 
 	err = c.tryConfirmTokenSents(header.Height)
