@@ -110,8 +110,7 @@ func NewElectrumClient(globalConfig *config.Config, config *Config, dbAdapter *d
 
 func (c *Client) Start(ctx context.Context) error {
 	params := []interface{}{}
-	//Set batch size from config or default value
-	params = append(params, 1)
+	params = append(params, c.electrumConfig.BatchSize)
 	if c.scalarClient != nil {
 		var err error
 		c.custodialGroups, err = c.scalarClient.GetCovenantGroups(ctx)

@@ -140,13 +140,12 @@ var BLOCK_HASHES = []string{
 }
 
 func (c *Broadcaster) ConfirmBtcVaultBlock(confirmRequest chainstypes.ConfirmSourceTxsRequestV2) error {
-	log.Debug().Msgf("[Broadcaster] [ConfirmBtcVaultBlock] Enqueue for confirmation %d txs from block %s from chain %s",
-		len(confirmRequest.Batch.Txs),
-		confirmRequest.Batch.BlockHash.Hex(),
-		confirmRequest.Chain)
 	confirmRequest.Sender = c.network.GetAddress()
 	if slices.Contains(BLOCK_HASHES, hex.EncodeToString(confirmRequest.Batch.BlockHash.Bytes())) {
-		log.Debug().Msgf("[Broadcaster] [ConfirmBtcVaultBlock] Block hash is %s", confirmRequest.Batch.BlockHash.Hex())
+		log.Debug().Msgf("[Broadcaster] [ConfirmBtcVaultBlock] Enqueue for confirmation %d txs from block %s from chain %s",
+			len(confirmRequest.Batch.Txs),
+			confirmRequest.Batch.BlockHash.Hex(),
+			confirmRequest.Chain)
 		c.QueueTxMsg(&confirmRequest)
 	}
 

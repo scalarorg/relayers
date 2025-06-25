@@ -246,7 +246,8 @@ func (c *Client) handleBlockBtcTokenSents(blockNumber uint64, tokenSents []*chai
 		log.Debug().Msgf("[ElectrumClient] [handleTokenSents] No token sent transactions to handle")
 		return nil
 	}
-	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [handleTokenSents] Received %d token sent transactions", len(tokenSents))
+	log.Debug().Int("CurrentHeight", c.currentHeight).Uint64("BlockNumber", blockNumber).
+		Msgf("[ElectrumClient] [handleTokenSents] Received %d token sent transactions", len(tokenSents))
 	//If confirmations is 1, send to the event bus with destination chain is scalar for confirmation
 	//If confirmations is greater than 1, wait for the next blocks to get more confirmations before broadcasting to the scalar network
 
