@@ -1505,6 +1505,14 @@ github.com/scalarorg/go-electrum v0.1.2-0.20250625024753-606058752ae0 h1:+KBczOy
 github.com/scalarorg/go-electrum v0.1.2-0.20250625024753-606058752ae0/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
 github.com/scalarorg/go-electrum v0.1.2-0.20250625025358-5d426a24d988 h1:vjB5Dikdxkkaer0mRkLpYVBPWOnvkWvYvIRodWqPwx0=
 github.com/scalarorg/go-electrum v0.1.2-0.20250625025358-5d426a24d988/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
+github.com/scalarorg/go-electrum v0.1.2-0.20250625152620-b412a142c985 h1:eYMq9YYFJyoGjvIFW9aySAFKMujiecUkHBhnFHu85ZM=
+github.com/scalarorg/go-electrum v0.1.2-0.20250625152620-b412a142c985/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
+github.com/scalarorg/go-electrum v0.1.2-0.20250625154759-98b99511f05e h1:mDuHifCJXXcOcCR1bpN/C+W1MBXWbCfxoljz1jzdmfk=
+github.com/scalarorg/go-electrum v0.1.2-0.20250625154759-98b99511f05e/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
+github.com/scalarorg/go-electrum v0.1.2-0.20250625155133-54e86bab5edb h1:buEQjCid3XMctu4oxtuYHouTKlXfd4fZTSUIz9PJ2qs=
+github.com/scalarorg/go-electrum v0.1.2-0.20250625155133-54e86bab5edb/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
+github.com/scalarorg/go-electrum v0.1.2-0.20250625161705-16b985cca1c0 h1:FeCvMpLmt6BIfPbmncnAI4KThrCwNN5TjUXF2D0yEO0=
+github.com/scalarorg/go-electrum v0.1.2-0.20250625161705-16b985cca1c0/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250619074652-c40229f8b953 h1:d9yOuXp7Iau6sTMDeN+dPPmEnZKGp4wcvCI+PB2Kc+M=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250619074652-c40229f8b953/go.mod h1:i7krhVinSl9Dfs6hD6L6Fxe7ySN6ob5aYK/GislHIv8=
 github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible h1:Bn1aCHHRnjv4Bl16T8rcaFjYSrGrIZvpiGO6P3Q4GpU=

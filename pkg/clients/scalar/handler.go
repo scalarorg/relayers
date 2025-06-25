@@ -295,7 +295,7 @@ func (c *Client) processBatchedCommandSigned(ctx context.Context, chain string, 
 	// defer c.pendingCommands.BatchCommandsMutex.Unlock()
 	// _, ok := c.pendingCommands.BatchCommands.Load(batchID)
 	// if ok {
-	log.Debug().Str("Chain", chain).Str("BatchCommandId", batchID).Msg("[ScalarClient] [processBatchedCommandSigned] found batch command.")
+	log.Debug().Str("Chain", chain).Str("BatchCommandId", batchID).Msg("[ScalarClient] [processBatchedCommandSigned] broadcast batch command.")
 	eventEnvelope := events.EventEnvelope{
 		EventType:        events.EVENT_SCALAR_BATCHCOMMAND_SIGNED,
 		DestinationChain: chain,

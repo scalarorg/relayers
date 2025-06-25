@@ -17,7 +17,7 @@ require (
 	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250426033010-eb69d1a47edd
 	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250426033010-eb69d1a47edd
 	github.com/scalarorg/data-models v0.0.0-20250620144535-e9b4cf33c641
-	github.com/scalarorg/go-electrum v0.1.2-0.20250625025358-5d426a24d988
+	github.com/scalarorg/go-electrum v0.1.2-0.20250625161705-16b985cca1c0
 	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250619074652-c40229f8b953
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0

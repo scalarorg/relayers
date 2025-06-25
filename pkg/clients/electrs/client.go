@@ -64,11 +64,11 @@ func NewElectrumClient(globalConfig *config.Config, config *Config, dbAdapter *d
 	if config.BatchSize == 0 {
 		config.BatchSize = 1
 	}
-	if config.DialTimeout.ToDuration().Seconds() <= 10 {
-		config.DialTimeout = Duration(10 * time.Second)
+	if config.DialTimeout.ToDuration().Seconds() <= 100 {
+		config.DialTimeout = Duration(100 * time.Second)
 	}
-	if config.MethodTimeout.ToDuration().Seconds() <= 60 {
-		config.MethodTimeout = Duration(60 * time.Second)
+	if config.MethodTimeout.ToDuration().Seconds() <= 600 {
+		config.MethodTimeout = Duration(600 * time.Second)
 	}
 	if config.PingInterval <= 0 {
 		config.PingInterval = Duration(30 * time.Second)
@@ -144,6 +144,10 @@ func (c *Client) Start(ctx context.Context) error {
 	// } else if c.electrumConfig.LastVaultTx != "" {
 	// 	params = append(params, lastCheckpoint.EventKey)
 	// }
+
+	//TODO: remove this after testing
+	c.SetCurrentHeight(87993)
+	c.getVaultBlock(87971)
 	//params = append(params, 87220)
 	params = append(params, 87970)
 
@@ -165,7 +169,16 @@ func (c *Client) Start(ctx context.Context) error {
 
 	return nil
 }
-
+func (c *Client) getVaultBlock(height int64) error {
+	var vaultBlock types.VaultBlock
+	params := []interface{}{height}
+	err := c.Electrs.CallRpcBlockingMethod(context.Background(), &vaultBlock, "vault.blocks.get", params...)
+	if err != nil {
+		log.Error().Err(err).Msgf("Failed to get block at height %d", height)
+	}
+	c.HandleSingleBlockWithVaultTxs(&vaultBlock)
+	return err
+}
 func (c *Client) GetSymbol(chainId string, tokenAddress string) (string, error) {
 	if c.scalarClient == nil {
 		return "", fmt.Errorf("scalar client is not initialized")

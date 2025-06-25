@@ -108,6 +108,46 @@ func (c *Client) findAndHandleRedeemTxs(blockHeight int) error {
 	return c.handleRedeemTxs(redeemTxs)
 }
 
+func (c *Client) HandleSingleBlockWithVaultTxs(vaultBlock *types.VaultBlock) {
+	log.Debug().Msgf("[ElectrumClient] [HandleSingleBlockWithVaultTxs] Received vaultBlock %+v ", vaultBlock)
+	//Store all block headers
+	blockHeader := chains.BlockHeader{
+		Chain:       c.electrumConfig.SourceChain,
+		BlockNumber: uint64(vaultBlock.Height),
+		BlockHash:   vaultBlock.Hash,
+		BlockTime:   uint64(vaultBlock.Time),
+	}
+	err := c.dbAdapter.CreateBlockHeader(&blockHeader)
+	if err != nil {
+		log.Error().Err(err).Msg("[ElectrumClient] [HandleSingleBlockWithVaultTxs] Failed to store block header")
+	}
+
+	lastCheckpoint := c.getLastCheckpoint()
+
+	log.Debug().Int("blockHeight", vaultBlock.Height).Msgf("[ElectrumClient] [HandleSingleBlockWithVaultTxs] Received %d vault transactions", len(vaultBlock.VaultTxs))
+	if uint64(vaultBlock.Height) > lastCheckpoint.BlockNumber {
+		lastCheckpoint.BlockNumber = uint64(vaultBlock.Height)
+		lastCheckpoint.TxHash = vaultBlock.Hash
+	}
+	tokenSents, redeemTxs := c.CategorizeVaultBlock(vaultBlock)
+	err = c.handleBlockBtcTokenSents(uint64(vaultBlock.Height), tokenSents)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to handle token sents")
+	}
+
+	if len(redeemTxs) > 0 {
+		err = c.handleRedeemTxs(redeemTxs)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to handle redeem transactions")
+		}
+	}
+
+	err = c.dbAdapter.UpdateLastEventCheckPoint(lastCheckpoint)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to update last event checkpoint")
+	}
+}
+
 // Handle whole block with vault transactions
 func (c *Client) HandleValueBlockWithVaultTxs(rawMessage json.RawMessage, err error) {
 	if err != nil {
