@@ -33,7 +33,7 @@ func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err err
 		return nil
 	}
 	log.Debug().Msgf("[ElectrumClient] [BlockchainHeaderHandler] Update current block chain header: %v", header)
-	c.currentHeight = header.Height
+	c.SetCurrentHeight(int64(header.Height))
 
 	err = c.tryConfirmTokenSents(header.Height)
 	if err != nil {
@@ -246,19 +246,19 @@ func (c *Client) handleBlockBtcTokenSents(blockNumber uint64, tokenSents []*chai
 		log.Debug().Msgf("[ElectrumClient] [handleTokenSents] No token sent transactions to handle")
 		return nil
 	}
-	log.Debug().Int("CurrentHeight", c.currentHeight).Uint64("BlockNumber", blockNumber).
+	log.Debug().Int64("CurrentHeight", c.GetCurrentHeight()).Uint64("BlockNumber", blockNumber).
 		Msgf("[ElectrumClient] [handleTokenSents] Received %d token sent transactions", len(tokenSents))
 	//If confirmations is 1, send to the event bus with destination chain is scalar for confirmation
 	//If confirmations is greater than 1, wait for the next blocks to get more confirmations before broadcasting to the scalar network
 
-	if c.electrumConfig.Confirmations <= 1 || c.currentHeight-int(blockNumber) >= c.electrumConfig.Confirmations {
+	if c.electrumConfig.Confirmations <= 1 || c.GetCurrentHeight()-int64(blockNumber) >= int64(c.electrumConfig.Confirmations) {
 		for _, tokenSent := range tokenSents {
 			tokenSent.Status = chains.TokenSentStatusVerifying
 		}
 
 	} else {
 		log.Debug().Msgf("[ElectrumClient] [handleTokenSents] %d BridgeTxes does not have enough %d confirmed yet. Current block height %d, transactions height %d",
-			len(tokenSents), c.electrumConfig.Confirmations, c.currentHeight, blockNumber)
+			len(tokenSents), c.electrumConfig.Confirmations, c.GetCurrentHeight(), blockNumber)
 	}
 
 	//Get blockHash by blockNumber
@@ -399,7 +399,7 @@ func (c *Client) handleBlockBtcTokenSents(blockNumber uint64, tokenSents []*chai
 
 // Todo: update ContractCallWithToken status with execution confirmation from bitcoin network
 func (c *Client) handleRedeemTxs(redeemTxs []*chains.BtcRedeemTx) error {
-	log.Debug().Int("CurrentHeight", c.currentHeight).Msgf("[ElectrumClient] [handleRedeemTxs] Received %d redeem transactions", len(redeemTxs))
+	log.Debug().Int64("CurrentHeight", c.GetCurrentHeight()).Msgf("[ElectrumClient] [handleRedeemTxs] Received %d redeem transactions", len(redeemTxs))
 
 	//Group redeem txs by custodian group id, in each group we keep only txs with highest sequence number
 	mapRedeemTxs := c.groupRedeemTxs(redeemTxs)
@@ -442,8 +442,8 @@ func (c *Client) groupRedeemTxs(redeemTxs []*chains.BtcRedeemTx) map[string]*eve
 	//Store group uids that have been queried to ensure each group uid is only queried once
 	queriedGroupUids := make(map[string]bool)
 	for _, redeemTx := range redeemTxs {
-		txConfirmations := c.currentHeight - int(redeemTx.BlockNumber) + 1
-		if txConfirmations < c.electrumConfig.Confirmations {
+		txConfirmations := c.GetCurrentHeight() - int64(redeemTx.BlockNumber) + 1
+		if txConfirmations < int64(c.electrumConfig.Confirmations) {
 			continue
 		}
 		//Find current redeem session

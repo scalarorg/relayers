@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -29,7 +30,7 @@ type Client struct {
 	eventBus        *events.EventBus
 	scalarClient    *scalar.Client
 	custodialGroups []*exported.CustodianGroup
-	currentHeight   int
+	currentHeight   int64
 }
 
 func NewElectrumClients(globalConfig *config.Config, dbAdapter *db.DatabaseAdapter, eventBus *events.EventBus, scalarClient *scalar.Client) ([]*Client, error) {
@@ -129,6 +130,14 @@ func (c *Client) Start(ctx context.Context) error {
 	c.Electrs.BlockchainHeaderSubscribe(ctx, c.BlockchainHeaderHandler)
 	//log.Debug().Msgf("[ElectrumClient] [Start] Subscribing to vault transactions with params: %v", params)
 	//c.Electrs.VaultTransactionSubscribe(ctx, c.VaultTxMessageHandler, params...)
+	//wait for lastblock is updated
+	for {
+		if c.GetCurrentHeight() > 0 {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	log.Debug().Int64("CurrentHeight", c.GetCurrentHeight()).Msgf("[ElectrumClient] [Start] Subscribing to vault transactions with params: %v", params)
 	c.Electrs.SubscribeEvent(ctx, types.VaultBlocksSubscribe, c.HandleValueBlockWithVaultTxs, params...)
 	return nil
 }
@@ -150,4 +159,14 @@ func (c *Client) getLastCheckpoint() *scalarnet.EventCheckPoint {
 			Msg("[ElectrumClient] [getLastCheckpoint] using default value")
 	}
 	return lastCheckpoint
+}
+
+// GetCurrentHeight returns the current height in a thread-safe manner
+func (c *Client) GetCurrentHeight() int64 {
+	return atomic.LoadInt64(&c.currentHeight)
+}
+
+// SetCurrentHeight sets the current height in a thread-safe manner
+func (c *Client) SetCurrentHeight(height int64) {
+	atomic.StoreInt64(&c.currentHeight, height)
 }
