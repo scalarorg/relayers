@@ -57,6 +57,10 @@ func TestMain(m *testing.M) {
 		DialTimeout:   electrs.Duration(10 * time.Second),
 		MethodTimeout: electrs.Duration(60 * time.Second),
 		PingInterval:  electrs.Duration(30 * time.Second),
+		// Test reconnection settings
+		EnableAutoReconnect:  true,
+		MaxReconnectAttempts: 3,
+		ReconnectDelay:       electrs.Duration(2 * time.Second),
 	}
 	rpcEndpoint := fmt.Sprintf("%s:%d", electrsConfig.Host, electrsConfig.Port)
 	electrsClient, _ = electrum.Connect(&electrum.Options{
@@ -98,4 +102,34 @@ func VaultTxMessageHandler(vaultTxs []types.VaultTransaction, err error) error {
 		log.Debug().Msgf("[ElectrumClient] [VaultTxMessageHandler] Received vault transaction: %v", vaultTx)
 	}
 	return nil
+}
+
+func TestReconnectionConfig(t *testing.T) {
+	// Test that default reconnection values are set when not provided
+	config := &electrs.Config{
+		Host:          "localhost",
+		Port:          50001,
+		SourceChain:   "bitcoin-testnet",
+		DialTimeout:   electrs.Duration(5 * time.Second),
+		MethodTimeout: electrs.Duration(30 * time.Second),
+		PingInterval:  electrs.Duration(15 * time.Second),
+		// Don't set reconnection values to test defaults
+	}
+
+	// Create a client to trigger default value setting
+	_, err := electrs.NewElectrumClient(nil, config, nil, nil, nil)
+	if err == nil {
+		t.Error("Expected error when creating client with nil dependencies, but got nil")
+	}
+
+	// Check that default values were set
+	if config.MaxReconnectAttempts != 5 {
+		t.Errorf("Expected MaxReconnectAttempts to be 5, got %d", config.MaxReconnectAttempts)
+	}
+	if config.ReconnectDelay != electrs.Duration(5*time.Second) {
+		t.Errorf("Expected ReconnectDelay to be 5s, got %v", config.ReconnectDelay)
+	}
+	if !config.EnableAutoReconnect {
+		t.Error("Expected EnableAutoReconnect to be true")
+	}
 }

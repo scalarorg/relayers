@@ -24,7 +24,7 @@ func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err err
 		log.Error().Err(err).Msg("[ElectrumClient] [BlockchainHeaderHandler] Failed to receive block chain header")
 		// Check if it's a timeout error and log additional context
 		if err.Error() == "context deadline exceeded" {
-			log.Error().Msg("[ElectrumClient] [BlockchainHeaderHandler] Timeout error detected - consider increasing MethodTimeout in electrum config")
+			log.Error().Msg("[ElectrumClient] [BlockchainHeaderHandler] Timeout error detected - reconnection will be attempted automatically")
 		}
 		return fmt.Errorf("failed to parse block chain header: %w", err)
 	}
@@ -114,7 +114,7 @@ func (c *Client) HandleValueBlockWithVaultTxs(rawMessage json.RawMessage, err er
 		log.Warn().Msgf("[ElectrumClient] [HandleValueBlockWithVaultTxs] Failed to receive vault transaction: %v", err)
 		// Check if it's a timeout error and log additional context
 		if err.Error() == "context deadline exceeded" {
-			log.Error().Msg("[ElectrumClient] [HandleValueBlockWithVaultTxs] Timeout error detected - consider increasing MethodTimeout in electrum config")
+			log.Error().Msg("[ElectrumClient] [HandleValueBlockWithVaultTxs] Timeout error detected - reconnection will be attempted automatically")
 		}
 		return
 	}

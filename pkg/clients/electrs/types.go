@@ -58,4 +58,8 @@ type Config struct {
 	MethodTimeout Duration
 	//Ping interval for keeping the connection alive (-1 to disable)
 	PingInterval Duration
+	//Reconnection configuration
+	MaxReconnectAttempts int
+	ReconnectDelay       Duration
+	EnableAutoReconnect  bool
 }
