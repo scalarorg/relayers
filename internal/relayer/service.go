@@ -109,10 +109,11 @@ func (s *Service) Start(ctx context.Context) error {
 		panic(err)
 	}
 
-	//Start electrum clients. This client can get all vault transactions from last checkpoint of begining if no checkpoint is found
-	for _, client := range s.Electrs {
-		go client.Start(ctx)
-	}
+	// Start electrum clients. This client can get all vault transactions from last checkpoint of begining if no checkpoint is found
+	//TODO: uncomment this after testing
+	// for _, client := range s.Electrs {
+	// 	go client.Start(ctx)
+	// }
 	//Recover all events
 	for _, client := range s.EvmClients {
 		go client.ProcessMissingLogs()
