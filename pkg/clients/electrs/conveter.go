@@ -42,7 +42,7 @@ func (c *Client) CategorizeVaultBlock(vaultBlock *types.VaultBlock) ([]*chains.T
 			//1.Staking
 			tokenSent, err := c.CreateTokenSent(txInfo)
 			if err != nil {
-				log.Error().Err(err).Msg("[ElectrumClient] [CreateTokenSents] failed to create token sent")
+				//log.Error().Err(err).Msg("[ElectrumClient] [CreateTokenSents] failed to create token sent")
 			} else if tokenSent != nil {
 				if tokenSent.Symbol == "" {
 					log.Error().Msgf("[ElectrumClient] [CreateTokenSents] symbol not found for token: %s", txInfo.DestTokenAddress)
@@ -137,7 +137,7 @@ func (c *Client) CreateTokenSent(vaultTx types.VaultTransaction) (*chains.TokenS
 		for _, group := range c.custodialGroups {
 			pubkeys = append(pubkeys, hex.EncodeToString(group.BitcoinPubkey))
 		}
-		log.Debug().Strs("Supported custodian groups taproot pubkey", pubkeys).Msg("[ElectrumClient] CreateTokenSent failed")
+		//log.Debug().Strs("Supported custodian groups taproot pubkey", pubkeys).Msg("[ElectrumClient] CreateTokenSent failed")
 		return nil, fmt.Errorf("custodian group for script pubkey %s not found", hex.EncodeToString(vaultTx.ScriptPubkey))
 	}
 	//For btc vault tx, the log index is tx position in the block
