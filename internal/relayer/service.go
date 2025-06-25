@@ -94,16 +94,21 @@ func (s *Service) Start(ctx context.Context) error {
 	for ind, group := range groups {
 		groupUids[ind] = group.UID
 	}
+	//Start btc clients
+	for _, client := range s.BtcClient {
+		go client.Start(ctx)
+	}
+	//Start electrum clients. This client can get all vault transactions from last checkpoint of begining if no checkpoint is found
+	for _, client := range s.Electrs {
+		go client.StartBlockchainHeaderSubscriptionWithReconnect(ctx)
+	}
 	//Perform recovery redeem session before recover other events
 	err = s.RecoverEvmSessions(groupUids)
 	if err != nil {
 		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot recover sessions")
 		panic(err)
 	}
-	//Start btc clients
-	for _, client := range s.BtcClient {
-		go client.Start(ctx)
-	}
+
 	//Start electrum clients. This client can get all vault transactions from last checkpoint of begining if no checkpoint is found
 	for _, client := range s.Electrs {
 		go client.Start(ctx)
@@ -253,15 +258,16 @@ func (s *Service) processRecoverExecutingPhase(groupUid string, groupRedeemSessi
 			log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot wait for group %s to switch to preparing phase", groupUid)
 			return err
 		}
-
-		mapTxHashes, err := s.replayRedeemTransactions(groupUid, groupRedeemSessions.RedeemTokenEvents)
-		if err != nil {
-			log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot replay redeem transactions")
-			return err
+		if len(groupRedeemSessions.RedeemTokenEvents) > 0 {
+			mapTxHashes, err := s.replayRedeemTransactions(groupUid, groupRedeemSessions.RedeemTokenEvents)
+			if err != nil {
+				log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot replay redeem transactions")
+				return err
+			}
+			log.Info().Any("mapTxHashes", mapTxHashes).Msg("[Relayer] [processRecoverExecutionPhase] finished replay redeem transactions")
+			s.waitingForPendingCommands(mapTxHashes)
+			log.Info().Msgf("[Relayer] [processRecoverExecutionPhase] all pending commands are ready")
 		}
-		log.Info().Any("mapTxHashes", mapTxHashes).Msg("[Relayer] [processRecoverExecutionPhase] finished replay redeem transactions")
-		s.waitingForPendingCommands(mapTxHashes)
-		log.Info().Msgf("[Relayer] [processRecoverExecutionPhase] all pending commands are ready")
 	}
 	//5. Replay all switch to executing phase events
 	expectedPhase, evmCounter, hasDifferentPhase := s.replaySwitchPhaseEvents(groupRedeemSessions.SwitchPhaseEvents, 1)
@@ -459,10 +465,10 @@ func (s *Service) replayRedeemTransactions(groupUid string, mapRedeemTokenEvents
 		return nil, fmt.Errorf("[Relayer] [processRecoverExecutionPhase] scalar client is undefined")
 	}
 	//Waiting for utxo snapshot initialied
-	err := s.ScalarClient.WaitForUtxoSnapshot(groupUid)
-	if err != nil {
-		return nil, fmt.Errorf("[Relayer] [processRecoverExecutionPhase] cannot wait for utxo snapshot for group %s", groupUid)
-	}
+	// err := s.ScalarClient.WaitForUtxoSnapshot(groupUid)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("[Relayer] [processRecoverExecutionPhase] cannot wait for utxo snapshot for group %s", groupUid)
+	// }
 	mapTxHashes := sync.Map{}
 	wg := sync.WaitGroup{}
 	for _, evmClient := range s.EvmClients {

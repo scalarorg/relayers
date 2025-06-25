@@ -63,7 +63,7 @@ func (c *Client) BlockchainHeaderHandler(header *types.BlockchainHeader, err err
 		log.Error().Err(err).Msg("[ElectrumClient] create block header failed")
 	}
 	if c.eventBus != nil {
-		log.Debug().Msgf("[ElectrumClient] [BlockchainHeaderHandler] Broadcasting new block event: %v", header.Height)
+		log.Debug().Msgf("[ElectrumClient] [BlockchainHeaderHandler] Broadcasting new block event: height %d and Hash: %s", header.Height, header.Hash)
 		c.eventBus.BroadcastEvent(&events.EventEnvelope{
 			EventType:        events.EVENT_ELECTRS_NEW_BLOCK,
 			DestinationChain: events.SCALAR_NETWORK_NAME,

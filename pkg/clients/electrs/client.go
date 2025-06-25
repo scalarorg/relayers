@@ -146,14 +146,14 @@ func (c *Client) Start(ctx context.Context) error {
 	// }
 
 	//TODO: remove this after testing
-	c.SetCurrentHeight(87993)
-	c.getVaultBlock(87971)
-	c.getVaultBlock(87988)
+	// c.SetCurrentHeight(87993)
+	// c.getVaultBlock(87971)
+	// c.getVaultBlock(87988)
 	//params = append(params, 87220)
 	params = append(params, 87970)
 
 	// Start blockchain header subscription with reconnection logic
-	go c.startBlockchainHeaderSubscriptionWithReconnect(ctx)
+	//go c.startBlockchainHeaderSubscriptionWithReconnect(ctx)
 
 	//wait for lastblock is updated
 	for {
@@ -166,7 +166,7 @@ func (c *Client) Start(ctx context.Context) error {
 	log.Debug().Int64("CurrentHeight", c.GetCurrentHeight()).Msgf("[ElectrumClient] [Start] Subscribing to vault transactions with params: %v", params)
 
 	// Start vault transaction subscription with reconnection logic
-	go c.startVaultTransactionSubscriptionWithReconnect(ctx, params)
+	go c.startVaultBlocksSubscriptionWithReconnect(ctx, params)
 
 	return nil
 }
@@ -237,7 +237,7 @@ func (c *Client) recreateConnection() error {
 }
 
 // startBlockchainHeaderSubscriptionWithReconnect starts the blockchain header subscription with automatic reconnection
-func (c *Client) startBlockchainHeaderSubscriptionWithReconnect(ctx context.Context) {
+func (c *Client) StartBlockchainHeaderSubscriptionWithReconnect(ctx context.Context) {
 	attempt := 0
 	for {
 		select {
@@ -257,7 +257,7 @@ func (c *Client) startBlockchainHeaderSubscriptionWithReconnect(ctx context.Cont
 			// Subscribe to blockchain headers in a goroutine
 			subscriptionDone := make(chan error, 1)
 			go func() {
-				defer cancel()
+				// Don't defer cancel() here - let the subscription run until it naturally completes
 				c.Electrs.BlockchainHeaderSubscribe(subscriptionCtx, c.BlockchainHeaderHandler)
 				subscriptionDone <- nil
 			}()
@@ -265,6 +265,7 @@ func (c *Client) startBlockchainHeaderSubscriptionWithReconnect(ctx context.Cont
 			// Wait for either completion or timeout
 			select {
 			case <-subscriptionCtx.Done():
+				cancel() // Cancel the context when timeout occurs
 				if subscriptionCtx.Err() == context.DeadlineExceeded {
 					log.Warn().Msg("[ElectrumClient] [startBlockchainHeaderSubscriptionWithReconnect] Subscription timeout detected")
 				} else {
@@ -272,6 +273,7 @@ func (c *Client) startBlockchainHeaderSubscriptionWithReconnect(ctx context.Cont
 					return
 				}
 			case err := <-subscriptionDone:
+				cancel() // Cancel the context when subscription completes
 				if err != nil {
 					log.Error().Err(err).Msg("[ElectrumClient] [startBlockchainHeaderSubscriptionWithReconnect] Subscription error")
 				} else {
@@ -306,7 +308,7 @@ func (c *Client) startBlockchainHeaderSubscriptionWithReconnect(ctx context.Cont
 }
 
 // startVaultTransactionSubscriptionWithReconnect starts the vault transaction subscription with automatic reconnection
-func (c *Client) startVaultTransactionSubscriptionWithReconnect(ctx context.Context, params []interface{}) {
+func (c *Client) startVaultBlocksSubscriptionWithReconnect(ctx context.Context, params []interface{}) {
 	attempt := 0
 	for {
 		select {
@@ -326,14 +328,23 @@ func (c *Client) startVaultTransactionSubscriptionWithReconnect(ctx context.Cont
 			// Subscribe to vault transactions in a goroutine
 			subscriptionDone := make(chan error, 1)
 			go func() {
-				defer cancel()
-				c.Electrs.SubscribeEvent(subscriptionCtx, types.VaultBlocksSubscribe, c.HandleValueBlockWithVaultTxs, params...)
-				subscriptionDone <- nil
+				// Don't defer cancel() here - let the subscription run until it naturally completes
+				vaultBlocks := []types.VaultBlock{}
+				log.Info().Msgf("[ElectrumClient] [startVaultTransactionSubscriptionWithReconnect] Subscribing to vault transactions with params: %v", params)
+				//err := c.Electrs.SubscribeEvent(subscriptionCtx, types.VaultBlocksSubscribe, c.HandleValueBlockWithVaultTxs, params...)
+				err := c.Electrs.SubscribeEventBlocking(subscriptionCtx, types.VaultBlocksSubscribe, c.HandleValueBlockWithVaultTxs, &vaultBlocks, params...)
+				log.Info().Msgf("[ElectrumClient] [startVaultTransactionSubscriptionWithReconnect] Received %d vault blocks", len(vaultBlocks))
+				for _, vaultBlock := range vaultBlocks {
+					log.Info().Msgf("[ElectrumClient] [startVaultTransactionSubscriptionWithReconnect] Received vault block: %d with %d vault transactions", vaultBlock.Height, len(vaultBlock.VaultTxs))
+					c.HandleSingleBlockWithVaultTxs(&vaultBlock)
+				}
+				subscriptionDone <- err
 			}()
 
 			// Wait for either completion or timeout
 			select {
 			case <-subscriptionCtx.Done():
+				cancel() // Cancel the context when timeout occurs
 				if subscriptionCtx.Err() == context.DeadlineExceeded {
 					log.Warn().Msg("[ElectrumClient] [startVaultTransactionSubscriptionWithReconnect] Subscription timeout detected")
 				} else {
@@ -341,6 +352,7 @@ func (c *Client) startVaultTransactionSubscriptionWithReconnect(ctx context.Cont
 					return
 				}
 			case err := <-subscriptionDone:
+				cancel() // Cancel the context when subscription completes
 				if err != nil {
 					log.Error().Err(err).Msg("[ElectrumClient] [startVaultTransactionSubscriptionWithReconnect] Subscription error")
 				} else {
