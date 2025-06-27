@@ -150,7 +150,7 @@ func (c *Client) Start(ctx context.Context) error {
 	// c.getVaultBlock(87971)
 	// c.getVaultBlock(87988)
 	//params = append(params, 87220)
-	params = append(params, 87970)
+	//params = append(params, 87970)
 
 	// Start blockchain header subscription with reconnection logic
 	//go c.startBlockchainHeaderSubscriptionWithReconnect(ctx)
