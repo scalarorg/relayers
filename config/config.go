@@ -22,6 +22,7 @@ type ChainFamily map[uint64]IChainConfig
 type Config struct {
 	ConfigPath        string                 `mapstructure:"config_path"`
 	ConnnectionString string                 `mapstructure:"database_url"` // Postgres db connection string
+	DBIndexerUrl      string                 `mapstructure:"db_indexer_url"`
 	ScalarMnemonic    string                 `mapstructure:"scalar_mnemonic"`
 	EvmKey            string                 `mapstructure:"evm_key"`
 	Nonce             string                 `mapstructure:"nonce"`

@@ -15,7 +15,7 @@ import (
 
 func (db *DatabaseAdapter) SaveValuesWithCheckpoint(values any, lastCheckpoint *scalarnet.EventCheckPoint) error {
 	//Up date checkpoint and relayDatas in a transaction
-	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+	err := db.RelayerClient.Transaction(func(tx *gorm.DB) error {
 		result := tx.Save(values)
 		if result.Error != nil {
 			return result.Error
@@ -32,7 +32,7 @@ func (db *DatabaseAdapter) SaveValuesWithCheckpoint(values any, lastCheckpoint *
 }
 
 func (db *DatabaseAdapter) SaveSingleValue(value any) error {
-	result := db.PostgresClient.Save(value)
+	result := db.RelayerClient.Save(value)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -58,7 +58,7 @@ func (db *DatabaseAdapter) SaveSingleValue(value any) error {
 // }
 
 func (db *DatabaseAdapter) CreateBatchValue(values any, batchSize int) error {
-	result := db.PostgresClient.CreateInBatches(values, batchSize)
+	result := db.RelayerClient.CreateInBatches(values, batchSize)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -76,7 +76,7 @@ func (db *DatabaseAdapter) GetLastCheckPoint(chainName string) (*scalarnet.Event
 		LogIndex:    0,
 		EventKey:    "",
 	}
-	result := db.PostgresClient.Where("chain_name = ?", chainName).Order("block_number ASC").First(&lastBlock)
+	result := db.RelayerClient.Where("chain_name = ?", chainName).Order("block_number ASC").First(&lastBlock)
 	return &lastBlock, result.Error
 }
 
@@ -90,11 +90,11 @@ func (db *DatabaseAdapter) GetLastEventCheckPoint(chainName, eventName string) (
 		LogIndex:    0,
 		EventKey:    "",
 	}
-	result := db.PostgresClient.Where("chain_name = ? AND event_name = ?", chainName, eventName).First(&lastBlock)
+	result := db.RelayerClient.Where("chain_name = ? AND event_name = ?", chainName, eventName).First(&lastBlock)
 	return &lastBlock, result.Error
 }
 func (db *DatabaseAdapter) UpdateLastEventCheckPoints(checkpoints map[string]scalarnet.EventCheckPoint) error {
-	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+	return db.RelayerClient.Transaction(func(tx *gorm.DB) error {
 		for _, checkpoint := range checkpoints {
 			err := UpdateLastEventCheckPoint(tx, &checkpoint)
 			if err != nil {
@@ -106,7 +106,7 @@ func (db *DatabaseAdapter) UpdateLastEventCheckPoints(checkpoints map[string]sca
 }
 
 func (db *DatabaseAdapter) UpdateLastEventCheckPoint(value *scalarnet.EventCheckPoint) error {
-	return UpdateLastEventCheckPoint(db.PostgresClient, value)
+	return UpdateLastEventCheckPoint(db.RelayerClient, value)
 }
 
 // For transactional update

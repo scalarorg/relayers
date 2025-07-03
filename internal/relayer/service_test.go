@@ -55,7 +55,7 @@ func TestRecoverEvmSessions(t *testing.T) {
 	groups := []chainExported.Hash{
 		(chainExported.Hash)(mockCustodianGroupUid),
 	}
-	err := service.RecoverEvmSessions(groups)
+	err := service.RecoverEvmSessions(groups[0])
 	require.NoError(t, err)
 }
 

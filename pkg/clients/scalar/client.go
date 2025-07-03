@@ -22,6 +22,7 @@ import (
 	//tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
+	"github.com/scalarorg/data-models/relayer"
 )
 
 type Client struct {
@@ -38,6 +39,8 @@ type Client struct {
 	initUtxo        bool                               //key: chain, value: utxo
 	redeemTxCache   map[string]*CustodianGroupRedeemTx //Map RedeemSession by chainId
 	chains          []string
+	pollInterval    time.Duration       // Interval for polling unexecuted transactions
+	lastVaultBlock  *relayer.VaultBlock // Current processing VaultBlock to avoid redundant DB calls
 	// Add other necessary fields like chain ID, gas prices, etc.
 }
 
@@ -106,6 +109,10 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 	}
 	pendingCommands := NewPendingCommands()
 	broadcaster := NewBroadcaster(networkClient, pendingCommands, time.Second, BroadcasterBatchSize)
+	pollInterval := time.Millisecond * time.Duration(config.PollInterval)
+	if pollInterval == 0 {
+		pollInterval = time.Second * 5
+	}
 	client := &Client{
 		globalConfig:    globalConfig,
 		networkConfig:   config,
@@ -118,6 +125,7 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 		eventBus:        eventBus,
 		pendingCommands: pendingCommands,
 		chains:          chains,
+		pollInterval:    pollInterval,
 	}
 	return client, nil
 }
@@ -150,15 +158,15 @@ func (c *Client) Start(ctx context.Context) error {
 			log.Error().Err(err).Msg("[ScalarClient] [subscribeAllBlockEventsWithHeatBeat] Failed")
 		}
 	}()
-	// go func() {
-	// 	err := c.ProcessNextBlock(ctx)
-	// 	if err != nil {
-	// 		log.Error().Err(err).Msg("[ScalarClient] [getNextBlock] Failed")
-	// 	}
-	// }()
-	// go func() {
-	// 	c.subscribeWithHeatBeat(ctx)
-	// }()
+	go func() {
+		c.StartBridgeProcessing(ctx)
+	}()
+	go func() {
+		c.StartTransferProcessing(ctx)
+	}()
+	go func() {
+		c.StartRedeemProcessing(ctx)
+	}()
 	log.Info().Msg("Scalar client started")
 	return nil
 }

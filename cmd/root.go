@@ -11,7 +11,6 @@ import (
 	"github.com/scalarorg/relayers/config"
 	_ "github.com/scalarorg/relayers/internal/codec"
 	"github.com/scalarorg/relayers/internal/relayer"
-	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -50,14 +49,8 @@ func run(cmd *cobra.Command, args []string) {
 	}
 	evtBusConfig := config.EventBusConfig{}
 	eventBus := events.GetEventBus(&evtBusConfig)
-	// Initialize global DatabaseClient
-	dbAdapter, err := db.NewDatabaseAdapter(&config.GlobalConfig)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create database adapter")
-	}
-
 	// Initialize relayer service
-	service, err := relayer.NewService(&config.GlobalConfig, dbAdapter, eventBus)
+	service, err := relayer.NewService(&config.GlobalConfig, eventBus)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create relayer service")
 	}

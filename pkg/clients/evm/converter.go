@@ -8,7 +8,6 @@ import (
 
 	chainTypes "github.com/scalarorg/bitcoin-vault/go-utils/chain"
 	chains "github.com/scalarorg/data-models/chains"
-	"github.com/scalarorg/data-models/scalarnet"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/utils"
 )
@@ -154,14 +153,14 @@ func (c *EvmClient) GetTokenContractAddressFromSymbol(chainId string, symbol str
 	}
 	return ""
 }
-func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGatewayContractCallApproved) (scalarnet.ContractCallApproved, error) {
+func (c *EvmClient) ContractCallApprovedEvent2Model(event *contracts.IScalarGatewayContractCallApproved) (chains.ContractCallApproved, error) {
 	txHash := event.Raw.TxHash.String()
 	eventId := strings.ToLower(fmt.Sprintf("%s-%d-%d", txHash, event.SourceEventIndex, event.Raw.Index))
 	sourceEventIndex := uint64(0)
 	if event.SourceEventIndex != nil && event.SourceEventIndex.IsUint64() {
 		sourceEventIndex = event.SourceEventIndex.Uint64()
 	}
-	record := scalarnet.ContractCallApproved{
+	record := chains.ContractCallApproved{
 		EventID:          eventId,
 		SourceChain:      event.SourceChain,
 		DestinationChain: c.EvmConfig.GetId(),
@@ -190,7 +189,7 @@ func (c *EvmClient) CommandExecutedEvent2Model(event *contracts.IScalarGatewayEx
 
 func (c *EvmClient) TokenDeployedEvent2Model(event *contracts.IScalarGatewayTokenDeployed) chains.TokenDeployed {
 	tokenDeployed := chains.TokenDeployed{
-		Chain:        c.EvmConfig.GetId(),
+		SourceChain:  c.EvmConfig.GetId(),
 		BlockNumber:  uint64(event.Raw.BlockNumber),
 		TxHash:       event.Raw.TxHash.String(),
 		Symbol:       event.Symbol,
@@ -201,7 +200,7 @@ func (c *EvmClient) TokenDeployedEvent2Model(event *contracts.IScalarGatewayToke
 
 func (c *EvmClient) SwitchPhaseEvent2Model(event *contracts.IScalarGatewaySwitchPhase) chains.SwitchedPhase {
 	switchPhase := chains.SwitchedPhase{
-		Chain:             c.EvmConfig.GetId(),
+		SourceChain:       c.EvmConfig.GetId(),
 		BlockNumber:       uint64(event.Raw.BlockNumber),
 		TxHash:            event.Raw.TxHash.String(),
 		CustodianGroupUid: hex.EncodeToString(event.CustodianGroupId[:]),

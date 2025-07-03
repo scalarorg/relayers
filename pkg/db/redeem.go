@@ -12,7 +12,7 @@ import (
 )
 
 func (db *DatabaseAdapter) SaveSwitchPhase(value *chains.SwitchedPhase) error {
-	err := db.PostgresClient.Clauses(
+	err := db.RelayerClient.Clauses(
 		clause.OnConflict{
 			Columns:   []clause.Column{{Name: "chain"}, {Name: "tx_hash"}},
 			DoNothing: true,
@@ -48,7 +48,7 @@ func (db *DatabaseAdapter) SaveBtcRedeemTxs(btcChain string, redeemTxs []*chains
 	oldRedeemTxs := make([]uint, 0)
 	for _, tx := range redeemTxMap {
 		var existingTx chains.BtcRedeemTx
-		err := db.PostgresClient.Where("chain = ? AND custodian_group_uid = ? AND session_sequence = ? AND block_number < ?",
+		err := db.RelayerClient.Where("chain = ? AND custodian_group_uid = ? AND session_sequence = ? AND block_number < ?",
 			btcChain, tx.CustodianGroupUid, tx.SessionSequence, tx.BlockNumber).First(&existingTx).Error
 		if err == nil {
 			log.Error().Err(err).Msg("Redeem Tx with the same custodian_group_uid and session_sequence found")
@@ -62,7 +62,7 @@ func (db *DatabaseAdapter) SaveBtcRedeemTxs(btcChain string, redeemTxs []*chains
 		}
 	}
 
-	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+	return db.RelayerClient.Transaction(func(tx *gorm.DB) error {
 		// Remove existing records with same custodian_group_uid and session_sequence but smaller block_number
 		result := tx.Exec(`DELETE FROM btc_redeem_txes where id IN (?)`, oldRedeemTxs)
 		if result.Error != nil {
@@ -92,7 +92,7 @@ func (db *DatabaseAdapter) SaveBtcRedeemTxs(btcChain string, redeemTxs []*chains
 }
 
 func (db *DatabaseAdapter) CreateEvmRedeemToken(redeemToken *chains.EvmRedeemTx, lastCheckpoint *scalarnet.EventCheckPoint) error {
-	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+	err := db.RelayerClient.Transaction(func(tx *gorm.DB) error {
 		result := tx.Save(redeemToken)
 		if result.Error != nil {
 			return result.Error
@@ -111,7 +111,7 @@ func (db *DatabaseAdapter) CreateEvmRedeemToken(redeemToken *chains.EvmRedeemTx,
 // Get last pending redeem transaction by block height
 func (db *DatabaseAdapter) FindExecutingRedeemTxs(chainId string, blockHeight int) ([]*chains.BtcRedeemTx, error) {
 	var redeemTxs []*chains.BtcRedeemTx
-	err := db.PostgresClient.Where("chain = ? AND block_number <= ? AND status = ?", chainId, blockHeight, chains.RedeemStatusExecuting).
+	err := db.RelayerClient.Where("chain = ? AND block_number <= ? AND status = ?", chainId, blockHeight, chains.RedeemStatusExecuting).
 		Find(&redeemTxs).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to find pending redeem transaction: %w", err)
@@ -124,11 +124,11 @@ func (db *DatabaseAdapter) UpdateRedeemTxsStatus(redeemTxs []*chains.BtcRedeemTx
 	for i, redeemTx := range redeemTxs {
 		txHashes[i] = redeemTx.TxHash
 	}
-	return db.PostgresClient.Model(&chains.BtcRedeemTx{}).Where("tx_hash IN (?)", txHashes).Update("status", status).Error
+	return db.RelayerClient.Model(&chains.BtcRedeemTx{}).Where("tx_hash IN (?)", txHashes).Update("status", status).Error
 }
 
 func (db *DatabaseAdapter) StoreRedeemEvent(redeemEvent *contracts.IScalarGatewayRedeemToken) error {
-	return db.PostgresClient.Create(redeemEvent).Error
+	return db.RelayerClient.Create(redeemEvent).Error
 }
 
 // func (db *DatabaseAdapter) UpdateRedeemExecutedCommands(chainId string, txHashes []string) error {
@@ -146,6 +146,6 @@ func (db *DatabaseAdapter) StoreRedeemEvent(redeemEvent *contracts.IScalarGatewa
 
 // Delete existing redeem transactions with same custodian_group_uid and session_sequence but smaller block_number
 func (db *DatabaseAdapter) DeleteBtcRedeemTxsByGroupAndSequence(chainId string, custodianGroupUid string, sessionSequence uint64, blockNumber uint64) error {
-	return db.PostgresClient.Where("chain = ? AND custodian_group_uid = ? AND session_sequence = ? AND block_number < ?",
+	return db.RelayerClient.Where("chain = ? AND custodian_group_uid = ? AND session_sequence = ? AND block_number < ?",
 		chainId, custodianGroupUid, sessionSequence, blockNumber).Delete(&chains.BtcRedeemTx{}).Error
 }

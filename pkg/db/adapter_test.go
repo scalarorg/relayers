@@ -92,7 +92,7 @@ func SetupTestDB(busEventChan chan *events.EventEnvelope, receiverChanBufSize in
 
 	// Create test DatabaseAdapter
 	testAdapter := &db.DatabaseAdapter{
-		PostgresClient: postgresDb,
+		RelayerClient: postgresDb,
 		// BusEventChan:         busEventChan,
 		// BusEventReceiverChan: make(chan *types.EventEnvelope, receiverChanBufSize),
 	}
@@ -187,7 +187,7 @@ func TestSaveMintTokenCommandExecuted(t *testing.T) {
 	}
 	err := dbAdapter.SaveCommandExecuted(&cmdExecuted, &chainstypes.CommandResponse{Type: "mintToken"})
 	tokenSent := chains.TokenSent{}
-	dbAdapter.PostgresClient.Find(&chains.TokenSent{}).Where("event_id = ?", TOKEN_SENT_EVENT_ID).First(&tokenSent)
+	dbAdapter.RelayerClient.Find(&chains.TokenSent{}).Where("event_id = ?", TOKEN_SENT_EVENT_ID).First(&tokenSent)
 	require.NoError(t, err)
 	require.Equal(t, chains.TokenSentStatusSuccess, tokenSent.Status)
 	cleanup()
@@ -214,7 +214,7 @@ func TestUpdateBroadcastedCommands(t *testing.T) {
 		TX_HASH_BTC)
 	require.NoError(t, err)
 	contractCallWithToken := chains.ContractCallWithToken{}
-	dbAdapter.PostgresClient.Find(&chains.ContractCallWithToken{}).
+	dbAdapter.RelayerClient.Find(&chains.ContractCallWithToken{}).
 		Where("event_id = ?", CONTRACT_CALL_WITH_TOKEN_EVENT_ID).
 		First(&contractCallWithToken)
 	require.Equal(t, chains.ContractCallStatusExecuting, contractCallWithToken.Status)
