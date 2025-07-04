@@ -177,17 +177,6 @@ func (c *Client) handleContractCallWithMintApprovedEvents(ctx context.Context, e
 		entities[i] = CreateCallContractApprovedWithMintFromScalarEvent(event.Args)
 	}
 	return c.dbAdapter.CreateOrUpdateContractCallApprovedWithMints(entities)
-	// updates := make([]db.RelaydataExecuteResult, 0)
-	// for _, event := range events {
-	// 	result, err := c.handleContractCallWithTokenApprovedEvent(ctx, &event)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if result != nil {
-	// 		updates = append(updates, *result)
-	// 	}
-	// }
-	// return c.dbAdapter.UpdateBatchRelayDataStatus(updates, len(updates))
 }
 
 // func (c *Client) handleContractCallWithTokenApprovedEvent(ctx context.Context, event *IBCEvent[*chainstypes.EventContractCallWithMintApproved]) (*db.RelaydataExecuteResult, error) {
@@ -468,12 +457,12 @@ func (c *Client) handleSwitchPhaseCompletedEvents(ctx context.Context, switchPha
 }
 
 func (c *Client) handleContractCallWithTokenCompletedEvent(event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
-	c.dbAdapter.PostgresClient.Model(&chains.ContractCallWithToken{}).Where("event_id = ?", event.Args.EventID).Update("status", chains.ContractCallStatusSuccess)
+	c.dbAdapter.RelayerClient.Model(&chains.ContractCallWithToken{}).Where("event_id = ?", event.Args.EventID).Update("status", chains.ContractCallStatusSuccess)
 	return nil
 }
 
 func (c *Client) handleTokenSentCompletedEvent(event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
-	c.dbAdapter.PostgresClient.Model(&chains.TokenSent{}).Where("event_id = ?", event.Args.EventID).Update("status", chains.TokenSentStatusSuccess)
+	c.dbAdapter.RelayerClient.Model(&chains.TokenSent{}).Where("event_id = ?", event.Args.EventID).Update("status", chains.TokenSentStatusSuccess)
 	return nil
 }
 

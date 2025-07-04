@@ -21,9 +21,9 @@ func CreateCallContractApprovedFromScalarEvent(event *types.ContractCallApproved
 	e.PayloadHash = hex.EncodeToString(event.PayloadHash[:])
 	return e
 }
-func CreateCallContractApprovedFromEvmEvent(destinationChain string, event *contracts.IScalarGatewayContractCallApproved) scalarnet.ContractCallApproved {
+func CreateCallContractApprovedFromEvmEvent(destinationChain string, event *contracts.IScalarGatewayContractCallApproved) chains.ContractCallApproved {
 	eventId := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
-	e := scalarnet.ContractCallApproved{}
+	e := chains.ContractCallApproved{}
 	e.EventID = eventId
 	e.SourceChain = string(event.SourceChain)
 	e.CommandID = hex.EncodeToString(event.CommandId[:])
@@ -48,18 +48,18 @@ func CreateCallContractApprovedWithMintFromScalarEvent(event *types.EventContrac
 	return e
 }
 
-func CreateCallContractApprovedWithMintFromEvmEvent(destinationChain string, event *contracts.IScalarGatewayContractCallApprovedWithMint) scalarnet.ContractCallApprovedWithMint {
-	e := scalarnet.ContractCallApprovedWithMint{}
-	eventId := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
-	e.EventID = eventId
-	e.SourceChain = string(event.SourceChain)
-	e.CommandID = hex.EncodeToString(event.CommandId[:])
-	e.Sender = event.SourceAddress
-	e.DestinationChain = string(destinationChain)
-	e.ContractAddress = string(event.SourceAddress)
-	e.PayloadHash = hex.EncodeToString(event.PayloadHash[:])
-	return e
-}
+// func CreateCallContractApprovedWithMintFromEvmEvent(destinationChain string, event *contracts.IScalarGatewayContractCallApprovedWithMint) scalarnet.ContractCallApprovedWithMint {
+// 	e := scalarnet.ContractCallApprovedWithMint{}
+// 	eventId := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
+// 	e.EventID = eventId
+// 	e.SourceChain = string(event.SourceChain)
+// 	e.CommandID = hex.EncodeToString(event.CommandId[:])
+// 	e.Sender = event.SourceAddress
+// 	e.DestinationChain = string(destinationChain)
+// 	e.ContractAddress = string(event.SourceAddress)
+// 	e.PayloadHash = hex.EncodeToString(event.PayloadHash[:])
+// 	return e
+// }
 
 func CreateMintCommandFromScalarEvent(event *types.MintCommand) chains.MintCommand {
 	e := chains.MintCommand{}

@@ -106,6 +106,7 @@ func (c *BtcClient) Start(ctx context.Context) error {
 			}
 		}()
 	}
+	//Start goroutine for fetch new block from btc network
 	return nil
 }
 

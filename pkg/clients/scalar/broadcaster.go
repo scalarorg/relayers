@@ -137,14 +137,14 @@ func (c *Broadcaster) ConfirmBtcBlock(chainName string, blockHashStr string, blo
 // 	"0000000000000006040d56615fb3228d0c1c1908a89d19f4b10ef5db60b2c06d",
 // }
 
-func (c *Broadcaster) ConfirmBtcVaultBlock(confirmRequest chainstypes.ConfirmSourceTxsRequestV2) error {
+func (c *Broadcaster) ConfirmBtcVaultBlock(confirmRequest *chainstypes.ConfirmSourceTxsRequestV2) error {
 	confirmRequest.Sender = c.network.GetAddress()
 	//if slices.Contains(BLOCK_HASHES, hex.EncodeToString(confirmRequest.Batch.BlockHash.Bytes())) {
 	log.Debug().Msgf("[Broadcaster] [ConfirmBtcVaultBlock] Enqueue for confirmation %d txs from block %s from chain %s",
 		len(confirmRequest.Batch.Txs),
 		confirmRequest.Batch.BlockHash.Hex(),
 		confirmRequest.Chain)
-	c.QueueTxMsg(&confirmRequest)
+	c.QueueTxMsg(confirmRequest)
 	//}
 
 	return nil
@@ -205,9 +205,9 @@ func (c *Broadcaster) ConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed) 
 	log.Debug().Str("TxHash", tokenDeployed.TxHash).
 		Str("TokenAddress", tokenDeployed.TokenAddress).Msgf("[Broadcaster] [ConfirmTokenDeployed] Confirm token deployed")
 	msg := chainstypes.NewConfirmTokenRequest(c.network.GetAddress(),
-		tokenDeployed.Chain,
+		tokenDeployed.SourceChain,
 		chainstypes.Asset{
-			Chain:  nexus.ChainName(tokenDeployed.Chain),
+			Chain:  nexus.ChainName(tokenDeployed.SourceChain),
 			Symbol: tokenDeployed.Symbol,
 		},
 		common.HexToHash(tokenDeployed.TxHash))
@@ -216,14 +216,14 @@ func (c *Broadcaster) ConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed) 
 
 func (c *Broadcaster) ConfirmSwitchedPhase(switchedPhase *chains.SwitchedPhase) error {
 	log.Debug().Str("TxHash", switchedPhase.TxHash).
-		Str("Chain", switchedPhase.Chain).
+		Str("Chain", switchedPhase.SourceChain).
 		Str("CustodianGroupUid", switchedPhase.CustodianGroupUid).
 		Uint64("SessionSequence", switchedPhase.SessionSequence).
 		Uint8("From", switchedPhase.From).
 		Uint8("To", switchedPhase.To).Msgf("[Broadcaster] [ConfirmSwitchedPhase] Confirm switched phase")
 	msg := covtypes.NewConfirmSwitchedPhaseRequest(
 		c.network.GetAddress(),
-		switchedPhase.Chain,
+		switchedPhase.SourceChain,
 		switchedPhase.CustodianGroupUid,
 		switchedPhase.TxHash,
 	)

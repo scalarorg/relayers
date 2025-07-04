@@ -7,21 +7,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/events"
-	chainsTypes "github.com/scalarorg/scalar-core/x/chains/types"
 )
 
 func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 	switch event.EventType {
-	case events.EVENT_ELECTRS_VAULT_TRANSACTION:
-		//Broadcast from electrs.handleVaultTransaction
-		return c.requestConfirmBtcTxs(event.Data.(events.ConfirmTxsRequest))
-	case events.EVENT_ELECTRS_VAULT_BLOCK:
-		//Broadcast from electrs.handleVaultBlock
-		return c.broadcaster.ConfirmBtcVaultBlock(event.Data.(chainsTypes.ConfirmSourceTxsRequestV2))
-	case events.EVENT_ELECTRS_REDEEM_TRANSACTION:
-		//Broadcast from electrs.handleRedeemTransaction
-		return c.broadcastRedeemTxsConfirm(event.Data.(*events.BtcRedeemTxEvents))
-		//return c.handleElectrsEventRedeemTx(event.Data.(*events.RedeemTxEvents))
 	case events.EVENT_ELECTRS_NEW_BLOCK:
 		return c.handleElectrsEventNewBlock(event.Data.(*chains.BlockHeader))
 	case events.EVENT_EVM_TOKEN_SENT,
@@ -106,7 +95,7 @@ func (c *Client) extractValidConfirmTxs(confirmRequest events.ConfirmTxsRequest)
 
 func (c *Client) requestConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed) error {
 	//Try to query to the scalar network, if token is not confirms then broadcast confirm request
-	tokenInfo, err := c.GetTokenInfo(context.Background(), tokenDeployed.Chain, tokenDeployed.Symbol)
+	tokenInfo, err := c.GetTokenInfo(context.Background(), tokenDeployed.SourceChain, tokenDeployed.Symbol)
 	if err != nil || tokenInfo == nil {
 		return fmt.Errorf("failed to get token info: %w", err)
 	}
@@ -130,7 +119,7 @@ func (c *Client) requestConfirmTokenDeployed(tokenDeployed *chains.TokenDeployed
 
 func (c *Client) requestConfirmSwitchedPhase(switchedPhase *chains.SwitchedPhase) error {
 	log.Debug().
-		Str("Chain", switchedPhase.Chain).
+		Str("Chain", switchedPhase.SourceChain).
 		Str("TxHash", switchedPhase.TxHash).
 		Uint64("SessionSequence", switchedPhase.SessionSequence).
 		Uint8("From", switchedPhase.From).

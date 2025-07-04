@@ -25,6 +25,10 @@ type CustodianGroupRedeemTx struct {
 	mapRedeemTxs map[string][]*models.BtcRedeemTx
 }
 
+func (c *Client) StartRedeemProcessing(ctx context.Context) {
+
+}
+
 func (s *CustodianGroupRedeemTx) AddRedeemTxs(redeemTxEvents *events.BtcRedeemTxEvents) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -176,45 +180,6 @@ func (c *Client) broadcastRedeemTxsConfirm(redeemTxEvents *events.BtcRedeemTxEve
 		return nil
 	}
 }
-
-// func (c *Client) handleElectrsEventRedeemTx(redeemTxEvents *events.RedeemTxEvents) error {
-// 	log.Info().Any("redeemTxEvents", redeemTxEvents).Msg("[ScalarClient] handleElectrsEventRedeemTx")
-// 	redeemSession, err := c.GetRedeemSession(strings.TrimPrefix(redeemTxEvents.GroupUid, "0x"))
-// 	if err != nil || redeemSession == nil || redeemSession.Session == nil {
-// 		log.Error().Str("GroupUid", redeemTxEvents.GroupUid).Err(err).Msgf("[EvmClient] [handleElectrsEventRedeemTx] failed to get redeem session: %s", err)
-// 		c.AddRedeemTxsToCache(redeemTxEvents.Chain, redeemTxEvents)
-// 		return nil
-// 	}
-// 	log.Info().Any("RedeemSession", redeemSession).Msg("[ScalarClient] handleElectrsEventRedeemTx")
-// 	if redeemSession.Session.Sequence < redeemTxEvents.Sequence {
-// 		log.Info().Str("groupUid", redeemTxEvents.GroupUid).
-// 			Any("Session", redeemSession.Session).
-// 			Uint64("Incomming RedeemTx Sequence", redeemTxEvents.Sequence).
-// 			Msgf("[EvmClient] [handleElectrsEventRedeemTx] redeem tx is belong to future redeem session")
-// 	} else if redeemSession.Session.Sequence == redeemTxEvents.Sequence {
-// 		if redeemSession.Session.CurrentPhase == covExported.Executing {
-// 			err = c.BroadcastRedeemTxsConfirmRequest(redeemTxEvents.Chain, redeemTxEvents.GroupUid, redeemTxEvents.RedeemTxs)
-// 			if err != nil {
-// 				log.Error().Err(err).Msgf("[ScalarClient] [handleElectrsEventRedeemTx] failed to broadcast redeem txs confirm request")
-// 			} else {
-// 				log.Info().Msg("[ScalarClient] handleElectrsEventRedeemTx broadcasted RedeemTxsConfirmRequest")
-// 			}
-// 		} else {
-// 			log.Info().Str("groupUid", redeemTxEvents.GroupUid).
-// 				Any("Session", redeemSession.Session).
-// 				Uint64("Incomming RedeemTx Sequence", redeemTxEvents.Sequence).
-// 				Msgf("[ScalarClient] [handleElectrsEventRedeemTx] current redeem session is not in executing phase, add redeem txs to cache")
-// 			c.AddRedeemTxsToCache(redeemTxEvents.Chain, redeemTxEvents)
-// 		}
-// 	} else {
-// 		log.Warn().Str("groupUid", redeemTxEvents.GroupUid).
-// 			Any("Current Session", redeemSession.Session).
-// 			Uint64("Incomming RedeemTx Sequence", redeemTxEvents.Sequence).
-// 			Msgf("[ScalarClient] [handleElectrsEventRedeemTx] redeem tx is belong to past redeem session")
-// 		return fmt.Errorf("[ScalarClient] [handleElectrsEventRedeemTx] redeem tx is belong to past redeem session")
-// 	}
-// 	return nil
-// }
 
 func (c *Client) AddRedeemTxsToCache(chainId string, redeemTxEvents *events.BtcRedeemTxEvents) {
 	if c.redeemTxCache == nil {

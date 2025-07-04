@@ -10,7 +10,7 @@ import (
 // Add methods to DBAdapter for MintCommand operations
 // -------------------------------------------------------------------------------------------------
 func (d *DatabaseAdapter) CreateOrUpdateMintCommand(cmd *chains.MintCommand) error {
-	return d.PostgresClient.Save(cmd).Error
+	return d.RelayerClient.Save(cmd).Error
 }
 
 //	func (d *DatabaseAdapter) UpdateMintCommandStatus(id string, status string, txHash string) error {
@@ -22,12 +22,12 @@ func (d *DatabaseAdapter) CreateOrUpdateMintCommand(cmd *chains.MintCommand) err
 //			}).Error
 //	}
 func (d *DatabaseAdapter) CreateOrUpdateMintCommands(cmdModels []chains.MintCommand) error {
-	return d.PostgresClient.Save(cmdModels).Error
+	return d.RelayerClient.Save(cmdModels).Error
 }
 
 func (d *DatabaseAdapter) GetMintCommand(id string) (*chains.MintCommand, error) {
 	var cmd chains.MintCommand
-	err := d.PostgresClient.Where("id = ?", id).First(&cmd).Error
+	err := d.RelayerClient.Where("id = ?", id).First(&cmd).Error
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (db *DatabaseAdapter) SaveTokenSentApproveds(approvals []scalarnet.TokenSen
 	for i, approval := range approvals {
 		eventIds[i] = approval.EventID
 	}
-	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+	err := db.RelayerClient.Transaction(func(tx *gorm.DB) error {
 		result := tx.Save(approvals)
 		if result.Error != nil {
 			return result.Error
@@ -60,12 +60,12 @@ func (db *DatabaseAdapter) SaveTokenSentApproveds(approvals []scalarnet.TokenSen
 // Add methods to DBAdapter for ContractCallApprovedWithMint operations
 // -------------------------------------------------------------------------------------------------
 func (db *DatabaseAdapter) CreateOrUpdateContractCallApprovedWithMints(approvals []scalarnet.ContractCallApprovedWithMint) error {
-	return db.PostgresClient.Save(approvals).Error
+	return db.RelayerClient.Save(approvals).Error
 }
 
 // -------------------------------------------------------------------------------------------------
 // Add methods to DBAdapter for ContractCallApproved operations
 // -------------------------------------------------------------------------------------------------
 func (db *DatabaseAdapter) CreateOrUpdateContractCallApproveds(approvals []scalarnet.ContractCallApproved) error {
-	return db.PostgresClient.Save(approvals).Error
+	return db.RelayerClient.Save(approvals).Error
 }

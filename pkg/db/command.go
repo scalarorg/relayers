@@ -12,7 +12,7 @@ import (
 )
 
 func (db *DatabaseAdapter) SaveCommands(commands []*scalarnet.Command) error {
-	return db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+	return db.RelayerClient.Transaction(func(tx *gorm.DB) error {
 		// for _, command := range commands {
 		// 	err := tx.Clauses(clause.OnConflict{
 		// 		Columns: []clause.Column{{Name: "command_id"}},
@@ -68,7 +68,7 @@ func (db *DatabaseAdapter) SaveCommands(commands []*scalarnet.Command) error {
 
 func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecuted, command *chainstypes.CommandResponse) error {
 	commandId := cmdExecuted.CommandID
-	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+	err := db.RelayerClient.Transaction(func(tx *gorm.DB) error {
 		//TODO: use original postgres for upsert command instead of timescaledb
 		// storedCmdExecuted := chains.CommandExecuted{}
 		// err = tx.Where("command_id = ?", cmdExecuted.CommandID).First(&storedCmdExecuted).Error
@@ -156,7 +156,7 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 }
 
 func (db *DatabaseAdapter) UpdateBroadcastedCommands(chainId string, batchedCommandId string, commandIds []string, txHash string) error {
-	err := db.PostgresClient.Transaction(func(tx *gorm.DB) error {
+	err := db.RelayerClient.Transaction(func(tx *gorm.DB) error {
 		err := tx.Model(&scalarnet.Command{}).
 			Where("batch_command_id = ? AND command_id IN (?)", batchedCommandId, commandIds).
 			Updates(scalarnet.Command{ExecutedTxHash: txHash, Status: scalarnet.CommandStatusBroadcasted}).Error

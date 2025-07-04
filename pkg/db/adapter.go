@@ -4,37 +4,43 @@ import (
 	"fmt"
 
 	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/relayer"
 	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-var dbAdapter *DatabaseAdapter
-
 type DatabaseAdapter struct {
-	PostgresClient *gorm.DB
+	RelayerClient *gorm.DB
+	IndexerClient *gorm.DB
 }
 
 func NewDatabaseAdapter(config *config.Config) (*DatabaseAdapter, error) {
-	if dbAdapter == nil {
-		pgClient, err := NewPostgresClient(config)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create postgres client: %w", err)
-		}
-		dbAdapter = &DatabaseAdapter{
-			PostgresClient: pgClient,
-		}
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+	dbAdapter := &DatabaseAdapter{}
+	var err error
+	// Create postgres client for scalar network
+	dbAdapter.RelayerClient, err = NewPostgresClient(config.ConnnectionString)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create postgres client: %w", err)
+	}
+	// Create postgres client for indexer
+	dbAdapter.IndexerClient, err = NewPostgresClient(config.DBIndexerUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create postgres client: %w", err)
 	}
 	return dbAdapter, nil
 }
 
-func NewPostgresClient(config *config.Config) (*gorm.DB, error) {
-	if config == nil || config.ConnnectionString == "" {
-		return nil, fmt.Errorf("config is nil or connnection string is empty")
+func NewPostgresClient(connectionString string) (*gorm.DB, error) {
+	if connectionString == "" {
+		return nil, fmt.Errorf("connection string is empty")
 	}
 
-	db, err := SetupDatabase(config.ConnnectionString)
+	db, err := SetupDatabase(connectionString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup database: %w", err)
 	}
@@ -62,21 +68,23 @@ func SetupDatabase(dsn string) (*gorm.DB, error) {
 
 func RunMigrations(db *gorm.DB) error {
 	return db.AutoMigrate(
-		&chains.BlockHeader{},
-		&chains.TokenSent{},
-		&chains.MintCommand{},
-		&chains.CommandExecuted{},
-		&chains.ContractCall{},
-		&chains.ContractCallWithToken{},
-		&chains.TokenDeployed{},
+		&relayer.VaultBlock{},
+		&relayer.TokenSentBlock{},
+		// &chains.BlockHeader{},
+		// &chains.TokenSent{},
+		// &chains.MintCommand{},
+		// &chains.CommandExecuted{},
+		// &chains.ContractCall{},
+		// &chains.ContractCallWithToken{},
+		// &chains.TokenDeployed{},
+		//&chains.SwitchedPhase{},
+		//&scalarnet.Command{},
 		&chains.BtcRedeemTx{},
 		&chains.EvmRedeemTx{},
-		&chains.SwitchedPhase{},
-		&scalarnet.Command{},
 		&scalarnet.ScalarRedeemTokenApproved{},
 		&scalarnet.CallContractWithToken{},
 		&scalarnet.TokenSentApproved{},
-		&scalarnet.ContractCallApprovedWithMint{},
+		//&scalarnet.ContractCallApprovedWithMint{},
 
 		&scalarnet.EventCheckPoint{},
 	)

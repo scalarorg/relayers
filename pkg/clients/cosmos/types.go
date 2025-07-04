@@ -24,6 +24,7 @@ type CosmosNetworkConfig struct {
 	PrivateKeys   []string `mapstructure:"private_keys"`
 	PublicKeys    []string `mapstructure:"public_keys"`
 	SignerNetwork string   `mapstructure:"signer_network"`
+	PollInterval  int64    `mapstructure:"poll_interval"` //milliseconds
 }
 
 func (c *CosmosNetworkConfig) GetFamily() string {
