@@ -10,7 +10,6 @@ import (
 	"github.com/scalarorg/data-models/relayer"
 	chainsExported "github.com/scalarorg/scalar-core/x/chains/exported"
 	chainsTypes "github.com/scalarorg/scalar-core/x/chains/types"
-	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	nexus "github.com/scalarorg/scalar-core/x/nexus/exported"
 )
 
@@ -31,14 +30,14 @@ func (c *Client) StartBridgeProcessing(ctx context.Context) {
 			log.Info().Msg("[ScalarClient] Context cancelled, stopping bridge processing")
 			return
 		case <-ticker.C:
-			if err := c.processNextVaultBlock(ctx); err != nil {
+			if err := c.processNextVaultBlock(); err != nil {
 				log.Error().Err(err).Msg("[ScalarClient] Failed to process vault block")
 			}
 		}
 	}
 }
 
-func (c *Client) processNextVaultBlock(ctx context.Context) error {
+func (c *Client) processNextVaultBlock() error {
 	// If we don't have a current processing block, get the next uncompleted one
 	var vaultTxs []*chains.VaultTransaction
 	var err error
@@ -85,7 +84,7 @@ func (c *Client) processNextVaultBlock(ctx context.Context) error {
 		BlockNumber:      vaultTxs[0].BlockNumber,
 		BlockHash:        vaultTxs[0].BlockHash,
 		Chain:            vaultTxs[0].Chain,
-		Status:           string(relayer.VaultBlockStatusProcessing),
+		Status:           string(relayer.BlockStatusProcessing),
 		TransactionCount: len(vaultTxs),
 		ProcessedTxCount: 0,
 	}
@@ -104,7 +103,7 @@ func (c *Client) processNextVaultBlock(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) formConfirmSourceTxsRequestV2(vaultBlock *relayer.VaultBlock, vaultTxs []*chains.VaultTransaction) ([]*chainstypes.ConfirmSourceTxsRequestV2, error) {
+func (c *Client) formConfirmSourceTxsRequestV2(vaultBlock *relayer.VaultBlock, vaultTxs []*chains.VaultTransaction) ([]*chainsTypes.ConfirmSourceTxsRequestV2, error) {
 	confirmTxs := make([]*chainsTypes.ConfirmSourceTxsRequestV2, 0)
 	// Get block hash
 	blockHash, err := chainsExported.HashFromHex(vaultBlock.BlockHash)
@@ -135,7 +134,7 @@ func (c *Client) formConfirmSourceTxsRequestV2(vaultBlock *relayer.VaultBlock, v
 			merklePath = append(merklePath, chainsExported.Hash(vaultTx.MerkleProof[i:i+HASH_LENGTH]))
 		}
 
-		trustedTx := &chainstypes.TrustedTx{
+		trustedTx := &chainsTypes.TrustedTx{
 			Hash:                     txHash,
 			TxIndex:                  uint64(vaultTx.TxPosition),
 			Raw:                      vaultTx.RawTx,

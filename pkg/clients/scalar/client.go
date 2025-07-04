@@ -26,21 +26,22 @@ import (
 )
 
 type Client struct {
-	globalConfig    *config.Config
-	networkConfig   *cosmos.CosmosNetworkConfig
-	txConfig        client.TxConfig
-	broadcaster     *Broadcaster
-	network         *cosmos.NetworkClient
-	queryClient     *cosmos.QueryClient
-	dbAdapter       *db.DatabaseAdapter
-	eventBus        *events.EventBus
-	subscriberName  string //Use as subscriber for networkClient
-	pendingCommands *PendingCommands
-	initUtxo        bool                               //key: chain, value: utxo
-	redeemTxCache   map[string]*CustodianGroupRedeemTx //Map RedeemSession by chainId
-	chains          []string
-	pollInterval    time.Duration       // Interval for polling unexecuted transactions
-	lastVaultBlock  *relayer.VaultBlock // Current processing VaultBlock to avoid redundant DB calls
+	globalConfig       *config.Config
+	networkConfig      *cosmos.CosmosNetworkConfig
+	txConfig           client.TxConfig
+	broadcaster        *Broadcaster
+	network            *cosmos.NetworkClient
+	queryClient        *cosmos.QueryClient
+	dbAdapter          *db.DatabaseAdapter
+	eventBus           *events.EventBus
+	subscriberName     string //Use as subscriber for networkClient
+	pendingCommands    *PendingCommands
+	initUtxo           bool                               //key: chain, value: utxo
+	redeemTxCache      map[string]*CustodianGroupRedeemTx //Map RedeemSession by chainId
+	chains             []string
+	pollInterval       time.Duration           // Interval for polling unexecuted transactions
+	lastVaultBlock     *relayer.VaultBlock     // Last processed VaultBlock to avoid redundant DB calls
+	lastTokenSentBlock *relayer.TokenSentBlock // Last processed TokenSentBlock to avoid redundant DB calls
 	// Add other necessary fields like chain ID, gas prices, etc.
 }
 
