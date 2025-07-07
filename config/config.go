@@ -22,7 +22,7 @@ type ChainFamily map[uint64]IChainConfig
 type Config struct {
 	ConfigPath        string                 `mapstructure:"config_path"`
 	ConnnectionString string                 `mapstructure:"database_url"` // Postgres db connection string
-	DBIndexerUrl      string                 `mapstructure:"db_indexer_url"`
+	IndexerUrl        string                 `mapstructure:"indexer_url"`
 	ScalarMnemonic    string                 `mapstructure:"scalar_mnemonic"`
 	EvmKey            string                 `mapstructure:"evm_key"`
 	Nonce             string                 `mapstructure:"nonce"`
@@ -48,7 +48,7 @@ func LoadEnv(environment string) error {
 		viper.SetConfigType("env")
 	}
 	viper.AddConfigPath(".") // look for config in the working directory
-	fmt.Println("[LoadEnv] ReadInConfig for environment:", environment)
+	log.Info().Msgf("[LoadEnv] ReadInConfig for environment: %s", environment)
 	// Read the .env file
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {

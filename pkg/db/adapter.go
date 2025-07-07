@@ -28,7 +28,7 @@ func NewDatabaseAdapter(config *config.Config) (*DatabaseAdapter, error) {
 		return nil, fmt.Errorf("failed to create postgres client: %w", err)
 	}
 	// Create postgres client for indexer
-	dbAdapter.IndexerClient, err = NewPostgresClient(config.DBIndexerUrl)
+	dbAdapter.IndexerClient, err = NewPostgresClient(config.IndexerUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create postgres client: %w", err)
 	}
