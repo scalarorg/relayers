@@ -91,24 +91,6 @@ func TestSepoliaRecoverEvents(t *testing.T) {
 	wg.Wait()
 }
 
-func TestSepoliaProcessMissingLogs(t *testing.T) {
-	sepoliaClient, err := evm.NewEvmClient(&globalConfig, sepoliaConfig, nil, nil, nil)
-	if err != nil {
-		log.Error().Msgf("failed to create evm client: %v", err)
-	}
-	wg := sync.WaitGroup{}
-	//Log missing logs
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		sepoliaClient.ProcessMissingLogs()
-	}()
-	//err = sepoliaClient.RecoverEvents(context.Background(), []string{events.EVENT_EVM_SWITCHED_PHASE})
-	err = sepoliaClient.RecoverAllEvents(context.Background(), []*covExported.CustodianGroup{mockCustodianGroup})
-	require.NoError(t, err)
-	wg.Wait()
-}
-
 func TestRecoverBnbRedeemSessions(t *testing.T) {
 	bnbClient, err := evm.NewEvmClient(&globalConfig, bnbConfig, nil, nil, nil)
 	if err != nil {

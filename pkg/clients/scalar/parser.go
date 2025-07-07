@@ -100,12 +100,11 @@ func ParseIBCEvent[T proto.Message](rawData map[string][]string) ([]IBCEvent[T],
 	result := []IBCEvent[T]{}
 	for _, data := range jsonDatas {
 		instance := copyMessage(msg)
-		log.Debug().Any("JsonData", data).Msgf("Try to parser to type %T", msg)
 		err := UnmarshalJson(data, instance)
 		if err != nil {
-			log.Error().Err(err).Any("JsonData", data).Msg("Cannot unmarshal message")
+			log.Error().Err(err).Any("JsonData", data).Msgf("Cannot unmarshal message of type %T", msg)
 		} else {
-			log.Debug().Any("Instance", instance).Msg("Parse event successfull")
+			log.Debug().Any("Instance", instance).Msgf("Parse event of type %T successfull", msg)
 		}
 		args := instance.(T)
 		result = append(result, IBCEvent[T]{

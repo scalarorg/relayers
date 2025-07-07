@@ -68,10 +68,15 @@ func (c *Client) processNextTokenSent(ctx context.Context) error {
 	}
 
 	if len(tokenSents) == 0 {
-		log.Info().Uint64("blockNumber", c.lastTokenSentBlock.BlockNumber).
-			Msg("[ScalarClient] No more token sents to process, waiting for next token sent block")
+		if c.lastTokenSentBlock != nil {
+			log.Info().Uint64("blockNumber", c.lastTokenSentBlock.BlockNumber).
+				Msg("[ScalarClient] No more token sents to process, waiting for next token sent block")
 
-		return nil
+			return nil
+		} else {
+			log.Info().Msg("[ScalarClient] No token sent blocks processed")
+			return nil
+		}
 	}
 
 	c.lastTokenSentBlock = &relayer.TokenSentBlock{

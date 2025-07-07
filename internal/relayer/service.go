@@ -68,16 +68,26 @@ func NewService(config *config.Config,
 }
 
 func (s *Service) Start(ctx context.Context) error {
-	//Start scalar client
 	if s.ScalarClient != nil {
+		//Subscribe all block events with heat beat
 		go func() {
-			err := s.ScalarClient.Start(ctx)
+			err := s.ScalarClient.SubscribeAllBlockEventsWithHeatBeat(ctx)
 			if err != nil {
-				log.Error().Msgf("Start scalar client with error %+v", err)
+				log.Error().Err(err).Msg("[ScalarClient] [subscribeAllBlockEventsWithHeatBeat] Failed")
 			}
 		}()
-	} else {
-		log.Warn().Msg("[Relayer] [Start] scalar client is undefined")
+		//Start broadcast
+		go func() {
+			err := s.ScalarClient.StartBroadcast(ctx)
+			if err != nil {
+				log.Error().Err(err).Msg("[ScalarClient] [StartBroadcast] Failed")
+			}
+		}()
+		//Subscribe event bus
+		err := s.ScalarClient.SubscribeEventBus(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("[ScalarClient] [SubscribeEventBus] Failed")
+		}
 	}
 	// Improvement recovery evm missing source events
 	// 2025, March 10
@@ -96,6 +106,17 @@ func (s *Service) Start(ctx context.Context) error {
 		}(group.UID)
 	}
 	wg.Wait()
+	//Start scalar client
+	if s.ScalarClient != nil {
+		go func() {
+			err := s.ScalarClient.Start(ctx)
+			if err != nil {
+				log.Error().Msgf("Start scalar client with error %+v", err)
+			}
+		}()
+	} else {
+		log.Warn().Msg("[Relayer] [Start] scalar client is undefined")
+	}
 	//Start btc clients
 	for _, client := range s.BtcClient {
 		go client.Start(ctx)
@@ -311,54 +332,54 @@ func (s *Service) replaySwitchPhaseEvents(mapSwitchPhaseEvents map[string][]*con
 	return expectedPhase.Load(), evmCounter.Load(), hasDifferentPhase.Load()
 }
 
-func (s *Service) replayRedeemTransactions(groupUid string, mapRedeemTokenEvents map[string][]*contracts.IScalarGatewayRedeemToken) (map[string][]string, error) {
-	if s.ScalarClient == nil {
-		return nil, fmt.Errorf("[Relayer] [processRecoverExecutionPhase] scalar client is undefined")
-	}
-	//Waiting for utxo snapshot initialied
-	// err := s.ScalarClient.WaitForUtxoSnapshot(groupUid)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("[Relayer] [processRecoverExecutionPhase] cannot wait for utxo snapshot for group %s", groupUid)
-	// }
-	mapTxHashes := sync.Map{}
-	wg := sync.WaitGroup{}
-	for _, evmClient := range s.EvmClients {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			chainId := evmClient.EvmConfig.GetId()
-			redeemTokenEvents, ok := mapRedeemTokenEvents[chainId]
-			if !ok {
-				log.Warn().Str("ChainId", chainId).Msgf("[Relayer] [processRecoverExecutionPhase] no redeemToken event for repaylaying")
-				return
-			}
-			// Scalar network will utxoSnapshot request on each confirm RedeemToken event
-			for _, redeemTokenEvent := range redeemTokenEvents {
-				err := evmClient.HandleRedeemToken(redeemTokenEvent)
-				if err != nil {
-					log.Warn().
-						Str("chainId", chainId).
-						Any("redeemTokenEvent", redeemTokenEvent).
-						Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot handle redeem token event")
-				} else {
-					value, loaded := mapTxHashes.LoadOrStore(redeemTokenEvent.DestinationChain, []string{redeemTokenEvent.Raw.TxHash.Hex()})
-					if loaded {
-						mapTxHashes.Store(redeemTokenEvent.DestinationChain, append(value.([]string), redeemTokenEvent.Raw.TxHash.Hex()))
-					}
-				}
-			}
-			log.Info().Str("ChainId", chainId).Int("RedeemTx count", len(redeemTokenEvents)).
-				Msgf("[Relayer] [processRecoverExecutionPhase] finished handle redeem token events")
-		}()
-	}
-	wg.Wait()
-	result := map[string][]string{}
-	mapTxHashes.Range(func(key, value interface{}) bool {
-		result[key.(string)] = value.([]string)
-		return true
-	})
-	return result, nil
-}
+//	func (s *Service) replayRedeemTransactions(groupUid string, mapRedeemTokenEvents map[string][]*contracts.IScalarGatewayRedeemToken) (map[string][]string, error) {
+//		if s.ScalarClient == nil {
+//			return nil, fmt.Errorf("[Relayer] [processRecoverExecutionPhase] scalar client is undefined")
+//		}
+//		//Waiting for utxo snapshot initialied
+//		// err := s.ScalarClient.WaitForUtxoSnapshot(groupUid)
+//		// if err != nil {
+//		// 	return nil, fmt.Errorf("[Relayer] [processRecoverExecutionPhase] cannot wait for utxo snapshot for group %s", groupUid)
+//		// }
+//		mapTxHashes := sync.Map{}
+//		wg := sync.WaitGroup{}
+//		for _, evmClient := range s.EvmClients {
+//			wg.Add(1)
+//			go func() {
+//				defer wg.Done()
+//				chainId := evmClient.EvmConfig.GetId()
+//				redeemTokenEvents, ok := mapRedeemTokenEvents[chainId]
+//				if !ok {
+//					log.Warn().Str("ChainId", chainId).Msgf("[Relayer] [processRecoverExecutionPhase] no redeemToken event for repaylaying")
+//					return
+//				}
+//				// Scalar network will utxoSnapshot request on each confirm RedeemToken event
+//				for _, redeemTokenEvent := range redeemTokenEvents {
+//					err := evmClient.HandleRedeemToken(redeemTokenEvent)
+//					if err != nil {
+//						log.Warn().
+//							Str("chainId", chainId).
+//							Any("redeemTokenEvent", redeemTokenEvent).
+//							Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot handle redeem token event")
+//					} else {
+//						value, loaded := mapTxHashes.LoadOrStore(redeemTokenEvent.DestinationChain, []string{redeemTokenEvent.Raw.TxHash.Hex()})
+//						if loaded {
+//							mapTxHashes.Store(redeemTokenEvent.DestinationChain, append(value.([]string), redeemTokenEvent.Raw.TxHash.Hex()))
+//						}
+//					}
+//				}
+//				log.Info().Str("ChainId", chainId).Int("RedeemTx count", len(redeemTokenEvents)).
+//					Msgf("[Relayer] [processRecoverExecutionPhase] finished handle redeem token events")
+//			}()
+//		}
+//		wg.Wait()
+//		result := map[string][]string{}
+//		mapTxHashes.Range(func(key, value interface{}) bool {
+//			result[key.(string)] = value.([]string)
+//			return true
+//		})
+//		return result, nil
+//	}
 func (s *Service) Stop() {
 	log.Info().Msg("Relayer service stopped")
 	for _, client := range s.Electrs {

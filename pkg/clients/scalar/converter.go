@@ -48,21 +48,8 @@ func CreateCallContractApprovedWithMintFromScalarEvent(event *types.EventContrac
 	return e
 }
 
-// func CreateCallContractApprovedWithMintFromEvmEvent(destinationChain string, event *contracts.IScalarGatewayContractCallApprovedWithMint) scalarnet.ContractCallApprovedWithMint {
-// 	e := scalarnet.ContractCallApprovedWithMint{}
-// 	eventId := fmt.Sprintf("%s-%d", event.Raw.TxHash.String(), event.Raw.Index)
-// 	e.EventID = eventId
-// 	e.SourceChain = string(event.SourceChain)
-// 	e.CommandID = hex.EncodeToString(event.CommandId[:])
-// 	e.Sender = event.SourceAddress
-// 	e.DestinationChain = string(destinationChain)
-// 	e.ContractAddress = string(event.SourceAddress)
-// 	e.PayloadHash = hex.EncodeToString(event.PayloadHash[:])
-// 	return e
-// }
-
-func CreateMintCommandFromScalarEvent(event *types.MintCommand) chains.MintCommand {
-	e := chains.MintCommand{}
+func CreateMintCommandFromScalarEvent(event *types.MintCommand) scalarnet.MintCommand {
+	e := scalarnet.MintCommand{}
 	e.TransferID = uint64(event.TransferID)
 	e.CommandID = hex.EncodeToString(event.CommandID[:])
 	e.SourceChain = string(event.Chain)

@@ -14,7 +14,7 @@ import (
 func (db *DatabaseAdapter) SaveSwitchPhase(value *chains.SwitchedPhase) error {
 	err := db.RelayerClient.Clauses(
 		clause.OnConflict{
-			Columns:   []clause.Column{{Name: "chain"}, {Name: "tx_hash"}},
+			Columns:   []clause.Column{{Name: "source_chain"}, {Name: "tx_hash"}},
 			DoNothing: true,
 		},
 	).Save(value).Error

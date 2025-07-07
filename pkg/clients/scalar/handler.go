@@ -19,7 +19,7 @@ import (
 )
 
 func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*chainstypes.EventTokenSent]) error {
-	tokenSentApproveds := []scalarnet.TokenSentApproved{}
+	tokenSentApproveds := []*scalarnet.TokenSentApproved{}
 	mapChains := make(map[string]int, 0)
 	for _, event := range events {
 		chain := string(event.Args.DestinationChain)
@@ -35,7 +35,7 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*c
 			continue
 		}
 		model.Status = string(chains.TokenSentStatusApproved)
-		tokenSentApproveds = append(tokenSentApproveds, model)
+		tokenSentApproveds = append(tokenSentApproveds, &model)
 	}
 	if len(tokenSentApproveds) == 0 {
 		log.Debug().Msg("[ScalarClient] [handleTokenSentEvents] No token sent approveds to save")
@@ -103,7 +103,7 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*c
 
 func (c *Client) handleMintCommandEvents(ctx context.Context, events []IBCEvent[*chainstypes.MintCommand]) error {
 	//Store the mint command to the db
-	cmdModels := make([]chains.MintCommand, len(events))
+	cmdModels := make([]scalarnet.MintCommand, len(events))
 	for i, event := range events {
 		model := CreateMintCommandFromScalarEvent(event.Args)
 		model.TxHash = event.Hash
@@ -411,29 +411,30 @@ func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string
 }
 
 func (c *Client) handleCompletedEvents(ctx context.Context, events []IBCEvent[*chainstypes.ChainEventCompleted]) error {
+	mapEventIDs := make(map[string][]string)
 	for _, event := range events {
-		switch event.Args.Type {
-		// TODO: Currently, we only support contract call with token and token sent
-		// case "Event_ContractCall":
-		// 	err := c.handleContractCallCompletedEvent(ctx, &event)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		case "Event_ContractCallWithToken":
-			err := c.handleContractCallWithTokenCompletedEvent(&event)
-			if err != nil {
-				return err
-			}
-		case "Event_TokenSent":
-			err := c.handleTokenSentCompletedEvent(&event)
-			if err != nil {
-				return err
-			}
-		default:
-			log.Warn().Msgf("[ScalarClient] [handleCompletedEvents] unsupported event type: %s", event.Args.Type)
-		}
-
+		mapEventIDs[event.Args.Type] = append(mapEventIDs[event.Args.Type], string(event.Args.EventID))
 	}
+	for eventType, eventIDs := range mapEventIDs {
+		switch eventType {
+		case "Event_ContractCallWithToken":
+			c.handleContractCallWithTokenCompletedEvents(eventIDs)
+		case "Event_TokenSent":
+			c.handleTokenSentCompletedEvents(eventIDs)
+			// case "Event_ContractCall":
+			// 	c.handleContractCallCompletedEvents(eventIDs)
+		}
+	}
+	return nil
+}
+
+func (c *Client) handleContractCallWithTokenCompletedEvents(eventIDs []string) error {
+	c.dbAdapter.RelayerClient.Model(&scalarnet.ContractCallApprovedWithMint{}).Where("event_id IN (?)", eventIDs).Update("status", chains.ContractCallStatusSuccess)
+	return nil
+}
+
+func (c *Client) handleTokenSentCompletedEvents(eventIDs []string) error {
+	c.dbAdapter.RelayerClient.Model(&scalarnet.TokenSentApproved{}).Where("event_id IN (?)", eventIDs).Update("status", chains.TokenSentStatusSuccess)
 	return nil
 }
 
@@ -456,14 +457,17 @@ func (c *Client) handleSwitchPhaseCompletedEvents(ctx context.Context, switchPha
 	return nil
 }
 
-func (c *Client) handleContractCallWithTokenCompletedEvent(event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
-	c.dbAdapter.RelayerClient.Model(&chains.ContractCallWithToken{}).Where("event_id = ?", event.Args.EventID).Update("status", chains.ContractCallStatusSuccess)
-	return nil
-}
-
-func (c *Client) handleTokenSentCompletedEvent(event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
-	c.dbAdapter.RelayerClient.Model(&chains.TokenSent{}).Where("event_id = ?", event.Args.EventID).Update("status", chains.TokenSentStatusSuccess)
-	return nil
+func findEventAttribute(events []sdk.StringEvent, eventType string, attrKey string) string {
+	for _, event := range events {
+		if event.Type == eventType {
+			for _, attr := range event.Attributes {
+				if attr.Key == attrKey {
+					return attr.Value
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // func (c *Client) handleContractCallCompletedEvent(ctx context.Context, event *IBCEvent[*chainstypes.ChainEventCompleted]) error {
@@ -538,16 +542,3 @@ func (c *Client) handleTokenSentCompletedEvent(event *IBCEvent[*chainstypes.Chai
 // 	}
 // 	return nil
 // }
-
-func findEventAttribute(events []sdk.StringEvent, eventType string, attrKey string) string {
-	for _, event := range events {
-		if event.Type == eventType {
-			for _, attr := range event.Attributes {
-				if attr.Key == attrKey {
-					return attr.Value
-				}
-			}
-		}
-	}
-	return ""
-}

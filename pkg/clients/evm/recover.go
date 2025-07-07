@@ -41,59 +41,59 @@ var (
 )
 
 // Go routine for process missing logs
-func (c *EvmClient) ProcessMissingLogs() {
-	mapEvents := map[string]abi.Event{}
-	for _, event := range scalarGatewayAbi.Events {
-		mapEvents[event.ID.String()] = event
-	}
-	for {
-		logs := c.MissingLogs.GetLogs(10)
-		if len(logs) == 0 {
-			if c.MissingLogs.IsRecovered() {
-				log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] no logs to process, recovered flag is true, exit")
-				break
-			} else {
-				log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] no logs to process, recover is in progress, sleep 1 second then continue")
-				time.Sleep(time.Second)
-				continue
-			}
-		}
-		log.Info().Str("Chain", c.EvmConfig.ID).Int("Number of logs", len(logs)).Msg("[EvmClient] [ProcessMissingLogs] processing logs")
-		for _, txLog := range logs {
-			topic := txLog.Topics[0].String()
-			event, ok := mapEvents[topic]
-			if !ok {
-				log.Error().Str("topic", topic).Any("txLog", txLog).Msg("[EvmClient] [ProcessMissingLogs] event not found")
-				continue
-			}
-			log.Debug().
-				Str("chainId", c.EvmConfig.GetId()).
-				Str("eventName", event.Name).
-				Str("txHash", txLog.TxHash.String()).
-				Msg("[EvmClient] [ProcessMissingLogs] start processing missing event")
+// func (c *EvmClient) ProcessMissingLogs() {
+// 	mapEvents := map[string]abi.Event{}
+// 	for _, event := range scalarGatewayAbi.Events {
+// 		mapEvents[event.ID.String()] = event
+// 	}
+// 	for {
+// 		logs := c.MissingLogs.GetLogs(10)
+// 		if len(logs) == 0 {
+// 			if c.MissingLogs.IsRecovered() {
+// 				log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] no logs to process, recovered flag is true, exit")
+// 				break
+// 			} else {
+// 				log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] no logs to process, recover is in progress, sleep 1 second then continue")
+// 				time.Sleep(time.Second)
+// 				continue
+// 			}
+// 		}
+// 		log.Info().Str("Chain", c.EvmConfig.ID).Int("Number of logs", len(logs)).Msg("[EvmClient] [ProcessMissingLogs] processing logs")
+// 		for _, txLog := range logs {
+// 			topic := txLog.Topics[0].String()
+// 			event, ok := mapEvents[topic]
+// 			if !ok {
+// 				log.Error().Str("topic", topic).Any("txLog", txLog).Msg("[EvmClient] [ProcessMissingLogs] event not found")
+// 				continue
+// 			}
+// 			log.Debug().
+// 				Str("chainId", c.EvmConfig.GetId()).
+// 				Str("eventName", event.Name).
+// 				Str("txHash", txLog.TxHash.String()).
+// 				Msg("[EvmClient] [ProcessMissingLogs] start processing missing event")
 
-			err := c.handleEventLog(event, txLog)
-			if err != nil {
-				log.Error().Err(err).Msg("[EvmClient] [ProcessMissingLogs] failed to handle event log")
-			}
+// 			err := c.handleEventLog(event, txLog)
+// 			if err != nil {
+// 				log.Error().Err(err).Msg("[EvmClient] [ProcessMissingLogs] failed to handle event log")
+// 			}
 
-		}
-	}
-	//Waiting for all redeem confirm request to be handled and redeem commands ready in the pending command queue
+// 		}
+// 	}
+// 	//Waiting for all redeem confirm request to be handled and redeem commands ready in the pending command queue
 
-	c.WaitForRedeemCommandConfirmed(c.MissingLogs.RedeemTxs)
-	//Recover all redeem commands
-	mapExecutingEvents := c.MissingLogs.GetExecutingEvents()
-	groupUids := []string{}
-	for groupUid, executingEvent := range mapExecutingEvents {
-		log.Info().Str("Chain", c.EvmConfig.ID).Str("GroupUid", groupUid).Msgf("[EvmClient] [RecoverAllEvents] handle switched phase event to executing")
-		c.HandleSwitchPhase(executingEvent)
-		groupUids = append(groupUids, groupUid)
-	}
-	//Wait for scalar network switch to Executing phase
-	c.WaitForSwitchingToPhase(groupUids, covExported.Executing)
-	log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] finished processing all missing evm events")
-}
+// 	c.WaitForRedeemCommandConfirmed(c.MissingLogs.RedeemTxs)
+// 	//Recover all redeem commands
+// 	mapExecutingEvents := c.MissingLogs.GetExecutingEvents()
+// 	groupUids := []string{}
+// 	for groupUid, executingEvent := range mapExecutingEvents {
+// 		log.Info().Str("Chain", c.EvmConfig.ID).Str("GroupUid", groupUid).Msgf("[EvmClient] [RecoverAllEvents] handle switched phase event to executing")
+// 		c.HandleSwitchPhase(executingEvent)
+// 		groupUids = append(groupUids, groupUid)
+// 	}
+// 	//Wait for scalar network switch to Executing phase
+// 	c.WaitForSwitchingToPhase(groupUids, covExported.Executing)
+// 	log.Info().Str("Chain", c.EvmConfig.ID).Msg("[EvmClient] [ProcessMissingLogs] finished processing all missing evm events")
+// }
 
 // Recover all events after recovering
 func (c *EvmClient) RecoverAllEvents(ctx context.Context, groups []*covExported.CustodianGroup) error {

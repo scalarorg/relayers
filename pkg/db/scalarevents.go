@@ -1,15 +1,13 @@
 package db
 
 import (
-	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
-	"gorm.io/gorm"
 )
 
 // -------------------------------------------------------------------------------------------------
 // Add methods to DBAdapter for MintCommand operations
 // -------------------------------------------------------------------------------------------------
-func (d *DatabaseAdapter) CreateOrUpdateMintCommand(cmd *chains.MintCommand) error {
+func (d *DatabaseAdapter) CreateOrUpdateMintCommand(cmd *scalarnet.MintCommand) error {
 	return d.RelayerClient.Save(cmd).Error
 }
 
@@ -21,12 +19,12 @@ func (d *DatabaseAdapter) CreateOrUpdateMintCommand(cmd *chains.MintCommand) err
 //				"tx_hash": txHash,
 //			}).Error
 //	}
-func (d *DatabaseAdapter) CreateOrUpdateMintCommands(cmdModels []chains.MintCommand) error {
+func (d *DatabaseAdapter) CreateOrUpdateMintCommands(cmdModels []scalarnet.MintCommand) error {
 	return d.RelayerClient.Save(cmdModels).Error
 }
 
-func (d *DatabaseAdapter) GetMintCommand(id string) (*chains.MintCommand, error) {
-	var cmd chains.MintCommand
+func (d *DatabaseAdapter) GetMintCommand(id string) (*scalarnet.MintCommand, error) {
+	var cmd scalarnet.MintCommand
 	err := d.RelayerClient.Where("id = ?", id).First(&cmd).Error
 	if err != nil {
 		return nil, err
@@ -34,25 +32,16 @@ func (d *DatabaseAdapter) GetMintCommand(id string) (*chains.MintCommand, error)
 	return &cmd, nil
 }
 
+// TODO: add chunking to save token sent approveds
 // -------------------------------------------------------------------------------------------------
 // Add methods to DBAdapter for TokenSentApproved operations
 // -------------------------------------------------------------------------------------------------
-func (db *DatabaseAdapter) SaveTokenSentApproveds(approvals []scalarnet.TokenSentApproved) error {
-	eventIds := make([]string, len(approvals))
-	for i, approval := range approvals {
-		eventIds[i] = approval.EventID
+func (db *DatabaseAdapter) SaveTokenSentApproveds(approvals []*scalarnet.TokenSentApproved) error {
+	err := db.RelayerClient.Save(approvals).Error
+	if err != nil {
+		return err
 	}
-	err := db.RelayerClient.Transaction(func(tx *gorm.DB) error {
-		result := tx.Save(approvals)
-		if result.Error != nil {
-			return result.Error
-		}
-		result = tx.Model(&chains.TokenSent{}).Where("event_id IN (?)", eventIds).Updates(map[string]interface{}{"status": chains.TokenSentStatusApproved})
-		if result.Error != nil {
-			return result.Error
-		}
-		return nil
-	})
+
 	return err
 }
 

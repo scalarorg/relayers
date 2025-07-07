@@ -265,15 +265,6 @@ func TestEvmClientListenEVMExecutedEvent(t *testing.T) {
 	}
 	select {}
 }
-func TestRecoverEvent(t *testing.T) {
-	fnCreateEventData := func(log types.Log) *contracts.IScalarGatewayContractCall {
-		return &contracts.IScalarGatewayContractCall{
-			Raw: log,
-		}
-	}
-	err := evm.RecoverEvent[*contracts.IScalarGatewayContractCall](sepoliaClient, context.Background(), events.EVENT_EVM_CONTRACT_CALL, fnCreateEventData)
-	require.NoError(t, err)
-}
 func TestEvmSubscribe(t *testing.T) {
 	fmt.Println("Test evm client")
 

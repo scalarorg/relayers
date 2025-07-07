@@ -17,6 +17,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/events"
 	"github.com/scalarorg/relayers/pkg/types"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
+	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	//tmtypes "github.com/cometbft/cometbft/types"
@@ -42,6 +43,8 @@ type Client struct {
 	pollInterval       time.Duration           // Interval for polling unexecuted transactions
 	lastVaultBlock     *relayer.VaultBlock     // Last processed VaultBlock to avoid redundant DB calls
 	lastTokenSentBlock *relayer.TokenSentBlock // Last processed TokenSentBlock to avoid redundant DB calls
+	tmclient           rpcclient.Client
+	cancelFunc         context.CancelFunc
 	// Add other necessary fields like chain ID, gas prices, etc.
 }
 
@@ -130,8 +133,14 @@ func NewClientFromConfig(globalConfig *config.Config, config *cosmos.CosmosNetwo
 	}
 	return client, nil
 }
-
-func (c *Client) Start(ctx context.Context) error {
+func (c *Client) StartBroadcast(ctx context.Context) error {
+	err := c.broadcaster.Start(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("[ScalarClient] Failed to start broadcaster")
+	}
+	return nil
+}
+func (c *Client) SubscribeEventBus(ctx context.Context) error {
 	receiver := c.eventBus.Subscribe(events.SCALAR_NETWORK_NAME)
 	go func() {
 		for event := range receiver {
@@ -143,22 +152,14 @@ func (c *Client) Start(ctx context.Context) error {
 			}()
 		}
 	}()
+	return nil
+}
+func (c *Client) Start(ctx context.Context) error {
 	go func() {
 		log.Info().Msg("[ScalarClient] Start ProcessPendingCommands process")
 		c.ProcessPendingCommands(ctx)
 	}()
-	go func() {
-		err := c.broadcaster.Start(ctx)
-		if err != nil {
-			log.Error().Err(err).Msg("[ScalarClient] Failed to start broadcaster")
-		}
-	}()
-	go func() {
-		err := c.subscribeAllBlockEventsWithHeatBeat(ctx)
-		if err != nil {
-			log.Error().Err(err).Msg("[ScalarClient] [subscribeAllBlockEventsWithHeatBeat] Failed")
-		}
-	}()
+
 	go func() {
 		c.StartBridgeProcessing(ctx)
 	}()
@@ -286,134 +287,178 @@ func (c *Client) handleBlockResultsEvents(blockResults *ctypes.ResultBlockResult
 	// EventTypeContractCallWithTokenSubmitted  = "scalar.scalarnet.v1beta1.ContractCallWithTokenSubmitted"
 	return nil
 }
-func (c *Client) subscribeAllBlockEventsWithHeatBeat(ctx context.Context) error {
+func (c *Client) SubscribeAllBlockEventsWithHeatBeat(ctx context.Context) error {
 	retryInterval := time.Millisecond * time.Duration(c.networkConfig.RetryInterval)
 	deadCount := 0
+
 	for {
-		cancelCtx, cancelFunc := context.WithCancel(ctx)
-		//Start rpc client
-		log.Debug().Msg("[ScalarClient] [Start] Try to start scalar connection")
-		tmclient, err := c.network.Start()
-		if err != nil {
-			deadCount += 1
+		if err := c.tryConnectAndSubscribe(ctx); err != nil {
+			deadCount++
 			if deadCount >= 10 {
 				log.Debug().Msgf("[ScalarClient] [Start] Connect to the scalar network failed, sleep for %ds then retry", int64(retryInterval.Seconds()))
 			}
-			c.network.RemoveRpcClient()
 			time.Sleep(retryInterval)
 			continue
 		}
-		log.Info().Msgf("[ScalarClient] [Start] Start rpc client success. Subscribing for events...")
-		go func() {
-			err := SubscribeAllNewBlockEvent(cancelCtx, c.network, c.handleNewBlockEvents)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeAllNewBlockEvent] Failed: %v", err)
-			}
-		}()
-		//HeatBeat
-		aliveCount := 0
-		for {
-			_, err := tmclient.Health(ctx)
-			if err != nil {
-				// clean all subscriber then retry
-				log.Info().Msgf("[ScalarClient] ScalarNode is dead. Perform reconnecting")
-				c.network.RemoveRpcClient()
-				break
-			} else {
-				aliveCount += 1
-				if aliveCount >= 100 {
-					log.Debug().Msgf("[ScalarClient] ScalarNode is alive")
-					aliveCount = 0
-				}
-			}
-			time.Sleep(retryInterval)
-		}
-		cancelFunc()
+
+		// Reset dead count on successful connection
+		deadCount = 0
+
+		// Start heartbeat monitoring
+		// This function return only when the connection is lost
+		c.monitorHeartbeat(ctx, retryInterval)
 	}
 }
 
-func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
-	retryInterval := time.Millisecond * time.Duration(c.networkConfig.RetryInterval)
-	deadCount := 0
-	for {
-		cancelCtx, cancelFunc := context.WithCancel(ctx)
-		//Start rpc client
-		log.Debug().Msg("[ScalarClient] [Start] Try to start scalar connection")
-		tmclient, err := c.network.Start()
+// tryConnectAndSubscribe attempts to establish connection and start subscription
+func (c *Client) tryConnectAndSubscribe(ctx context.Context) error {
+	log.Debug().Msg("[ScalarClient] [Start] Try to start scalar connection")
+
+	tmclient, err := c.network.Start()
+	if err != nil {
+		c.network.RemoveRpcClient()
+		return fmt.Errorf("failed to start network client: %w", err)
+	}
+
+	log.Info().Msgf("[ScalarClient] [Start] Start rpc client success. Subscribing for events...")
+
+	// Start subscription in a separate goroutine
+	cancelCtx, cancelFunc := context.WithCancel(ctx)
+	go func(tmclient rpcclient.Client) {
+		defer cancelFunc()
+		running := tmclient.IsRunning()
+		if !running {
+			log.Error().Msgf("[ScalarClient] [tryConnectAndSubscribe] tmclient is not running")
+			return
+		}
+		err := SubscribeAllNewBlockEvent(cancelCtx, tmclient, c.handleNewBlockEvents)
 		if err != nil {
-			deadCount += 1
-			if deadCount >= 10 {
-				log.Debug().Msgf("[ScalarClient] [Start] Connect to the scalar network failed, sleep for %ds then retry", int64(retryInterval.Seconds()))
-			}
-			c.network.RemoveRpcClient()
-			time.Sleep(retryInterval)
-			continue
+			log.Error().Msgf("[ScalarClient] [subscribeAllNewBlockEvent] Failed: %v", err)
 		}
-		log.Info().Msgf("[ScalarClient] [Start] Start rpc client success. Subscribing for events...")
-		//Handle the event in a separate goroutine
-		go func() {
-			err = subscribeTokenSentEvent(cancelCtx, c.network, c.handleTokenSentEvents)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeTokenSentEvent] error: %v", err)
-			}
-		}()
-		go func() {
-			err = subscribeMintCommand(cancelCtx, c.network, c.handleMintCommandEvents)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeMintCommand] error: %v", err)
-			}
-		}()
-		go func() {
-			err = subscribeContractCallWithTokenApprovedEvent(cancelCtx, c.network, c.handleContractCallWithMintApprovedEvents)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
-			}
-		}()
-		go func() {
-			err = subscribeContractCallApprovedEvent(cancelCtx, c.network, c.handleContractCallApprovedEvents)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
-			}
-		}()
-		go func() {
-			err = subscribeCommandBatchSignedEvent(cancelCtx, c.network, c.handleCommandBatchSignedEvents)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
-			}
-		}()
-		go func() {
-			//Todo: check if the handler is correct
-			err = subscribeEVMCompletedEvent(cancelCtx, c.network, c.handleCompletedEvents)
-			if err != nil {
-				log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] error: %v", err)
-			}
-		}()
-		// For debug purpose, subscribe to all tx events, findout if there is sign commands event
-		// err = subscribeAllTxEvent(cancelCtx, c.network)
-		// if err != nil {
-		// 	log.Error().Msgf("[ScalarClient] [subscribeAllTxEvent] Failed: %v", err)
-		// }
-		//HeatBeat
-		aliveCount := 0
-		for {
-			_, err := tmclient.Health(ctx)
-			if err != nil {
-				// clean all subscriber then retry
-				log.Info().Msgf("[ScalarClient] ScalarNode is dead. Perform reconnecting")
-				c.network.RemoveRpcClient()
-				break
-			} else {
-				aliveCount += 1
-				if aliveCount >= 100 {
-					log.Debug().Msgf("[ScalarClient] ScalarNode is alive")
-					aliveCount = 0
-				}
-			}
-			time.Sleep(retryInterval)
+	}(tmclient)
+
+	// Store the client for heartbeat monitoring
+	c.tmclient = tmclient
+	c.cancelFunc = cancelFunc
+
+	return nil
+}
+
+// monitorHeartbeat continuously monitors the health of the connection
+func (c *Client) monitorHeartbeat(ctx context.Context, retryInterval time.Duration) {
+	aliveCount := 0
+	const heartbeatLogInterval = 100
+
+	for {
+		_, err := c.tmclient.Status(ctx)
+		if err != nil {
+			log.Info().Msgf("[ScalarClient] ScalarNode is dead. Perform reconnecting")
+			c.cleanupConnection()
+			return
 		}
-		cancelFunc()
+
+		aliveCount++
+		if aliveCount >= heartbeatLogInterval {
+			log.Debug().Msgf("[ScalarClient] ScalarNode is alive")
+			aliveCount = 0
+		}
+
+		time.Sleep(retryInterval)
 	}
 }
+
+// cleanupConnection cleans up the current connection
+func (c *Client) cleanupConnection() {
+	if c.cancelFunc != nil {
+		c.cancelFunc()
+		c.cancelFunc = nil
+	}
+	c.network.RemoveRpcClient()
+	c.tmclient = nil
+}
+
+// func (c *Client) subscribeWithHeatBeat(ctx context.Context) {
+// 	retryInterval := time.Millisecond * time.Duration(c.networkConfig.RetryInterval)
+// 	deadCount := 0
+// 	for {
+// 		cancelCtx, cancelFunc := context.WithCancel(ctx)
+// 		//Start rpc client
+// 		log.Debug().Msg("[ScalarClient] [Start] Try to start scalar connection")
+// 		tmclient, err := c.network.Start()
+// 		if err != nil {
+// 			deadCount += 1
+// 			if deadCount >= 10 {
+// 				log.Debug().Msgf("[ScalarClient] [Start] Connect to the scalar network failed, sleep for %ds then retry", int64(retryInterval.Seconds()))
+// 			}
+// 			c.network.RemoveRpcClient()
+// 			time.Sleep(retryInterval)
+// 			continue
+// 		}
+// 		log.Info().Msgf("[ScalarClient] [Start] Start rpc client success. Subscribing for events...")
+// 		//Handle the event in a separate goroutine
+// 		go func() {
+// 			err = subscribeTokenSentEvent(cancelCtx, c.network, c.handleTokenSentEvents)
+// 			if err != nil {
+// 				log.Error().Msgf("[ScalarClient] [subscribeTokenSentEvent] error: %v", err)
+// 			}
+// 		}()
+// 		go func() {
+// 			err = subscribeMintCommand(cancelCtx, c.network, c.handleMintCommandEvents)
+// 			if err != nil {
+// 				log.Error().Msgf("[ScalarClient] [subscribeMintCommand] error: %v", err)
+// 			}
+// 		}()
+// 		go func() {
+// 			err = subscribeContractCallWithTokenApprovedEvent(cancelCtx, c.network, c.handleContractCallWithMintApprovedEvents)
+// 			if err != nil {
+// 				log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
+// 			}
+// 		}()
+// 		go func() {
+// 			err = subscribeContractCallApprovedEvent(cancelCtx, c.network, c.handleContractCallApprovedEvents)
+// 			if err != nil {
+// 				log.Error().Msgf("[ScalarClient] [subscribeContractCallApprovedEvent] error: %v", err)
+// 			}
+// 		}()
+// 		go func() {
+// 			err = subscribeCommandBatchSignedEvent(cancelCtx, c.network, c.handleCommandBatchSignedEvents)
+// 			if err != nil {
+// 				log.Error().Msgf("[ScalarClient] [subscribeSignCommandsEvent] error: %v", err)
+// 			}
+// 		}()
+// 		go func() {
+// 			//Todo: check if the handler is correct
+// 			err = subscribeEVMCompletedEvent(cancelCtx, c.network, c.handleCompletedEvents)
+// 			if err != nil {
+// 				log.Error().Msgf("[ScalarClient] [subscribeEVMCompletedEvent] error: %v", err)
+// 			}
+// 		}()
+// 		// For debug purpose, subscribe to all tx events, findout if there is sign commands event
+// 		// err = subscribeAllTxEvent(cancelCtx, c.network)
+// 		// if err != nil {
+// 		// 	log.Error().Msgf("[ScalarClient] [subscribeAllTxEvent] Failed: %v", err)
+// 		// }
+// 		//HeatBeat
+// 		aliveCount := 0
+// 		for {
+// 			_, err := tmclient.Status(ctx)
+// 			if err != nil {
+// 				// clean all subscriber then retry
+// 				log.Info().Msgf("[ScalarClient] ScalarNode is dead. Perform reconnecting")
+// 				c.network.RemoveRpcClient()
+// 				break
+// 			} else {
+// 				aliveCount += 1
+// 				if aliveCount >= 100 {
+// 					log.Debug().Msgf("[ScalarClient] ScalarNode is alive")
+// 					aliveCount = 0
+// 				}
+// 			}
+// 			time.Sleep(retryInterval)
+// 		}
+// 		cancelFunc()
+// 	}
+// }
 
 // https://github.com/cosmos/cosmos-sdk/blob/main/client/rpc/tx.go#L159
 func Subscribe[T proto.Message](ctx context.Context,

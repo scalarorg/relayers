@@ -148,7 +148,7 @@ func (s *Service) processRecoverExecutingPhase(groupUid chainExported.Hash, swit
 		}
 
 		if len(redeemTokenEvents) > 0 {
-			mapTxHashes, err := s.replayRedeemTransactionsFromDB(groupUid, redeemTokenEvents)
+			mapTxHashes, err := s.replayRedeemTransactions(groupUid, redeemTokenEvents)
 			if err != nil {
 				log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot replay redeem transactions")
 				return err
@@ -219,7 +219,7 @@ func (s *Service) processRecoverPreparingPhase(groupUid chainExported.Hash, swit
 			return err
 		}
 
-		mapTxHashes, err := s.replayRedeemTransactionsFromDB(groupUid, redeemTokenEvents)
+		mapTxHashes, err := s.replayRedeemTransactions(groupUid, redeemTokenEvents)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[Relayer] [processRecoverPreparingPhase] cannot replay redeem transactions")
 			return err
@@ -270,13 +270,13 @@ func (s *Service) replaySwitchPhase(switchedPhases []*chains.SwitchedPhase, expe
 }
 
 // replayRedeemTransactionsFromDB replays redeem transactions from database instead of EVM network
-func (s *Service) replayRedeemTransactionsFromDB(groupUid chainExported.Hash, redeemTokenEvents []*chains.EvmRedeemTx) (map[string][]string, error) {
+func (s *Service) replayRedeemTransactions(groupUid chainExported.Hash, redeemTokenEvents []*chains.EvmRedeemTx) (map[string][]string, error) {
 	mapTxHashes := make(map[string][]string)
 
 	for _, redeemTx := range redeemTokenEvents {
 		// Convert database model to contract event and handle it
-		contractEvent := s.convertRedeemTxToContractEvent(redeemTx)
-		err := s.EvmClients[0].HandleRedeemToken(contractEvent) // Assuming we have at least one EVM client
+		//contractEvent := s.convertRedeemTxToContractEvent(redeemTx)
+		err := s.EvmClients[0].HandleRedeemToken(redeemTx) // Assuming we have at least one EVM client
 		if err != nil {
 			log.Warn().Err(err).Msgf("[Relayer] [replayRedeemTransactionsFromDB] cannot handle redeem token event")
 			continue

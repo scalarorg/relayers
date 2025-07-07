@@ -130,45 +130,14 @@ func (ec *EvmClient) HandleContractCallWithToken(event *contracts.IScalarGateway
 	return nil
 }
 
-func (ec *EvmClient) HandleRedeemToken(event *contracts.IScalarGatewayRedeemToken) error {
+func (ec *EvmClient) HandleRedeemToken(redeemTx *chains.EvmRedeemTx) error {
 	//0. Preprocess the event
-	log.Info().Str("Chain", ec.EvmConfig.ID).Any("event", event).Msg("[EvmClient] [HandleRedeemToken] Start processing evm redeem token")
-	blockHeader, err := ec.fetchBlockHeader(event.Raw.BlockNumber)
-	if err != nil {
-		log.Error().Err(err).Msgf("[EvmClient] [HandleRedeemToken] failed to fetch block header %d", event.Raw.BlockNumber)
-	}
-	//1. Convert into a RelayData instance then store to the db
-	redeemToken, err := ec.RedeemTokenEvent2Model(event)
-	if err != nil {
-		return fmt.Errorf("failed to convert ContractCallEvent to ContractCallWithToken: %w", err)
-	}
-	if blockHeader != nil {
-		redeemToken.BlockTime = blockHeader.BlockTime
-	}
-	//2. update last checkpoint
-	lastCheckpoint, err := ec.dbAdapter.GetLastEventCheckPoint(ec.EvmConfig.GetId(), events.EVENT_EVM_REDEEM_TOKEN)
-	lastCheckpoint.BlockNumber = ec.EvmConfig.StartBlock
-	if err != nil {
-		log.Debug().Str("chainId", ec.EvmConfig.GetId()).
-			Str("eventName", events.EVENT_EVM_REDEEM_TOKEN).
-			Msg("[EvmClient] [handleRedeemToken] Get event from begining")
-	}
-	if event.Raw.BlockNumber > lastCheckpoint.BlockNumber ||
-		(event.Raw.BlockNumber == lastCheckpoint.BlockNumber && event.Raw.TxIndex > lastCheckpoint.LogIndex) {
-		lastCheckpoint.BlockNumber = event.Raw.BlockNumber
-		lastCheckpoint.TxHash = event.Raw.TxHash.String()
-		lastCheckpoint.LogIndex = event.Raw.Index
-		lastCheckpoint.EventKey = fmt.Sprintf("%s-%d-%d", event.Raw.TxHash.String(), event.Raw.BlockNumber, event.Raw.Index)
-	}
-	//3. store relay data to the db, update last checkpoint
-	err = ec.dbAdapter.CreateEvmRedeemToken(redeemToken, lastCheckpoint)
-	if err != nil {
-		return fmt.Errorf("failed to create evm contract call: %w", err)
-	}
+	log.Info().Str("Chain", ec.EvmConfig.ID).Any("event", redeemTx).Msg("[EvmClient] [HandleRedeemToken] Start processing evm redeem token")
+
 	//2. Send to the bus
 	confirmTxs := events.ConfirmTxsRequest{
 		ChainName: ec.EvmConfig.GetId(),
-		TxHashs:   map[string]string{redeemToken.TxHash: redeemToken.DestinationChain},
+		TxHashs:   map[string]string{redeemTx.TxHash: redeemTx.DestinationChain},
 	}
 	if ec.eventBus != nil {
 		ec.eventBus.BroadcastEvent(&events.EventEnvelope{
@@ -464,17 +433,14 @@ func (ec *EvmClient) HandleTokenDeployed(event *contracts.IScalarGatewayTokenDep
 	return nil
 }
 
+/*
+* Send switch phase event to the scalar network
+ */
 func (ec *EvmClient) HandleSwitchPhase(event *contracts.IScalarGatewaySwitchPhase) error {
 	//0. Preprocess the event
 	log.Info().Str("Chain", ec.EvmConfig.ID).Any("event", event).Msg("[EvmClient] [HandleSwitchPhase] Start processing evm switch phase")
 	//1. Convert into a RelayData instance then store to the db
 	switchPhase := ec.SwitchPhaseEvent2Model(event)
-	if ec.dbAdapter != nil {
-		err := ec.dbAdapter.SaveSwitchPhase(&switchPhase)
-		if err != nil {
-			return fmt.Errorf("failed to create evm switch phase: %w", err)
-		}
-	}
 	//2. Send to the bus
 	if ec.eventBus != nil {
 		ec.eventBus.BroadcastEvent(&events.EventEnvelope{

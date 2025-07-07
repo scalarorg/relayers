@@ -2,6 +2,7 @@ package scalar
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -88,6 +89,7 @@ func (c *Client) processNextVaultBlock() error {
 		TransactionCount: len(vaultTxs),
 		ProcessedTxCount: 0,
 	}
+	//Store vault block to the relayerdb
 	c.dbAdapter.CreateVaultBlock(c.lastVaultBlock)
 
 	err = c.confirmVaultTransactions(c.lastVaultBlock, vaultTxs)
@@ -133,13 +135,16 @@ func (c *Client) formConfirmSourceTxsRequestV2(vaultBlock *relayer.VaultBlock, v
 		for i := 0; i+HASH_LENGTH <= len(vaultTx.MerkleProof); i += HASH_LENGTH {
 			merklePath = append(merklePath, chainsExported.Hash(vaultTx.MerkleProof[i:i+HASH_LENGTH]))
 		}
-
+		stakerScriptPubkey, err := hex.DecodeString(vaultTx.StakerScriptPubkey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode staker script pubkey: %w", err)
+		}
 		trustedTx := &chainsTypes.TrustedTx{
 			Hash:                     txHash,
 			TxIndex:                  uint64(vaultTx.TxPosition),
 			Raw:                      vaultTx.RawTx,
 			MerklePath:               merklePath,
-			PrevOutpointScriptPubkey: vaultTx.ScriptPubkey,
+			PrevOutpointScriptPubkey: stakerScriptPubkey,
 		}
 		if len(lastConfirmTx.Batch.Txs) >= CONFIRM_BATCH_SIZE {
 			confirmTxs = append(confirmTxs, lastConfirmTx)

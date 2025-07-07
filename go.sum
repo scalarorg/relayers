@@ -1513,8 +1513,10 @@ github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250426033010-eb69d1a47e
 github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250426033010-eb69d1a47edd/go.mod h1:4s0zJZh3DxlHHQl8CVuTJ6u2K44jPPhR1Ccr0t0NvVo=
 github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250426033010-eb69d1a47edd h1:x/N1H9vcQBgxp3TGpF+hT5xP3x6hVyp+E3bHZaPjL+c=
 github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250426033010-eb69d1a47edd/go.mod h1:NaEUh4Mv/4YaPfSFLQpzSiYKYzha6R3RNFKFXfxrQB8=
-github.com/scalarorg/data-models v0.0.0-20250704084851-75a3219521c1 h1:sJxyPvlfYjyoGdcXTpxJptYZ0Jw2Sb0tZ3TmvEgZ8vM=
-github.com/scalarorg/data-models v0.0.0-20250704084851-75a3219521c1/go.mod h1:Z26TBRv9TTDniNxeUj9BRc1HUr/STXEdTh5lheUM5N0=
+github.com/scalarorg/data-models v0.0.0-20250707085845-e6eb262b6a52 h1:pQRnM8zJJ4ygnr+X4Gr4KoA80EHwj8dwpiLAKRCDNKE=
+github.com/scalarorg/data-models v0.0.0-20250707085845-e6eb262b6a52/go.mod h1:Z26TBRv9TTDniNxeUj9BRc1HUr/STXEdTh5lheUM5N0=
+github.com/scalarorg/data-models v0.0.0-20250707095356-4cffc9b96e47 h1:aouim2t6RbEdKeH121RwWssI3y3akcpEHQj/qjvKXZ0=
+github.com/scalarorg/data-models v0.0.0-20250707095356-4cffc9b96e47/go.mod h1:Z26TBRv9TTDniNxeUj9BRc1HUr/STXEdTh5lheUM5N0=
 github.com/scalarorg/go-electrum v0.1.2-0.20250625161705-16b985cca1c0 h1:FeCvMpLmt6BIfPbmncnAI4KThrCwNN5TjUXF2D0yEO0=
 github.com/scalarorg/go-electrum v0.1.2-0.20250625161705-16b985cca1c0/go.mod h1:gSVi07YMEu6pHOgk/9Q1WqTr/Q2u0rchkvey74XNaKk=
 github.com/scalarorg/scalar-core v0.0.1-staking.0.20250619074652-c40229f8b953 h1:d9yOuXp7Iau6sTMDeN+dPPmEnZKGp4wcvCI+PB2Kc+M=
