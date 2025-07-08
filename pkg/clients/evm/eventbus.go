@@ -233,7 +233,7 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 		Uint64("nonce", signedTx.Nonce()).
 		Int64("chainId", signedTx.ChainId().Int64()).
 		Str("signer", signedTx.To().Hex()).
-		Msg("[EvmClient] [handleScalarBatchCommandSigned]")
+		Msg("[EvmClient] [handleScalarBatchCommandSigned] successfully sent tx to the network")
 	//2. Add the transaction waiting to be mined
 	// ec.pendingTxs.AddTx(signedTx.Hash().String(), time.Now())
 	//3. Todo: Clearify how to update status of the batchcommand

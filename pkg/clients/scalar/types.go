@@ -48,6 +48,41 @@ const (
 	ExecuteMessageEventTopicId        = "tm.event='Tx' AND message.action='ExecuteMessage'"
 )
 
+type BlockEvents struct {
+	tokenSentEvents                    []*types.EventTokenSent
+	mintCommandEvents                  []*types.MintCommand
+	contractCallWithMintApprovedEvents []*types.EventContractCallWithMintApproved
+	contractCallApprovedEvents         []*types.ContractCallApproved
+	redeemTokenApprovedEvents          []*types.EventRedeemTokenApproved
+	commandBatchSignedEvents           []*types.CommandBatchSigned
+	evmCompletedEvents                 []*types.ChainEventCompleted
+	switchPhaseStartedEvents           []*covtypes.SwitchPhaseStarted
+	switchPhaseCompletedEvents         []*covtypes.SwitchPhaseCompleted
+}
+
+func (b *BlockEvents) Add(msgTypeName string, msg proto.Message) {
+	switch msgTypeName {
+	case EventTypeTokenSent:
+		b.tokenSentEvents = append(b.tokenSentEvents, msg.(*types.EventTokenSent))
+	case EventTypeMintCommand:
+		b.mintCommandEvents = append(b.mintCommandEvents, msg.(*types.MintCommand))
+	case EventTypeContractCallWithMintApproved:
+		b.contractCallWithMintApprovedEvents = append(b.contractCallWithMintApprovedEvents, msg.(*types.EventContractCallWithMintApproved))
+	case EventTypeContractCallApproved:
+		b.contractCallApprovedEvents = append(b.contractCallApprovedEvents, msg.(*types.ContractCallApproved))
+	case EventTypeRedeemTokenApproved:
+		b.redeemTokenApprovedEvents = append(b.redeemTokenApprovedEvents, msg.(*types.EventRedeemTokenApproved))
+	case EventTypeCommandBatchSigned:
+		b.commandBatchSignedEvents = append(b.commandBatchSignedEvents, msg.(*types.CommandBatchSigned))
+	case EventTypeEVMEventCompleted:
+		b.evmCompletedEvents = append(b.evmCompletedEvents, msg.(*types.ChainEventCompleted))
+	case EventTypeSwitchPhaseStarted:
+		b.switchPhaseStartedEvents = append(b.switchPhaseStartedEvents, msg.(*covtypes.SwitchPhaseStarted))
+	case EventTypeSwitchPhaseCompleted:
+		b.switchPhaseCompletedEvents = append(b.switchPhaseCompletedEvents, msg.(*covtypes.SwitchPhaseCompleted))
+	}
+}
+
 type EventHandlerCallBack[T any] func(events []IBCEvent[T])
 type ListenerEvent[T any] struct {
 	TopicId string

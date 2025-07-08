@@ -13,9 +13,26 @@ import (
 	proto "github.com/gogo/protobuf/proto"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/scalar-core/x/chains/types"
+	covtypes "github.com/scalarorg/scalar-core/x/covenant/types"
 	abci "github.com/tendermint/tendermint/abci/types"
 	//gogoproto "google.golang.org/protobuf/proto"
 )
+
+var (
+	allEventTypes = map[string]proto.Message{
+		proto.MessageName(&types.MintCommand{}):                       &types.MintCommand{},
+		proto.MessageName(&types.ContractCallApproved{}):              &types.ContractCallApproved{},
+		proto.MessageName(&types.EventContractCallWithMintApproved{}): &types.EventContractCallWithMintApproved{},
+		proto.MessageName(&types.EventTokenSent{}):                    &types.EventTokenSent{},
+		proto.MessageName(&types.EventRedeemTokenApproved{}):          &types.EventRedeemTokenApproved{},
+		proto.MessageName(&types.CommandBatchSigned{}):                &types.CommandBatchSigned{},
+		proto.MessageName(&types.ChainEventCompleted{}):               &types.ChainEventCompleted{},
+		proto.MessageName(&covtypes.SwitchPhaseStarted{}):             &covtypes.SwitchPhaseStarted{},
+		proto.MessageName(&covtypes.SwitchPhaseCompleted{}):           &covtypes.SwitchPhaseCompleted{},
+	}
+)
+
+type eventJson = map[string]string
 
 func DecodeIntArrayToBytes(input string) ([]byte, error) {
 	// Parse the input string as a slice of integers
@@ -77,6 +94,54 @@ func ParseAbciEvent[T proto.Message](event abci.Event, messages T) error {
 	}
 	return err
 }
+func findMessageTypeByKey(key string, msgTypes map[string]proto.Message) (proto.Message, error) {
+	for msgType, msg := range msgTypes {
+		if strings.HasPrefix(key, msgType) {
+			return msg, nil
+		}
+	}
+	return nil, fmt.Errorf("message not found")
+}
+func ParseBlockEvents(allEvents map[string][]string) (*BlockEvents, error) {
+	parsedEvents := &BlockEvents{}
+	eventDatas := map[string][]eventJson{}
+	for key, values := range allEvents {
+		msgType, err := findMessageTypeByKey(key, allEventTypes)
+		if err != nil {
+			continue
+		}
+		msgTypeName := proto.MessageName(msgType)
+		fieldName := key[len(msgTypeName)+1:]
+		eventData, ok := eventDatas[msgTypeName]
+		if !ok {
+			for i := 0; i < len(values); i++ {
+				eventData = append(eventData, map[string]string{})
+			}
+			eventDatas[msgTypeName] = eventData
+		}
+		for i, value := range values {
+			eventData[i][fieldName] = value
+		}
+	}
+	for msgTypeName, eventData := range eventDatas {
+		msgType, ok := allEventTypes[msgTypeName]
+		if !ok {
+			log.Error().Str("MsgTypeName", msgTypeName).Msgf("Message type not found")
+			continue
+		}
+		for _, eventData := range eventData {
+			instance := reflect.New(reflect.TypeOf(msgType).Elem()).Interface().(proto.Message)
+			err := UnmarshalJson(eventData, instance.(proto.Message))
+			if err != nil {
+				log.Error().Err(err).Msgf("Cannot unmarshal message of type %T", msgType)
+				continue
+			}
+			parsedEvents.Add(msgTypeName, instance.(proto.Message))
+		}
+	}
+	return parsedEvents, nil
+}
+
 func ParseIBCEvent[T proto.Message](rawData map[string][]string) ([]IBCEvent[T], error) {
 	jsonDatas := []map[string]string{}
 	var args T

@@ -18,17 +18,17 @@ import (
 	protocol "github.com/scalarorg/scalar-core/x/protocol/exported"
 )
 
-func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*chainstypes.EventTokenSent]) error {
+func (c *Client) handleTokenSentEvents(ctx context.Context, events []*chainstypes.EventTokenSent) error {
 	tokenSentApproveds := []*scalarnet.TokenSentApproved{}
 	mapChains := make(map[string]int, 0)
 	for _, event := range events {
-		chain := string(event.Args.DestinationChain)
+		chain := string(event.DestinationChain)
 		counter, ok := mapChains[chain]
 		if !ok {
 			counter = 0
 		}
 		mapChains[chain] = counter + 1
-		model := models.EventTokenSent2Model(event.Args)
+		model := models.EventTokenSent2Model(event)
 		//Check if event_id is not empty
 		if model.EventID == "" {
 			log.Warn().Msgf("[ScalarClient] [handleTokenSentEvents] event_id is empty for event %v", event)
@@ -101,22 +101,22 @@ func (c *Client) handleTokenSentEvents(ctx context.Context, events []IBCEvent[*c
 // 	}
 // }
 
-func (c *Client) handleMintCommandEvents(ctx context.Context, events []IBCEvent[*chainstypes.MintCommand]) error {
+func (c *Client) handleMintCommandEvents(ctx context.Context, events []*chainstypes.MintCommand) error {
 	//Store the mint command to the db
 	cmdModels := make([]scalarnet.MintCommand, len(events))
 	for i, event := range events {
-		model := CreateMintCommandFromScalarEvent(event.Args)
-		model.TxHash = event.Hash
+		model := CreateMintCommandFromScalarEvent(event)
+		//model.TxHash = event.Hash
 		cmdModels[i] = model
 	}
 	return c.dbAdapter.CreateOrUpdateMintCommands(cmdModels)
 
 }
 
-func (c *Client) handleContractCallApprovedEvents(ctx context.Context, events []IBCEvent[*chainstypes.ContractCallApproved]) error {
+func (c *Client) handleContractCallApprovedEvents(ctx context.Context, events []*chainstypes.ContractCallApproved) error {
 	entities := make([]scalarnet.ContractCallApproved, len(events))
 	for i, event := range events {
-		entities[i] = CreateCallContractApprovedFromScalarEvent(event.Args)
+		entities[i] = CreateCallContractApprovedFromScalarEvent(event)
 	}
 	return c.dbAdapter.CreateOrUpdateContractCallApproveds(entities)
 	// updates := make([]db.RelaydataExecuteResult, 0)
@@ -131,18 +131,18 @@ func (c *Client) handleContractCallApprovedEvents(ctx context.Context, events []
 	// }
 	// return c.dbAdapter.UpdateBatchRelayDataStatus(updates, len(updates))
 }
-func (c *Client) handleRedeemTokenApprovedEvents(events []IBCEvent[*chainstypes.EventRedeemTokenApproved]) error {
+func (c *Client) handleRedeemTokenApprovedEvents(ctx context.Context, events []*chainstypes.EventRedeemTokenApproved) error {
 	entities := make([]scalarnet.ScalarRedeemTokenApproved, len(events))
 	for i, event := range events {
 		entities[i] = scalarnet.ScalarRedeemTokenApproved{
-			EventID:          string(event.Args.EventID),
-			SourceChain:      string(event.Args.Chain),
-			SourceTxHash:     event.Hash,
-			CommandID:        hex.EncodeToString(event.Args.CommandID[:]),
-			Sender:           event.Args.Sender,
-			DestinationChain: string(event.Args.DestinationChain),
-			ContractAddress:  event.Args.ContractAddress,
-			PayloadHash:      hex.EncodeToString(event.Args.PayloadHash[:]),
+			EventID:     string(event.EventID),
+			SourceChain: string(event.Chain),
+			//SourceTxHash:     event.Hash,
+			CommandID:        hex.EncodeToString(event.CommandID[:]),
+			Sender:           event.Sender,
+			DestinationChain: string(event.DestinationChain),
+			ContractAddress:  event.ContractAddress,
+			PayloadHash:      hex.EncodeToString(event.PayloadHash[:]),
 		}
 	}
 	return c.dbAdapter.CreateBatchValue(entities, len(entities))
@@ -170,11 +170,11 @@ func (c *Client) handleRedeemTokenApprovedEvents(events []IBCEvent[*chainstypes.
 // 	}
 // }
 
-func (c *Client) handleContractCallWithMintApprovedEvents(ctx context.Context, events []IBCEvent[*chainstypes.EventContractCallWithMintApproved]) error {
+func (c *Client) handleContractCallWithMintApprovedEvents(ctx context.Context, events []*chainstypes.EventContractCallWithMintApproved) error {
 	log.Debug().Msgf("[ScalarClient] [handleContractCallWithTokenApprovedEvents] update ContractCallWithToken status to Approved")
 	entities := make([]scalarnet.ContractCallApprovedWithMint, len(events))
 	for i, event := range events {
-		entities[i] = CreateCallContractApprovedWithMintFromScalarEvent(event.Args)
+		entities[i] = CreateCallContractApprovedWithMintFromScalarEvent(event)
 	}
 	return c.dbAdapter.CreateOrUpdateContractCallApprovedWithMints(entities)
 }
@@ -230,9 +230,9 @@ func (c *Client) handleContractCallWithMintApprovedEvents(ctx context.Context, e
 // 	return nil, nil
 // }
 
-func (c *Client) handleCommandBatchSignedEvents(ctx context.Context, events []IBCEvent[*chainstypes.CommandBatchSigned]) error {
+func (c *Client) handleCommandBatchSignedEvents(ctx context.Context, events []*chainstypes.CommandBatchSigned) error {
 	for _, event := range events {
-		err := c.handleCommantBatchSignedsEvent(ctx, &event)
+		err := c.handleCommantBatchSignedsEvent(ctx, event)
 		if err != nil {
 			return err
 		}
@@ -240,9 +240,9 @@ func (c *Client) handleCommandBatchSignedEvents(ctx context.Context, events []IB
 	return nil
 }
 
-func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *IBCEvent[*chainstypes.CommandBatchSigned]) error {
-	destinationChain := string(event.Args.Chain)
-	batchedCmds, err := c.getBatchedCommands(ctx, destinationChain, event.Args.CommandBatchID)
+func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *chainstypes.CommandBatchSigned) error {
+	destinationChain := string(event.Chain)
+	batchedCmds, err := c.getBatchedCommands(ctx, destinationChain, event.CommandBatchID)
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func (c *Client) handleCommantBatchSignedsEvent(ctx context.Context, event *IBCE
 	}
 	log.Debug().
 		Str("Chain", destinationChain).
-		Str("BatchCommandId", hex.EncodeToString(event.Args.CommandBatchID)).
+		Str("BatchCommandId", hex.EncodeToString(event.CommandBatchID)).
 		Msgf("[ScalarClient] [handleCommantBatchSignedsEvent] found batched command signed")
 	return c.processBatchedCommandSigned(ctx, destinationChain, batchedCmds)
 }
@@ -297,7 +297,7 @@ func (c *Client) processBatchedCommandSigned(ctx context.Context, chain string, 
 		return c.handleBitcoinBatchCommands(chain, batchedCmds)
 	}
 
-	c.updateCommandStatuses(ctx, chain, batchedCmds.CommandIDs)
+	//c.updateCommandStatuses(ctx, chain, batchedCmds.CommandIDs)
 	//c.pendingCommands.BatchCommands.Delete(batchID)
 	return nil
 	// } else {
@@ -410,10 +410,10 @@ func (c *Client) waitForExecuteData(ctx context.Context, destinationChain string
 	return res, nil
 }
 
-func (c *Client) handleCompletedEvents(ctx context.Context, events []IBCEvent[*chainstypes.ChainEventCompleted]) error {
+func (c *Client) handleCompletedEvents(ctx context.Context, events []*chainstypes.ChainEventCompleted) error {
 	mapEventIDs := make(map[string][]string)
 	for _, event := range events {
-		mapEventIDs[event.Args.Type] = append(mapEventIDs[event.Args.Type], string(event.Args.EventID))
+		mapEventIDs[event.Type] = append(mapEventIDs[event.Type], string(event.EventID))
 	}
 	for eventType, eventIDs := range mapEventIDs {
 		switch eventType {
@@ -438,20 +438,20 @@ func (c *Client) handleTokenSentCompletedEvents(eventIDs []string) error {
 	return nil
 }
 
-func (c *Client) handleSwitchPhaseStartedEvents(ctx context.Context, switchPhaseEvents []IBCEvent[*covTypes.SwitchPhaseStarted]) error {
+func (c *Client) handleSwitchPhaseStartedEvents(ctx context.Context, switchPhaseEvents []*covTypes.SwitchPhaseStarted) error {
 	//Loop through all the evm chains and update the status
 	for _, event := range switchPhaseEvents {
 		eventEnvelope := events.EventEnvelope{
 			EventType:        events.EVENT_SCALAR_SWITCH_PHASE_STARTED,
-			DestinationChain: string(event.Args.Chain),
-			Data:             event.Args,
+			DestinationChain: string(event.Chain),
+			Data:             event,
 		}
 		c.eventBus.BroadcastEvent(&eventEnvelope)
 	}
 	return nil
 }
 
-func (c *Client) handleSwitchPhaseCompletedEvents(ctx context.Context, switchPhaseEvents []IBCEvent[*covTypes.SwitchPhaseCompleted]) error {
+func (c *Client) handleSwitchPhaseCompletedEvents(ctx context.Context, switchPhaseEvents []*covTypes.SwitchPhaseCompleted) error {
 	//call sign pending command for each custodian pool
 
 	return nil

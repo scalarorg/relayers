@@ -14,7 +14,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/bitcoin-vault/go-utils/encode"
 	utiltypes "github.com/scalarorg/bitcoin-vault/go-utils/types"
-	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/types"
 	"github.com/scalarorg/relayers/pkg/utils"
@@ -462,14 +461,14 @@ func (c *Client) UpdateBatchCommandSigned(ctx context.Context, destChain string,
 
 		}
 	}
-	for cmdType, cmdIds := range commandByType {
-		switch cmdType {
-		case "approveContractCallWithMint":
-			c.dbAdapter.UpdateContractCallWithMintsStatus(ctx, cmdIds, chains.ContractCallStatusExecuting)
-		case "mintToken":
-			c.dbAdapter.UpdateTokenSentsStatus(ctx, cmdIds, chains.TokenSentStatusExecuting)
-		}
-	}
+	// for cmdType, cmdIds := range commandByType {
+	// 	switch cmdType {
+	// 	case "approveContractCallWithMint":
+	// 		c.dbAdapter.UpdateContractCallWithMintsStatus(ctx, cmdIds, chains.ContractCallStatusExecuting)
+	// 	case "mintToken":
+	// 		c.dbAdapter.UpdateTokenSentsStatus(ctx, cmdIds, chains.TokenSentStatusExecuting)
+	// 	}
+	// }
 	c.dbAdapter.SaveCommands(commands)
 	return nil
 }

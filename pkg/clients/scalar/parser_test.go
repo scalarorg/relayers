@@ -158,3 +158,14 @@ func TestDecodeCommandBatchId(t *testing.T) {
 	decodedHex := hex.EncodeToString(decoded)
 	assert.Equal(t, "8ef64ac5ead13c9d2554c00922e03c19524370ea4c379352adfd52448dd15cd2", decodedHex)
 }
+
+func TestParseBlockEvents(t *testing.T) {
+	var rawMap map[string][]string
+	if err := json.Unmarshal([]byte(jsonData), &rawMap); err != nil {
+		log.Fatalf("Error unmarshalling to map: %v", err)
+	}
+	t.Logf("RawMap %v", rawMap)
+	events, err := scalar.ParseBlockEvents(rawMap)
+	assert.NoError(t, err)
+	t.Logf("Events %+v", events)
+}
