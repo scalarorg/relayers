@@ -25,10 +25,6 @@ type CustodianGroupRedeemTx struct {
 	mapRedeemTxs map[string][]*models.BtcRedeemTx
 }
 
-func (c *Client) StartRedeemProcessing(ctx context.Context) {
-
-}
-
 func (s *CustodianGroupRedeemTx) AddRedeemTxs(redeemTxEvents *events.BtcRedeemTxEvents) {
 	s.lock.Lock()
 	defer s.lock.Unlock()

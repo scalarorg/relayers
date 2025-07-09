@@ -89,9 +89,7 @@ func (s *Service) Start(ctx context.Context) error {
 			log.Error().Err(err).Msg("[ScalarClient] [SubscribeEventBus] Failed")
 		}
 	}
-	// Improvement recovery evm missing source events
-	// 2025, March 10
-	// Recover all swiched phase events from evm networks
+
 	groups, err := s.ScalarClient.GetCovenantGroups(ctx)
 	if err != nil {
 		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot get covenant groups")
@@ -121,17 +119,9 @@ func (s *Service) Start(ctx context.Context) error {
 	for _, client := range s.BtcClient {
 		go client.Start(ctx)
 	}
-	// Start electrum clients. This client can get all vault transactions from last checkpoint of begining if no checkpoint is found
-	// for _, client := range s.Electrs {
-	// 	go client.StartBlockchainHeaderSubscriptionWithReconnect(ctx)
-	// 	go client.Start(ctx)
-	// }
 
-	//Recover all events
-	//Todo: Get latest session of each group
 	for _, client := range s.EvmClients {
 		go func() {
-
 			client.Start(ctx)
 		}()
 	}

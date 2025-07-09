@@ -167,7 +167,10 @@ func (c *Client) Start(ctx context.Context) error {
 		c.StartTransferProcessing(ctx)
 	}()
 	go func() {
-		c.StartRedeemProcessing(ctx)
+		c.StartPoolRedeemProcessing(ctx)
+	}()
+	go func() {
+		c.StartUpcRedeemProcessing(ctx)
 	}()
 	log.Info().Msg("Scalar client started")
 	return nil
