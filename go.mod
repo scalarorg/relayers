@@ -16,7 +16,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250426033010-eb69d1a47edd
 	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250426033010-eb69d1a47edd
-	github.com/scalarorg/data-models v0.0.0-20250707095356-4cffc9b96e47
+	github.com/scalarorg/data-models v0.0.0-20250709092031-cf5812564e27
 	github.com/scalarorg/go-electrum v0.1.2-0.20250625161705-16b985cca1c0
 	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250619074652-c40229f8b953
 	github.com/spf13/cobra v1.8.1
@@ -252,7 +252,7 @@ require (
 
 // replace github.com/scalarorg/scalar-core => ../scalar-core
 
-replace github.com/scalarorg/data-models => ../data-models
+// replace github.com/scalarorg/data-models => ../data-models
 
 // Temporary replacement for rosetta support
 replace github.com/cosmos/cosmos-sdk => github.com/axelarnetwork/cosmos-sdk v0.45.17-0.20240321205000-47c0c80e20ca
