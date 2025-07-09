@@ -7,9 +7,67 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/relayer"
 	"github.com/scalarorg/data-models/scalarnet"
 	"gorm.io/gorm"
 )
+
+func (db *DatabaseAdapter) GetLastContractCallBlock() (*relayer.ContractCallBlock, error) {
+	var contractCallBlock relayer.ContractCallBlock
+	query := `
+		SELECT * FROM contract_call_blocks ORDER BY block_number DESC LIMIT 1
+	`
+	err := db.RelayerClient.Raw(query).Scan(&contractCallBlock).Error
+	if err != nil {
+		return nil, err
+	}
+	if contractCallBlock.ID == 0 {
+		return nil, nil
+	}
+	return &contractCallBlock, nil
+}
+func (db *DatabaseAdapter) CreateContractCallBlock(contractCallBlock *relayer.ContractCallBlock) error {
+	err := db.RelayerClient.Create(contractCallBlock).Error
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func (db *DatabaseAdapter) GetUnprocessedContractCallTxsByBlock(blockNumber uint64) ([]*chains.ContractCallWithToken, error) {
+	var contractCallWithTokens []*chains.ContractCallWithToken
+	query := `
+		SELECT * FROM contract_call_with_tokens
+		WHERE block_number = $1
+		AND tx_hash NOT IN (
+			SELECT ce.command_id FROM command_executeds ce
+			WHERE ce.command_id = contract_call_with_tokens.tx_hash
+		)
+		ORDER BY log_index ASC
+	`
+	result := db.IndexerClient.Raw(query, blockNumber).Scan(&contractCallWithTokens)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return contractCallWithTokens, nil
+}
+
+func (db *DatabaseAdapter) GetNextContractCallWithTokens(lastBlockNumber uint64) ([]*chains.ContractCallWithToken, error) {
+	var contractCallWithTokens []*chains.ContractCallWithToken
+	query := `
+		SELECT * FROM contract_call_with_tokens
+		WHERE block_number = (
+			SELECT MIN(block_number) 
+			FROM contract_call_with_tokens 
+			WHERE block_number > $1
+		)
+		ORDER BY log_index ASC
+	`
+	result := db.IndexerClient.Raw(query, lastBlockNumber).Scan(&contractCallWithTokens)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return contractCallWithTokens, nil
+}
 
 func (db *DatabaseAdapter) UpdateContractCallApproved(messageID string, executeHash string) error {
 	updateData := map[string]interface{}{

@@ -72,13 +72,13 @@ func (c *Client) processNextVaultBlock() error {
 	// If we don't have a current processing block, get the next uncompleted one
 	var vaultTxs []*chains.VaultTransaction
 	var err error
-	if c.lastVaultBlock == nil {
-		c.lastVaultBlock, err = c.getLastVaultBlock()
+	if c.processCheckPoint.LastVaultBlock == nil {
+		c.processCheckPoint.LastVaultBlock, err = c.getLastVaultBlock()
 		if err != nil {
 			return fmt.Errorf("failed to get next uncompleted vault block: %w", err)
 		}
 	}
-	if c.lastVaultBlock == nil {
+	if c.processCheckPoint.LastVaultBlock == nil {
 		//No executed vault tx command, get the new vault txs
 		vaultTxs, err = c.dbAdapter.GetNextVaultTransactions(0)
 		if err != nil {
@@ -86,24 +86,24 @@ func (c *Client) processNextVaultBlock() error {
 		}
 	} else {
 		// Get uncompleted vault transactions for this block (not in command_executed)
-		vaultTxs, err = c.dbAdapter.GetUnprocessedVaultTransactionsByBlock(c.lastVaultBlock.BlockNumber)
+		vaultTxs, err = c.dbAdapter.GetUnprocessedVaultTransactionsByBlock(c.processCheckPoint.LastVaultBlock.BlockNumber)
 		if err != nil {
-			return fmt.Errorf("failed to get uncompleted vault transactions for block %d: %w", c.lastVaultBlock.BlockNumber, err)
+			return fmt.Errorf("failed to get uncompleted vault transactions for block %d: %w", c.processCheckPoint.LastVaultBlock.BlockNumber, err)
 		}
 		if len(vaultTxs) == 0 {
-			log.Info().Uint64("blockNumber", c.lastVaultBlock.BlockNumber).
-				Str("status", c.lastVaultBlock.Status).
+			log.Info().Uint64("blockNumber", c.processCheckPoint.LastVaultBlock.BlockNumber).
+				Str("status", c.processCheckPoint.LastVaultBlock.Status).
 				Msg("[ScalarClient] new unfinished vault block to process. Get vault txs from next block")
-			vaultTxs, err = c.dbAdapter.GetNextVaultTransactions(c.lastVaultBlock.BlockNumber)
+			vaultTxs, err = c.dbAdapter.GetNextVaultTransactions(c.processCheckPoint.LastVaultBlock.BlockNumber)
 			if err != nil {
-				return fmt.Errorf("failed to get vault transactions for block %d: %w", c.lastVaultBlock.BlockNumber, err)
+				return fmt.Errorf("failed to get vault transactions for block %d: %w", c.processCheckPoint.LastVaultBlock.BlockNumber, err)
 			}
 		}
 	}
 
 	if len(vaultTxs) == 0 {
-		if c.lastVaultBlock != nil {
-			log.Info().Uint64("blockNumber", c.lastVaultBlock.BlockNumber).
+		if c.processCheckPoint.LastVaultBlock != nil {
+			log.Info().Uint64("blockNumber", c.processCheckPoint.LastVaultBlock.BlockNumber).
 				Msg("[ScalarClient] No more vault transactions to process, waiting for next vault block")
 
 			return nil
@@ -113,7 +113,7 @@ func (c *Client) processNextVaultBlock() error {
 		}
 	}
 
-	c.lastVaultBlock = &relayer.VaultBlock{
+	c.processCheckPoint.LastVaultBlock = &relayer.VaultBlock{
 		BlockNumber:      vaultTxs[0].BlockNumber,
 		BlockHash:        vaultTxs[0].BlockHash,
 		Chain:            vaultTxs[0].Chain,
@@ -122,15 +122,15 @@ func (c *Client) processNextVaultBlock() error {
 		ProcessedTxCount: 0,
 	}
 	//Store vault block to the relayerdb
-	c.dbAdapter.CreateVaultBlock(c.lastVaultBlock)
+	c.dbAdapter.CreateVaultBlock(c.processCheckPoint.LastVaultBlock)
 
-	err = c.confirmVaultTransactions(c.lastVaultBlock, vaultTxs)
+	err = c.confirmVaultTransactions(c.processCheckPoint.LastVaultBlock, vaultTxs)
 	if err != nil {
 		log.Error().Err(err).Msg("[ScalarClient] Failed to confirm vault transactions")
 		return err
 	}
 
-	log.Info().Uint64("blockNumber", c.lastVaultBlock.BlockNumber).
+	log.Info().Uint64("blockNumber", c.processCheckPoint.LastVaultBlock.BlockNumber).
 		Int("uncompletedTxs", len(vaultTxs)).
 		Msg("[ScalarClient] Processing uncompleted transactions in vault block")
 

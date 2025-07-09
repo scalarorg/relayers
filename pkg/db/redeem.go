@@ -13,7 +13,7 @@ func (db *DatabaseAdapter) CreateRedeemBlock(redeemBlock *relayer.RedeemBlock) e
 	}).Create(redeemBlock).Error
 }
 
-func (db *DatabaseAdapter) GetLastRedeemTxBlock() (*relayer.RedeemBlock, error) {
+func (db *DatabaseAdapter) GetLastRedeemBlock() (*relayer.RedeemBlock, error) {
 	var redeemTxBlock relayer.RedeemBlock
 	query := `
 		SELECT * FROM redeem_blocks ORDER BY block_number DESC LIMIT 1
@@ -85,6 +85,30 @@ func (db *DatabaseAdapter) FindLastRedeemVaultTxs(groupUid string) ([]*chains.Bt
 		return nil, err
 	}
 	return redeemTxs, nil
+}
+
+func (db *DatabaseAdapter) GetNextBtcRedeemExecuteds(lastProcessedBlock uint64) ([]*chains.BtcRedeemTx, error) {
+	var btcRedeemTxs []*chains.BtcRedeemTx
+	query := `
+		SELECT * FROM btc_redeem_txes
+		WHERE block_number = (
+			SELECT MIN(block_number) 
+			FROM btc_redeem_txes
+			WHERE block_number > $1
+		)
+	`
+	err := db.IndexerClient.Raw(query, lastProcessedBlock).Scan(&btcRedeemTxs).Error
+	return btcRedeemTxs, err
+}
+
+func (db *DatabaseAdapter) GetBtcRedeemExecutedsByBlock(blockNumber uint64) ([]*chains.BtcRedeemTx, error) {
+	var btcRedeemTxs []*chains.BtcRedeemTx
+	query := `
+		SELECT * FROM btc_redeem_txes
+		WHERE block_number = $1
+	`
+	err := db.IndexerClient.Raw(query, blockNumber).Scan(&btcRedeemTxs).Error
+	return btcRedeemTxs, err
 }
 
 // func (db *DatabaseAdapter) SaveBtcRedeemTxs(btcChain string, redeemTxs []*chains.BtcRedeemTx) error {

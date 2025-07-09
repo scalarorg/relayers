@@ -260,7 +260,7 @@ func (db *DatabaseAdapter) GetNextTokenSents(lastProcessedBlock uint64) ([]*chai
 			FROM token_sents 
 			WHERE block_number > $1
 		)
-		ORDER BY tx_position ASC
+		ORDER BY ts.log_index ASC
 	`
 	err := db.IndexerClient.Raw(query, lastProcessedBlock).Scan(&tokenSents).Error
 	if err != nil {

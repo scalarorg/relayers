@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/btc"
-	"github.com/scalarorg/relayers/pkg/clients/electrs"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
@@ -23,7 +22,6 @@ type Service struct {
 	EventBus     *events.EventBus
 	ScalarClient *scalar.Client
 	//CustodialClient *custodial.Client
-	Electrs    []*electrs.Client
 	EvmClients []*evm.EvmClient
 	BtcClient  []*btc.BtcClient
 }
@@ -321,6 +319,9 @@ func (s *Service) replaySwitchPhaseEvents(mapSwitchPhaseEvents map[string][]*con
 	wg.Wait()
 	return expectedPhase.Load(), evmCounter.Load(), hasDifferentPhase.Load()
 }
+func (s *Service) Stop() {
+	log.Info().Msg("Relayer service stopped")
+}
 
 //	func (s *Service) replayRedeemTransactions(groupUid string, mapRedeemTokenEvents map[string][]*contracts.IScalarGatewayRedeemToken) (map[string][]string, error) {
 //		if s.ScalarClient == nil {
@@ -370,9 +371,3 @@ func (s *Service) replaySwitchPhaseEvents(mapSwitchPhaseEvents map[string][]*con
 //		})
 //		return result, nil
 //	}
-func (s *Service) Stop() {
-	log.Info().Msg("Relayer service stopped")
-	for _, client := range s.Electrs {
-		go client.Electrs.Close()
-	}
-}

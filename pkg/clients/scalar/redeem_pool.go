@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	chains "github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/relayers/pkg/events"
 	chainExported "github.com/scalarorg/scalar-core/x/chains/exported"
 )
 
@@ -36,49 +38,19 @@ func (c *Client) StartPoolRedeemProcessing(ctx context.Context) {
 	}
 }
 
-// func (c *Client) getLastRedeemTxBlock() (*relayer.RedeemBlock, error) {
-// 	redeemTxBlock, err := c.dbAdapter.GetLastRedeemTxBlock()
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to get last redeem tx block: %w", err)
-// 	}
-// 	if redeemTxBlock == nil {
-// 		log.Debug().Msg("[ScalarClient] No token sent blocks processed")
-// 		redeemTxs, err := c.dbAdapter.FindLastVaultRedeemTx(c.networkConfig.GetId())
-// 		if err != nil {
-// 			return nil, fmt.Errorf("failed to get uncompleted token sents for block %d: %w", 0, err)
-// 		}
-// 		if len(redeemTxs) > 0 {
-// 			redeemTxBlock = &relayer.RedeemBlock{
-// 				BlockNumber:      redeemTxs[0].BlockNumber,
-// 				Chain:            c.networkConfig.GetId(),
-// 				Status:           string(relayer.BlockStatusProcessing),
-// 				TransactionCount: len(redeemTxs),
-// 				ProcessedTxCount: len(redeemTxs),
-// 			}
-// 			err = c.dbAdapter.CreateRedeemBlock(redeemTxBlock)
-// 			if err != nil {
-// 				return nil, fmt.Errorf("failed to create token sent block: %w", err)
-// 			}
-// 			log.Info().Int("redeemTxsCount", len(redeemTxs)).
-// 				Msg("[ScalarClient] create redeem new block")
-// 			return redeemTxBlock, nil
-// 		}
-// 	}
-// 	return redeemTxBlock, nil
-// }
-
 func (c *Client) processNextPoolRedeemTx(groupUid chainExported.Hash) error {
-	evmRedeemTxs, err := c.dbAdapter.FindPoolRedeemTxsInLastSession(groupUid.String())
+	groupUidStr := groupUid.String()
+	evmRedeemTxs, err := c.dbAdapter.FindPoolRedeemTxsInLastSession(groupUidStr)
 	if err != nil {
 		return fmt.Errorf("failed to get last redeem tx block: %w", err)
 	}
 	if len(evmRedeemTxs) == 0 {
-		log.Debug().Msgf("[ScalarClient] No redeem txs found for group %s", groupUid.String())
+		log.Debug().Msgf("[ScalarClient] No redeem txs found for group %s", groupUidStr)
 		return nil
 	}
-	log.Info().Msgf("[ScalarClient] Processing %d redeem txs for group %s", len(evmRedeemTxs), groupUid.String())
+	log.Info().Msgf("[ScalarClient] Processing %d redeem txs for group %s", len(evmRedeemTxs), groupUidStr)
 	//Log process redeem txs of the last session
-	btcRedeemTxs, err := c.dbAdapter.FindLastRedeemVaultTxs(groupUid.String())
+	btcRedeemTxs, err := c.dbAdapter.FindLastRedeemVaultTxs(groupUidStr)
 	if err != nil {
 		return fmt.Errorf("failed to get last redeem vault txs: %w", err)
 	}
@@ -87,14 +59,34 @@ func (c *Client) processNextPoolRedeemTx(groupUid chainExported.Hash) error {
 		for _, tx := range btcRedeemTxs {
 			txHashes = append(txHashes, tx.TxHash)
 		}
-		log.Info().Hex("CustodianGroupUid", groupUid.Bytes()).
+		log.Info().Str("CustodianGroupUid", groupUidStr).
 			Uint64("SessionSequence", btcRedeemTxs[0].SessionSequence).
 			Strs("TxHashes", txHashes).
 			Msgf("[ScalarClient] redeem session already broadcasted")
+		return nil
 	}
-	log.Info().Hex("CustodianGroupUid", groupUid.Bytes()).
-		Uint64("SessionSequence", evmRedeemTxs[0].SessionSequence).
-		Msgf("[ScalarClient] Redeem transactions are not broadcasted. Processing...")
-
+	mapChainRedeemTxs := c.groupEvmRedeemTxs(evmRedeemTxs)
+	for chain, redeemTxs := range mapChainRedeemTxs {
+		txHashes := make(map[string]string)
+		for _, tx := range redeemTxs {
+			txHashes[tx.TxHash] = tx.DestinationChain
+		}
+		err := c.requestConfirmEvmTxs(events.ConfirmTxsRequest{
+			ChainName: chain,
+			TxHashs:   txHashes,
+		})
+		if err != nil {
+			log.Error().Err(err).Msgf("[ScalarClient] [processNextPoolRedeemTx] failed to request confirm evm txs")
+			continue
+		}
+	}
 	return nil
+}
+
+func (c *Client) groupEvmRedeemTxs(evmRedeemTxs []*chains.EvmRedeemTx) map[string][]*chains.EvmRedeemTx {
+	mapChainRedeemTxs := make(map[string][]*chains.EvmRedeemTx)
+	for _, tx := range evmRedeemTxs {
+		mapChainRedeemTxs[tx.SourceChain] = append(mapChainRedeemTxs[tx.SourceChain], tx)
+	}
+	return mapChainRedeemTxs
 }
