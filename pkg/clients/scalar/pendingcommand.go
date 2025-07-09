@@ -79,10 +79,9 @@ func (c *Client) tryProcessPendingCommands(ctx context.Context, chain string) bo
 	//Check if there is signing batch command
 	res, err := c.queryClient.QueryBatchedCommands(ctx, chain, "")
 	if err != nil {
+		//Continue to process pending commands
 		log.Error().Err(err).Msg("[ScalarClient] [tryProcessPendingCommands] failed to get batched commands")
-		return false
-	}
-	if res.Status == chainstypes.BatchSigning {
+	} else if res.Status == chainstypes.BatchSigning {
 		log.Debug().Str("Chain", chain).Msg("[ScalarClient] [tryProcessPendingCommands] There is signing batch command, skip send new signing request")
 		return false
 	}

@@ -103,7 +103,7 @@ func (c *Client) processNextVaultBlock() error {
 
 	if len(vaultTxs) == 0 {
 		if c.processCheckPoint.LastVaultBlock != nil {
-			log.Info().Uint64("blockNumber", c.processCheckPoint.LastVaultBlock.BlockNumber).
+			log.Info().Uint64("LastVaultBlockNumber", c.processCheckPoint.LastVaultBlock.BlockNumber).
 				Msg("[ScalarClient] No more vault transactions to process, waiting for next vault block")
 
 			return nil

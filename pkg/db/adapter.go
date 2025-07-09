@@ -3,7 +3,6 @@ package db
 import (
 	"fmt"
 
-	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/relayer"
 	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/config"
@@ -70,6 +69,8 @@ func RunMigrations(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&relayer.VaultBlock{},
 		&relayer.TokenSentBlock{},
+		&relayer.ContractCallBlock{},
+		&relayer.RedeemBlock{},
 		// &chains.BlockHeader{},
 		// &chains.TokenSent{},
 		// &chains.CommandExecuted{},
@@ -78,14 +79,11 @@ func RunMigrations(db *gorm.DB) error {
 		// &chains.TokenDeployed{},
 		//&chains.SwitchedPhase{},
 		&scalarnet.Command{},
-		&chains.BtcRedeemTx{},
-		&chains.EvmRedeemTx{},
 		&scalarnet.MintCommand{},
 		&scalarnet.ScalarRedeemTokenApproved{},
 		&scalarnet.CallContractWithToken{},
 		&scalarnet.TokenSentApproved{},
 		&scalarnet.ContractCallApprovedWithMint{},
-
 		&scalarnet.EventCheckPoint{},
 	)
 }

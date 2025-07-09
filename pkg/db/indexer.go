@@ -254,7 +254,7 @@ func (db *DatabaseAdapter) GetUnprocessedTokenSentsByBlock(blockNumber uint64) (
 func (db *DatabaseAdapter) GetNextTokenSents(lastProcessedBlock uint64) ([]*chains.TokenSent, error) {
 	var tokenSents []*chains.TokenSent
 	query := `
-		SELECT * FROM token_sents
+		SELECT * FROM token_sents ts
 		WHERE block_number = (
 			SELECT MIN(block_number) 
 			FROM token_sents 
