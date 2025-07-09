@@ -23,28 +23,26 @@ import (
 	//tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
-	"github.com/scalarorg/data-models/relayer"
 )
 
 type Client struct {
-	globalConfig       *config.Config
-	networkConfig      *cosmos.CosmosNetworkConfig
-	txConfig           client.TxConfig
-	broadcaster        *Broadcaster
-	network            *cosmos.NetworkClient
-	queryClient        *cosmos.QueryClient
-	dbAdapter          *db.DatabaseAdapter
-	eventBus           *events.EventBus
-	subscriberName     string //Use as subscriber for networkClient
-	pendingCommands    *PendingCommands
-	initUtxo           bool                               //key: chain, value: utxo
-	redeemTxCache      map[string]*CustodianGroupRedeemTx //Map RedeemSession by chainId
-	chains             []string
-	pollInterval       time.Duration           // Interval for polling unexecuted transactions
-	lastVaultBlock     *relayer.VaultBlock     // Last processed VaultBlock to avoid redundant DB calls
-	lastTokenSentBlock *relayer.TokenSentBlock // Last processed TokenSentBlock to avoid redundant DB calls
-	tmclient           rpcclient.Client
-	cancelFunc         context.CancelFunc
+	globalConfig      *config.Config
+	networkConfig     *cosmos.CosmosNetworkConfig
+	txConfig          client.TxConfig
+	broadcaster       *Broadcaster
+	network           *cosmos.NetworkClient
+	queryClient       *cosmos.QueryClient
+	dbAdapter         *db.DatabaseAdapter
+	eventBus          *events.EventBus
+	subscriberName    string //Use as subscriber for networkClient
+	pendingCommands   *PendingCommands
+	initUtxo          bool                               //key: chain, value: utxo
+	redeemTxCache     map[string]*CustodianGroupRedeemTx //Map RedeemSession by chainId
+	chains            []string
+	pollInterval      time.Duration // Interval for polling unexecuted transactions
+	processCheckPoint ProcessCheckPoint
+	tmclient          rpcclient.Client
+	cancelFunc        context.CancelFunc
 	// Add other necessary fields like chain ID, gas prices, etc.
 }
 
@@ -164,10 +162,16 @@ func (c *Client) Start(ctx context.Context) error {
 		c.StartBridgeProcessing(ctx)
 	}()
 	go func() {
+		c.StartRedeemExecutedProcessing(ctx)
+	}()
+	go func() {
 		c.StartTransferProcessing(ctx)
 	}()
 	go func() {
-		c.StartRedeemProcessing(ctx)
+		c.StartPoolRedeemProcessing(ctx)
+	}()
+	go func() {
+		c.StartUpcRedeemProcessing(ctx)
 	}()
 	log.Info().Msg("Scalar client started")
 	return nil

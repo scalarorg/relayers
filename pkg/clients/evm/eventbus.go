@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/rs/zerolog/log"
@@ -154,7 +155,7 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 		log.Debug().Msg("[EvmClient] [handleScalarBatchCommandSigned] tx is already broadcasted")
 		return nil
 	}
-	ec.observeScalarExecuteData(decodedExecuteData)
+	// ec.observeScalarExecuteData(decodedExecuteData)
 	//1. Call ScalarGateway's execute method
 	//TODO: add retry
 	if ec.auth == nil {
@@ -212,7 +213,11 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 					Msg("[EvmClient] [handleScalarBatchCommandSigned] failed to send tx to the network")
 				return err
 			} else {
-				log.Info().Str("txHash", signedTx.Hash().String()).
+				ec.auth.Nonce = new(big.Int).SetUint64(signedTx.Nonce() + 1)
+				log.Info().Str("signed TxHash", signedTx.Hash().String()).
+					Uint64("nonce", signedTx.Nonce()).
+					Int64("chainId", signedTx.ChainId().Int64()).
+					Str("signer", signedTx.To().Hex()).
 					Msg("[EvmClient] [handleScalarBatchCommandSigned] successfully sent tx to the network")
 			}
 		} else if isPending {
@@ -223,20 +228,6 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 				Msg("[EvmClient] [handleScalarBatchCommandSigned] tx is mined")
 		}
 	}
-	//Or send raw transaction to the network directly
-	// txRaw := types.NewTx()
-	// tx, err := ec.Client.SendTransaction(context.Background(), txRaw)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to send raw transaction: %w", err)
-	// }
-	log.Info().Str("signed TxHash", signedTx.Hash().String()).
-		Uint64("nonce", signedTx.Nonce()).
-		Int64("chainId", signedTx.ChainId().Int64()).
-		Str("signer", signedTx.To().Hex()).
-		Msg("[EvmClient] [handleScalarBatchCommandSigned] successfully sent tx to the network")
-	//2. Add the transaction waiting to be mined
-	// ec.pendingTxs.AddTx(signedTx.Hash().String(), time.Now())
-	//3. Todo: Clearify how to update status of the batchcommand
 	return nil
 }
 

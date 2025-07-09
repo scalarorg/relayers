@@ -24,52 +24,80 @@ func (c *Client) StartTransferProcessing(ctx context.Context) {
 			log.Info().Msg("[ScalarClient] Context cancelled, stopping transfer processing")
 			return
 		case <-ticker.C:
-			if err := c.processNextTokenSent(ctx); err != nil {
+			if err := c.processNextTokenSent(); err != nil {
 				log.Error().Err(err).Msg("[ScalarClient] Failed to process token sent")
 			}
 		}
 	}
 }
-
-func (c *Client) processNextTokenSent(ctx context.Context) error {
+func (c *Client) getLastTokenSentBlock() (*relayer.TokenSentBlock, error) {
+	tokenSentBlock, err := c.dbAdapter.GetLastTokenSentBlock()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get next uncompleted token sent block: %w", err)
+	}
+	if tokenSentBlock == nil {
+		log.Debug().Msg("[ScalarClient] No token sent blocks processed")
+		commandExecuteds, err := c.dbAdapter.FindLastExecutedCommands(c.networkConfig.GetId())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get uncompleted token sents for block %d: %w", 0, err)
+		}
+		if len(commandExecuteds) > 0 {
+			tokenSentBlock = &relayer.TokenSentBlock{
+				BlockNumber:      commandExecuteds[0].BlockNumber,
+				Chain:            c.networkConfig.GetId(),
+				Status:           string(relayer.BlockStatusProcessing),
+				TransactionCount: len(commandExecuteds),
+				ProcessedTxCount: len(commandExecuteds),
+			}
+			err = c.dbAdapter.CreateTokenSentBlock(tokenSentBlock)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create token sent block: %w", err)
+			}
+			log.Info().Int("tokenSentsCount", len(commandExecuteds)).
+				Msg("[ScalarClient] create token new sent block")
+			return tokenSentBlock, nil
+		}
+	}
+	return tokenSentBlock, nil
+}
+func (c *Client) processNextTokenSent() error {
 	// If we don't have a current processing block, get the next uncompleted one
 	var tokenSents []*chains.TokenSent
 	var err error
-	if c.lastTokenSentBlock == nil {
-		tokenSentBlock, err := c.dbAdapter.GetLastTokenSentBlock()
+	//1. Find out the last processing token sent block
+	if c.processCheckPoint.LastTokenSentBlock == nil {
+		c.processCheckPoint.LastTokenSentBlock, err = c.getLastTokenSentBlock()
 		if err != nil {
-			return fmt.Errorf("failed to get next uncompleted token sent block: %w", err)
+			return fmt.Errorf("failed to get last token sent block: %w", err)
 		}
-		if tokenSentBlock == nil {
-			log.Debug().Msg("[ScalarClient] No token sent blocks processed")
-			tokenSents, err = c.dbAdapter.FindLatestUnprocessedTokenSents()
-			if err != nil {
-				return fmt.Errorf("failed to get uncompleted token sents for block %d: %w", 0, err)
-			}
-			log.Info().Int("tokenSentsCount", len(tokenSents)).
-				Msg("[ScalarClient] processNextTokenSent")
-		} else {
-			c.lastTokenSentBlock = tokenSentBlock
-			// Get uncompleted token sents for this block (not in command_executed)
-			tokenSents, err = c.dbAdapter.GetUnprocessedTokenSentsByBlock(c.lastTokenSentBlock.BlockNumber)
-			if err != nil {
-				return fmt.Errorf("failed to get uncompleted token sents for block %d: %w", c.lastTokenSentBlock.BlockNumber, err)
-			}
-			log.Info().Uint64("blockNumber", tokenSentBlock.BlockNumber).
-				Str("blockHash", tokenSentBlock.BlockHash).
-				Str("status", tokenSentBlock.Status).
-				Msg("[ScalarClient] Starting to process token sent block")
+	}
+	if c.processCheckPoint.LastTokenSentBlock == nil {
+		//No executed token sent command, get the new token sents
+		tokenSents, err = c.dbAdapter.GetNextTokenSents(0)
+		if err != nil {
+			return fmt.Errorf("failed to get new token sents: %w", err)
 		}
 	} else {
-		tokenSents, err = c.dbAdapter.GetNextTokenSents(c.lastTokenSentBlock.BlockNumber)
+		// Get uncompleted token sents for this block (not in command_executed)
+		tokenSents, err = c.dbAdapter.GetUnprocessedTokenSentsByBlock(c.processCheckPoint.LastTokenSentBlock.BlockNumber)
 		if err != nil {
-			return fmt.Errorf("failed to get token sents for block %d: %w", c.lastTokenSentBlock.BlockNumber, err)
+			return fmt.Errorf("failed to get uncompleted token sents for block %d: %w", c.processCheckPoint.LastTokenSentBlock.BlockNumber, err)
 		}
+		if len(tokenSents) == 0 {
+			log.Info().Uint64("blockNumber", c.processCheckPoint.LastTokenSentBlock.BlockNumber).
+				Str("status", c.processCheckPoint.LastTokenSentBlock.Status).
+				Msg("[ScalarClient] Starting to process token sent block")
+			tokenSents, err = c.dbAdapter.GetNextTokenSents(c.processCheckPoint.LastTokenSentBlock.BlockNumber)
+			if err != nil {
+				return fmt.Errorf("failed to get token sents for block %d: %w", c.processCheckPoint.LastTokenSentBlock.BlockNumber, err)
+			}
+		}
+
 	}
 
 	if len(tokenSents) == 0 {
-		if c.lastTokenSentBlock != nil {
-			log.Info().Uint64("blockNumber", c.lastTokenSentBlock.BlockNumber).
+		if c.processCheckPoint.LastTokenSentBlock != nil {
+			log.Info().Uint64("blockNumber", c.processCheckPoint.LastTokenSentBlock.BlockNumber).
 				Msg("[ScalarClient] No more token sents to process, waiting for next token sent block")
 
 			return nil
@@ -79,22 +107,22 @@ func (c *Client) processNextTokenSent(ctx context.Context) error {
 		}
 	}
 
-	c.lastTokenSentBlock = &relayer.TokenSentBlock{
+	c.processCheckPoint.LastTokenSentBlock = &relayer.TokenSentBlock{
 		BlockNumber:      tokenSents[0].BlockNumber,
 		Chain:            tokenSents[0].SourceChain,
 		Status:           string(relayer.BlockStatusProcessing),
 		TransactionCount: len(tokenSents),
 		ProcessedTxCount: 0,
 	}
-	c.dbAdapter.CreateTokenSentBlock(c.lastTokenSentBlock)
+	c.dbAdapter.CreateTokenSentBlock(c.processCheckPoint.LastTokenSentBlock)
 
-	err = c.confirmTokenSents(c.lastTokenSentBlock, tokenSents)
+	err = c.confirmTokenSents(c.processCheckPoint.LastTokenSentBlock, tokenSents)
 	if err != nil {
 		log.Error().Err(err).Msg("[ScalarClient] Failed to confirm token sents")
 		return err
 	}
 
-	log.Info().Uint64("blockNumber", c.lastTokenSentBlock.BlockNumber).
+	log.Info().Uint64("blockNumber", c.processCheckPoint.LastTokenSentBlock.BlockNumber).
 		Int("uncompletedTxs", len(tokenSents)).
 		Msg("[ScalarClient] Processing uncompleted token sents in token sent block")
 

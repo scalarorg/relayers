@@ -24,30 +24,6 @@ func (db *DatabaseAdapter) GetLastSwitchedPhases(groupUid string) ([]*chains.Swi
 	return switchedPhases, err
 }
 
-func (db *DatabaseAdapter) GetLastRedeemTxs(groupUid string, sessionSequence uint64) ([]*chains.EvmRedeemTx, error) {
-	var redeemTxs []*chains.EvmRedeemTx
-	query := `
-		SELECT * FROM evm_redeem_txes
-		WHERE custodian_group_uid = $1
-		AND session_sequence = $2
-	`
-	err := db.IndexerClient.Raw(query, groupUid, sessionSequence).Scan(&redeemTxs).Error
-	return redeemTxs, err
-}
-
-// GetRedeemTokenEventsByGroupAndSequence retrieves redeem token events from database by group UID and session sequence
-func (db *DatabaseAdapter) GetRedeemTokenEventsByGroupAndSequence(groupUid string, sessionSequence uint64) ([]*chains.EvmRedeemTx, error) {
-	var redeemTxs []*chains.EvmRedeemTx
-	query := `
-		SELECT * FROM evm_redeem_txes
-		WHERE custodian_group_uid = $1
-		AND session_sequence = $2
-		ORDER BY block_number ASC, log_index ASC
-	`
-	err := db.IndexerClient.Raw(query, groupUid, sessionSequence).Scan(&redeemTxs).Error
-	return redeemTxs, err
-}
-
 // VaultBlock operations
 func (db *DatabaseAdapter) GetLastProcessedVaultBlock() (uint64, error) {
 	var blockNumber uint64
@@ -97,8 +73,7 @@ func (db *DatabaseAdapter) GetVaultBlockByNumber(blockNumber uint64) (*relayer.V
 func (db *DatabaseAdapter) GetLastVaultBlock() (*relayer.VaultBlock, error) {
 	var vaultBlock relayer.VaultBlock
 	query := `
-		SELECT * FROM vault_blocks 
-		WHERE block_number = (SELECT COALESCE(MAX(block_number), 0) FROM vault_blocks)
+		SELECT * FROM vault_blocks ORDER BY block_number DESC LIMIT 1
 	`
 	err := db.RelayerClient.Raw(query).Scan(&vaultBlock).Error
 	if err != nil {
@@ -109,7 +84,22 @@ func (db *DatabaseAdapter) GetLastVaultBlock() (*relayer.VaultBlock, error) {
 	}
 	return &vaultBlock, nil
 }
+func (db *DatabaseAdapter) GetLastTokenSentBlock() (*relayer.TokenSentBlock, error) {
+	var tokenSentBlock relayer.TokenSentBlock
+	query := `
+		SELECT * FROM token_sent_blocks ORDER BY block_number DESC LIMIT 1
+	`
+	err := db.RelayerClient.Raw(query).Scan(&tokenSentBlock).Error
+	if err != nil {
+		return nil, err
+	}
+	if tokenSentBlock.ID == 0 {
+		return nil, nil
+	}
+	return &tokenSentBlock, nil
+}
 
+// Find if there is any un processed vault transaction in the last processing block
 // This is expensive query, should be used only when there is no vault block processed
 func (db *DatabaseAdapter) FindLatestUnprocessedVaultTransactions() ([]*chains.VaultTransaction, error) {
 	var vaultTxs []*chains.VaultTransaction
@@ -196,22 +186,21 @@ func (db *DatabaseAdapter) GetVaultTransactionsByBlock(blockNumber uint64) ([]*c
 	return vaultTxs, err
 }
 
-func (db *DatabaseAdapter) GetLastTokenSentBlock() (*relayer.TokenSentBlock, error) {
-	var tokenSentBlock relayer.TokenSentBlock
+func (db *DatabaseAdapter) FindLastExecutedCommands(chainId string) ([]*chains.CommandExecuted, error) {
+	var commandExecuteds []*chains.CommandExecuted
 	query := `
-		SELECT * FROM token_sent_blocks 
-		WHERE block_number = (SELECT COALESCE(MAX(block_number), 0) FROM token_sent_blocks)
+		SELECT * FROM command_executeds 
+		WHERE source_chain = $1
+		AND block_number = (SELECT COALESCE(MAX(block_number), 0) FROM command_executeds where source_chain = $1)
 	`
-	err := db.RelayerClient.Raw(query).Scan(&tokenSentBlock).Error
+	err := db.IndexerClient.Raw(query, chainId).Scan(&commandExecuteds).Error
 	if err != nil {
 		return nil, err
 	}
-	if tokenSentBlock.ID == 0 {
-		return nil, nil
-	}
-	return &tokenSentBlock, nil
+	return commandExecuteds, nil
 }
 
+// Find if there is any un processed token sent transaction in the last processing block
 func (db *DatabaseAdapter) FindLatestUnprocessedTokenSents() ([]*chains.TokenSent, error) {
 	var tokenSents []*chains.TokenSent
 	var maxBlockNumber uint64
@@ -271,7 +260,7 @@ func (db *DatabaseAdapter) GetNextTokenSents(lastProcessedBlock uint64) ([]*chai
 			FROM token_sents 
 			WHERE block_number > $1
 		)
-		ORDER BY tx_position ASC
+		ORDER BY ts.log_index ASC
 	`
 	err := db.IndexerClient.Raw(query, lastProcessedBlock).Scan(&tokenSents).Error
 	if err != nil {

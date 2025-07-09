@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/btc"
-	"github.com/scalarorg/relayers/pkg/clients/electrs"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
@@ -23,7 +22,6 @@ type Service struct {
 	EventBus     *events.EventBus
 	ScalarClient *scalar.Client
 	//CustodialClient *custodial.Client
-	Electrs    []*electrs.Client
 	EvmClients []*evm.EvmClient
 	BtcClient  []*btc.BtcClient
 }
@@ -89,9 +87,7 @@ func (s *Service) Start(ctx context.Context) error {
 			log.Error().Err(err).Msg("[ScalarClient] [SubscribeEventBus] Failed")
 		}
 	}
-	// Improvement recovery evm missing source events
-	// 2025, March 10
-	// Recover all swiched phase events from evm networks
+
 	groups, err := s.ScalarClient.GetCovenantGroups(ctx)
 	if err != nil {
 		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot get covenant groups")
@@ -121,17 +117,9 @@ func (s *Service) Start(ctx context.Context) error {
 	for _, client := range s.BtcClient {
 		go client.Start(ctx)
 	}
-	// Start electrum clients. This client can get all vault transactions from last checkpoint of begining if no checkpoint is found
-	// for _, client := range s.Electrs {
-	// 	go client.StartBlockchainHeaderSubscriptionWithReconnect(ctx)
-	// 	go client.Start(ctx)
-	// }
 
-	//Recover all events
-	//Todo: Get latest session of each group
 	for _, client := range s.EvmClients {
 		go func() {
-
 			client.Start(ctx)
 		}()
 	}
@@ -331,6 +319,9 @@ func (s *Service) replaySwitchPhaseEvents(mapSwitchPhaseEvents map[string][]*con
 	wg.Wait()
 	return expectedPhase.Load(), evmCounter.Load(), hasDifferentPhase.Load()
 }
+func (s *Service) Stop() {
+	log.Info().Msg("Relayer service stopped")
+}
 
 //	func (s *Service) replayRedeemTransactions(groupUid string, mapRedeemTokenEvents map[string][]*contracts.IScalarGatewayRedeemToken) (map[string][]string, error) {
 //		if s.ScalarClient == nil {
@@ -380,9 +371,3 @@ func (s *Service) replaySwitchPhaseEvents(mapSwitchPhaseEvents map[string][]*con
 //		})
 //		return result, nil
 //	}
-func (s *Service) Stop() {
-	log.Info().Msg("Relayer service stopped")
-	for _, client := range s.Electrs {
-		go client.Electrs.Close()
-	}
-}

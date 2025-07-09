@@ -100,7 +100,7 @@ func (c *QueryClient) QueryBatchedCommands(ctx context.Context, destinationChain
 	}
 	resp, err := client.BatchedCommands(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("query batched commands with id %s: %w", batchedCommandId, err)
+		return nil, fmt.Errorf("query batched commands with id %s: %s", batchedCommandId, err.Error())
 	}
 	return resp, nil
 }

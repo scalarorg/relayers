@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/relayer"
 	"github.com/scalarorg/relayers/pkg/utils"
 	chainsExported "github.com/scalarorg/scalar-core/x/chains/exported"
 	"github.com/scalarorg/scalar-core/x/chains/types"
@@ -83,6 +84,12 @@ func (b *BlockEvents) Add(msgTypeName string, msg proto.Message) {
 	}
 }
 
+type ProcessCheckPoint struct {
+	LastTokenSentBlock    *relayer.TokenSentBlock
+	LastContractCallBlock *relayer.ContractCallBlock
+	LastRedeemBlock       *relayer.RedeemBlock
+	LastVaultBlock        *relayer.VaultBlock
+}
 type EventHandlerCallBack[T any] func(events []IBCEvent[T])
 type ListenerEvent[T any] struct {
 	TopicId string
