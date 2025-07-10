@@ -1,4 +1,4 @@
-package scalar
+package evm
 
 import (
 	"context"
@@ -8,11 +8,13 @@ import (
 	"github.com/rs/zerolog/log"
 	chains "github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/relayer"
+	"github.com/scalarorg/relayers/pkg/events"
+	pkgTypes "github.com/scalarorg/relayers/pkg/types"
 )
 
 // Constants are already defined in bridge.go
 
-func (c *Client) StartTransferProcessing(ctx context.Context) {
+func (c *EvmClient) StartTransferProcessing(ctx context.Context) {
 	log.Info().Msg("[ScalarClient] Starting transfer processing")
 
 	ticker := time.NewTicker(c.pollInterval)
@@ -30,48 +32,48 @@ func (c *Client) StartTransferProcessing(ctx context.Context) {
 		}
 	}
 }
-func (c *Client) getLastTokenSentBlock() (*relayer.TokenSentBlock, error) {
+func (c *EvmClient) getLastTokenSentBlock() (*relayer.TokenSentBlock, error) {
 	tokenSentBlock, err := c.dbAdapter.GetLastTokenSentBlock()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get next uncompleted token sent block: %w", err)
 	}
 	if tokenSentBlock == nil {
 		log.Debug().Msg("[ScalarClient] No token sent blocks processed")
-		commandExecuteds, err := c.dbAdapter.FindLastExecutedCommands(c.networkConfig.GetId())
+		lastTokenSents, err := c.dbAdapter.FindLastExecutedTokenSentCommand(c.EvmConfig.GetId())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get uncompleted token sents for block %d: %w", 0, err)
 		}
-		if len(commandExecuteds) > 0 {
+		if len(lastTokenSents) > 0 {
 			tokenSentBlock = &relayer.TokenSentBlock{
-				BlockNumber:      commandExecuteds[0].BlockNumber,
-				Chain:            c.networkConfig.GetId(),
+				BlockNumber:      lastTokenSents[0].BlockNumber,
+				Chain:            c.EvmConfig.GetId(),
 				Status:           string(relayer.BlockStatusProcessing),
-				TransactionCount: len(commandExecuteds),
-				ProcessedTxCount: len(commandExecuteds),
+				TransactionCount: len(lastTokenSents),
+				ProcessedTxCount: len(lastTokenSents),
 			}
 			err = c.dbAdapter.CreateTokenSentBlock(tokenSentBlock)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create token sent block: %w", err)
 			}
-			log.Info().Int("tokenSentsCount", len(commandExecuteds)).
+			log.Info().Int("tokenSentsCount", len(lastTokenSents)).
 				Msg("[ScalarClient] create token new sent block")
 			return tokenSentBlock, nil
 		}
 	}
 	return tokenSentBlock, nil
 }
-func (c *Client) processNextTokenSent() error {
+func (c *EvmClient) processNextTokenSent() error {
 	// If we don't have a current processing block, get the next uncompleted one
 	var tokenSents []*chains.TokenSent
 	var err error
 	//1. Find out the last processing token sent block
-	if c.processCheckPoint.LastTokenSentBlock == nil {
-		c.processCheckPoint.LastTokenSentBlock, err = c.getLastTokenSentBlock()
+	if c.lastTokenSentBlock == nil {
+		c.lastTokenSentBlock, err = c.getLastTokenSentBlock()
 		if err != nil {
 			return fmt.Errorf("failed to get last token sent block: %w", err)
 		}
 	}
-	if c.processCheckPoint.LastTokenSentBlock == nil {
+	if c.lastTokenSentBlock == nil {
 		//No executed token sent command, get the new token sents
 		tokenSents, err = c.dbAdapter.GetNextTokenSents(0)
 		if err != nil {
@@ -79,25 +81,25 @@ func (c *Client) processNextTokenSent() error {
 		}
 	} else {
 		// Get uncompleted token sents for this block (not in command_executed)
-		tokenSents, err = c.dbAdapter.GetUnprocessedTokenSentsByBlock(c.processCheckPoint.LastTokenSentBlock.BlockNumber)
+		tokenSents, err = c.dbAdapter.GetUnprocessedTokenSentsByBlock(c.lastTokenSentBlock.BlockNumber)
 		if err != nil {
-			return fmt.Errorf("failed to get uncompleted token sents for block %d: %w", c.processCheckPoint.LastTokenSentBlock.BlockNumber, err)
+			return fmt.Errorf("failed to get uncompleted token sents for block %d: %w", c.lastTokenSentBlock.BlockNumber, err)
 		}
 		if len(tokenSents) == 0 {
-			log.Info().Uint64("blockNumber", c.processCheckPoint.LastTokenSentBlock.BlockNumber).
-				Str("status", c.processCheckPoint.LastTokenSentBlock.Status).
+			log.Info().Uint64("blockNumber", c.lastTokenSentBlock.BlockNumber).
+				Str("status", c.lastTokenSentBlock.Status).
 				Msg("[ScalarClient] Starting to process token sent block")
-			tokenSents, err = c.dbAdapter.GetNextTokenSents(c.processCheckPoint.LastTokenSentBlock.BlockNumber)
+			tokenSents, err = c.dbAdapter.GetNextTokenSents(c.lastTokenSentBlock.BlockNumber)
 			if err != nil {
-				return fmt.Errorf("failed to get token sents for block %d: %w", c.processCheckPoint.LastTokenSentBlock.BlockNumber, err)
+				return fmt.Errorf("failed to get token sents for block %d: %w", c.lastTokenSentBlock.BlockNumber, err)
 			}
 		}
 
 	}
 
 	if len(tokenSents) == 0 {
-		if c.processCheckPoint.LastTokenSentBlock != nil {
-			log.Info().Uint64("blockNumber", c.processCheckPoint.LastTokenSentBlock.BlockNumber).
+		if c.lastTokenSentBlock != nil {
+			log.Info().Uint64("blockNumber", c.lastTokenSentBlock.BlockNumber).
 				Msg("[ScalarClient] No more token sents to process, waiting for next token sent block")
 
 			return nil
@@ -107,22 +109,22 @@ func (c *Client) processNextTokenSent() error {
 		}
 	}
 
-	c.processCheckPoint.LastTokenSentBlock = &relayer.TokenSentBlock{
+	c.lastTokenSentBlock = &relayer.TokenSentBlock{
 		BlockNumber:      tokenSents[0].BlockNumber,
 		Chain:            tokenSents[0].SourceChain,
 		Status:           string(relayer.BlockStatusProcessing),
 		TransactionCount: len(tokenSents),
 		ProcessedTxCount: 0,
 	}
-	c.dbAdapter.CreateTokenSentBlock(c.processCheckPoint.LastTokenSentBlock)
+	c.dbAdapter.CreateTokenSentBlock(c.lastTokenSentBlock)
 
-	err = c.confirmTokenSents(c.processCheckPoint.LastTokenSentBlock, tokenSents)
+	err = c.confirmTokenSents(c.lastTokenSentBlock, tokenSents)
 	if err != nil {
 		log.Error().Err(err).Msg("[ScalarClient] Failed to confirm token sents")
 		return err
 	}
 
-	log.Info().Uint64("blockNumber", c.processCheckPoint.LastTokenSentBlock.BlockNumber).
+	log.Info().Uint64("blockNumber", c.lastTokenSentBlock.BlockNumber).
 		Int("uncompletedTxs", len(tokenSents)).
 		Msg("[ScalarClient] Processing uncompleted token sents in token sent block")
 
@@ -187,7 +189,7 @@ func (c *Client) processNextTokenSent() error {
 // }
 
 // CreateTokenSentBlockFromTransactions creates a TokenSentBlock record from token sent transactions
-func (c *Client) CreateTokenSentBlockFromTransactions(blockNumber uint64, blockHash string, chain string, tokenSents []*chains.TokenSent) error {
+func (c *EvmClient) CreateTokenSentBlockFromTransactions(blockNumber uint64, blockHash string, chain string, tokenSents []*chains.TokenSent) error {
 	tokenSentBlock := &relayer.TokenSentBlock{
 		BlockNumber:      blockNumber,
 		BlockHash:        blockHash,
@@ -210,25 +212,33 @@ func (c *Client) CreateTokenSentBlockFromTransactions(blockNumber uint64, blockH
 }
 
 // processTokenSent processes a single token sent transaction
-func (c *Client) confirmTokenSents(tokenSentBlock *relayer.TokenSentBlock, tokenSents []*chains.TokenSent) error {
+func (c *EvmClient) confirmTokenSents(tokenSentBlock *relayer.TokenSentBlock, tokenSents []*chains.TokenSent) error {
 	// Form ConfirmSourceTxsRequestV2 for single transaction
-	chunks := make([][]string, 0)
-	for i := 0; i < len(tokenSents); i += CONFIRM_BATCH_SIZE {
-		end := i + CONFIRM_BATCH_SIZE
+	chunks := make([]map[string]string, 0)
+	for i := 0; i < len(tokenSents); i += pkgTypes.CONFIRM_BATCH_SIZE {
+		end := i + pkgTypes.CONFIRM_BATCH_SIZE
 		if end > len(tokenSents) {
 			end = len(tokenSents)
 		}
-		chunk := make([]string, 0)
+		chunk := make(map[string]string, 0)
 		for _, tokenSent := range tokenSents[i:end] {
-			chunk = append(chunk, tokenSent.TxHash)
+			chunk[tokenSent.TxHash] = tokenSent.DestinationChain
 		}
 		chunks = append(chunks, chunk)
 	}
 	for _, chunk := range chunks {
-		err := c.broadcaster.ConfirmEvmTxs(tokenSentBlock.Chain, chunk)
-		if err != nil {
-			return fmt.Errorf("failed to confirm token sent transactions: %w", err)
-		}
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_EVM_TOKEN_SENT,
+			DestinationChain: events.SCALAR_NETWORK_NAME,
+			Data: events.ConfirmTxsRequest{
+				ChainName: tokenSentBlock.Chain,
+				TxHashs:   chunk,
+			},
+		})
+		// err := c.broadcaster.ConfirmEvmTxs(tokenSentBlock.Chain, chunk)
+		// if err != nil {
+		// 	return fmt.Errorf("failed to confirm token sent transactions: %w", err)
+		// }
 	}
 
 	log.Debug().Uint64("blockNumber", tokenSentBlock.BlockNumber).

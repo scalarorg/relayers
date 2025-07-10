@@ -84,6 +84,22 @@ func (db *DatabaseAdapter) GetLastVaultBlock() (*relayer.VaultBlock, error) {
 	}
 	return &vaultBlock, nil
 }
+func (db *DatabaseAdapter) FindLastVaultBlockByChain(sourceChain string) ([]*chains.VaultTransaction, error) {
+	var vaultTxs []*chains.VaultTransaction
+	query := `
+		SELECT vt.* FROM vault_transactions vt 
+		WHERE source_chain = $1 AND block_number = (
+			SELECT max(block_number) FROM vault_transactions vt join command_executeds ce 
+			on vt.tx_hash = ce.command_id and 'evm|'||vt.destination_chain = ce.source_chain
+			WHERE source_chain = $1 AND vt.vault_tx_type = 1
+		)
+	`
+	err := db.IndexerClient.Raw(query, sourceChain).Scan(&vaultTxs).Error
+	if err != nil {
+		return nil, err
+	}
+	return vaultTxs, nil
+}
 func (db *DatabaseAdapter) GetLastTokenSentBlock() (*relayer.TokenSentBlock, error) {
 	var tokenSentBlock relayer.TokenSentBlock
 	query := `
@@ -97,6 +113,25 @@ func (db *DatabaseAdapter) GetLastTokenSentBlock() (*relayer.TokenSentBlock, err
 		return nil, nil
 	}
 	return &tokenSentBlock, nil
+}
+
+func (db *DatabaseAdapter) FindLastExecutedTokenSentCommand(sourceChain string) ([]*chains.TokenSent, error) {
+	var tokenSents []*chains.TokenSent
+	query := `
+		SELECT ts.* FROM token_sents ts
+		WHERE ts.source_chain = $1 
+		AND ts.block_number =
+		(
+			SELECT max(ts.block_number) 
+			FROM token_sents ts join command_executeds ce on ts.tx_hash = ce.command_id
+			WHERE ts.source_chain = $1
+		)
+	`
+	err := db.IndexerClient.Raw(query, sourceChain).Scan(&tokenSents).Error
+	if err != nil {
+		return nil, err
+	}
+	return tokenSents, nil
 }
 
 // Find if there is any un processed vault transaction in the last processing block
@@ -186,19 +221,18 @@ func (db *DatabaseAdapter) GetVaultTransactionsByBlock(blockNumber uint64) ([]*c
 	return vaultTxs, err
 }
 
-func (db *DatabaseAdapter) FindLastExecutedCommands(chainId string) ([]*chains.CommandExecuted, error) {
-	var commandExecuteds []*chains.CommandExecuted
-	query := `
-		SELECT * FROM command_executeds 
-		WHERE source_chain = $1
-		AND block_number = (SELECT COALESCE(MAX(block_number), 0) FROM command_executeds where source_chain = $1)
-	`
-	err := db.IndexerClient.Raw(query, chainId).Scan(&commandExecuteds).Error
-	if err != nil {
-		return nil, err
-	}
-	return commandExecuteds, nil
-}
+// func (db *DatabaseAdapter) FindLastExecutedCommands(sourceChain string) ([]*chains.CommandExecuted, error) {
+// 	var commandExecuteds []*chains.CommandExecuted
+// 	query := `
+// 		SELECT * FROM command_executeds WHERE source_chain = $1
+// 		AND block_number = (SELECT COALESCE(MAX(block_number), 0) FROM command_executeds WHERE source_chain = $1)
+// 	`
+// 	err := db.IndexerClient.Raw(query, sourceChain).Scan(&commandExecuteds).Error
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return commandExecuteds, nil
+// }
 
 // Find if there is any un processed token sent transaction in the last processing block
 func (db *DatabaseAdapter) FindLatestUnprocessedTokenSents() ([]*chains.TokenSent, error) {

@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog/log"
 	chains "github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/relayer"
 	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/config"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
@@ -40,7 +41,10 @@ type EvmClient struct {
 	MissingLogs       MissingLogs
 	ChnlReceivedBlock chan uint64
 	// pendingTxs     pending.PendingTxs //Transactions sent to Gateway for approval, waiting for event from EVM chain.
-	retryInterval time.Duration
+	retryInterval         time.Duration
+	lastTokenSentBlock    *relayer.TokenSentBlock
+	lastContractCallBlock *relayer.ContractCallBlock
+	pollInterval          time.Duration
 }
 
 // This function is used to adjust the rpc url to the ws prefix
@@ -107,6 +111,10 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		//auth is only used for sending transaction
 		panic(fmt.Errorf("[EvmClient] [NewEvmClient] failed to create auth for network %s: %w", evmConfig.Name, err))
 	}
+	pollInterval := time.Second * time.Duration(evmConfig.PollInterval)
+	if pollInterval == 0 {
+		pollInterval = time.Second * 12
+	}
 	evmClient := &EvmClient{
 		globalConfig:   globalConfig,
 		EvmConfig:      evmConfig,
@@ -123,6 +131,7 @@ func NewEvmClient(globalConfig *config.Config, evmConfig *EvmNetworkConfig, dbAd
 		},
 		ChnlReceivedBlock: make(chan uint64),
 		retryInterval:     RETRY_INTERVAL,
+		pollInterval:      pollInterval,
 	}
 
 	return evmClient, nil
@@ -198,6 +207,15 @@ func (c *EvmClient) SetAuth(auth *bind.TransactOpts) {
 }
 
 func (c *EvmClient) Start(ctx context.Context) error {
+	go func() {
+		c.StartTransferProcessing(ctx)
+	}()
+	go func() {
+		c.StartPoolRedeemProcessing(ctx)
+	}()
+	go func() {
+		c.StartUpcRedeemProcessing(ctx)
+	}()
 	//c.startFetchBlock()
 	//Subscribe to the event bus
 	c.subscribeEventBus()

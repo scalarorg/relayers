@@ -17,20 +17,21 @@ const (
 )
 
 type BtcNetworkConfig struct {
-	Network    string  `mapstructure:"network"`
-	ID         string  `mapstructure:"id"`
-	ChainID    uint64  `mapstructure:"chain_id"`
-	Name       string  `mapstructure:"name"`
-	Type       string  `mapstructure:"type"`
-	Host       string  `mapstructure:"host"`
-	Port       int     `mapstructure:"port"`
-	User       string  `mapstructure:"user"`
-	Password   string  `mapstructure:"password"`
-	SSL        *bool   `mapstructure:"ssl,omitempty"`
-	MempoolUrl string  `mapstructure:"mempool_url,omitempty"`
-	PrivateKey string  `mapstructure:"private_key,omitempty"`
-	Address    *string `mapstructure:"address,omitempty"` //Taproot address. Todo: set it as parameter from scalar note
-	MaxFeeRate float64 `mapstructure:"max_fee_rate,omitempty"`
+	Network      string  `mapstructure:"network"`
+	ID           string  `mapstructure:"id"`
+	ChainID      uint64  `mapstructure:"chain_id"`
+	Name         string  `mapstructure:"name"`
+	Type         string  `mapstructure:"type"`
+	Host         string  `mapstructure:"host"`
+	Port         int     `mapstructure:"port"`
+	User         string  `mapstructure:"user"`
+	Password     string  `mapstructure:"password"`
+	SSL          *bool   `mapstructure:"ssl,omitempty"`
+	MempoolUrl   string  `mapstructure:"mempool_url,omitempty"`
+	PrivateKey   string  `mapstructure:"private_key,omitempty"`
+	Address      *string `mapstructure:"address,omitempty"` //Taproot address. Todo: set it as parameter from scalar note
+	MaxFeeRate   float64 `mapstructure:"max_fee_rate,omitempty"`
+	PollInterval int     `mapstructure:"poll_interval,omitempty"` //In seconds
 }
 
 func (c *BtcNetworkConfig) GetChainId() uint64 {

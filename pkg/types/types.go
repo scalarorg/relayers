@@ -15,6 +15,11 @@ import (
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
+const (
+	CONFIRM_BATCH_SIZE = 50
+	HASH_LENGTH        = 32
+)
+
 type BlockTime struct {
 	ResultBlock ctypes.ResultBlock
 	QueryTime   time.Time
