@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/events"
+	chainsTypes "github.com/scalarorg/scalar-core/x/chains/types"
 )
 
 func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
@@ -18,6 +19,10 @@ func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 		events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN,
 		events.EVENT_EVM_REDEEM_TOKEN:
 		return c.requestConfirmEvmTxs(event.Data.(events.ConfirmTxsRequest))
+	case events.EVENT_BTC_VAULT_BLOCK:
+		return c.requestConfirmBtcVaultBlock(event.Data.(*chainsTypes.ConfirmSourceTxsRequestV2))
+	case events.EVENT_BTC_REDEEM_TRANSACTION:
+		return c.broadcastRedeemTxsConfirm(event.Data.(*events.BtcRedeemTxEvents))
 	case events.EVENT_EVM_TOKEN_DEPLOYED:
 		return c.requestConfirmTokenDeployed(event.Data.(*chains.TokenDeployed))
 	case events.EVENT_EVM_SWITCHED_PHASE:
@@ -126,5 +131,13 @@ func (c *Client) requestConfirmSwitchedPhase(switchedPhase *chains.SwitchedPhase
 		Uint8("To", switchedPhase.To).
 		Msgf("[ScalarClient] [requestConfirmSwitchedPhase] Confirm switched phase")
 	c.broadcaster.ConfirmSwitchedPhase(switchedPhase)
+	return nil
+}
+
+func (c *Client) requestConfirmBtcVaultBlock(confirmRequest *chainsTypes.ConfirmSourceTxsRequestV2) error {
+	log.Debug().
+		Str("Chain", string(confirmRequest.Chain)).
+		Msgf("[ScalarClient] [requestConfirmBtcVaultBlock] Confirm btc vault block")
+	c.broadcaster.ConfirmBtcVaultBlock(confirmRequest)
 	return nil
 }

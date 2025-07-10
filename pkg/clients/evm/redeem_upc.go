@@ -1,4 +1,4 @@
-package scalar
+package evm
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/events"
 )
 
-func (c *Client) StartUpcRedeemProcessing(ctx context.Context) {
+func (c *EvmClient) StartUpcRedeemProcessing(ctx context.Context) {
 	log.Info().Msg("[ScalarClient] Starting redeem upc processing")
 	ticker := time.NewTicker(c.pollInterval)
 	defer ticker.Stop()
@@ -28,16 +28,16 @@ func (c *Client) StartUpcRedeemProcessing(ctx context.Context) {
 	}
 }
 
-func (c *Client) processNextUpcRedeemTx() error {
+func (c *EvmClient) processNextUpcRedeemTx() error {
 	var err error
-	if c.processCheckPoint.LastContractCallBlock == nil {
-		c.processCheckPoint.LastContractCallBlock, err = c.getLastContractCallBlock()
+	if c.lastContractCallBlock == nil {
+		c.lastContractCallBlock, err = c.getLastContractCallBlock()
 		if err != nil {
 			return fmt.Errorf("failed to get last token sent block: %w", err)
 		}
 	}
 	var contractCallTxs []*chains.ContractCallWithToken
-	if c.processCheckPoint.LastContractCallBlock == nil {
+	if c.lastContractCallBlock == nil {
 		//No executed contract call command, get the new contract call txs
 		contractCallTxs, err = c.dbAdapter.GetNextContractCallWithTokens(0)
 		if err != nil {
@@ -45,17 +45,17 @@ func (c *Client) processNextUpcRedeemTx() error {
 		}
 	} else {
 		// Get uncompleted contract call txs for this block (not in command_executed)
-		contractCallTxs, err = c.dbAdapter.GetUnprocessedContractCallTxsByBlock(c.processCheckPoint.LastContractCallBlock.BlockNumber)
+		contractCallTxs, err = c.dbAdapter.GetUnprocessedContractCallTxsByBlock(c.lastContractCallBlock.BlockNumber)
 		if err != nil {
-			return fmt.Errorf("failed to get uncompleted contract call txs for block %d: %w", c.processCheckPoint.LastContractCallBlock.BlockNumber, err)
+			return fmt.Errorf("failed to get uncompleted contract call txs for block %d: %w", c.lastContractCallBlock.BlockNumber, err)
 		}
 		if len(contractCallTxs) == 0 {
-			log.Info().Uint64("blockNumber", c.processCheckPoint.LastContractCallBlock.BlockNumber).
-				Str("status", c.processCheckPoint.LastContractCallBlock.Status).
+			log.Info().Uint64("blockNumber", c.lastContractCallBlock.BlockNumber).
+				Str("status", c.lastContractCallBlock.Status).
 				Msg("[ScalarClient] Starting to process contract call block")
-			contractCallTxs, err = c.dbAdapter.GetNextContractCallWithTokens(c.processCheckPoint.LastContractCallBlock.BlockNumber)
+			contractCallTxs, err = c.dbAdapter.GetNextContractCallWithTokens(c.lastContractCallBlock.BlockNumber)
 			if err != nil {
-				return fmt.Errorf("failed to get contract call txs for block %d: %w", c.processCheckPoint.LastContractCallBlock.BlockNumber, err)
+				return fmt.Errorf("failed to get contract call txs for block %d: %w", c.lastContractCallBlock.BlockNumber, err)
 			}
 		}
 	}
@@ -65,41 +65,36 @@ func (c *Client) processNextUpcRedeemTx() error {
 
 	} else {
 		mapChainContractCallWithTokens := c.groupContractCallWithTokens(contractCallTxs)
-		var overallErr error
 		for chain, contractCallWithTokens := range mapChainContractCallWithTokens {
 			txHashes := make(map[string]string)
 			for _, tx := range contractCallWithTokens {
 				txHashes[tx.TxHash] = tx.DestinationChain
 			}
-			err := c.requestConfirmEvmTxs(events.ConfirmTxsRequest{
-				ChainName: chain,
-				TxHashs:   txHashes,
+			c.eventBus.BroadcastEvent(&events.EventEnvelope{
+				EventType:        events.EVENT_EVM_CONTRACT_CALL,
+				DestinationChain: events.SCALAR_NETWORK_NAME,
+				Data: events.ConfirmTxsRequest{
+					ChainName: chain,
+					TxHashs:   txHashes,
+				},
 			})
-			if err != nil {
-				log.Error().Err(err).Msgf("[ScalarClient] [processNextPoolRedeemTx] failed to request confirm evm txs")
-				overallErr = err
-			}
 		}
-		if overallErr != nil {
-			log.Error().Err(overallErr).Msgf("[ScalarClient] [processNextUpcRedeemTx] failed to request confirm evm txs")
-			return overallErr
-		}
-		c.processCheckPoint.LastContractCallBlock = &relayer.ContractCallBlock{
+		c.lastContractCallBlock = &relayer.ContractCallBlock{
 			BlockNumber:      contractCallTxs[0].BlockNumber,
 			Chain:            contractCallTxs[0].SourceChain,
 			Status:           string(relayer.BlockStatusProcessing),
 			TransactionCount: len(contractCallTxs),
 			ProcessedTxCount: 0,
 		}
-		c.dbAdapter.CreateContractCallBlock(c.processCheckPoint.LastContractCallBlock)
-		log.Info().Uint64("blockNumber", c.processCheckPoint.LastContractCallBlock.BlockNumber).
+		c.dbAdapter.CreateContractCallBlock(c.lastContractCallBlock)
+		log.Info().Uint64("blockNumber", c.lastContractCallBlock.BlockNumber).
 			Int("uncompletedTxs", len(contractCallTxs)).
 			Msg("[ScalarClient] Processing uncompleted contract call with token txs in contract call block")
 	}
 	return nil
 }
 
-func (c *Client) getLastContractCallBlock() (*relayer.ContractCallBlock, error) {
+func (c *EvmClient) getLastContractCallBlock() (*relayer.ContractCallBlock, error) {
 	contractCallBlock, err := c.dbAdapter.GetLastContractCallBlock()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get last contract call block: %w", err)
@@ -107,7 +102,7 @@ func (c *Client) getLastContractCallBlock() (*relayer.ContractCallBlock, error) 
 	return contractCallBlock, nil
 }
 
-func (c *Client) groupContractCallWithTokens(contractCallWithTokens []*chains.ContractCallWithToken) map[string][]*chains.ContractCallWithToken {
+func (c *EvmClient) groupContractCallWithTokens(contractCallWithTokens []*chains.ContractCallWithToken) map[string][]*chains.ContractCallWithToken {
 	mapChainContractCallWithTokens := make(map[string][]*chains.ContractCallWithToken)
 	for _, tx := range contractCallWithTokens {
 		mapChainContractCallWithTokens[tx.SourceChain] = append(mapChainContractCallWithTokens[tx.SourceChain], tx)

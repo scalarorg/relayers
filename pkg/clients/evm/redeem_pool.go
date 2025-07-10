@@ -1,4 +1,4 @@
-package scalar
+package evm
 
 import (
 	"context"
@@ -11,11 +11,11 @@ import (
 	chainExported "github.com/scalarorg/scalar-core/x/chains/exported"
 )
 
-func (c *Client) StartPoolRedeemProcessing(ctx context.Context) {
+func (c *EvmClient) StartPoolRedeemProcessing(ctx context.Context) {
 	log.Info().Msg("[ScalarClient] Starting redeem pool processing")
 	ticker := time.NewTicker(c.pollInterval)
 	defer ticker.Stop()
-	groups, err := c.GetCovenantGroups(ctx)
+	groups, err := c.ScalarClient.GetCovenantGroups(ctx)
 	if err != nil {
 		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot get covenant groups")
 		panic(err)
@@ -38,7 +38,7 @@ func (c *Client) StartPoolRedeemProcessing(ctx context.Context) {
 	}
 }
 
-func (c *Client) processNextPoolRedeemTx(groupUid chainExported.Hash) error {
+func (c *EvmClient) processNextPoolRedeemTx(groupUid chainExported.Hash) error {
 	groupUidStr := groupUid.String()
 	evmRedeemTxs, err := c.dbAdapter.FindPoolRedeemTxsInLastSession(groupUidStr)
 	if err != nil {
@@ -71,19 +71,19 @@ func (c *Client) processNextPoolRedeemTx(groupUid chainExported.Hash) error {
 		for _, tx := range redeemTxs {
 			txHashes[tx.TxHash] = tx.DestinationChain
 		}
-		err := c.requestConfirmEvmTxs(events.ConfirmTxsRequest{
-			ChainName: chain,
-			TxHashs:   txHashes,
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_EVM_REDEEM_TOKEN,
+			DestinationChain: events.SCALAR_NETWORK_NAME,
+			Data: events.ConfirmTxsRequest{
+				ChainName: chain,
+				TxHashs:   txHashes,
+			},
 		})
-		if err != nil {
-			log.Error().Err(err).Msgf("[ScalarClient] [processNextPoolRedeemTx] failed to request confirm evm txs")
-			continue
-		}
 	}
 	return nil
 }
 
-func (c *Client) groupEvmRedeemTxs(evmRedeemTxs []*chains.EvmRedeemTx) map[string][]*chains.EvmRedeemTx {
+func (c *EvmClient) groupEvmRedeemTxs(evmRedeemTxs []*chains.EvmRedeemTx) map[string][]*chains.EvmRedeemTx {
 	mapChainRedeemTxs := make(map[string][]*chains.EvmRedeemTx)
 	for _, tx := range evmRedeemTxs {
 		mapChainRedeemTxs[tx.SourceChain] = append(mapChainRedeemTxs[tx.SourceChain], tx)

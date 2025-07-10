@@ -40,6 +40,7 @@ type EvmNetworkConfig struct {
 	RecoverRange uint64 `mapstructure:"recover_range"` //Max block range to recover events in single query
 	RetryDelay   time.Duration
 	TxTimeout    time.Duration `mapstructure:"tx_timeout"` //Timeout for send txs (~3s)
+	PollInterval int           `mapstructure:"poll_interval"`
 }
 
 func (c *EvmNetworkConfig) GetChainId() uint64 {

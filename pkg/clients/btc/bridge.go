@@ -1,4 +1,4 @@
-package scalar
+package btc
 
 import (
 	"context"
@@ -6,20 +6,18 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	chains "github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/relayer"
+	"github.com/scalarorg/relayers/pkg/events"
+	pkgTypes "github.com/scalarorg/relayers/pkg/types"
 	chainsExported "github.com/scalarorg/scalar-core/x/chains/exported"
 	chainsTypes "github.com/scalarorg/scalar-core/x/chains/types"
 	nexus "github.com/scalarorg/scalar-core/x/nexus/exported"
 )
 
-const (
-	CONFIRM_BATCH_SIZE = 50
-	HASH_LENGTH        = 32
-)
-
-func (c *Client) StartBridgeProcessing(ctx context.Context) {
+func (c *BtcClient) StartBridgeProcessing(ctx context.Context) {
 	log.Info().Msg("[ScalarClient] Starting bridge processing")
 
 	ticker := time.NewTicker(c.pollInterval)
@@ -37,30 +35,30 @@ func (c *Client) StartBridgeProcessing(ctx context.Context) {
 		}
 	}
 }
-func (c *Client) getLastVaultBlock() (*relayer.VaultBlock, error) {
+func (c *BtcClient) getLastVaultBlock() (*relayer.VaultBlock, error) {
 	vaultBlock, err := c.dbAdapter.GetLastVaultBlock()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get last vault block: %w", err)
 	}
 	if vaultBlock == nil {
 		log.Debug().Msg("[ScalarClient] No vault blocks processed")
-		commandExecuteds, err := c.dbAdapter.FindLastExecutedCommands(c.networkConfig.GetId())
+		vaultTxs, err := c.dbAdapter.FindLastVaultBlockByChain(c.btcConfig.GetId())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get uncompleted vault transactions for block %d: %w", 0, err)
 		}
-		if len(commandExecuteds) > 0 {
+		if len(vaultTxs) > 0 {
 			vaultBlock = &relayer.VaultBlock{
-				BlockNumber:      commandExecuteds[0].BlockNumber,
-				Chain:            c.networkConfig.GetId(),
+				BlockNumber:      vaultTxs[0].BlockNumber,
+				Chain:            c.btcConfig.GetId(),
 				Status:           string(relayer.BlockStatusProcessing),
-				TransactionCount: len(commandExecuteds),
-				ProcessedTxCount: len(commandExecuteds),
+				TransactionCount: len(vaultTxs),
+				ProcessedTxCount: len(vaultTxs),
 			}
 			err = c.dbAdapter.CreateVaultBlock(vaultBlock)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create vault block: %w", err)
 			}
-			log.Info().Int("vaultTxsCount", len(commandExecuteds)).
+			log.Info().Int("vaultTxsCount", len(vaultTxs)).
 				Msg("[ScalarClient] create vault new block")
 			return vaultBlock, nil
 		}
@@ -68,17 +66,17 @@ func (c *Client) getLastVaultBlock() (*relayer.VaultBlock, error) {
 	return vaultBlock, nil
 }
 
-func (c *Client) processNextVaultBlock() error {
+func (c *BtcClient) processNextVaultBlock() error {
 	// If we don't have a current processing block, get the next uncompleted one
 	var vaultTxs []*chains.VaultTransaction
 	var err error
-	if c.processCheckPoint.LastVaultBlock == nil {
-		c.processCheckPoint.LastVaultBlock, err = c.getLastVaultBlock()
+	if c.lastVaultBlock == nil {
+		c.lastVaultBlock, err = c.getLastVaultBlock()
 		if err != nil {
 			return fmt.Errorf("failed to get next uncompleted vault block: %w", err)
 		}
 	}
-	if c.processCheckPoint.LastVaultBlock == nil {
+	if c.lastVaultBlock == nil {
 		//No executed vault tx command, get the new vault txs
 		vaultTxs, err = c.dbAdapter.GetNextVaultTransactions(0)
 		if err != nil {
@@ -86,24 +84,24 @@ func (c *Client) processNextVaultBlock() error {
 		}
 	} else {
 		// Get uncompleted vault transactions for this block (not in command_executed)
-		vaultTxs, err = c.dbAdapter.GetUnprocessedVaultTransactionsByBlock(c.processCheckPoint.LastVaultBlock.BlockNumber)
+		vaultTxs, err = c.dbAdapter.GetUnprocessedVaultTransactionsByBlock(c.lastVaultBlock.BlockNumber)
 		if err != nil {
-			return fmt.Errorf("failed to get uncompleted vault transactions for block %d: %w", c.processCheckPoint.LastVaultBlock.BlockNumber, err)
+			return fmt.Errorf("failed to get uncompleted vault transactions for block %d: %w", c.lastVaultBlock.BlockNumber, err)
 		}
 		if len(vaultTxs) == 0 {
-			log.Info().Uint64("blockNumber", c.processCheckPoint.LastVaultBlock.BlockNumber).
-				Str("status", c.processCheckPoint.LastVaultBlock.Status).
+			log.Info().Uint64("blockNumber", c.lastVaultBlock.BlockNumber).
+				Str("status", c.lastVaultBlock.Status).
 				Msg("[ScalarClient] new unfinished vault block to process. Get vault txs from next block")
-			vaultTxs, err = c.dbAdapter.GetNextVaultTransactions(c.processCheckPoint.LastVaultBlock.BlockNumber)
+			vaultTxs, err = c.dbAdapter.GetNextVaultTransactions(c.lastVaultBlock.BlockNumber)
 			if err != nil {
-				return fmt.Errorf("failed to get vault transactions for block %d: %w", c.processCheckPoint.LastVaultBlock.BlockNumber, err)
+				return fmt.Errorf("failed to get vault transactions for block %d: %w", c.lastVaultBlock.BlockNumber, err)
 			}
 		}
 	}
 
 	if len(vaultTxs) == 0 {
-		if c.processCheckPoint.LastVaultBlock != nil {
-			log.Info().Uint64("LastVaultBlockNumber", c.processCheckPoint.LastVaultBlock.BlockNumber).
+		if c.lastVaultBlock != nil {
+			log.Info().Uint64("LastVaultBlockNumber", c.lastVaultBlock.BlockNumber).
 				Msg("[ScalarClient] No more vault transactions to process, waiting for next vault block")
 
 			return nil
@@ -113,7 +111,7 @@ func (c *Client) processNextVaultBlock() error {
 		}
 	}
 
-	c.processCheckPoint.LastVaultBlock = &relayer.VaultBlock{
+	c.lastVaultBlock = &relayer.VaultBlock{
 		BlockNumber:      vaultTxs[0].BlockNumber,
 		BlockHash:        vaultTxs[0].BlockHash,
 		Chain:            vaultTxs[0].Chain,
@@ -122,22 +120,22 @@ func (c *Client) processNextVaultBlock() error {
 		ProcessedTxCount: 0,
 	}
 	//Store vault block to the relayerdb
-	c.dbAdapter.CreateVaultBlock(c.processCheckPoint.LastVaultBlock)
+	c.dbAdapter.CreateVaultBlock(c.lastVaultBlock)
 
-	err = c.confirmVaultTransactions(c.processCheckPoint.LastVaultBlock, vaultTxs)
+	err = c.confirmVaultTransactions(c.lastVaultBlock, vaultTxs)
 	if err != nil {
 		log.Error().Err(err).Msg("[ScalarClient] Failed to confirm vault transactions")
 		return err
 	}
 
-	log.Info().Uint64("blockNumber", c.processCheckPoint.LastVaultBlock.BlockNumber).
+	log.Info().Uint64("blockNumber", c.lastVaultBlock.BlockNumber).
 		Int("uncompletedTxs", len(vaultTxs)).
 		Msg("[ScalarClient] Processing uncompleted transactions in vault block")
 
 	return nil
 }
 
-func (c *Client) formConfirmSourceTxsRequestV2(vaultBlock *relayer.VaultBlock, vaultTxs []*chains.VaultTransaction) ([]*chainsTypes.ConfirmSourceTxsRequestV2, error) {
+func (c *BtcClient) formConfirmSourceTxsRequestV2(vaultBlock *relayer.VaultBlock, vaultTxs []*chains.VaultTransaction) ([]*chainsTypes.ConfirmSourceTxsRequestV2, error) {
 	confirmTxs := make([]*chainsTypes.ConfirmSourceTxsRequestV2, 0)
 	// Get block hash
 	blockHash, err := chainsExported.HashFromHex(vaultBlock.BlockHash)
@@ -164,8 +162,8 @@ func (c *Client) formConfirmSourceTxsRequestV2(vaultBlock *relayer.VaultBlock, v
 
 		// Convert merkle proof - MerkleProof is []byte, need to decode it
 		var merklePath []chainsExported.Hash
-		for i := 0; i+HASH_LENGTH <= len(vaultTx.MerkleProof); i += HASH_LENGTH {
-			merklePath = append(merklePath, chainsExported.Hash(vaultTx.MerkleProof[i:i+HASH_LENGTH]))
+		for i := 0; i+pkgTypes.HASH_LENGTH <= len(vaultTx.MerkleProof); i += pkgTypes.HASH_LENGTH {
+			merklePath = append(merklePath, chainsExported.Hash(vaultTx.MerkleProof[i:i+pkgTypes.HASH_LENGTH]))
 		}
 		stakerScriptPubkey, err := hex.DecodeString(vaultTx.StakerScriptPubkey)
 		if err != nil {
@@ -178,7 +176,7 @@ func (c *Client) formConfirmSourceTxsRequestV2(vaultBlock *relayer.VaultBlock, v
 			MerklePath:               merklePath,
 			PrevOutpointScriptPubkey: stakerScriptPubkey,
 		}
-		if len(lastConfirmTx.Batch.Txs) >= CONFIRM_BATCH_SIZE {
+		if len(lastConfirmTx.Batch.Txs) >= pkgTypes.CONFIRM_BATCH_SIZE {
 			confirmTxs = append(confirmTxs, lastConfirmTx)
 			lastConfirmTx = &chainsTypes.ConfirmSourceTxsRequestV2{
 				Chain: nexus.ChainName(vaultBlock.Chain),
@@ -239,7 +237,7 @@ func (c *Client) formConfirmSourceTxsRequestV2(vaultBlock *relayer.VaultBlock, v
 // }
 
 // CreateVaultBlockFromTransactions creates a VaultBlock record from vault transactions
-func (c *Client) CreateVaultBlockFromTransactions(blockNumber uint64, blockHash string, chain string, vaultTxs []*chains.VaultTransaction) error {
+func (c *BtcClient) CreateVaultBlockFromTransactions(blockNumber uint64, blockHash string, chain string, vaultTxs []*chains.VaultTransaction) error {
 	vaultBlock := &relayer.VaultBlock{
 		BlockNumber:      blockNumber,
 		BlockHash:        blockHash,
@@ -262,7 +260,7 @@ func (c *Client) CreateVaultBlockFromTransactions(blockNumber uint64, blockHash 
 }
 
 // processVaultTransaction processes a single vault transaction
-func (c *Client) confirmVaultTransactions(vaultBlock *relayer.VaultBlock, vaultTxs []*chains.VaultTransaction) error {
+func (c *BtcClient) confirmVaultTransactions(vaultBlock *relayer.VaultBlock, vaultTxs []*chains.VaultTransaction) error {
 	// Form ConfirmSourceTxsRequestV2 for single transaction
 	confirmRequests, err := c.formConfirmSourceTxsRequestV2(vaultBlock, vaultTxs)
 	if err != nil {
@@ -271,10 +269,16 @@ func (c *Client) confirmVaultTransactions(vaultBlock *relayer.VaultBlock, vaultT
 
 	// Send to broadcaster
 	for _, confirmRequest := range confirmRequests {
-		err = c.broadcaster.ConfirmBtcVaultBlock(confirmRequest)
-		if err != nil {
-			return fmt.Errorf("failed to send confirm request to broadcaster for block %d with hash %s: %w", vaultBlock.BlockNumber, vaultBlock.BlockHash, err)
-		}
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_BTC_VAULT_BLOCK,
+			DestinationChain: events.SCALAR_NETWORK_NAME,
+			MessageID:        uuid.New().String(),
+			Data:             confirmRequest,
+		})
+		// err = c.broadcaster.ConfirmBtcVaultBlock(confirmRequest)
+		// if err != nil {
+		// 	return fmt.Errorf("failed to send confirm request to broadcaster for block %d with hash %s: %w", vaultBlock.BlockNumber, vaultBlock.BlockHash, err)
+		// }
 	}
 	log.Debug().Uint64("blockNumber", vaultBlock.BlockNumber).
 		Int("txCount", len(vaultTxs)).

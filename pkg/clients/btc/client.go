@@ -6,12 +6,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/rs/zerolog/log"
+	"github.com/scalarorg/data-models/relayer"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
@@ -19,12 +21,15 @@ import (
 )
 
 type BtcClient struct {
-	globalConfig *config.Config
-	btcConfig    *BtcNetworkConfig
-	client       *rpcclient.Client
-	scalarClient *scalar.Client
-	dbAdapter    *db.DatabaseAdapter
-	eventBus     *events.EventBus
+	globalConfig    *config.Config
+	btcConfig       *BtcNetworkConfig
+	client          *rpcclient.Client
+	scalarClient    *scalar.Client
+	dbAdapter       *db.DatabaseAdapter
+	eventBus        *events.EventBus
+	pollInterval    time.Duration
+	lastVaultBlock  *relayer.VaultBlock
+	lastRedeemBlock *relayer.RedeemBlock
 }
 
 type BtcClientInterface interface {
@@ -84,6 +89,10 @@ func NewBtcClientFromConfig(globalConfig *config.Config, btcConfig *BtcNetworkCo
 	if err != nil {
 		return nil, fmt.Errorf("failed to create BTC client for network %s: %w", btcConfig.Network, err)
 	}
+	pollInterval := time.Second * time.Duration(btcConfig.PollInterval)
+	if pollInterval == 0 {
+		pollInterval = time.Second * 5
+	}
 	btcClient := &BtcClient{
 		globalConfig: globalConfig,
 		btcConfig:    btcConfig,
@@ -91,11 +100,18 @@ func NewBtcClientFromConfig(globalConfig *config.Config, btcConfig *BtcNetworkCo
 		scalarClient: scalarClient,
 		dbAdapter:    dbAdapter,
 		eventBus:     eventBus,
+		pollInterval: pollInterval,
 	}
 	return btcClient, nil
 }
 
 func (c *BtcClient) Start(ctx context.Context) error {
+	go func() {
+		c.StartBridgeProcessing(ctx)
+	}()
+	go func() {
+		c.StartRedeemExecutedProcessing(ctx)
+	}()
 	//Subscribe to the event bus by string identity
 	receiver := c.eventBus.Subscribe(c.btcConfig.GetId())
 	for event := range receiver {
@@ -106,6 +122,7 @@ func (c *BtcClient) Start(ctx context.Context) error {
 			}
 		}()
 	}
+
 	//Start goroutine for fetch new block from btc network
 	return nil
 }

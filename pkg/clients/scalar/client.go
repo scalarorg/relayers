@@ -157,22 +157,6 @@ func (c *Client) Start(ctx context.Context) error {
 		log.Info().Msg("[ScalarClient] Start ProcessPendingCommands process")
 		c.ProcessPendingCommands(ctx)
 	}()
-
-	go func() {
-		c.StartBridgeProcessing(ctx)
-	}()
-	go func() {
-		c.StartRedeemExecutedProcessing(ctx)
-	}()
-	go func() {
-		c.StartTransferProcessing(ctx)
-	}()
-	go func() {
-		c.StartPoolRedeemProcessing(ctx)
-	}()
-	go func() {
-		c.StartUpcRedeemProcessing(ctx)
-	}()
 	log.Info().Msg("Scalar client started")
 	return nil
 }
