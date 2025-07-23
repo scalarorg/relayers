@@ -15,7 +15,7 @@ const (
 	EVENT_ELECTRS_VAULT_TRANSACTION      = "Electrs.VaultTransaction"
 	EVENT_BTC_VAULT_BLOCK                = "Btc.VaultBlock"
 	EVENT_BTC_REDEEM_TRANSACTION         = "Btc.RedeemTransaction"
-	EVENT_ELECTRS_NEW_BLOCK              = "Electrs.NewBlock"
+	EVENT_BTC_NEW_BLOCK                  = "Btc.NewBlock"
 	EVENT_SCALAR_TOKEN_SENT              = "Scalar.TokenSent"
 	EVENT_SCALAR_DEST_CALL_APPROVED      = "Scalar.ContractCallApproved"
 	EVENT_SCALAR_BATCHCOMMAND_SIGNED     = "Scalar.BatchCommandSigned"

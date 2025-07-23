@@ -12,7 +12,9 @@ import (
 )
 
 func (c *BtcClient) StartRedeemExecutedProcessing(ctx context.Context) {
-	log.Info().Msg("[ScalarClient] Starting bridge processing")
+	log.Info().Str("ChainId", c.btcConfig.GetId()).
+		Int("PollInterval in seconds", int(c.pollInterval.Seconds())).
+		Msg("[BtcClient] Starting redeem executed processing")
 
 	ticker := time.NewTicker(c.pollInterval)
 	defer ticker.Stop()
@@ -34,14 +36,14 @@ func (c *BtcClient) StartRedeemExecutedProcessing(ctx context.Context) {
 func (c *BtcClient) processNextRedeemExecuted() error {
 	var btcRedeemTxs []*chains.BtcRedeemTx
 	var err error
-	if c.lastRedeemBlock == nil {
-		c.lastRedeemBlock, err = c.getLastRedeemBlock()
+	if c.lastRedeemTx == nil {
+		c.lastRedeemTx, err = c.dbAdapter.GetEvmLastRedeemTx()
 		if err != nil {
 			return fmt.Errorf("failed to get next uncompleted vault block: %w", err)
 		}
 	}
 
-	if c.lastRedeemBlock == nil {
+	if c.lastRedeemTx == nil {
 		//No executed vault tx command, get the new vault txs
 		btcRedeemTxs, err = c.dbAdapter.GetNextBtcRedeemExecuteds(0)
 		if err != nil {
@@ -49,17 +51,17 @@ func (c *BtcClient) processNextRedeemExecuted() error {
 		}
 	} else {
 		// Get uncompleted vault transactions for this block (not in command_executed)
-		btcRedeemTxs, err = c.dbAdapter.GetBtcRedeemExecutedsByBlock(c.lastRedeemBlock.BlockNumber)
+		btcRedeemTxs, err = c.dbAdapter.GetBtcRedeemExecutedsByBlock(c.lastRedeemTx.BlockNumber)
 		if err != nil {
-			return fmt.Errorf("failed to get uncompleted vault transactions for block %d: %w", c.lastRedeemBlock.BlockNumber, err)
+			return fmt.Errorf("failed to get uncompleted vault transactions for block %d: %w", c.lastRedeemTx.BlockNumber, err)
 		}
 		if len(btcRedeemTxs) == 0 {
-			log.Info().Uint64("blockNumber", c.lastRedeemBlock.BlockNumber).
-				Str("status", c.lastRedeemBlock.Status).
+			log.Info().Uint64("blockNumber", c.lastRedeemTx.BlockNumber).
+				Str("status", c.lastRedeemTx.Status).
 				Msg("[ScalarClient] new unfinished redeem block to process. Get redeem txs from next block")
-			btcRedeemTxs, err = c.dbAdapter.GetNextBtcRedeemExecuteds(c.lastRedeemBlock.BlockNumber)
+			btcRedeemTxs, err = c.dbAdapter.GetNextBtcRedeemExecuteds(c.lastRedeemTx.BlockNumber)
 			if err != nil {
-				return fmt.Errorf("failed to get redeem transactions for block %d: %w", c.lastRedeemBlock.BlockNumber, err)
+				return fmt.Errorf("failed to get redeem transactions for block %d: %w", c.lastRedeemTx.BlockNumber, err)
 			}
 		}
 	}
@@ -83,16 +85,14 @@ func (c *BtcClient) processNextRedeemExecuted() error {
 				// }
 			}
 		}
-		c.lastRedeemBlock = &relayer.RedeemBlock{
-			BlockNumber:      btcRedeemTxs[0].BlockNumber,
-			BlockHash:        btcRedeemTxs[0].BlockHash,
-			Chain:            btcRedeemTxs[0].Chain,
-			Status:           string(relayer.BlockStatusProcessing),
-			TransactionCount: len(btcRedeemTxs),
-			ProcessedTxCount: 0,
-		}
-		//Store vault block to the relayerdb
-		c.dbAdapter.CreateRedeemBlock(c.lastRedeemBlock)
+		// c.lastRedeemTx = &relayer.EvmRedeemTx{
+		// 	BlockNumber: btcRedeemTxs[0].BlockNumber,
+		// 	TxHash:      btcRedeemTxs[0].TxHash,
+		// 	Chain:       btcRedeemTxs[0].Chain,
+		// 	Status:      string(relayer.BlockStatusProcessing),
+		// }
+		// //Store vault block to the relayerdb
+		// c.dbAdapter.CreateRedeemBlock(c.lastRedeemTx)
 	} else {
 		log.Info().Msg("[ScalarClient] No redeem executed transactions to process.")
 	}
@@ -100,12 +100,12 @@ func (c *BtcClient) processNextRedeemExecuted() error {
 	return nil
 }
 
-func (c *BtcClient) getLastRedeemBlock() (*relayer.RedeemBlock, error) {
-	redeemBlock, err := c.dbAdapter.GetLastRedeemBlock()
+func (c *BtcClient) getLastRedeemBlock() (*relayer.EvmRedeemTx, error) {
+	evmRedeemTx, err := c.dbAdapter.GetEvmLastRedeemTx()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get last redeem block: %w", err)
 	}
-	return redeemBlock, nil
+	return evmRedeemTx, nil
 }
 
 func (c *BtcClient) groupRedeemTxs(btcRedeemTxs []*chains.BtcRedeemTx) []*events.BtcRedeemTxEvents {

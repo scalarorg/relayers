@@ -1,6 +1,9 @@
 package types
 
-import "github.com/scalarorg/bitcoin-vault/go-utils/types"
+import (
+	"github.com/scalarorg/bitcoin-vault/go-utils/types"
+	"github.com/scalarorg/data-models/chains"
+)
 
 type BtcTransaction struct {
 	EventType                   int    `json:"event_type"`
@@ -40,4 +43,9 @@ type CommandOutPoint struct {
 	BTCFeeOpts types.BTCFeeOpts
 	RBF        bool
 	OutPoint   types.UnlockingOutput
+}
+
+type BtcBlockHeaderWithChain struct {
+	ChainId     string
+	BlockHeader *chains.BtcBlockHeader
 }

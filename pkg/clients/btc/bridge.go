@@ -18,7 +18,9 @@ import (
 )
 
 func (c *BtcClient) StartBridgeProcessing(ctx context.Context) {
-	log.Info().Msg("[ScalarClient] Starting bridge processing")
+	log.Info().Str("ChainId", c.btcConfig.GetId()).
+		Int("PollInterval in seconds", int(c.pollInterval.Seconds())).
+		Msg("[BtcClient] Starting bridge processing")
 
 	ticker := time.NewTicker(c.pollInterval)
 	defer ticker.Stop()
@@ -111,17 +113,18 @@ func (c *BtcClient) processNextVaultBlock() error {
 		}
 	}
 
-	c.lastVaultBlock = &relayer.VaultBlock{
-		BlockNumber:      vaultTxs[0].BlockNumber,
-		BlockHash:        vaultTxs[0].BlockHash,
-		Chain:            vaultTxs[0].Chain,
-		Status:           string(relayer.BlockStatusProcessing),
-		TransactionCount: len(vaultTxs),
-		ProcessedTxCount: 0,
+	if c.lastVaultBlock == nil || c.lastVaultBlock.BlockNumber < vaultTxs[0].BlockNumber {
+		c.lastVaultBlock = &relayer.VaultBlock{
+			BlockNumber:      vaultTxs[0].BlockNumber,
+			BlockHash:        vaultTxs[0].BlockHash,
+			Chain:            vaultTxs[0].Chain,
+			Status:           string(relayer.BlockStatusProcessing),
+			TransactionCount: len(vaultTxs),
+			ProcessedTxCount: 0,
+		}
+		//Store vault block to the relayerdb
+		c.dbAdapter.CreateVaultBlock(c.lastVaultBlock)
 	}
-	//Store vault block to the relayerdb
-	c.dbAdapter.CreateVaultBlock(c.lastVaultBlock)
-
 	err = c.confirmVaultTransactions(c.lastVaultBlock, vaultTxs)
 	if err != nil {
 		log.Error().Err(err).Msg("[ScalarClient] Failed to confirm vault transactions")

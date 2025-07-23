@@ -84,3 +84,12 @@ func (db *DatabaseAdapter) GetBlockTime(chainId string, blockNumbers []uint64) (
 	}
 	return blockTimeMap, nil
 }
+
+func (db *DatabaseAdapter) GetLastBtcBlockHeader(chainId string) (*chains.BtcBlockHeader, error) {
+	var btcBlockHeader chains.BtcBlockHeader
+	result := db.IndexerClient.Order("height DESC").First(&btcBlockHeader)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &btcBlockHeader, nil
+}

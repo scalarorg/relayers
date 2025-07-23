@@ -7,13 +7,14 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/relayers/pkg/events"
+	"github.com/scalarorg/relayers/pkg/types"
 	chainsTypes "github.com/scalarorg/scalar-core/x/chains/types"
 )
 
 func (c *Client) handleEventBusMessage(event *events.EventEnvelope) error {
 	switch event.EventType {
-	case events.EVENT_ELECTRS_NEW_BLOCK:
-		return c.handleElectrsEventNewBlock(event.Data.(*chains.BlockHeader))
+	case events.EVENT_BTC_NEW_BLOCK:
+		return c.handleBtcEventNewBlock(event.Data.(*types.BtcBlockHeaderWithChain))
 	case events.EVENT_EVM_TOKEN_SENT,
 		events.EVENT_EVM_CONTRACT_CALL,
 		events.EVENT_EVM_CONTRACT_CALL_WITH_TOKEN,
@@ -63,12 +64,12 @@ func (c *Client) requestConfirmEvmTxs(confirmRequest events.ConfirmTxsRequest) e
 	}
 	return nil
 }
-func (c *Client) handleElectrsEventNewBlock(blockHeader *chains.BlockHeader) error {
-	log.Debug().Uint64("blockHeight", blockHeader.BlockNumber).Msg("[ScalarClient] [handleElectrsEventNewBlock] Received new block event")
-	c.broadcaster.ConfirmBtcBlock(blockHeader.Chain, blockHeader.BlockHash, blockHeader.BlockNumber)
+func (c *Client) handleBtcEventNewBlock(blockHeader *types.BtcBlockHeaderWithChain) error {
+	log.Debug().Int("blockHeight", blockHeader.BlockHeader.Height).Msg("[ScalarClient] [handleBtcEventNewBlock] Received new block event")
+	c.broadcaster.ConfirmBtcBlock(blockHeader.ChainId, blockHeader.BlockHeader.Hash, blockHeader.BlockHeader.Height)
 	// Todo: init utxo for first time
 	if !c.initUtxo {
-		c.broadcaster.InitializeUtxoRequest(blockHeader.Chain, blockHeader.BlockNumber)
+		c.broadcaster.InitializeUtxoRequest(blockHeader.ChainId, uint64(blockHeader.BlockHeader.Height))
 		c.initUtxo = true
 	}
 	return nil

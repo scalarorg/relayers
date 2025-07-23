@@ -117,7 +117,7 @@ func (c *Broadcaster) ConfirmEvmTxs(chainName string, txIds []string) error {
 	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, txHashs)
 	return c.QueueTxMsg(msg)
 }
-func (c *Broadcaster) ConfirmBtcBlock(chainName string, blockHashStr string, blockHeight uint64) error {
+func (c *Broadcaster) ConfirmBtcBlock(chainName string, blockHashStr string, blockHeight int) error {
 	log.Debug().Msgf("[Broadcaster] [ConfirmBtcBlock] Enqueue for confirmation block %s at height %d from chain %s", blockHashStr, blockHeight, chainName)
 	blockHash, err := chainsExported.HashFromHex(blockHashStr)
 	if err != nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/rs/zerolog/log"
+	chains "github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/relayer"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
@@ -28,8 +29,9 @@ type BtcClient struct {
 	dbAdapter       *db.DatabaseAdapter
 	eventBus        *events.EventBus
 	pollInterval    time.Duration
+	lastBlockHeader *chains.BtcBlockHeader
 	lastVaultBlock  *relayer.VaultBlock
-	lastRedeemBlock *relayer.RedeemBlock
+	lastRedeemTx    *relayer.EvmRedeemTx
 }
 
 type BtcClientInterface interface {
@@ -106,6 +108,9 @@ func NewBtcClientFromConfig(globalConfig *config.Config, btcConfig *BtcNetworkCo
 }
 
 func (c *BtcClient) Start(ctx context.Context) error {
+	go func() {
+		c.StartNewBlockProcessing(ctx)
+	}()
 	go func() {
 		c.StartBridgeProcessing(ctx)
 	}()

@@ -1,23 +1,25 @@
 package db
 
 import (
+	"sort"
+
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/relayer"
 	"gorm.io/gorm/clause"
 )
 
-func (db *DatabaseAdapter) CreateRedeemBlock(redeemBlock *relayer.RedeemBlock) error {
-	return db.RelayerClient.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "block_number"}},
-		DoNothing: true,
-	}).Create(redeemBlock).Error
-}
+// func (db *DatabaseAdapter) CreateRedeemBlock(redeemBlock *relayer.EvmRedeemTx) error {
+// 	return db.RelayerClient.Clauses(clause.OnConflict{
+// 		Columns:   []clause.Column{{Name: "block_number"}},
+// 		DoNothing: true,
+// 	}).Create(redeemBlock).Error
+// }
 
-func (db *DatabaseAdapter) GetLastRedeemBlock() (*relayer.RedeemBlock, error) {
-	var redeemTxBlock relayer.RedeemBlock
+func (db *DatabaseAdapter) GetEvmLastRedeemTx() (*relayer.EvmRedeemTx, error) {
+	var redeemTxBlock relayer.EvmRedeemTx
 	query := `
-		SELECT * FROM redeem_blocks ORDER BY block_number DESC LIMIT 1
-	`
+			SELECT * FROM evm_redeem_txes ORDER BY block_number DESC, log_index DESC LIMIT 1
+		`
 	err := db.RelayerClient.Raw(query).Scan(&redeemTxBlock).Error
 	if err != nil {
 		return nil, err
@@ -27,7 +29,12 @@ func (db *DatabaseAdapter) GetLastRedeemBlock() (*relayer.RedeemBlock, error) {
 	}
 	return &redeemTxBlock, nil
 }
-
+func (db *DatabaseAdapter) CreateProcessedEvmRedeemTxes(redeemTxs []*relayer.EvmRedeemTx) error {
+	return db.RelayerClient.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "tx_hash"}, {Name: "log_index"}},
+		DoNothing: true,
+	}).Create(redeemTxs).Error
+}
 func (db *DatabaseAdapter) GetLastRedeemTxs(groupUid string, sessionSequence uint64) ([]*chains.EvmRedeemTx, error) {
 	var redeemTxs []*chains.EvmRedeemTx
 	query := `
@@ -53,18 +60,26 @@ func (db *DatabaseAdapter) GetRedeemTokenEventsByGroupAndSequence(groupUid strin
 }
 
 // Find redeem txs in the last session in pool model
-func (db *DatabaseAdapter) FindPoolRedeemTxsInLastSession(custodianGroupUid string) ([]*chains.EvmRedeemTx, error) {
+func (db *DatabaseAdapter) FindPoolRedeemTxsInLastSession(custodianGroupUid string,
+	lastRedeemBlock uint64, lastRedeemLogIndex uint64, limit int) ([]*chains.EvmRedeemTx, error) {
 	var redeemTxs []*chains.EvmRedeemTx
 	query := `
 		SELECT * FROM evm_redeem_txes
 		WHERE session_sequence = (
 			SELECT max(session_sequence) FROM evm_redeem_txes
 			WHERE custodian_group_uid = $1
-		) and session_sequence > 0
+		) and (block_number > $2 or (block_number = $2 and log_index > $3))
+		LIMIT $4
 	`
-	err := db.IndexerClient.Raw(query, custodianGroupUid).Scan(&redeemTxs).Error
+	err := db.IndexerClient.Raw(query, custodianGroupUid, lastRedeemBlock, lastRedeemLogIndex, limit).Scan(&redeemTxs).Error
 	if err != nil {
 		return nil, err
+	}
+	if len(redeemTxs) == 0 {
+		sort.Slice(redeemTxs, func(i, j int) bool {
+			return redeemTxs[i].BlockNumber < redeemTxs[j].BlockNumber ||
+				(redeemTxs[i].BlockNumber == redeemTxs[j].BlockNumber && redeemTxs[i].LogIndex < redeemTxs[j].LogIndex)
+		})
 	}
 	return redeemTxs, nil
 }

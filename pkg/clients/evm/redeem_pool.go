@@ -7,12 +7,19 @@ import (
 
 	"github.com/rs/zerolog/log"
 	chains "github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/relayer"
 	"github.com/scalarorg/relayers/pkg/events"
 	chainExported "github.com/scalarorg/scalar-core/x/chains/exported"
 )
 
+const (
+	POOL_REDEEM_TX_BATCH_SIZE = 10
+)
+
 func (c *EvmClient) StartPoolRedeemProcessing(ctx context.Context) {
-	log.Info().Msg("[ScalarClient] Starting redeem pool processing")
+	log.Info().Str("ChainId", c.EvmConfig.GetId()).
+		Int("PollInterval in seconds", int(c.pollInterval.Seconds())).
+		Msg("[EvmClient] Starting redeem pool processing")
 	ticker := time.NewTicker(c.pollInterval)
 	defer ticker.Stop()
 	groups, err := c.ScalarClient.GetCovenantGroups(ctx)
@@ -22,7 +29,7 @@ func (c *EvmClient) StartPoolRedeemProcessing(ctx context.Context) {
 	}
 	for _, group := range groups {
 		go func(groupUid chainExported.Hash) {
-			log.Info().Msgf("[ScalarClient] Starting redeem pool processing for group %s", groupUid.String())
+			log.Info().Str("ChainId", c.EvmConfig.GetId()).Msgf("[ScalarClient] Starting redeem pool processing for group %s", groupUid.String())
 			for {
 				select {
 				case <-ctx.Done():
@@ -40,12 +47,24 @@ func (c *EvmClient) StartPoolRedeemProcessing(ctx context.Context) {
 
 func (c *EvmClient) processNextPoolRedeemTx(groupUid chainExported.Hash) error {
 	groupUidStr := groupUid.String()
-	evmRedeemTxs, err := c.dbAdapter.FindPoolRedeemTxsInLastSession(groupUidStr)
+	log.Info().Str("ChainId", c.EvmConfig.GetId()).
+		Msgf("[ScalarClient] [processNextPoolRedeemTx] Processing redeem txs for group %s", groupUidStr)
+	lastPoolRedeemTx, err := c.getLastPoolRedeemTx(groupUidStr)
 	if err != nil {
-		return fmt.Errorf("failed to get last redeem tx block: %w", err)
+		return fmt.Errorf("failed to get last pool redeem tx: %w", err)
+	}
+	lastRedeemBlock := uint64(0)
+	lastRedeemLogIndex := uint64(0)
+	if lastPoolRedeemTx != nil {
+		lastRedeemBlock = lastPoolRedeemTx.BlockNumber
+		lastRedeemLogIndex = lastPoolRedeemTx.LogIndex
+	}
+	evmRedeemTxs, err := c.dbAdapter.FindPoolRedeemTxsInLastSession(groupUidStr, lastRedeemBlock, lastRedeemLogIndex, POOL_REDEEM_TX_BATCH_SIZE)
+	if err != nil {
+		log.Error().Err(err).Msgf("[ScalarClient] [processNextPoolRedeemTx] failed to get redeem txs in last session")
 	}
 	if len(evmRedeemTxs) == 0 {
-		log.Debug().Msgf("[ScalarClient] No redeem txs found for group %s", groupUidStr)
+		log.Debug().Msgf("[ScalarClient] [processNextPoolRedeemTx] No redeem txs found for group %s", groupUidStr)
 		return nil
 	}
 	log.Info().Msgf("[ScalarClient] Processing %d redeem txs for group %s", len(evmRedeemTxs), groupUidStr)
@@ -67,6 +86,11 @@ func (c *EvmClient) processNextPoolRedeemTx(groupUid chainExported.Hash) error {
 	}
 	mapChainRedeemTxs := c.groupEvmRedeemTxs(evmRedeemTxs)
 	for chain, redeemTxs := range mapChainRedeemTxs {
+		log.Info().Str("ChainId", c.EvmConfig.GetId()).
+			Str("Chain", chain).
+			Str("CustodianGroupUid", groupUidStr).
+			Int("TxCount", len(redeemTxs)).
+			Msg("[ScalarClient] [processNextPoolRedeemTx] Broadcasting redeem txs")
 		txHashes := make(map[string]string)
 		for _, tx := range redeemTxs {
 			txHashes[tx.TxHash] = tx.DestinationChain
@@ -80,6 +104,11 @@ func (c *EvmClient) processNextPoolRedeemTx(groupUid chainExported.Hash) error {
 			},
 		})
 	}
+	if len(evmRedeemTxs) > 0 {
+		lastEvmRedeemTx := evmRedeemTxs[len(evmRedeemTxs)-1]
+		c.setLastPoolRedeemTx(groupUidStr, lastEvmRedeemTx)
+		c.storeProcessedPoolRedeemTxs(groupUidStr, evmRedeemTxs)
+	}
 	return nil
 }
 
@@ -89,4 +118,38 @@ func (c *EvmClient) groupEvmRedeemTxs(evmRedeemTxs []*chains.EvmRedeemTx) map[st
 		mapChainRedeemTxs[tx.SourceChain] = append(mapChainRedeemTxs[tx.SourceChain], tx)
 	}
 	return mapChainRedeemTxs
+}
+
+func (c *EvmClient) storeProcessedPoolRedeemTxs(groupUid string, evmRedeemTxs []*chains.EvmRedeemTx) {
+	relayerEvmRedeemTxs := make([]*relayer.EvmRedeemTx, len(evmRedeemTxs))
+	for i, tx := range evmRedeemTxs {
+		relayerEvmRedeemTxs[i] = &relayer.EvmRedeemTx{
+			BlockNumber: tx.BlockNumber,
+			TxHash:      tx.TxHash,
+			Chain:       tx.SourceChain,
+			Status:      string(relayer.BlockStatusProcessing),
+			LogIndex:    uint64(tx.LogIndex),
+		}
+	}
+	if len(relayerEvmRedeemTxs) > 0 {
+		if c.lastPoolRedeems == nil {
+			c.lastPoolRedeems = make(map[string]*relayer.EvmRedeemTx)
+		}
+		lastEvmRedeemTx := relayerEvmRedeemTxs[len(relayerEvmRedeemTxs)-1]
+		c.lastPoolRedeems[groupUid] = &relayer.EvmRedeemTx{
+			BlockNumber: lastEvmRedeemTx.BlockNumber,
+			TxHash:      lastEvmRedeemTx.TxHash,
+			Chain:       lastEvmRedeemTx.Chain,
+			Status:      string(relayer.BlockStatusProcessing),
+			LogIndex:    uint64(lastEvmRedeemTx.LogIndex),
+		}
+		err := c.dbAdapter.CreateProcessedEvmRedeemTxes(relayerEvmRedeemTxs)
+		if err != nil {
+			log.Error().Err(err).Msg("[ScalarClient] Failed to store processed pool redeem txs")
+		}
+	}
+}
+
+func (c *EvmClient) setLastPoolRedeemTx(groupUid string, evmRedeemTx *chains.EvmRedeemTx) {
+
 }

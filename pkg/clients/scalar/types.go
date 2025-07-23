@@ -85,10 +85,10 @@ func (b *BlockEvents) Add(msgTypeName string, msg proto.Message) {
 }
 
 type ProcessCheckPoint struct {
-	LastTokenSentBlock    *relayer.TokenSentBlock
-	LastContractCallBlock *relayer.ContractCallBlock
-	LastRedeemBlock       *relayer.RedeemBlock
-	LastVaultBlock        *relayer.VaultBlock
+	LastTokenSentBlock *relayer.TokenSentBlock
+	//LastContractCallBlock *relayer.ContractCallBlock
+	//LastRedeemBlock *relayer.RedeemBlock
+	LastVaultBlock *relayer.VaultBlock
 }
 type EventHandlerCallBack[T any] func(events []IBCEvent[T])
 type ListenerEvent[T any] struct {

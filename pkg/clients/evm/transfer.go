@@ -15,7 +15,9 @@ import (
 // Constants are already defined in bridge.go
 
 func (c *EvmClient) StartTransferProcessing(ctx context.Context) {
-	log.Info().Msg("[ScalarClient] Starting transfer processing")
+	log.Info().Str("ChainId", c.EvmConfig.GetId()).
+		Int("PollInterval in seconds", int(c.pollInterval.Seconds())).
+		Msg("[EvmClient] Starting transfer processing")
 
 	ticker := time.NewTicker(c.pollInterval)
 	defer ticker.Stop()

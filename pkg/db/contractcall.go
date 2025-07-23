@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -10,62 +11,68 @@ import (
 	"github.com/scalarorg/data-models/relayer"
 	"github.com/scalarorg/data-models/scalarnet"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-func (db *DatabaseAdapter) GetLastContractCallBlock() (*relayer.ContractCallBlock, error) {
-	var contractCallBlock relayer.ContractCallBlock
-	query := `
-		SELECT * FROM contract_call_blocks ORDER BY block_number DESC LIMIT 1
-	`
-	err := db.RelayerClient.Raw(query).Scan(&contractCallBlock).Error
+func (db *DatabaseAdapter) GetLastContractCallWithToken() (*relayer.ContractCallWithToken, error) {
+	var contractCallWithToken relayer.ContractCallWithToken
+	err := db.RelayerClient.Model(&relayer.ContractCallWithToken{}).
+		Order(clause.OrderBy{
+			Columns: []clause.OrderByColumn{
+				{Column: clause.Column{Name: "tx_hash"}, Desc: true},
+				{Column: clause.Column{Name: "log_index"}, Desc: true}},
+		}).
+		First(&contractCallWithToken).Error
 	if err != nil {
 		return nil, err
 	}
-	if contractCallBlock.ID == 0 {
-		return nil, nil
-	}
-	return &contractCallBlock, nil
+	return &contractCallWithToken, nil
 }
-func (db *DatabaseAdapter) CreateContractCallBlock(contractCallBlock *relayer.ContractCallBlock) error {
-	err := db.RelayerClient.Create(contractCallBlock).Error
+
+func (db *DatabaseAdapter) CreateContractCallWithTokens(contractCallWithTokens []*relayer.ContractCallWithToken) error {
+	err := db.RelayerClient.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "tx_hash"}, {Name: "log_index"}},
+		DoNothing: true,
+	}).Create(contractCallWithTokens).Error
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (db *DatabaseAdapter) GetUnprocessedContractCallTxsByBlock(blockNumber uint64) ([]*chains.ContractCallWithToken, error) {
-	var contractCallWithTokens []*chains.ContractCallWithToken
-	query := `
-		SELECT * FROM contract_call_with_tokens
-		WHERE block_number = $1
-		AND tx_hash NOT IN (
-			SELECT ce.command_id FROM command_executeds ce
-			WHERE ce.command_id = contract_call_with_tokens.tx_hash
-		)
-		ORDER BY log_index ASC
-	`
-	result := db.IndexerClient.Raw(query, blockNumber).Scan(&contractCallWithTokens)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	return contractCallWithTokens, nil
-}
 
-func (db *DatabaseAdapter) GetNextContractCallWithTokens(lastBlockNumber uint64) ([]*chains.ContractCallWithToken, error) {
+// func (db *DatabaseAdapter) GetUnprocessedContractCallTxsByBlock(blockNumber uint64) ([]*chains.ContractCallWithToken, error) {
+// 	var contractCallWithTokens []*chains.ContractCallWithToken
+// 	query := `
+// 		SELECT * FROM contract_call_with_tokens
+// 		WHERE block_number = $1
+// 		AND tx_hash NOT IN (
+// 			SELECT ce.command_id FROM command_executeds ce
+// 			WHERE ce.command_id = contract_call_with_tokens.tx_hash
+// 		)
+// 		ORDER BY log_index ASC
+// 	`
+// 	result := db.IndexerClient.Raw(query, blockNumber).Scan(&contractCallWithTokens)
+// 	if result.Error != nil {
+// 		return nil, result.Error
+// 	}
+// 	return contractCallWithTokens, nil
+// }
+
+func (db *DatabaseAdapter) GetNextContractCallWithTokens(lastBlockNumber uint64, lastLogIndex uint64, limit int) ([]*chains.ContractCallWithToken, error) {
 	var contractCallWithTokens []*chains.ContractCallWithToken
 	query := `
 		SELECT * FROM contract_call_with_tokens
-		WHERE block_number = (
-			SELECT MIN(block_number) 
-			FROM contract_call_with_tokens 
-			WHERE block_number > $1
-		)
-		ORDER BY log_index ASC
+		WHERE block_number > $1 OR (block_number = $1 AND log_index > $2)
+		LIMIT $3
 	`
-	result := db.IndexerClient.Raw(query, lastBlockNumber).Scan(&contractCallWithTokens)
+	result := db.IndexerClient.Raw(query, lastBlockNumber, lastLogIndex, limit).Scan(&contractCallWithTokens)
 	if result.Error != nil {
 		return nil, result.Error
 	}
+	sort.Slice(contractCallWithTokens, func(i, j int) bool {
+		return contractCallWithTokens[i].BlockNumber < contractCallWithTokens[j].BlockNumber ||
+			(contractCallWithTokens[i].BlockNumber == contractCallWithTokens[j].BlockNumber && contractCallWithTokens[i].LogIndex < contractCallWithTokens[j].LogIndex)
+	})
 	return contractCallWithTokens, nil
 }
 
@@ -178,19 +185,12 @@ func (db *DatabaseAdapter) CreateContractCall(contractCall chains.ContractCall, 
 	}
 	return nil
 }
-func (db *DatabaseAdapter) CreateContractCallWithToken(contractCallWithToken *chains.ContractCallWithToken, lastCheckpoint *scalarnet.EventCheckPoint) error {
-	err := db.RelayerClient.Transaction(func(tx *gorm.DB) error {
-		result := tx.Save(contractCallWithToken)
-		if result.Error != nil {
-			return result.Error
-		}
-		if lastCheckpoint != nil {
-			UpdateLastEventCheckPoint(tx, lastCheckpoint)
-		}
-		return nil
-	})
+
+// Cantract call with tokens which are processed by relayer
+func (db *DatabaseAdapter) CreateRelayerContractCallWithTokens(contractCallWithTokens []*relayer.ContractCallWithToken) error {
+	err := db.RelayerClient.Create(contractCallWithTokens).Error
 	if err != nil {
-		return fmt.Errorf("failed to create evm token send: %w", err)
+		return fmt.Errorf("failed to create relayer contract call with tokens: %w", err)
 	}
 	return nil
 }

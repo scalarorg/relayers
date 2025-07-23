@@ -3,12 +3,14 @@ package evm
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/relayers/pkg/events"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	covTypes "github.com/scalarorg/scalar-core/x/covenant/types"
@@ -219,6 +221,12 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 					Int64("chainId", signedTx.ChainId().Int64()).
 					Str("signer", signedTx.To().Hex()).
 					Msg("[EvmClient] [handleScalarBatchCommandSigned] successfully sent tx to the network")
+				//Update sent transactions to db
+				err = ec.dbAdapter.UpdateBatchCommandSigned(chainId, batchedCmdRes.CommandIDs)
+				if err != nil {
+					log.Error().Err(err).Msg("[EvmClient] [handleScalarBatchCommandSigned] failed to update batch command signed")
+					return err
+				}
 			}
 		} else if isPending {
 			log.Info().Str("txHash", signedTx.Hash().String()).
@@ -229,6 +237,22 @@ func (ec *EvmClient) handleScalarBatchCommandSigned(chainId string, batchedCmdRe
 		}
 	}
 	return nil
+}
+
+func CommandResponse2Model(chainId string, batchCommandId string, command *chainstypes.CommandResponse) *scalarnet.Command {
+	params, err := json.Marshal(command.Params)
+	if err != nil {
+		log.Error().Err(err).Msg("[ScalarClient] [CommandResponse2Model] failed to marshal command params")
+	}
+	return &scalarnet.Command{
+		CommandID:      command.ID,
+		BatchCommandID: batchCommandId,
+		ChainID:        chainId,
+		Params:         string(params),
+		KeyID:          command.KeyID,
+		CommandType:    command.Type,
+		Status:         scalarnet.CommandStatusPending,
+	}
 }
 
 // Call ScalarGateway's execute method

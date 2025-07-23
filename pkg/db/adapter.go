@@ -69,8 +69,9 @@ func RunMigrations(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&relayer.VaultBlock{},
 		&relayer.TokenSentBlock{},
-		&relayer.ContractCallBlock{},
-		&relayer.RedeemBlock{},
+		&relayer.ContractCall{},
+		&relayer.ContractCallWithToken{},
+		&relayer.EvmRedeemTx{},
 		// &chains.BlockHeader{},
 		// &chains.TokenSent{},
 		// &chains.CommandExecuted{},

@@ -106,6 +106,9 @@ func ParseBlockEvents(allEvents map[string][]string) (*BlockEvents, error) {
 	parsedEvents := &BlockEvents{}
 	eventDatas := map[string][]eventJson{}
 	for key, values := range allEvents {
+		log.Info().Str("Key", key).Int("ValueCount", len(values)).
+			Strs("Values", values).
+			Msg("[ScalarClient] [ParseBlockEvents] Event")
 		msgType, err := findMessageTypeByKey(key, allEventTypes)
 		if err != nil {
 			continue

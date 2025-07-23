@@ -41,10 +41,11 @@ type EvmClient struct {
 	MissingLogs       MissingLogs
 	ChnlReceivedBlock chan uint64
 	// pendingTxs     pending.PendingTxs //Transactions sent to Gateway for approval, waiting for event from EVM chain.
-	retryInterval         time.Duration
-	lastTokenSentBlock    *relayer.TokenSentBlock
-	lastContractCallBlock *relayer.ContractCallBlock
-	pollInterval          time.Duration
+	retryInterval             time.Duration
+	lastTokenSentBlock        *relayer.TokenSentBlock
+	lastContractCallWithToken *relayer.ContractCallWithToken
+	lastPoolRedeems           map[string]*relayer.EvmRedeemTx
+	pollInterval              time.Duration
 }
 
 // This function is used to adjust the rpc url to the ws prefix
@@ -336,4 +337,15 @@ func (c *EvmClient) subscribeEventBus() {
 	} else {
 		log.Warn().Msgf("[EvmClient] [subscribeEventBus] event bus is not set")
 	}
+}
+
+func (c *EvmClient) getLastPoolRedeemTx(groupUid string) (*relayer.EvmRedeemTx, error) {
+	if c.lastPoolRedeems == nil {
+		return nil, nil
+	}
+	evmRedeemTx, ok := c.lastPoolRedeems[groupUid]
+	if !ok {
+		return nil, nil
+	}
+	return evmRedeemTx, nil
 }
