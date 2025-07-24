@@ -37,117 +37,132 @@ func (c *BtcClient) StartBridgeProcessing(ctx context.Context) {
 		}
 	}
 }
-func (c *BtcClient) getLastVaultBlock() (*relayer.VaultBlock, error) {
-	vaultBlock, err := c.dbAdapter.GetLastVaultBlock()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get last vault block: %w", err)
-	}
-	if vaultBlock == nil {
-		log.Debug().Msg("[ScalarClient] No vault blocks processed")
-		vaultTxs, err := c.dbAdapter.FindLastVaultBlockByChain(c.btcConfig.GetId())
-		if err != nil {
-			return nil, fmt.Errorf("failed to get uncompleted vault transactions for block %d: %w", 0, err)
-		}
-		if len(vaultTxs) > 0 {
-			vaultBlock = &relayer.VaultBlock{
-				BlockNumber:      vaultTxs[0].BlockNumber,
-				Chain:            c.btcConfig.GetId(),
-				Status:           string(relayer.BlockStatusProcessing),
-				TransactionCount: len(vaultTxs),
-				ProcessedTxCount: len(vaultTxs),
-			}
-			err = c.dbAdapter.CreateVaultBlock(vaultBlock)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create vault block: %w", err)
-			}
-			log.Info().Int("vaultTxsCount", len(vaultTxs)).
-				Msg("[ScalarClient] create vault new block")
-			return vaultBlock, nil
-		}
-	}
-	return vaultBlock, nil
-}
+
+// func (c *BtcClient) getLastVaultTx() (*relayer.VaultTransaction, error) {
+// 	vaultTx, err := c.dbAdapter.GetLastVaultTransaction()
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to get last vault transaction: %w", err)
+// 	}
+// 	if vaultTx == nil {
+// 		log.Debug().Msg("[ScalarClient] No vault transactions processed")
+// 		vaultTxs, err := c.dbAdapter.FindLastVaultBlockByChain(c.btcConfig.GetId())
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to get uncompleted vault transactions for block %d: %w", 0, err)
+// 		}
+// 		if len(vaultTxs) > 0 {
+// 			vaultBlock = &relayer.VaultBlock{
+// 				BlockNumber:      vaultTxs[0].BlockNumber,
+// 				Chain:            c.btcConfig.GetId(),
+// 				Status:           string(relayer.BlockStatusProcessing),
+// 				TransactionCount: len(vaultTxs),
+// 				ProcessedTxCount: len(vaultTxs),
+// 			}
+// 			err = c.dbAdapter.CreateVaultBlock(vaultBlock)
+// 			if err != nil {
+// 				return nil, fmt.Errorf("failed to create vault block: %w", err)
+// 			}
+// 			log.Info().Int("vaultTxsCount", len(vaultTxs)).
+// 				Msg("[ScalarClient] create vault new block")
+// 			return vaultBlock, nil
+// 		}
+// 	}
+// 	return vaultBlock, nil
+// }
 
 func (c *BtcClient) processNextVaultBlock() error {
 	// If we don't have a current processing block, get the next uncompleted one
 	var vaultTxs []*chains.VaultTransaction
 	var err error
-	if c.lastVaultBlock == nil {
-		c.lastVaultBlock, err = c.getLastVaultBlock()
+	if c.lastVaultTx == nil {
+		c.lastVaultTx, err = c.dbAdapter.GetLastVaultTransaction()
 		if err != nil {
 			return fmt.Errorf("failed to get next uncompleted vault block: %w", err)
 		}
 	}
-	if c.lastVaultBlock == nil {
-		//No executed vault tx command, get the new vault txs
-		vaultTxs, err = c.dbAdapter.GetNextVaultTransactions(0)
-		if err != nil {
-			return fmt.Errorf("failed to get new vault txs: %w", err)
-		}
-	} else {
-		// Get uncompleted vault transactions for this block (not in command_executed)
-		vaultTxs, err = c.dbAdapter.GetUnprocessedVaultTransactionsByBlock(c.lastVaultBlock.BlockNumber)
-		if err != nil {
-			return fmt.Errorf("failed to get uncompleted vault transactions for block %d: %w", c.lastVaultBlock.BlockNumber, err)
-		}
-		if len(vaultTxs) == 0 {
-			log.Info().Uint64("blockNumber", c.lastVaultBlock.BlockNumber).
-				Str("status", c.lastVaultBlock.Status).
-				Msg("[ScalarClient] new unfinished vault block to process. Get vault txs from next block")
-			vaultTxs, err = c.dbAdapter.GetNextVaultTransactions(c.lastVaultBlock.BlockNumber)
-			if err != nil {
-				return fmt.Errorf("failed to get vault transactions for block %d: %w", c.lastVaultBlock.BlockNumber, err)
-			}
-		}
+
+	lastProcessedBlock := uint64(0)
+	lastProcessedPosition := uint(0)
+	if c.lastVaultTx != nil {
+		lastProcessedBlock = c.lastVaultTx.BlockHeight
+		lastProcessedPosition = c.lastVaultTx.TxPosition
 	}
+	//No executed vault tx command, get the new vault txs
+	vaultTxs, err = c.dbAdapter.GetNextVaultTransactions(lastProcessedBlock, lastProcessedPosition)
+	if err != nil {
+		return fmt.Errorf("failed to get new vault txs: %w", err)
+	}
+	// if c.lastVaultTx == nil {
+
+	// } else {
+	// 	// Get uncompleted vault transactions for this block (not in command_executed)
+	// 	vaultTxs, err = c.dbAdapter.GetUnprocessedVaultTransactionsByBlock(c.lastVaultBlock.BlockNumber)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to get uncompleted vault transactions for block %d: %w", c.lastVaultBlock.BlockNumber, err)
+	// 	}
+	// 	if len(vaultTxs) == 0 {
+	// 		log.Info().Uint64("blockNumber", c.lastVaultBlock.BlockNumber).
+	// 			Str("status", c.lastVaultBlock.Status).
+	// 			Msg("[ScalarClient] new unfinished vault block to process. Get vault txs from next block")
+	// 		vaultTxs, err = c.dbAdapter.GetNextVaultTransactions(c.lastVaultBlock.BlockNumber)
+	// 		if err != nil {
+	// 			return fmt.Errorf("failed to get vault transactions for block %d: %w", c.lastVaultBlock.BlockNumber, err)
+	// 		}
+	// 	}
+	// }
 
 	if len(vaultTxs) == 0 {
-		if c.lastVaultBlock != nil {
-			log.Info().Uint64("LastVaultBlockNumber", c.lastVaultBlock.BlockNumber).
-				Msg("[ScalarClient] No more vault transactions to process, waiting for next vault block")
-
-			return nil
-		} else {
-			log.Info().Msg("[ScalarClient] No vault blocks processed")
-			return nil
+		log.Info().Uint64("LastProcessedBlock", lastProcessedBlock).
+			Uint("LastProcessedPosition", lastProcessedPosition).
+			Msg("[ScalarClient] No more vault transactions to process, waiting for next vault block")
+	} else {
+		log.Info().Uint64("LastProcessedBlock", lastProcessedBlock).
+			Uint("LastProcessedPosition", lastProcessedPosition).
+			Int("vaultTxsCount", len(vaultTxs)).
+			Msg("[ScalarClient] Found new vault transactions to process")
+		err = c.confirmVaultTransactions(vaultTxs)
+		if err != nil {
+			log.Error().Err(err).Msg("[ScalarClient] Failed to confirm vault transactions")
+			return err
 		}
+		c.storeProcessedVaultTxs(vaultTxs)
 	}
 
-	if c.lastVaultBlock == nil || c.lastVaultBlock.BlockNumber < vaultTxs[0].BlockNumber {
-		c.lastVaultBlock = &relayer.VaultBlock{
-			BlockNumber:      vaultTxs[0].BlockNumber,
-			BlockHash:        vaultTxs[0].BlockHash,
-			Chain:            vaultTxs[0].Chain,
-			Status:           string(relayer.BlockStatusProcessing),
-			TransactionCount: len(vaultTxs),
-			ProcessedTxCount: 0,
-		}
-		//Store vault block to the relayerdb
-		c.dbAdapter.CreateVaultBlock(c.lastVaultBlock)
-	}
-	err = c.confirmVaultTransactions(c.lastVaultBlock, vaultTxs)
-	if err != nil {
-		log.Error().Err(err).Msg("[ScalarClient] Failed to confirm vault transactions")
-		return err
-	}
+	// if c.lastVaultTx == nil || c.lastVaultTx.BlockHeight < vaultTxs[0].BlockNumber {
+	// 	c.lastVaultBlock = &relayer.VaultBlock{
+	// 		BlockNumber:      vaultTxs[0].BlockNumber,
+	// 		BlockHash:        vaultTxs[0].BlockHash,
+	// 		Chain:            vaultTxs[0].Chain,
+	// 		Status:           string(relayer.BlockStatusProcessing),
+	// 		TransactionCount: len(vaultTxs),
+	// 		ProcessedTxCount: 0,
+	// 	}
+	// 	//Store vault block to the relayerdb
+	// 	c.dbAdapter.CreateVaultBlock(c.lastVaultBlock)
+	// }
+	// err = c.confirmVaultTransactions(c.lastVaultBlock, vaultTxs)
+	// if err != nil {
+	// 	log.Error().Err(err).Msg("[ScalarClient] Failed to confirm vault transactions")
+	// 	return err
+	// }
 
-	log.Info().Uint64("blockNumber", c.lastVaultBlock.BlockNumber).
-		Int("uncompletedTxs", len(vaultTxs)).
-		Msg("[ScalarClient] Processing uncompleted transactions in vault block")
+	// log.Info().Uint64("blockNumber", c.lastVaultBlock.BlockNumber).
+	// 	Int("uncompletedTxs", len(vaultTxs)).
+	// 	Msg("[ScalarClient] Processing uncompleted transactions in vault block")
 
 	return nil
 }
 
-func (c *BtcClient) formConfirmSourceTxsRequestV2(vaultBlock *relayer.VaultBlock, vaultTxs []*chains.VaultTransaction) ([]*chainsTypes.ConfirmSourceTxsRequestV2, error) {
+func (c *BtcClient) formConfirmSourceTxsRequestV2(vaultTxs []*chains.VaultTransaction) ([]*chainsTypes.ConfirmSourceTxsRequestV2, error) {
+	firstVaultTx := vaultTxs[0]
 	confirmTxs := make([]*chainsTypes.ConfirmSourceTxsRequestV2, 0)
 	// Get block hash
-	blockHash, err := chainsExported.HashFromHex(vaultBlock.BlockHash)
+	blockHash, err := chainsExported.HashFromHex(firstVaultTx.BlockHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse block hash: %w", err)
 	}
 
 	lastConfirmTx := &chainsTypes.ConfirmSourceTxsRequestV2{
-		Chain: nexus.ChainName(vaultBlock.Chain),
+		Chain: nexus.ChainName(firstVaultTx.Chain),
 		Batch: &chainsTypes.TrustedTxsByBlock{
 			BlockHash: blockHash,
 			Txs:       make([]*chainsTypes.TrustedTx, 0),
@@ -182,7 +197,7 @@ func (c *BtcClient) formConfirmSourceTxsRequestV2(vaultBlock *relayer.VaultBlock
 		if len(lastConfirmTx.Batch.Txs) >= pkgTypes.CONFIRM_BATCH_SIZE {
 			confirmTxs = append(confirmTxs, lastConfirmTx)
 			lastConfirmTx = &chainsTypes.ConfirmSourceTxsRequestV2{
-				Chain: nexus.ChainName(vaultBlock.Chain),
+				Chain: nexus.ChainName(firstVaultTx.Chain),
 				Batch: &chainsTypes.TrustedTxsByBlock{
 					BlockHash: blockHash,
 					Txs:       make([]*chainsTypes.TrustedTx, 0),
@@ -240,34 +255,43 @@ func (c *BtcClient) formConfirmSourceTxsRequestV2(vaultBlock *relayer.VaultBlock
 // }
 
 // CreateVaultBlockFromTransactions creates a VaultBlock record from vault transactions
-func (c *BtcClient) CreateVaultBlockFromTransactions(blockNumber uint64, blockHash string, chain string, vaultTxs []*chains.VaultTransaction) error {
-	vaultBlock := &relayer.VaultBlock{
-		BlockNumber:      blockNumber,
-		BlockHash:        blockHash,
-		Chain:            chain,
-		Status:           "pending",
-		TransactionCount: len(vaultTxs),
-		ProcessedTxCount: 0,
+func (c *BtcClient) storeProcessedVaultTxs(vaultTxs []*chains.VaultTransaction) error {
+	if len(vaultTxs) == 0 {
+		return fmt.Errorf("no vault transactions to store")
+	}
+	relayerVaultTxes := []*relayer.VaultTransaction{}
+	for _, vaultTx := range vaultTxs {
+		relayerVaultTxes = append(relayerVaultTxes, &relayer.VaultTransaction{
+			BlockHeight: vaultTx.BlockNumber,
+			TxPosition:  vaultTx.TxPosition,
+			TxHash:      vaultTx.TxHash,
+			Chain:       vaultTx.Chain,
+			Status:      "pending",
+		})
 	}
 
-	err := c.dbAdapter.CreateVaultBlock(vaultBlock)
+	err := c.dbAdapter.CreateVaultTransactions(relayerVaultTxes)
 	if err != nil {
-		return fmt.Errorf("failed to create vault block: %w", err)
+		return fmt.Errorf("failed to create vault transactions: %w", err)
 	}
 
-	log.Info().Uint64("blockNumber", blockNumber).
+	log.Info().Uint64("blockNumber", vaultTxs[0].BlockNumber).
 		Int("txCount", len(vaultTxs)).
-		Msg("[ScalarClient] Created vault block record")
+		Msg("[BtcClient] Created vault transactions record")
 
 	return nil
 }
 
 // processVaultTransaction processes a single vault transaction
-func (c *BtcClient) confirmVaultTransactions(vaultBlock *relayer.VaultBlock, vaultTxs []*chains.VaultTransaction) error {
+func (c *BtcClient) confirmVaultTransactions(vaultTxs []*chains.VaultTransaction) error {
+	if len(vaultTxs) == 0 {
+		return fmt.Errorf("no vault transactions to confirm")
+	}
 	// Form ConfirmSourceTxsRequestV2 for single transaction
-	confirmRequests, err := c.formConfirmSourceTxsRequestV2(vaultBlock, vaultTxs)
+	firstVaultTx := vaultTxs[0]
+	confirmRequests, err := c.formConfirmSourceTxsRequestV2(vaultTxs)
 	if err != nil {
-		return fmt.Errorf("failed to form confirm request for vaultBlock %+v: %w", vaultBlock, err)
+		return fmt.Errorf("failed to form confirm request for %d: vaultTxs in the block %d: %w", len(vaultTxs), firstVaultTx.BlockNumber, err)
 	}
 
 	// Send to broadcaster
@@ -283,10 +307,9 @@ func (c *BtcClient) confirmVaultTransactions(vaultBlock *relayer.VaultBlock, vau
 		// 	return fmt.Errorf("failed to send confirm request to broadcaster for block %d with hash %s: %w", vaultBlock.BlockNumber, vaultBlock.BlockHash, err)
 		// }
 	}
-	log.Debug().Uint64("blockNumber", vaultBlock.BlockNumber).
+	log.Debug().Uint64("blockNumber", firstVaultTx.BlockNumber).
 		Int("txCount", len(vaultTxs)).
-		Uint64("blockNumber", vaultBlock.BlockNumber).
-		Str("blockHash", vaultBlock.BlockHash).
+		Str("blockHash", firstVaultTx.BlockHash).
 		Msg("[ScalarClient] Successfully confirmed vault transactions")
 
 	return nil

@@ -1,10 +1,9 @@
 package db
 
 import (
-	"time"
-
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/relayer"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -25,64 +24,71 @@ func (db *DatabaseAdapter) GetLastSwitchedPhases(groupUid string) ([]*chains.Swi
 }
 
 // VaultBlock operations
-func (db *DatabaseAdapter) GetLastProcessedVaultBlock() (uint64, error) {
-	var blockNumber uint64
-	query := `
-		SELECT COALESCE(MAX(block_number), 0) FROM vault_blocks WHERE processed_tx_count > 0
-	`
-	err := db.RelayerClient.Raw(query).Scan(&blockNumber).Error
-	return blockNumber, err
-}
+// func (db *DatabaseAdapter) GetLastProcessedVaultBlock() (uint64, error) {
+// 	var blockNumber uint64
+// 	query := `
+// 		SELECT COALESCE(MAX(block_number), 0) FROM vault_blocks WHERE processed_tx_count > 0
+// 	`
+// 	err := db.RelayerClient.Raw(query).Scan(&blockNumber).Error
+// 	return blockNumber, err
+// }
 
-func (db *DatabaseAdapter) UpdateVaultBlockStatus(blockNumber uint64, status string, broadcastTxHash string) error {
-	updates := map[string]interface{}{
-		"status": status,
-	}
+// func (db *DatabaseAdapter) UpdateVaultBlockStatus(blockNumber uint64, status string, broadcastTxHash string) error {
+// 	updates := map[string]interface{}{
+// 		"status": status,
+// 	}
 
-	if status == "processing" {
-		now := time.Now()
-		updates["processed_at"] = &now
-	} else if status == "completed" {
-		now := time.Now()
-		updates["completed_at"] = &now
-		updates["broadcast_tx_hash"] = broadcastTxHash
-	}
+// 	if status == "processing" {
+// 		now := time.Now()
+// 		updates["processed_at"] = &now
+// 	} else if status == "completed" {
+// 		now := time.Now()
+// 		updates["completed_at"] = &now
+// 		updates["broadcast_tx_hash"] = broadcastTxHash
+// 	}
 
-	return db.RelayerClient.Model(&relayer.VaultBlock{}).
-		Where("block_number = ?", blockNumber).
-		Updates(updates).Error
-}
+// 	return db.RelayerClient.Model(&relayer.VaultBlock{}).
+// 		Where("block_number = ?", blockNumber).
+// 		Updates(updates).Error
+// }
 
-func (db *DatabaseAdapter) CreateVaultBlock(vaultBlock *relayer.VaultBlock) error {
+// func (db *DatabaseAdapter) CreateVaultBlock(vaultBlock *relayer.VaultBlock) error {
+// 	return db.RelayerClient.Clauses(clause.OnConflict{
+// 		Columns:   []clause.Column{{Name: "block_number"}},
+// 		DoNothing: true,
+// 	}).Create(vaultBlock).Error
+// }
+
+//	func (db *DatabaseAdapter) GetVaultBlockByNumber(blockNumber uint64) (*relayer.VaultBlock, error) {
+//		var vaultBlock relayer.VaultBlock
+//		err := db.RelayerClient.Where("block_number = ?", blockNumber).First(&vaultBlock).Error
+//		if err != nil {
+//			return nil, err
+//		}
+//		return &vaultBlock, nil
+//	}
+func (db *DatabaseAdapter) CreateVaultTransactions(vaultTxes []*relayer.VaultTransaction) error {
 	return db.RelayerClient.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "block_number"}},
+		Columns:   []clause.Column{{Name: "block_height"}, {Name: "tx_position"}},
 		DoNothing: true,
-	}).Create(vaultBlock).Error
-}
-
-func (db *DatabaseAdapter) GetVaultBlockByNumber(blockNumber uint64) (*relayer.VaultBlock, error) {
-	var vaultBlock relayer.VaultBlock
-	err := db.RelayerClient.Where("block_number = ?", blockNumber).First(&vaultBlock).Error
-	if err != nil {
-		return nil, err
-	}
-	return &vaultBlock, nil
+	}).Create(vaultTxes).Error
 }
 
 // GetLastUncompletedVaultBlock gets the next uncompleted vault block
-func (db *DatabaseAdapter) GetLastVaultBlock() (*relayer.VaultBlock, error) {
-	var vaultBlock relayer.VaultBlock
-	query := `
-		SELECT * FROM vault_blocks ORDER BY block_number DESC LIMIT 1
-	`
-	err := db.RelayerClient.Raw(query).Scan(&vaultBlock).Error
+func (db *DatabaseAdapter) GetLastVaultTransaction() (*relayer.VaultTransaction, error) {
+	var vaultTx relayer.VaultTransaction
+	err := db.RelayerClient.Model(&relayer.VaultTransaction{}).
+		Order(clause.OrderBy{
+			Columns: []clause.OrderByColumn{
+				{Column: clause.Column{Name: "block_height"}, Desc: true},
+				{Column: clause.Column{Name: "tx_position"}, Desc: true},
+			},
+		}).
+		First(&vaultTx).Error
 	if err != nil {
 		return nil, err
 	}
-	if vaultBlock.ID == 0 {
-		return nil, nil
-	}
-	return &vaultBlock, nil
+	return &vaultTx, nil
 }
 func (db *DatabaseAdapter) FindLastVaultBlockByChain(sourceChain string) ([]*chains.VaultTransaction, error) {
 	var vaultTxs []*chains.VaultTransaction
@@ -136,45 +142,45 @@ func (db *DatabaseAdapter) FindLastExecutedTokenSentCommand(sourceChain string) 
 
 // Find if there is any un processed vault transaction in the last processing block
 // This is expensive query, should be used only when there is no vault block processed
-func (db *DatabaseAdapter) FindLatestUnprocessedVaultTransactions() ([]*chains.VaultTransaction, error) {
-	var vaultTxs []*chains.VaultTransaction
-	// Find maximum block number whose transactions appear in command_executeds table
-	var maxBlockNumber uint64
-	query := `
-		SELECT max(vt.block_number) FROM vault_transactions vt join command_executeds ce 
-		on vt.tx_hash = ce.command_id and 'evm|'||vt.destination_chain = ce.source_chain
-	`
-	err := db.IndexerClient.Raw(query).Scan(&maxBlockNumber).Error
-	if err != nil || maxBlockNumber == 0 {
-		// No vault block transaction executed yet, get all vault transactions in the first block
-		query = `
-			SELECT vt.* FROM vault_transactions vt
-			WHERE vt.vault_tx_type = 1 AND vt.block_number = (
-				select min(block_number) from vault_transactions where vault_tx_type = 1
-			)
-			ORDER BY vt.tx_position ASC
-		`
-		err = db.IndexerClient.Raw(query).Scan(&vaultTxs).Error
-		return vaultTxs, err
-	}
-	// Get unprocessed transactions from the next block after the last processed block
-	query = `
-		SELECT vt.* FROM vault_transactions vt
-		WHERE vt.vault_tx_type = 1 AND vt.block_number = $1
-		AND vt.tx_hash NOT IN (
-			SELECT ce.command_id FROM command_executeds ce
-			WHERE ce.command_id = vt.tx_hash
-		)
-		ORDER BY vt.tx_position ASC
-	`
-	err = db.IndexerClient.Raw(query, maxBlockNumber).Scan(&vaultTxs).Error
-	if err != nil || len(vaultTxs) == 0 {
-		// No unprocessed transactions found, return empty slice
-		return db.GetNextVaultTransactions(maxBlockNumber)
-	} else {
-		return vaultTxs, nil
-	}
-}
+// func (db *DatabaseAdapter) FindLatestUnprocessedVaultTransactions() ([]*chains.VaultTransaction, error) {
+// 	var vaultTxs []*chains.VaultTransaction
+// 	// Find maximum block number whose transactions appear in command_executeds table
+// 	var maxBlockNumber uint64
+// 	query := `
+// 		SELECT max(vt.block_number) FROM vault_transactions vt join command_executeds ce
+// 		on vt.tx_hash = ce.command_id and 'evm|'||vt.destination_chain = ce.source_chain
+// 	`
+// 	err := db.IndexerClient.Raw(query).Scan(&maxBlockNumber).Error
+// 	if err != nil || maxBlockNumber == 0 {
+// 		// No vault block transaction executed yet, get all vault transactions in the first block
+// 		query = `
+// 			SELECT vt.* FROM vault_transactions vt
+// 			WHERE vt.vault_tx_type = 1 AND vt.block_number = (
+// 				select min(block_number) from vault_transactions where vault_tx_type = 1
+// 			)
+// 			ORDER BY vt.tx_position ASC
+// 		`
+// 		err = db.IndexerClient.Raw(query).Scan(&vaultTxs).Error
+// 		return vaultTxs, err
+// 	}
+// 	// Get unprocessed transactions from the next block after the last processed block
+// 	query = `
+// 		SELECT vt.* FROM vault_transactions vt
+// 		WHERE vt.vault_tx_type = 1 AND vt.block_number = $1
+// 		AND vt.tx_hash NOT IN (
+// 			SELECT ce.command_id FROM command_executeds ce
+// 			WHERE ce.command_id = vt.tx_hash
+// 		)
+// 		ORDER BY vt.tx_position ASC
+// 	`
+// 	err = db.IndexerClient.Raw(query, maxBlockNumber).Scan(&vaultTxs).Error
+// 	if err != nil || len(vaultTxs) == 0 {
+// 		// No unprocessed transactions found, return empty slice
+// 		return db.GetNextVaultTransactions(maxBlockNumber)
+// 	} else {
+// 		return vaultTxs, nil
+// 	}
+// }
 
 // GetUnprocessedVaultTransactionsByBlock gets vault transactions that are not in command_executeds table
 func (db *DatabaseAdapter) GetUnprocessedVaultTransactionsByBlock(blockNumber uint64) ([]*chains.VaultTransaction, error) {
@@ -192,18 +198,40 @@ func (db *DatabaseAdapter) GetUnprocessedVaultTransactionsByBlock(blockNumber ui
 	return vaultTxs, err
 }
 
-func (db *DatabaseAdapter) GetNextVaultTransactions(lastProcessedBlock uint64) ([]*chains.VaultTransaction, error) {
+func (db *DatabaseAdapter) GetNextVaultTransactions(lastProcessedBlock uint64,
+	lastProcessPosition uint) ([]*chains.VaultTransaction, error) {
 	var vaultTxs []*chains.VaultTransaction
-	query := `
-		SELECT * FROM vault_transactions
-		WHERE vault_tx_type = 1 AND block_number = (
-			SELECT MIN(block_number) 
-			FROM vault_transactions 
-			WHERE vault_tx_type = 1 AND block_number > $1
-		)
-		ORDER BY tx_position ASC
-	`
-	err := db.IndexerClient.Raw(query, lastProcessedBlock).Scan(&vaultTxs).Error
+	// query := `
+	// 	SELECT * FROM vault_transactions
+	// 	WHERE vault_tx_type = 1 AND block_number = (
+	// 		SELECT MIN(block_number)
+	// 		FROM vault_transactions
+	// 		WHERE vault_tx_type = 1 AND block_number > $1
+	// 	)
+	// 	ORDER BY tx_position ASC
+	// `
+	// err := db.IndexerClient.Raw(query, lastProcessedBlock).Scan(&vaultTxs).Error
+	err := db.IndexerClient.Model(&chains.VaultTransaction{}).
+		Where("vault_tx_type = 1 AND (block_number = $1 AND tx_position > $2)", lastProcessedBlock, lastProcessPosition).
+		Order(clause.OrderBy{
+			Columns: []clause.OrderByColumn{
+				{Column: clause.Column{Name: "block_number"}, Desc: true},
+				{Column: clause.Column{Name: "tx_position"}, Desc: true},
+			},
+		}).
+		Scan(&vaultTxs).Error
+	if err == gorm.ErrRecordNotFound {
+		query := `
+			SELECT * FROM vault_transactions
+			WHERE vault_tx_type = 1 AND block_number = (
+				SELECT MIN(block_number)
+				FROM vault_transactions
+				WHERE vault_tx_type = 1 AND block_number > $1
+			)
+			ORDER BY tx_position ASC
+		`
+		err = db.IndexerClient.Raw(query, lastProcessedBlock).Scan(&vaultTxs).Error
+	}
 	if err != nil {
 		return nil, err
 	}

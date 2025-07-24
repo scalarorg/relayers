@@ -33,15 +33,23 @@ func (c *EvmClient) StartPoolRedeemProcessing(ctx context.Context) {
 		wg.Add(1)
 		go func(groupUid chainExported.Hash) {
 			defer wg.Done()
-			log.Info().Str("ChainId", c.EvmConfig.GetId()).Msgf("[ScalarClient] Starting redeem pool processing for group %s", groupUid.String())
+			log.Info().Str("ChainId", c.EvmConfig.GetId()).Msgf("[EvmClient] Starting redeem pool processing for group %s", groupUid.String())
+			//Check if utxo snapshot is ready
+			//Waiting for utxo snapshot initialied
+			err := c.ScalarClient.WaitForUtxoSnapshot(groupUid)
+			if err != nil {
+				log.Error().Err(err).Msgf("[Relayer] [StartPoolRedeemProcessing] cannot wait for utxo snapshot for group %s", groupUid.String())
+				return
+			}
+			log.Info().Msgf("[Relayer] [StartPoolRedeemProcessing] utxo snapshot is ready for group %s", groupUid.String())
 			for {
 				select {
 				case <-ctx.Done():
-					log.Info().Msg("[ScalarClient] Context cancelled, stopping redeem processing")
+					log.Info().Msg("[EvmClient] Context cancelled, stopping redeem processing")
 					return
 				case <-ticker.C:
 					if err := c.processNextPoolRedeemTx(groupUid); err != nil {
-						log.Error().Err(err).Msg("[ScalarClient] Failed to process redeem tx")
+						log.Error().Err(err).Msg("[EvmClient] Failed to process pool redeem tx")
 					}
 				}
 			}

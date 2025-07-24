@@ -2,9 +2,7 @@ package scalar
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +10,7 @@ import (
 	models "github.com/scalarorg/data-models/chains"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/events"
+	chainExported "github.com/scalarorg/scalar-core/x/chains/exported"
 	chains "github.com/scalarorg/scalar-core/x/chains/types"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	covenant "github.com/scalarorg/scalar-core/x/covenant/types"
@@ -89,15 +88,11 @@ func (c *Client) WaitForSwitchingToPhase(groupHex string, expectedPhase covExpor
 	}
 }
 
-func (c *Client) WaitForUtxoSnapshot(groupHex string) error {
+func (c *Client) WaitForUtxoSnapshot(groupHex chainExported.Hash) error {
 	covenantClient := c.GetCovenantQueryClient()
-	groupBytes, err := hex.DecodeString(strings.TrimPrefix(groupHex, "0x"))
-	if err != nil {
-		log.Error().Err(err).Msgf("[EvmClient] [WaitForUtxoSnapshot] failed to decode group uid: %s", groupHex)
-		return err
-	}
+	log.Info().Msgf("[EvmClient] [WaitForUtxoSnapshot] waiting for utxo snapshot for group %s", groupHex.String())
 	request := &covenant.UTXOSnapshotRequest{
-		UID: groupBytes,
+		UID: groupHex.Bytes(),
 	}
 	for {
 		utxoSnapshot, err := covenantClient.UTXOSnapshot(context.Background(), request)

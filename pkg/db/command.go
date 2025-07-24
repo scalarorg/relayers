@@ -144,38 +144,16 @@ func (db *DatabaseAdapter) UpdateBroadcastedCommands(chainId string, batchedComm
 }
 
 func (db *DatabaseAdapter) UpdateBatchCommandSigned(chainId string, commandIds []string) error {
-	var blockCommands []struct {
-		BlockNumber uint64
-		BlockHash   string
-		Counter     int
-	}
-	rawSql := `select block_number, block_hash, count(tx_hash) as counter from vault_transactions vt 
-				where tx_hash in (?) 
-				group by block_number, block_hash`
-	db.IndexerClient.Raw(rawSql, commandIds).Scan(&blockCommands)
-	err := db.RelayerClient.Transaction(func(tx *gorm.DB) error {
-		for _, blockCommand := range blockCommands {
-			var totalTxCount int64
-			tx.Model(&relayer.VaultBlock{}).Where("block_number = ?", blockCommand.BlockNumber).Count(&totalTxCount)
-			err := tx.Clauses(clause.OnConflict{
-				Columns: []clause.Column{{Name: "block_number"}},
-				DoUpdates: clause.Assignments(map[string]interface{}{
-					"processed_tx_count": gorm.Expr("processed_tx_count + ?", blockCommand.Counter),
-				}),
-			}).Create(&relayer.VaultBlock{
-				BlockNumber:      blockCommand.BlockNumber,
-				Chain:            chainId,
-				BlockHash:        blockCommand.BlockHash,
-				TransactionCount: int(totalTxCount),
-				ProcessedTxCount: blockCommand.Counter,
-				Status:           string(relayer.BlockStatusProcessing),
-			})
-			if err != nil {
-				return fmt.Errorf("failed to update vault block status: %w", err)
-			}
-		}
-		return nil
-	})
+	// var blockCommands []struct {
+	// 	BlockNumber uint64
+	// 	BlockHash   string
+	// 	Counter     int
+	// }
+	// rawSql := `select block_number, block_hash, count(tx_hash) as counter from vault_transactions vt
+	// 			where tx_hash in (?)
+	// 			group by block_number, block_hash`
+	// db.IndexerClient.Raw(rawSql, commandIds).Scan(&blockCommands)
+	err := db.RelayerClient.Model(&relayer.VaultTransaction{}).Where("tx_hash in (?)", commandIds).Update("status", "executing").Error
 	if err != nil {
 		return fmt.Errorf("failed to update signed commands: %w", err)
 	}

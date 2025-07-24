@@ -30,7 +30,7 @@ type BtcClient struct {
 	eventBus        *events.EventBus
 	pollInterval    time.Duration
 	lastBlockHeader *chains.BtcBlockHeader
-	lastVaultBlock  *relayer.VaultBlock
+	lastVaultTx     *relayer.VaultTransaction
 	lastRedeemTx    *relayer.EvmRedeemTx
 }
 

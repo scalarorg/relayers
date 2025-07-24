@@ -67,7 +67,7 @@ func SetupDatabase(dsn string) (*gorm.DB, error) {
 
 func RunMigrations(db *gorm.DB) error {
 	return db.AutoMigrate(
-		&relayer.VaultBlock{},
+		&relayer.VaultTransaction{},
 		&relayer.TokenSentBlock{},
 		&relayer.ContractCall{},
 		&relayer.ContractCallWithToken{},

@@ -14,7 +14,9 @@ func (c *BtcClient) StartNewBlockProcessing(ctx context.Context) {
 	log.Info().Str("ChainId", c.btcConfig.GetId()).
 		Int("PollInterval in seconds", int(c.pollInterval.Seconds())).
 		Msg("[BtcClient] Starting new block processing")
-
+	if err := c.processNextBlock(); err != nil {
+		log.Error().Err(err).Msg("[BtcClient] Failed to process new block")
+	}
 	ticker := time.NewTicker(c.pollInterval)
 	defer ticker.Stop()
 
