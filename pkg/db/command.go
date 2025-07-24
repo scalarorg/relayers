@@ -114,32 +114,26 @@ func (db *DatabaseAdapter) SaveCommandExecuted(cmdExecuted *chains.CommandExecut
 	return nil
 }
 
-func (db *DatabaseAdapter) UpdateBroadcastedCommands(chainId string, batchedCommandId string, commandIds []string, txHash string) error {
+func (db *DatabaseAdapter) UpdateBroadcastedCommands(chainId string, batchedCommandId string, commandIds []string, btcTxHash string) error {
 	err := db.RelayerClient.Transaction(func(tx *gorm.DB) error {
 		err := tx.Model(&scalarnet.Command{}).
 			Where("batch_command_id = ? AND command_id IN (?)", batchedCommandId, commandIds).
-			Updates(scalarnet.Command{ExecutedTxHash: txHash, Status: scalarnet.CommandStatusBroadcasted}).Error
+			Updates(scalarnet.Command{ExecutedTxHash: btcTxHash, Status: scalarnet.CommandStatusBroadcasted}).Error
 		if err != nil {
 			return fmt.Errorf("failed to update broadcasted commands: %w", err)
 		} else {
 			tx.Logger.Info(context.Background(),
 				fmt.Sprintf("[DatabaseAdapter] UpdateBroadcastedCommands successfully with chainId: %s, batchedCommandId: %s, commandIds: %v, txHash: %s",
-					chainId, batchedCommandId, commandIds, txHash))
+					chainId, batchedCommandId, commandIds, btcTxHash))
 		}
-		err = tx.Exec(`UPDATE contract_call_with_tokens as ccwt SET status = ? 
-						WHERE ccwt.event_id 
-						IN (SELECT ccawm.event_id FROM contract_call_approved_with_mints as ccawm WHERE ccawm.command_id IN (?))`,
-			chains.ContractCallStatusExecuting, commandIds).Error
-		// err = tx.Table("contract_call_with_tokens as ccwt").
-		// 	Joins("JOIN contract_call_approved_with_mints as ccawm ON ccwt.event_id = ccawm.event_id").
-		// 	Where("ccawm.command_id IN (?)", commandIds).
-		// 	Update("ccwt.status", chains.ContractCallStatusExecuting).Error
+		err = tx.Model(&relayer.ContractCallWithToken{}).
+			Where("tx_hash in (?)", commandIds).Update("status", chains.ContractCallStatusExecuting).Error
 		if err != nil {
 			return fmt.Errorf("failed to update contract call tokens status: %w", err)
 		} else {
 			tx.Logger.Info(context.Background(),
 				fmt.Sprintf("[DatabaseAdapter] UpdateContractCallTokensStatus successfully with chainId: %s, batchedCommandId: %s, commandIds: %v, txHash: %s",
-					chainId, batchedCommandId, commandIds, txHash))
+					chainId, batchedCommandId, commandIds, btcTxHash))
 		}
 		return nil
 	})

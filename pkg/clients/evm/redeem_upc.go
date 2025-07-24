@@ -49,6 +49,10 @@ func (c *EvmClient) processNextUpcRedeemTx() error {
 		lastProcessBlock = c.lastContractCallWithToken.BlockNumber
 		lastProcessLogIndex = c.lastContractCallWithToken.LogIndex
 	}
+	log.Info().
+		Uint64("lastProcessBlock", lastProcessBlock).
+		Uint64("lastProcessLogIndex", lastProcessLogIndex).
+		Msg("[ScalarClient] [processNextUpcRedeemTx] last process block and log index")
 	contractCallTxs, err = c.dbAdapter.GetNextContractCallWithTokens(lastProcessBlock, lastProcessLogIndex, UPC_REDEEM_TX_BATCH_SIZE)
 	if err != nil {
 		return fmt.Errorf("failed to get new contract call txs: %w", err)
@@ -124,14 +128,12 @@ func (c *EvmClient) storeProcessedContractCallWithTokens(contractCallWithTokens 
 	relayerContractCallWithTokens := make([]*relayer.ContractCallWithToken, len(contractCallWithTokens))
 	for i, tx := range contractCallWithTokens {
 		relayerContractCallWithTokens[i] = &relayer.ContractCallWithToken{
-			ContractCall: relayer.ContractCall{
-				BlockNumber:      tx.BlockNumber,
-				TxHash:           tx.TxHash,
-				LogIndex:         uint64(tx.LogIndex),
-				SourceChain:      tx.SourceChain,
-				DestinationChain: tx.DestinationChain,
-				Status:           relayer.ContractCallStatusPending,
-			},
+			BlockNumber:          tx.BlockNumber,
+			TxHash:               tx.TxHash,
+			LogIndex:             uint64(tx.LogIndex),
+			SourceChain:          tx.SourceChain,
+			DestinationChain:     tx.DestinationChain,
+			Status:               relayer.ContractCallStatusPending,
 			TokenContractAddress: tx.TokenContractAddress,
 			Symbol:               tx.Symbol,
 			Amount:               tx.Amount,

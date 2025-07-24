@@ -19,7 +19,7 @@ func (db *DatabaseAdapter) GetLastContractCallWithToken() (*relayer.ContractCall
 	err := db.RelayerClient.Model(&relayer.ContractCallWithToken{}).
 		Order(clause.OrderBy{
 			Columns: []clause.OrderByColumn{
-				{Column: clause.Column{Name: "tx_hash"}, Desc: true},
+				{Column: clause.Column{Name: "block_number"}, Desc: true},
 				{Column: clause.Column{Name: "log_index"}, Desc: true}},
 		}).
 		First(&contractCallWithToken).Error
@@ -31,7 +31,7 @@ func (db *DatabaseAdapter) GetLastContractCallWithToken() (*relayer.ContractCall
 
 func (db *DatabaseAdapter) CreateContractCallWithTokens(contractCallWithTokens []*relayer.ContractCallWithToken) error {
 	err := db.RelayerClient.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "tx_hash"}, {Name: "log_index"}},
+		Columns:   []clause.Column{{Name: "block_number"}, {Name: "log_index"}},
 		DoNothing: true,
 	}).Create(contractCallWithTokens).Error
 	if err != nil {

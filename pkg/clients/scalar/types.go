@@ -28,8 +28,9 @@ const (
 	BlockEventsBase64Encoded                 = false
 	EventTypeMintCommand                     = "scalar.chains.v1beta1.MintCommand"
 	EventTypeContractCallApproved            = "scalar.chains.v1beta1.ContractCallApproved"
-	EventTypeContractCallWithMintApproved    = "scalar.chains.v1beta1.ContractCallWithMintApproved"
+	EventTypeContractCallWithMintApproved    = "scalar.chains.v1beta1.EventContractCallWithMintApproved"
 	EventTypeTokenSent                       = "scalar.chains.v1beta1.EventTokenSent"
+	ChainEventCompleted                      = "scalar.chains.v1beta1.ChainEventCompleted"
 	EventTypeEVMEventCompleted               = "scalar.chains.v1beta1.EVMEventCompleted"
 	EventTypeCommandBatchSigned              = "scalar.chains.v1beta1.CommandBatchSigned"
 	EventTypeRedeemTokenApproved             = "scalar.chains.v1beta1.EventRedeemTokenApproved"

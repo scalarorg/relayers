@@ -134,12 +134,12 @@ func ParseBlockEvents(allEvents map[string][]string) (*BlockEvents, error) {
 		}
 		for _, eventData := range eventData {
 			instance := reflect.New(reflect.TypeOf(msgType).Elem()).Interface().(proto.Message)
-			err := UnmarshalJson(eventData, instance.(proto.Message))
+			err := UnmarshalJson(eventData, instance)
 			if err != nil {
 				log.Error().Err(err).Msgf("Cannot unmarshal message of type %T", msgType)
 				continue
 			}
-			parsedEvents.Add(msgTypeName, instance.(proto.Message))
+			parsedEvents.Add(msgTypeName, instance)
 		}
 	}
 	return parsedEvents, nil

@@ -272,7 +272,7 @@ func (s *Service) replaySwitchPhase(switchedPhases []*chains.SwitchedPhase, expe
 // replayRedeemTransactionsFromDB replays redeem transactions from database instead of EVM network
 func (s *Service) replayRedeemTransactions(groupUid chainExported.Hash, redeemTokenEvents []*chains.EvmRedeemTx) (map[string][]string, error) {
 	mapTxHashes := make(map[string][]string)
-
+	log.Info().Any("redeemTokenEvents", redeemTokenEvents).Msg("[Relayer] [replayRedeemTransactions] redeem token events")
 	for _, redeemTx := range redeemTokenEvents {
 		// Convert database model to contract event and handle it
 		//contractEvent := s.convertRedeemTxToContractEvent(redeemTx)

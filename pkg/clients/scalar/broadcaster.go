@@ -105,14 +105,18 @@ func (c *Broadcaster) ConfirmEvmTxs(chainName string, txIds []string) error {
 	//1. Create Confirm message request
 	nexusChain := nexus.ChainName(utils.NormalizeString(chainName))
 	log.Debug().Msgf("[Broadcaster] [ConfirmEvmTxs] Enqueue for confirmation txs from chain %s: %v", nexusChain, txIds)
-	txHashs := make([]chainsExported.Hash, len(txIds))
-	for i, txId := range txIds {
+	txHashs := []chainsExported.Hash{}
+	for _, txId := range txIds {
 		txHash, err := chainsExported.HashFromHex(txId)
 		if err != nil {
 			log.Error().Err(err).Msgf("[Broadcaster] [ConfirmEvmTxs] Failed to get tx hash for tx %s", txId)
 			continue
 		}
-		txHashs[i] = txHash
+		txHashs = append(txHashs, txHash)
+	}
+	if len(txHashs) == 0 {
+		log.Error().Msgf("[Broadcaster] [ConfirmEvmTxs] No tx hash to confirm")
+		return nil
 	}
 	msg := chainstypes.NewConfirmSourceTxsRequest(c.network.GetAddress(), nexusChain, txHashs)
 	return c.QueueTxMsg(msg)
