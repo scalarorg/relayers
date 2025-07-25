@@ -3,6 +3,7 @@ package db
 import (
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/data-models/relayer"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -21,6 +22,16 @@ func (db *DatabaseAdapter) GetLastSwitchedPhases(groupUid string) ([]*chains.Swi
 	`
 	err := db.IndexerClient.Raw(query, groupUid).Scan(&switchedPhases).Error
 	return switchedPhases, err
+}
+func (db *DatabaseAdapter) GetNextSwitchPhaseEvent(chainId string, groupUid string, sequence uint64, phase covExported.Phase) (*chains.SwitchedPhase, error) {
+	var switchedPhase chains.SwitchedPhase
+	err := db.IndexerClient.Model(&chains.SwitchedPhase{}).
+		Where("source_chain = $1 AND custodian_group_uid = $2 AND (session_sequence > $3 OR (session_sequence = $3 AND \"to\" > $4))", chainId, groupUid, sequence, phase).
+		First(&switchedPhase).Error
+	if err != nil {
+		return nil, err
+	}
+	return &switchedPhase, nil
 }
 
 // VaultBlock operations

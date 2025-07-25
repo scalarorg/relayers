@@ -15,6 +15,7 @@ import (
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	chainExported "github.com/scalarorg/scalar-core/x/chains/exported"
 	"github.com/scalarorg/scalar-core/x/chains/types"
 	"github.com/scalarorg/scalar-core/x/covenant/exported"
 )
@@ -436,22 +437,28 @@ func (ec *EvmClient) HandleTokenDeployed(event *contracts.IScalarGatewayTokenDep
 /*
 * Send switch phase event to the scalar network
  */
-func (ec *EvmClient) HandleSwitchPhase(event *contracts.IScalarGatewaySwitchPhase) error {
+func (ec *EvmClient) HandleSwitchPhase(switchPhase *chains.SwitchedPhase) error {
 	//0. Preprocess the event
-	log.Info().Str("Chain", ec.EvmConfig.ID).Any("event", event).Msg("[EvmClient] [HandleSwitchPhase] Start processing evm switch phase")
+	log.Info().Str("Chain", ec.EvmConfig.ID).Any("SwitchPhase Event", switchPhase).
+		Msg("[EvmClient] [HandleSwitchPhase] Start processing evm switch phase")
 	//1. Convert into a RelayData instance then store to the db
-	switchPhase := ec.SwitchPhaseEvent2Model(event)
+	// switchPhase := ec.SwitchPhaseEvent2Model(event)
 	//2. Send to the bus
 	if ec.eventBus != nil {
 		ec.eventBus.BroadcastEvent(&events.EventEnvelope{
 			EventType:        events.EVENT_EVM_SWITCHED_PHASE,
 			DestinationChain: events.SCALAR_NETWORK_NAME,
-			Data:             &switchPhase,
+			Data:             switchPhase,
 		})
 		//Loop until the scalar network finishes the switch phase
 		for {
 			time.Sleep(2 * time.Second)
-			redeemSession, err := ec.ScalarClient.GetChainRedeemSession(ec.EvmConfig.ID, event.CustodianGroupId)
+			custodianGroupUid, err := chainExported.HashFromHex(switchPhase.CustodianGroupUid)
+			if err != nil {
+				log.Warn().Err(err).Msgf("[EvmClient] [HandleSwitchPhase] failed to decode custodian group uid")
+				continue
+			}
+			redeemSession, err := ec.ScalarClient.GetChainRedeemSession(ec.EvmConfig.ID, custodianGroupUid)
 			if err != nil {
 				log.Warn().Err(err).Msgf("[EvmClient] [HandleSwitchPhase] failed to get current redeem session from scalarnet")
 			}
@@ -462,13 +469,15 @@ func (ec *EvmClient) HandleSwitchPhase(event *contracts.IScalarGatewaySwitchPhas
 			log.Info().Str("Chain", ec.EvmConfig.ID).
 				Uint64("Sequence", redeemSession.Sequence).
 				Any("CurrentPhase", redeemSession.CurrentPhase).
-				Hex("CustodianGroupId", event.CustodianGroupId[:]).
+				Hex("CustodianGroupId", custodianGroupUid[:]).
 				Msg("[EvmClient] [HandleSwitchPhase] redeem session")
-			if redeemSession.Sequence == event.Sequence && redeemSession.CurrentPhase == exported.Phase(event.To) {
-				log.Info().Str("Chain", ec.EvmConfig.ID).Msgf("[EvmClient] [HandleSwitchPhase] successfully switched phase to sequence %d and phase %v", event.Sequence, exported.Phase(event.To))
+			if redeemSession.Sequence == switchPhase.SessionSequence && redeemSession.CurrentPhase == exported.Phase(switchPhase.To) {
+				log.Info().Str("Chain", ec.EvmConfig.ID).Msgf("[EvmClient] [HandleSwitchPhase] successfully switched phase to sequence %d and phase %v",
+					switchPhase.SessionSequence, exported.Phase(switchPhase.To))
 				break
 			} else {
-				log.Info().Str("Chain", ec.EvmConfig.ID).Msgf("[EvmClient] [HandleSwitchPhase] waiting for phase switch to sequence %d and phase %v", event.Sequence, exported.Phase(event.To))
+				log.Info().Str("Chain", ec.EvmConfig.ID).Msgf("[EvmClient] [HandleSwitchPhase] waiting for phase switch to sequence %d and phase %v",
+					switchPhase.SessionSequence, exported.Phase(switchPhase.To))
 			}
 		}
 	} else {

@@ -131,28 +131,28 @@ func (c *EvmClient) RecoverAllEvents(ctx context.Context, groups []*covExported.
 	return nil
 }
 
-func (c *EvmClient) WaitForSwitchingToPhase(groupUids []string, expectedPhase covExported.Phase) error {
-	waitingGroupUids := map[string]bool{}
-	for _, groupUid := range groupUids {
-		waitingGroupUids[groupUid] = true
-	}
-	for len(waitingGroupUids) > 0 {
-		time.Sleep(2 * time.Second)
-		for groupHex := range waitingGroupUids {
-			redeemSession, err := c.ScalarClient.GetRedeemSession(groupHex)
-			if err != nil {
-				log.Warn().Err(err).Msgf("[EvmClient] [RecoverAllEvents] failed to get current redeem session from scalarnet")
-			}
-			if redeemSession.Session.CurrentPhase == expectedPhase {
-				delete(waitingGroupUids, groupHex)
-			}
-			log.Info().Str("Chain", c.EvmConfig.ID).Str("GroupUid", groupHex).
-				Any("Session", redeemSession.Session).
-				Msgf("[EvmClient] [WaitForSwitchingToPhase] waiting for group %d to switch to expected phase %v", len(waitingGroupUids), expectedPhase)
-		}
-	}
-	return nil
-}
+// func (c *EvmClient) WaitForSwitchingToPhase(groupUids []string, expectedPhase covExported.Phase) error {
+// 	waitingGroupUids := map[string]bool{}
+// 	for _, groupUid := range groupUids {
+// 		waitingGroupUids[groupUid] = true
+// 	}
+// 	for len(waitingGroupUids) > 0 {
+// 		time.Sleep(2 * time.Second)
+// 		for groupHex := range waitingGroupUids {
+// 			redeemSession, err := c.ScalarClient.GetRedeemSession(groupHex)
+// 			if err != nil {
+// 				log.Warn().Err(err).Msgf("[EvmClient] [RecoverAllEvents] failed to get current redeem session from scalarnet")
+// 			}
+// 			if redeemSession.Session.CurrentPhase == expectedPhase {
+// 				delete(waitingGroupUids, groupHex)
+// 			}
+// 			log.Info().Str("Chain", c.EvmConfig.ID).Str("GroupUid", groupHex).
+// 				Any("Session", redeemSession.Session).
+// 				Msgf("[EvmClient] [WaitForSwitchingToPhase] waiting for group %d to switch to expected phase %v", len(waitingGroupUids), expectedPhase)
+// 		}
+// 	}
+// 	return nil
+// }
 
 func (c *EvmClient) WaitForRedeemCommandConfirmed(redeemTxs map[string][]string) {
 	wg := sync.WaitGroup{}

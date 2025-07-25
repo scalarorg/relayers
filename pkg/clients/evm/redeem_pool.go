@@ -11,27 +11,80 @@ import (
 	"github.com/scalarorg/data-models/relayer"
 	"github.com/scalarorg/relayers/pkg/events"
 	chainExported "github.com/scalarorg/scalar-core/x/chains/exported"
+	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
+	covTypes "github.com/scalarorg/scalar-core/x/covenant/types"
+	"gorm.io/gorm"
 )
 
 const (
 	POOL_REDEEM_TX_BATCH_SIZE = 10
 )
 
-func (c *EvmClient) StartPoolRedeemProcessing(ctx context.Context) {
+func (c *EvmClient) StartRedeemSessionProcessing(ctx context.Context, groups []*covExported.CustodianGroup) {
 	log.Info().Str("ChainId", c.EvmConfig.GetId()).
-		Int("PollInterval in seconds", int(c.pollInterval.Seconds())).
-		Msg("[EvmClient] Starting redeem pool processing")
-	ticker := time.NewTicker(c.pollInterval)
-	defer ticker.Stop()
-	groups, err := c.ScalarClient.GetCovenantGroups(ctx)
-	if err != nil {
-		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot get covenant groups")
-		panic(err)
-	}
+		Msgf("[EvmClient] Starting redeem pool session processing for %d groups", len(groups))
 	wg := sync.WaitGroup{}
 	for _, group := range groups {
 		wg.Add(1)
 		go func(groupUid chainExported.Hash) {
+			defer wg.Done()
+			ticker := time.NewTicker(c.pollInterval)
+			defer ticker.Stop()
+			log.Info().Str("ChainId", c.EvmConfig.GetId()).Msgf("[EvmClient] Starting redeem session switch phase processing for group %s", groupUid.String())
+			//Get current session phase from scalar core
+			for {
+				select {
+				case <-ctx.Done():
+					log.Info().Msg("[EvmClient] Context cancelled, stopping redeem session switch phase processing")
+					return
+				case <-ticker.C:
+					redeemSession, err := c.ScalarClient.GetRedeemSession(groupUid)
+					if err != nil {
+						log.Error().Err(err).Msgf("[EvmClient] Failed to get session phase for group %s", groupUid.String())
+						continue
+					}
+					if err := c.processNextSwitchPhase(groupUid, redeemSession.Session); err != nil {
+						log.Error().Err(err).Msg("[EvmClient] Failed to process pool redeem tx")
+					}
+				}
+			}
+		}(group.UID)
+	}
+	wg.Wait()
+}
+func (c *EvmClient) processNextSwitchPhase(groupUid chainExported.Hash, session *covTypes.RedeemSession) error {
+	log.Info().Str("ChainId", c.EvmConfig.GetId()).
+		Str("GroupUid", groupUid.String()).
+		Any("Session", session).
+		Msg("[EvmClient] Processing next switch phase")
+	switchedPhaseEvent, err := c.dbAdapter.GetNextSwitchPhaseEvent(c.EvmConfig.GetId(), groupUid.String(), session.Sequence, session.CurrentPhase)
+	if err == gorm.ErrRecordNotFound {
+		log.Info().Msg("[EvmClient] No next switch phase event found")
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to get next switch phase event: %w", err)
+	}
+	log.Info().Any("SwitchedPhase", switchedPhaseEvent).Msg("[EvmClient] Found next switch phase event")
+	//c.HandleSwitchPhase(switchedPhaseEvent)
+	if c.eventBus != nil {
+		c.eventBus.BroadcastEvent(&events.EventEnvelope{
+			EventType:        events.EVENT_EVM_SWITCHED_PHASE,
+			DestinationChain: events.SCALAR_NETWORK_NAME,
+			Data:             switchedPhaseEvent,
+		})
+	}
+	return nil
+}
+func (c *EvmClient) StartPoolRedeemProcessing(ctx context.Context, groups []*covExported.CustodianGroup) {
+	log.Info().Str("ChainId", c.EvmConfig.GetId()).
+		Int("PollInterval in seconds", int(c.pollInterval.Seconds())).
+		Msg("[EvmClient] Starting redeem pool processing")
+	wg := sync.WaitGroup{}
+	for _, group := range groups {
+		wg.Add(1)
+		go func(groupUid chainExported.Hash) {
+			ticker := time.NewTicker(c.pollInterval)
+			defer ticker.Stop()
 			defer wg.Done()
 			log.Info().Str("ChainId", c.EvmConfig.GetId()).Msgf("[EvmClient] Starting redeem pool processing for group %s", groupUid.String())
 			//Check if utxo snapshot is ready

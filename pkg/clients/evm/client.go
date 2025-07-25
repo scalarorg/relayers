@@ -24,6 +24,7 @@ import (
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
+	covenantExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -207,15 +208,18 @@ func (c *EvmClient) SetAuth(auth *bind.TransactOpts) {
 	c.auth = auth
 }
 
-func (c *EvmClient) Start(ctx context.Context) error {
+func (c *EvmClient) Start(ctx context.Context, groups []*covenantExported.CustodianGroup) error {
 	go func() {
 		c.StartTransferProcessing(ctx)
 	}()
 	go func() {
-		c.StartPoolRedeemProcessing(ctx)
+		c.StartPoolRedeemProcessing(ctx, groups)
 	}()
 	go func() {
 		c.StartUpcRedeemProcessing(ctx)
+	}()
+	go func() {
+		c.StartRedeemSessionProcessing(ctx, groups)
 	}()
 	//c.startFetchBlock()
 	//Subscribe to the event bus

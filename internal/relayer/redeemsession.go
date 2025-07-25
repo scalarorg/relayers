@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/data-models/chains"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
@@ -65,6 +64,11 @@ func getMinSession(lastSwitchedPhases []*chains.SwitchedPhase) *pkgTypes.Session
 }
 
 func (s *Service) RecoverEvmSessions(groupUid chainExported.Hash) error {
+	err := s.ScalarClient.WaitForUtxoSnapshot(groupUid)
+	if err != nil {
+		log.Warn().Err(err).Msgf("[Relayer] [RecoverEvmSessions] cannot wait for utxo snapshot")
+		return err
+	}
 	lastSwitchedPhases, err := s.DbAdapter.GetLastSwitchedPhases(hex.EncodeToString(groupUid[:]))
 	if err != nil {
 		return fmt.Errorf("failed to get last switched phases: %w", err)
@@ -134,7 +138,7 @@ func (s *Service) processRecoverExecutingPhase(groupUid chainExported.Hash, swit
 		}
 
 		//2. wait for group's session switch to preparing then replay all redeem token events
-		err := s.ScalarClient.WaitForSwitchingToPhase(hex.EncodeToString(groupUid[:]), covExported.Preparing)
+		err := s.ScalarClient.WaitForSwitchingToPhase(groupUid, covExported.Preparing)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot wait for group %s to switch to preparing phase", groupUid)
 			return err
@@ -167,12 +171,12 @@ func (s *Service) processRecoverExecutingPhase(groupUid chainExported.Hash, swit
 	if evmCounter == int32(len(s.EvmClients)) {
 		log.Info().Int32("evmCounter", evmCounter).Msg("[Relayer] [processRecoverExecutionPhase] all evm chains a in executing phase")
 		//All evm chains are in executing phase
-		err = s.ScalarClient.WaitForSwitchingToPhase(hex.EncodeToString(groupUid[:]), covExported.Executing)
+		err = s.ScalarClient.WaitForSwitchingToPhase(groupUid, covExported.Executing)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot wait for group %s to switch to executing phase", groupUid)
 			return err
 		}
-		err = s.replayBtcRedeemTxs(hex.EncodeToString(groupUid[:]))
+		err = s.replayBtcRedeemTxs(groupUid)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[Relayer] [processRecoverExecutionPhase] cannot replay btc redeem transactions")
 			return err
@@ -205,7 +209,7 @@ func (s *Service) processRecoverPreparingPhase(groupUid chainExported.Hash, swit
 		expectedPhase = covExported.Executing
 	}
 	//2. Waiting for group session switch to expected phase
-	err := s.ScalarClient.WaitForSwitchingToPhase(hex.EncodeToString(groupUid[:]), expectedPhase)
+	err := s.ScalarClient.WaitForSwitchingToPhase(groupUid, expectedPhase)
 	if err != nil {
 		log.Warn().Err(err).Msgf("[Relayer] [processRecoverPreparingPhase] cannot wait for group %s to switch to executing phase", groupUid)
 		return err
@@ -226,7 +230,7 @@ func (s *Service) processRecoverPreparingPhase(groupUid chainExported.Hash, swit
 		}
 		log.Info().Any("mapTxHashes", mapTxHashes).Msg("[Relayer] [processRecoverPreparingPhase] finished replay redeem transactions")
 	} else if expectedPhase == covExported.Executing {
-		err := s.replayBtcRedeemTxs(hex.EncodeToString(groupUid[:]))
+		err := s.replayBtcRedeemTxs(groupUid)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[Relayer] [processRecoverPreparingPhase] cannot replay btc redeem transactions")
 			return err
@@ -257,8 +261,8 @@ func (s *Service) replaySwitchPhase(switchedPhases []*chains.SwitchedPhase, expe
 		}
 
 		// Convert database model to contract event and handle it
-		contractEvent := s.convertSwitchedPhaseToContractEvent(switchPhaseEvent)
-		err := evmClient.HandleSwitchPhase(contractEvent)
+		//contractEvent := s.convertSwitchedPhaseToContractEvent(switchPhaseEvent)
+		err := evmClient.HandleSwitchPhase(switchPhaseEvent)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[Relayer] [replaySwitchPhaseEventsFromDB] cannot handle switch phase event for evm client %s", chainId)
 		} else {
@@ -291,25 +295,25 @@ func (s *Service) replayRedeemTransactions(groupUid chainExported.Hash, redeemTo
 }
 
 // convertSwitchedPhaseToContractEvent converts database model to contract event
-func (s *Service) convertSwitchedPhaseToContractEvent(switchedPhase *chains.SwitchedPhase) *contracts.IScalarGatewaySwitchPhase {
-	// Convert hex string to bytes32
-	var custodianGroupId [32]byte
-	copy(custodianGroupId[:], common.FromHex(switchedPhase.CustodianGroupUid))
+// func (s *Service) convertSwitchedPhaseToContractEvent(switchedPhase *chains.SwitchedPhase) *contracts.IScalarGatewaySwitchPhase {
+// 	// Convert hex string to bytes32
+// 	var custodianGroupId [32]byte
+// 	copy(custodianGroupId[:], common.FromHex(switchedPhase.CustodianGroupUid))
 
-	// Create a mock log for the event
-	mockLog := ethTypes.Log{
-		TxHash: common.HexToHash(switchedPhase.TxHash),
-		Index:  0, // Use default value since LogIndex doesn't exist in SwitchedPhase
-	}
+// 	// Create a mock log for the event
+// 	mockLog := ethTypes.Log{
+// 		TxHash: common.HexToHash(switchedPhase.TxHash),
+// 		Index:  0, // Use default value since LogIndex doesn't exist in SwitchedPhase
+// 	}
 
-	return &contracts.IScalarGatewaySwitchPhase{
-		CustodianGroupId: custodianGroupId,
-		Sequence:         switchedPhase.SessionSequence,
-		From:             switchedPhase.From,
-		To:               switchedPhase.To,
-		Raw:              mockLog,
-	}
-}
+// 	return &contracts.IScalarGatewaySwitchPhase{
+// 		CustodianGroupId: custodianGroupId,
+// 		Sequence:         switchedPhase.SessionSequence,
+// 		From:             switchedPhase.From,
+// 		To:               switchedPhase.To,
+// 		Raw:              mockLog,
+// 	}
+// }
 
 // convertRedeemTxToContractEvent converts database model to contract event
 func (s *Service) convertRedeemTxToContractEvent(redeemTx *chains.EvmRedeemTx) *contracts.IScalarGatewayRedeemToken {

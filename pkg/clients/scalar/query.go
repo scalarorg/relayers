@@ -2,12 +2,11 @@ package scalar
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/rs/zerolog/log"
+	chainExported "github.com/scalarorg/scalar-core/x/chains/exported"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 	covenanttypes "github.com/scalarorg/scalar-core/x/covenant/types"
@@ -159,17 +158,13 @@ func (c *Client) GetCovenantGroups(ctx context.Context) ([]*covExported.Custodia
 	return response.Groups, nil
 }
 
-func (c *Client) GetRedeemSession(custodianGroupUid string) (*covenanttypes.RedeemSessionResponse, error) {
+func (c *Client) GetRedeemSession(custodianGroup chainExported.Hash) (*covenanttypes.RedeemSessionResponse, error) {
 	client := c.GetCovenantQueryClient()
 	if client == nil {
 		return nil, errors.New("covenant query client is nil")
 	}
-	groupBytes, err := hex.DecodeString(custodianGroupUid)
-	if err != nil {
-		return nil, fmt.Errorf("[ScalarClient] [GetRedeemSession] cannot decode group uid: %w", err)
-	}
 	response, err := client.RedeemSession(context.Background(), &covenanttypes.RedeemSessionRequest{
-		UID: groupBytes,
+		UID: custodianGroup.Bytes(),
 	})
 	if err != nil {
 		return nil, err
@@ -177,7 +172,7 @@ func (c *Client) GetRedeemSession(custodianGroupUid string) (*covenanttypes.Rede
 	return response, nil
 }
 
-func (c *Client) GetChainRedeemSession(chainId string, custodianGroupUid [32]byte) (*chainstypes.RedeemSession, error) {
+func (c *Client) GetChainRedeemSession(chainId string, custodianGroupUid chainExported.Hash) (*chainstypes.RedeemSession, error) {
 	client := c.GetChainQueryServiceClient()
 	if client == nil {
 		return nil, errors.New("chain query client is nil")

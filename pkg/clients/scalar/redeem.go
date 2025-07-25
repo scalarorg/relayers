@@ -3,6 +3,7 @@ package scalar
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -66,20 +67,20 @@ func (s *CustodianGroupRedeemTx) PickRedeemTxsByGroupUid(groupUid string, sequen
 	return redeemTxs, nil
 }
 
-func (c *Client) WaitForSwitchingToPhase(groupHex string, expectedPhase covExported.Phase) error {
+func (c *Client) WaitForSwitchingToPhase(groupHash chainExported.Hash, expectedPhase covExported.Phase) error {
 	for {
-		redeemSession, err := c.GetRedeemSession(groupHex)
+		redeemSession, err := c.GetRedeemSession(groupHash)
 		if err != nil {
 			log.Warn().Err(err).Msgf("[EvmClient] [RecoverAllEvents] failed to get current redeem session from scalarnet")
 			continue
 		} else {
 			if redeemSession.Session.CurrentPhase == expectedPhase {
-				log.Info().Str("GroupUid", groupHex).
+				log.Info().Str("GroupUid", groupHash.String()).
 					Any("Session", redeemSession.Session).
 					Msgf("[EvmClient] [WaitForSwitchingToPhase] Current group has switched to expected phase %+v", expectedPhase)
 				return nil
 			} else {
-				log.Info().Str("GroupUid", groupHex).
+				log.Info().Str("GroupUid", groupHash.String()).
 					Any("Session", redeemSession.Session).
 					Msgf("[EvmClient] [WaitForSwitchingToPhase] waiting for group to switch to expected phase %v", expectedPhase)
 			}
@@ -96,17 +97,14 @@ func (c *Client) WaitForUtxoSnapshot(groupHex chainExported.Hash) error {
 	}
 	for {
 		utxoSnapshot, err := covenantClient.UTXOSnapshot(context.Background(), request)
-		if err != nil {
-			log.Error().Err(err).Msgf("[EvmClient] [WaitForUtxoSnapshot] failed to get utxo snapshot")
-			return err
-		}
 		//TODO: check with block height
 		if utxoSnapshot != nil && utxoSnapshot.UtxoSnapshot != nil && len(utxoSnapshot.UtxoSnapshot.Utxos) > 0 {
 			log.Info().Msgf("[EvmClient] [WaitForUtxoSnapshot] found utxo snapshot")
 			return nil
+		} else if err != nil {
+			log.Error().Err(err).Msgf("[EvmClient] [WaitForUtxoSnapshot] failed to get utxo snapshot. Waiting for utxo snapshot again")
+			time.Sleep(2 * time.Second)
 		}
-		log.Info().Msgf("[EvmClient] [WaitForUtxoSnapshot] waiting for utxo snapshot")
-		time.Sleep(2 * time.Second)
 	}
 }
 func (c *Client) ReserveUtxo(sourceChain string, redeemTokenEvent *contracts.IScalarGatewayRedeemToken) error {
@@ -145,7 +143,7 @@ func (c *Client) WaitForPendingCommands(chainId string, sourceTxs []string) erro
 			return err
 		}
 		for _, command := range pendingCommands.Commands {
-			txHash := command.Params["sourceTxHash"]
+			txHash := strings.TrimPrefix(command.Params["sourceTxHash"], "0x")
 			log.Info().Str("Chain", chainId).Str("TxHash", txHash).Msg("[EvmClient] [waitForPendingCommands] found pending command")
 			if _, ok := waitingTxs[txHash]; ok {
 				log.Info().Str("Chain", chainId).Str("TxHash", txHash).Msg("[EvmClient] [waitForPendingCommands] found pending command")
@@ -207,10 +205,10 @@ func (c *Client) BroadcastRedeemTxsConfirmRequest(chainId string, groupUid strin
 	}
 	return nil
 }
-func (c *Client) PickCacheRedeemTx(groupUid string, sequence uint64) map[string][]*models.BtcRedeemTx {
+func (c *Client) PickCacheRedeemTx(groupUid chainExported.Hash, sequence uint64) map[string][]*models.BtcRedeemTx {
 	result := make(map[string][]*models.BtcRedeemTx)
 	for chainId, redeemTxCache := range c.redeemTxCache {
-		redeemTxs, err := redeemTxCache.PickRedeemTxsByGroupUid(groupUid, sequence)
+		redeemTxs, err := redeemTxCache.PickRedeemTxsByGroupUid(groupUid.String(), sequence)
 		if err != nil {
 			log.Error().Err(err).Msgf("[EvmClient] [PickCacheRedeemTx] failed to get redeem txs")
 			continue

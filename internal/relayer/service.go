@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/btc"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
-	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/clients/scalar"
 	"github.com/scalarorg/relayers/pkg/db"
 	"github.com/scalarorg/relayers/pkg/events"
@@ -66,28 +64,33 @@ func NewService(config *config.Config,
 }
 
 func (s *Service) Start(ctx context.Context) error {
-	if s.ScalarClient != nil {
-		//Subscribe all block events with heat beat
-		go func() {
-			err := s.ScalarClient.SubscribeAllBlockEventsWithHeatBeat(ctx)
-			if err != nil {
-				log.Error().Err(err).Msg("[ScalarClient] [subscribeAllBlockEventsWithHeatBeat] Failed")
-			}
-		}()
-		//Start broadcast
-		go func() {
-			err := s.ScalarClient.StartBroadcast(ctx)
-			if err != nil {
-				log.Error().Err(err).Msg("[ScalarClient] [StartBroadcast] Failed")
-			}
-		}()
-		//Subscribe event bus
-		err := s.ScalarClient.SubscribeEventBus(ctx)
-		if err != nil {
-			log.Error().Err(err).Msg("[ScalarClient] [SubscribeEventBus] Failed")
-		}
+	if s.ScalarClient == nil {
+		log.Fatal().Msg("[Relayer] [Start] scalar client is undefined")
 	}
 
+	//Subscribe all block events with heat beat
+	go func() {
+		err := s.ScalarClient.SubscribeAllBlockEventsWithHeatBeat(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("[ScalarClient] [subscribeAllBlockEventsWithHeatBeat] Failed")
+		}
+	}()
+	//Start broadcast
+	go func() {
+		err := s.ScalarClient.StartBroadcast(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("[ScalarClient] [StartBroadcast] Failed")
+		}
+	}()
+	//Subscribe event bus
+	err := s.ScalarClient.SubscribeEventBus(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("[ScalarClient] [SubscribeEventBus] Failed")
+	}
+	//Init btc block for initial utxo snapshot
+	for _, client := range s.BtcClient {
+		go client.ProcessNextBlock()
+	}
 	groups, err := s.ScalarClient.GetCovenantGroups(ctx)
 	if err != nil {
 		log.Warn().Err(err).Msgf("[Relayer] [Start] cannot get covenant groups")
@@ -120,11 +123,15 @@ func (s *Service) Start(ctx context.Context) error {
 
 	for _, client := range s.EvmClients {
 		go func() {
-			client.Start(ctx)
+			client.Start(ctx, groups)
 		}()
 	}
 
 	return nil
+}
+
+func (s *Service) Stop() {
+	log.Info().Msg("Relayer service stopped")
 }
 
 // func (s *Service) processRecoverExecutingPhase(groupUid string, groupRedeemSessions *types.GroupRedeemSessions) error {
@@ -239,8 +246,8 @@ func (s *Service) Start(ctx context.Context) error {
 // }
 
 // Find and replay btc redeem tx
-func (s *Service) replayBtcRedeemTxs(groupUid string) error {
-	log.Info().Str("groupUid", groupUid).Msgf("[Relayer] [processRecoverPreparingPhase] replay btc redeem transactions")
+func (s *Service) replayBtcRedeemTxs(groupUid chainExported.Hash) error {
+	log.Info().Str("groupUid", groupUid.String()).Msgf("[Relayer] [processRecoverPreparingPhase] replay btc redeem transactions")
 	if s.ScalarClient == nil {
 		return fmt.Errorf("[Relayer] [processRecoverPreparingPhase] scalar client is undefined")
 	}
@@ -251,7 +258,7 @@ func (s *Service) replayBtcRedeemTxs(groupUid string) error {
 	redeemTxs := s.ScalarClient.PickCacheRedeemTx(groupUid, redeemSession.Session.Sequence)
 	log.Info().Any("redeemTxs", redeemTxs).Msgf("[Relayer] [replayBtcRedeemTxs] redeem txs in cache")
 	for chainId, redeemTxs := range redeemTxs {
-		err := s.ScalarClient.BroadcastRedeemTxsConfirmRequest(chainId, groupUid, redeemTxs)
+		err := s.ScalarClient.BroadcastRedeemTxsConfirmRequest(chainId, groupUid.String(), redeemTxs)
 		if err != nil {
 			return fmt.Errorf("[Relayer] [processRecoverPreparingPhase] cannot broadcast redeem txs confirm request for group %s", groupUid)
 		}
@@ -276,52 +283,50 @@ func (s *Service) waitingForPendingCommands(mapTxHashes map[string][]string) {
 	wg.Wait()
 
 }
-func (s *Service) replaySwitchPhaseEvents(mapSwitchPhaseEvents map[string][]*contracts.IScalarGatewaySwitchPhase, index int) (int32, int32, bool) {
-	wg := sync.WaitGroup{}
-	var hasDifferentPhase atomic.Bool
-	var expectedPhase atomic.Int32
-	var evmCounter atomic.Int32
-	expectedPhase.Store(-1)
 
-	for _, evmClient := range s.EvmClients {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			chainId := evmClient.EvmConfig.GetId()
-			switchPhaseEvents, ok := mapSwitchPhaseEvents[chainId]
-			if !ok || len(switchPhaseEvents) == 0 {
-				log.Warn().Msgf("[Relayer] [processRecoverPreparingPhase] cannot find redeem session for evm client %s", chainId)
-				return
-			}
-			if index >= len(switchPhaseEvents) {
-				log.Warn().Str("chainId", chainId).
-					Int("index", index).
-					Msgf("[Relayer] [processRecoverPreparingPhase] Switchphase event not found")
-				return
-			}
-			switchPhaseEvent := switchPhaseEvents[index]
-			expectedPhaseValue := expectedPhase.Load()
-			if expectedPhaseValue == -1 {
-				expectedPhase.Store(int32(switchPhaseEvent.To))
-			} else if expectedPhaseValue != int32(switchPhaseEvent.To) {
-				log.Warn().Msgf("[Relayer] [processRecoverPreparingPhase] found switch phase event with different phase")
-				hasDifferentPhase.Store(true)
-				return
-			}
-			err := evmClient.HandleSwitchPhase(switchPhaseEvent)
-			if err != nil {
-				log.Warn().Err(err).Msgf("[Relayer] [processRecoverPreparingPhase] cannot handle switch phase event for evm client %s", chainId)
-			} else {
-				evmCounter.Add(1)
-			}
-		}()
-	}
-	wg.Wait()
-	return expectedPhase.Load(), evmCounter.Load(), hasDifferentPhase.Load()
-}
-func (s *Service) Stop() {
-	log.Info().Msg("Relayer service stopped")
-}
+// func (s *Service) replaySwitchPhaseEvents(mapSwitchPhaseEvents map[string][]*contracts.IScalarGatewaySwitchPhase, index int) (int32, int32, bool) {
+// 	wg := sync.WaitGroup{}
+// 	var hasDifferentPhase atomic.Bool
+// 	var expectedPhase atomic.Int32
+// 	var evmCounter atomic.Int32
+// 	expectedPhase.Store(-1)
+
+//		for _, evmClient := range s.EvmClients {
+//			wg.Add(1)
+//			go func() {
+//				defer wg.Done()
+//				chainId := evmClient.EvmConfig.GetId()
+//				switchPhaseEvents, ok := mapSwitchPhaseEvents[chainId]
+//				if !ok || len(switchPhaseEvents) == 0 {
+//					log.Warn().Msgf("[Relayer] [processRecoverPreparingPhase] cannot find redeem session for evm client %s", chainId)
+//					return
+//				}
+//				if index >= len(switchPhaseEvents) {
+//					log.Warn().Str("chainId", chainId).
+//						Int("index", index).
+//						Msgf("[Relayer] [processRecoverPreparingPhase] Switchphase event not found")
+//					return
+//				}
+//				switchPhaseEvent := switchPhaseEvents[index]
+//				expectedPhaseValue := expectedPhase.Load()
+//				if expectedPhaseValue == -1 {
+//					expectedPhase.Store(int32(switchPhaseEvent.To))
+//				} else if expectedPhaseValue != int32(switchPhaseEvent.To) {
+//					log.Warn().Msgf("[Relayer] [processRecoverPreparingPhase] found switch phase event with different phase")
+//					hasDifferentPhase.Store(true)
+//					return
+//				}
+//				err := evmClient.HandleSwitchPhase(switchPhaseEvent)
+//				if err != nil {
+//					log.Warn().Err(err).Msgf("[Relayer] [processRecoverPreparingPhase] cannot handle switch phase event for evm client %s", chainId)
+//				} else {
+//					evmCounter.Add(1)
+//				}
+//			}()
+//		}
+//		wg.Wait()
+//		return expectedPhase.Load(), evmCounter.Load(), hasDifferentPhase.Load()
+//	}
 
 //	func (s *Service) replayRedeemTransactions(groupUid string, mapRedeemTokenEvents map[string][]*contracts.IScalarGatewayRedeemToken) (map[string][]string, error) {
 //		if s.ScalarClient == nil {
