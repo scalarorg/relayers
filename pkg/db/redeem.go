@@ -18,7 +18,7 @@ import (
 func (db *DatabaseAdapter) GetEvmLastRedeemTx() (*relayer.EvmRedeemTx, error) {
 	var redeemTxBlock relayer.EvmRedeemTx
 	query := `
-			SELECT * FROM evm_redeem_txes ORDER BY block_number DESC, log_index DESC LIMIT 1
+			SELECT * FROM evm_redeem_txes WHERE deleted_at is null ORDER BY block_number DESC, log_index DESC LIMIT 1
 		`
 	err := db.RelayerClient.Raw(query).Scan(&redeemTxBlock).Error
 	if err != nil {
@@ -53,6 +53,7 @@ func (db *DatabaseAdapter) GetRedeemTokenEventsByGroupAndSequence(groupUid strin
 		SELECT * FROM evm_redeem_txes
 		WHERE custodian_group_uid = $1
 		AND session_sequence = $2
+		AND deleted_at is null
 		ORDER BY block_number ASC, log_index ASC
 	`
 	err := db.IndexerClient.Raw(query, groupUid, sessionSequence).Scan(&redeemTxs).Error
@@ -67,10 +68,11 @@ func (db *DatabaseAdapter) FindPoolRedeemTxsInLastSession(custodianGroupUid stri
 		SELECT * FROM evm_redeem_txes
 		WHERE session_sequence = (
 			SELECT max(session_sequence) FROM evm_redeem_txes
-			WHERE custodian_group_uid = $1
-		) and (block_number > $2 or (block_number = $2 and log_index > $3))
+			WHERE custodian_group_uid = $1 and deleted_at is null
+		) and deleted_at is null and (block_number > $2 or (block_number = $2 and log_index > $3))
 		LIMIT $4
 	`
+
 	err := db.IndexerClient.Raw(query, custodianGroupUid, lastRedeemBlock, lastRedeemLogIndex, limit).Scan(&redeemTxs).Error
 	if err != nil {
 		return nil, err

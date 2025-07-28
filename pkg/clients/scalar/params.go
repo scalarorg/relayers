@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/rs/zerolog/log"
-	utils "github.com/scalarorg/bitcoin-vault/go-utils/types"
+	utils "github.com/scalarorg/go-common/types"
 	"github.com/scalarorg/relayers/pkg/types"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"
 	protypes "github.com/scalarorg/scalar-core/x/protocol/types"

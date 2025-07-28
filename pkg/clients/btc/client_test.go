@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	utils "github.com/scalarorg/bitcoin-vault/go-utils/types"
+	utils "github.com/scalarorg/go-common/types"
 	"github.com/scalarorg/relayers/config"
 	"github.com/scalarorg/relayers/pkg/clients/btc"
 	"github.com/scalarorg/relayers/pkg/db"

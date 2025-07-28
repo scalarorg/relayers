@@ -10,8 +10,8 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/psbt"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/scalarorg/bitcoin-vault/ffi/go-vault"
-	"github.com/scalarorg/bitcoin-vault/go-utils/types"
+	vault "github.com/scalarorg/bitcoin-vault/ffi/go"
+	"github.com/scalarorg/go-common/types"
 	"github.com/stretchr/testify/require"
 )
 

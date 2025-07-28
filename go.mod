@@ -14,9 +14,9 @@ require (
 	github.com/gogo/protobuf v1.3.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/rs/zerolog v1.33.0
-	github.com/scalarorg/bitcoin-vault/ffi/go-vault v0.0.0-20250426033010-eb69d1a47edd
-	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250426033010-eb69d1a47edd
+	github.com/scalarorg/bitcoin-vault/ffi/go v0.0.0-20250725050416-5864256ff7b1
 	github.com/scalarorg/data-models v0.0.0-20250724093838-e53369f46afd
+	github.com/scalarorg/go-common v0.0.0-20250728085152-57a48a6aa32a
 	github.com/scalarorg/scalar-core v0.0.1-staking.0.20250619074652-c40229f8b953
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
@@ -52,6 +52,7 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/influxdata/line-protocol v0.0.0-20210311194329-9aa0e372d097 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
+	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250426033010-eb69d1a47edd // indirect
 	github.com/supranational/blst v0.3.14 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
@@ -131,7 +132,7 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/flatbuffers v24.12.23+incompatible // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect

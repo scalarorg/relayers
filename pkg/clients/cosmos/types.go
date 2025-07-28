@@ -1,6 +1,6 @@
 package cosmos
 
-import "github.com/scalarorg/bitcoin-vault/go-utils/types"
+import "github.com/scalarorg/go-common/types"
 
 const (
 	DEFAULT_GAS_ADJUSTMENT = 1.2

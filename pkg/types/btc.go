@@ -1,8 +1,8 @@
 package types
 
 import (
-	"github.com/scalarorg/bitcoin-vault/go-utils/types"
 	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/go-common/types"
 )
 
 type BtcTransaction struct {

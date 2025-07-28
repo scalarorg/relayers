@@ -12,9 +12,9 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/bitcoin-vault/go-utils/encode"
-	utiltypes "github.com/scalarorg/bitcoin-vault/go-utils/types"
 	"github.com/scalarorg/data-models/scalarnet"
+	encode "github.com/scalarorg/go-common/encode"
+	utiltypes "github.com/scalarorg/go-common/types"
 	"github.com/scalarorg/relayers/pkg/types"
 	"github.com/scalarorg/relayers/pkg/utils"
 	chainstypes "github.com/scalarorg/scalar-core/x/chains/types"

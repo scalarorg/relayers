@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil/psbt"
-	"github.com/scalarorg/bitcoin-vault/go-utils/btc"
-	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
-	"github.com/scalarorg/bitcoin-vault/go-utils/types"
+	"github.com/scalarorg/go-common/btc"
+	"github.com/scalarorg/go-common/chain"
+	"github.com/scalarorg/go-common/types"
 )
 
 func NormalizeHash(hash string) string {

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	chainTypes "github.com/scalarorg/bitcoin-vault/go-utils/chain"
 	chains "github.com/scalarorg/data-models/chains"
+	chainTypes "github.com/scalarorg/go-common/chain"
 	contracts "github.com/scalarorg/relayers/pkg/clients/evm/contracts/generated"
 	"github.com/scalarorg/relayers/pkg/utils"
 )

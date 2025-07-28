@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/scalarorg/bitcoin-vault/go-utils/btc"
-	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
-	"github.com/scalarorg/bitcoin-vault/go-utils/types"
+	"github.com/scalarorg/go-common/btc"
+	"github.com/scalarorg/go-common/chain"
+	"github.com/scalarorg/go-common/types"
 	"github.com/scalarorg/relayers/pkg/utils"
 	"github.com/stretchr/testify/require"
 )

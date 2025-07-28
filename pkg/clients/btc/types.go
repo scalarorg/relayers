@@ -1,7 +1,7 @@
 package btc
 
 import (
-	"github.com/scalarorg/bitcoin-vault/go-utils/types"
+	"github.com/scalarorg/go-common/types"
 	"github.com/scalarorg/relayers/pkg/clients/evm"
 )
 

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/bitcoin-vault/go-utils/encode"
+	"github.com/scalarorg/go-common/encode"
 )
 
 func DecodeContractCallWithTokenPayload(payload []byte) (*encode.ContractCallWithTokenPayload, error) {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	vault "github.com/scalarorg/bitcoin-vault/ffi/go-vault"
-	utils "github.com/scalarorg/bitcoin-vault/go-utils/types"
+	vault "github.com/scalarorg/bitcoin-vault/ffi/go"
+	utils "github.com/scalarorg/go-common/types"
 	"github.com/scalarorg/relayers/pkg/types"
 	covExported "github.com/scalarorg/scalar-core/x/covenant/exported"
 )

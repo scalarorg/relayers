@@ -81,6 +81,7 @@ func (b *BlockEvents) Add(msgTypeName string, msg proto.Message) {
 		b.switchPhaseStartedEvents = append(b.switchPhaseStartedEvents, msg.(*covtypes.SwitchPhaseStarted))
 	case EventTypeSwitchPhaseCompleted:
 		b.switchPhaseCompletedEvents = append(b.switchPhaseCompletedEvents, msg.(*covtypes.SwitchPhaseCompleted))
+
 	}
 }
 
@@ -107,21 +108,56 @@ func UnmarshalJson(jsonData map[string]string, e proto.Message) error {
 	switch e := e.(type) {
 	case *types.EventTokenSent:
 		return UnmarshalTokenSent(jsonData, e)
+	case *types.MintCommand:
+		return UnmarshalMintCommand(jsonData, e)
 	case *types.ContractCallApproved:
 		return UnmarshalContractCallApproved(jsonData, e)
 	case *types.EventContractCallWithMintApproved:
 		return UnmarshalContractCallWithMintApproved(jsonData, e)
+	case *types.EventRedeemTokenApproved:
+		return UnmarshalRedeemTokenApproved(jsonData, e)
 	case *types.CommandBatchSigned:
 		return UnmarshalCommandBatchSigned(jsonData, e)
 	case *types.ChainEventCompleted:
 		return UnmarshalChainEventCompleted(jsonData, e)
 	case *covtypes.SwitchPhaseStarted:
 		return UnmarshalSwitchPhaseStarted(jsonData, e)
+	case *covtypes.SwitchPhaseCompleted:
+		return UnmarshalSwitchPhaseCompleted(jsonData, e)
 	default:
 		return fmt.Errorf("unsupport type %T", e)
 	}
 }
-func UnamrshalAsset(jsonData string) (sdk.Coin, error) {
+
+func UnmarshalMintCommand(jsonData map[string]string, e *types.MintCommand) error {
+	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
+	transferId, ok := sdk.NewIntFromString(removeQuote(jsonData["transfer_id"]))
+	if ok {
+		e.TransferID = exported.TransferID(transferId.Uint64())
+	}
+	commandIDHex, err := DecodeIntArrayToHexString(jsonData["command_id"])
+	if err != nil {
+		log.Warn().Msgf("Failed to decode command ID: %v, error: %v", jsonData["command_id"], err)
+	}
+	e.CommandID, _ = types.HexToCommandID(commandIDHex)
+	e.Asset, _ = UnmarshalAsset(removeQuote(jsonData["asset"]))
+	e.DestinationAddress = removeQuote(jsonData["destination_address"])
+	e.DestinationChain = exported.ChainName(removeQuote(jsonData["destination_chain"]))
+	return nil
+}
+
+func UnmarshalSwitchPhaseCompleted(jsonData map[string]string, e *covtypes.SwitchPhaseCompleted) error {
+	e.Module = removeQuote(jsonData["module"])
+	sequence, err := strconv.ParseUint(removeQuote(jsonData["sequence"]), 10, 64)
+	if err != nil {
+		log.Warn().Msgf("Failed to decode sequence: %v, error: %v", jsonData["sequence"], err)
+	}
+	e.Sequence = sequence
+	e.Phase = covExported.Phase(covExported.Phase_value[removeQuote(jsonData["phase"])])
+	return nil
+}
+
+func UnmarshalAsset(jsonData string) (sdk.Coin, error) {
 	var rawCoin map[string]string
 	err := json.Unmarshal([]byte(jsonData), &rawCoin)
 	if err != nil {
@@ -149,7 +185,7 @@ func UnmarshalTokenSent(jsonData map[string]string, e *types.EventTokenSent) err
 	e.CommandID = removeQuote(jsonData["command_id"])
 	assetData, ok := jsonData["asset"]
 	if ok {
-		e.Asset, _ = UnamrshalAsset(assetData)
+		e.Asset, _ = UnmarshalAsset(assetData)
 	}
 	return nil
 }
@@ -219,7 +255,7 @@ func UnmarshalContractCallWithMintApproved(jsonData map[string]string, e *types.
 	e.PayloadHash = chainsExported.Hash(common.HexToHash(payloadHex))
 	assetData, ok := jsonData["asset"]
 	if ok {
-		e.Asset, _ = UnamrshalAsset(assetData)
+		e.Asset, _ = UnmarshalAsset(assetData)
 	}
 	log.Debug().Any("JsonData", jsonData).Msg("Input data")
 	log.Debug().Any("result", e).Msg("Resut data")
@@ -235,6 +271,23 @@ func UnmarshalCommandBatchSigned(jsonData map[string]string, e *types.CommandBat
 		return err
 	}
 	e.CommandBatchID = commandBatch
+	return nil
+}
+
+func UnmarshalRedeemTokenApproved(jsonData map[string]string, e *types.EventRedeemTokenApproved) error {
+	e.Chain = exported.ChainName(removeQuote(jsonData["chain"]))
+	eventId := utils.NormalizeHash(removeQuote(jsonData["event_id"]))
+	e.EventID = types.EventID(eventId)
+	commandIDHex, err := DecodeIntArrayToHexString(jsonData["command_id"])
+	if err != nil {
+		log.Warn().Msgf("Failed to decode command ID: %v, error: %v", jsonData["command_id"], err)
+	}
+	e.CommandID, _ = types.HexToCommandID(commandIDHex)
+	e.Sender = removeQuote(jsonData["sender"])
+	e.DestinationChain = exported.ChainName(removeQuote(jsonData["destination_chain"]))
+	e.Asset, _ = UnmarshalAsset(removeQuote(jsonData["asset"]))
+	e.PayloadHash = chainsExported.Hash(common.HexToHash(removeQuote(jsonData["payload_hash"])))
+	e.ContractAddress = removeQuote(jsonData["contract_address"])
 	return nil
 }
 

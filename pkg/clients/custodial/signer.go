@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/scalarorg/bitcoin-vault/ffi/go-vault"
-	"github.com/scalarorg/bitcoin-vault/go-utils/types"
+	vault "github.com/scalarorg/bitcoin-vault/ffi/go"
+	"github.com/scalarorg/go-common/types"
 )
 
 func (c *Client) SignPsbt(inputBytes []byte, privateKey string, finalize bool) ([]byte, error) {
